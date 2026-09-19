@@ -1,7 +1,7 @@
 # State — Orchestration 1
 
 Plan status: **approved by the user on 2026-09-19**.
-Execution status: **wave 2 complete; wave 3 starting**.
+Execution status: **wave 3 complete; wave 4 starting**.
 Purpose: create the master plan only; later implementation wave plans are separate.
 Last updated: 2026-09-19.
 Resume from [EXECUTION_PLAN_1.md](EXECUTION_PLAN_1.md); prompt is [PROMPT_TEMPLATE_1.md](PROMPT_TEMPLATE_1.md).
@@ -39,7 +39,7 @@ No numerical pass results or tolerances have been established.
 | 2 | 1.2.1 | Design numerical core and memory contracts | done | gpt-5.6-luna | `dae1e3d` |
 | 2 | 1.2.2 | Design API, legacy I/O, and host boundaries | done | gpt-5.6-luna | `5a72a4b` |
 | 2 | 1.2.3 | Specify validation and performance evidence | done | gpt-5.6-luna | `c61da69` |
-| 3 | 1.3.1 | Build roadmap, risks, and requirement traceability | pending | — | — |
+| 3 | 1.3.1 | Build roadmap, risks, and requirement traceability | done | gpt-5.6-luna | `d433c0f` |
 | 4 | 1.4.1 | Assemble the master implementation plan | pending | — | — |
 | 5 | 1.5.1 | Review master-plan scientific and scope coverage | pending | — | — |
 | 5 | 1.5.2 | Review master-plan architecture and execution readiness | pending | — | — |
@@ -78,6 +78,9 @@ Done. API_AND_IO.md (1–111), task TODO. Core, legacy adapters, five hosts and 
 Done. VALIDATION_STRATEGY.md (1–91), task TODO. Oracle, five scenarios, tolerances, properties and performance gates specified; exact targeted check passed. Deviations: none. No fixture, numerical result or golden output exists.
 
 Wave 2 integration: three targeted checks passed; six support documents checked for headings, links and whitespace; `git diff --check` clean.
+
+### 1.3.1
+Done after one substantive verification retry. ROADMAP_AND_RISKS.md (1–140), task TODO. Initial draft grouped atomic prompt requirements and left first water variants vague; revised table maps prompt items and names iModel=0, boundaries, root/fixture gate. Both targeted checks and whitespace passed; no implementation artifacts. Commit `d433c0f`.
 
 ## Plan amendments and escalations
 
