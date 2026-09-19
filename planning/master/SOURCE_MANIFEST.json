@@ -1,0 +1,16 @@
+{
+  "src_reference/HYDRUS.FOR": "fca01114a773b0ec9d614d17ed493a008bac82f23d22a187a10a4d4f48fbf3a9",
+  "src_reference/HYSTER.FOR": "29e4818a3b8c58a6698257a4ac4fa9df439ed43e983271423c7877a9cd9d8a67",
+  "src_reference/INPUT.FOR": "d29d073ac40611b9991f77416edcdbcf8d0affe01330675e5a08f66db1f52411",
+  "src_reference/MATERIAL.FOR": "a2a2beb4cd986946c6a0b61e31d92de9e776d9d4d9e3ee9bf9ccee1cbcb698ca",
+  "src_reference/OUTPUT.FOR": "66bed77a0375f2561c39e2d93d6e9765980dae8abdb48cd0a68c163e6a031f80",
+  "src_reference/SINK.FOR": "95afb5f6ae99e03478a08641e9bea77451f7beda7f0c3460fd12af3a36e7901f",
+  "src_reference/SOLUTE.FOR": "81fed6adbbd18aabe53385151166ab36d0df504a7939b54e10460c2254488910",
+  "src_reference/TEMPER.FOR": "ac7ff3fb20283b50265af65445413da0dd7d3dad814679c147c9acd0a8fc2ad3",
+  "src_reference/TIME.FOR": "8b6af595a1ccb3952cfa7b1eb56c0e37a1cfc6b8d55e26d8907288c41f08b92f",
+  "src_reference/WATFLOW.FOR": "e5591cebae4cbb44e8fe07520e08fc98c1522531c67753c0cc03fe2e164b5ef9",
+  "planning/H1D_Src.zip": "d0c47cbcb7a298ab16c6e08010bd7ca048d5527ce2f989a749390c0c55e848cf",
+  "planning/reference/HYDRUS1D-4.08.pdf": "20c29f1bb6d0567cb5f63a725a877c9d5aa277ed284a6255c718730f0fc03847",
+  "planning/reference/HYDRUS1D-4.17.pdf": "286f4aedaf30064fbc723aba3f0e7f9e9b45c1ed933b04b184888a8bd9462755",
+  "planning/reference/Simunek et al., VZJ - 2008, Hydrus and Stanmod models.pdf": "22fafeae5e3a857f8fe6fb34f8b332ae1adb2b642af60298be4f65ef36e3c1bd"
+}
