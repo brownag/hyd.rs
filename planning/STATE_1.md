@@ -1,7 +1,7 @@
 # State — Orchestration 1
 
 Plan status: **approved by the user on 2026-09-19**.
-Execution status: **preflight complete; wave 1 starting**.
+Execution status: **wave 1 complete; wave 2 starting**.
 Purpose: create the master plan only; later implementation wave plans are separate.
 Last updated: 2026-09-19.
 Resume from [EXECUTION_PLAN_1.md](EXECUTION_PLAN_1.md); prompt is [PROMPT_TEMPLATE_1.md](PROMPT_TEMPLATE_1.md).
@@ -33,9 +33,9 @@ No numerical pass results or tolerances have been established.
 
 | Wave | Task | Deliverable | Status | Model | Commit |
 | --- | --- | --- | --- | --- | --- |
-| 1 | 1.1.1 | Inventory source and provenance | pending | — | — |
-| 1 | 1.1.2 | Trace lifecycle, calls, and owned state | pending | — | — |
-| 1 | 1.1.3 | Map physics and feature coverage | pending | — | — |
+| 1 | 1.1.1 | Inventory source and provenance | done | gpt-5.6-luna | `a7d9f20` |
+| 1 | 1.1.2 | Trace lifecycle, calls, and owned state | done | gpt-5.6-luna | `475101c` |
+| 1 | 1.1.3 | Map physics and feature coverage | done | gpt-5.6-luna | `b485eea` |
 | 2 | 1.2.1 | Design numerical core and memory contracts | pending | — | — |
 | 2 | 1.2.2 | Design API, legacy I/O, and host boundaries | pending | — | — |
 | 2 | 1.2.3 | Specify validation and performance evidence | pending | — | — |
@@ -56,7 +56,17 @@ Known original inputs remain immutable during worker execution.
 
 ## Task reports
 
-<!-- Orchestrator appends each completed report under its task ID, at most 15 lines. -->
+
+### 1.1.1
+Done. SOURCE_AUDIT.md (1–71), SOURCE_MANIFEST.json (1–16), task TODO (1–30). Source inventory covers ten files and declared routines; 10/10 archive members match. Section/whitespace and 14-asset hash checks passed. Deviations: none. Provenance, MSFLIB and TIME logical blocker remain explicit gaps.
+
+### 1.1.2
+Done. STATE_AND_CALLS.md (1–74), task TODO (1–22). Lifecycle/call/state audit covers ten files, three COMMON blocks and rollback obligations. Section/whitespace check passed. Deviations: none. Retry side effects and platform edges remain future investigations.
+
+### 1.1.3
+Done. FEATURE_MATRIX.md (1–61), task TODO (1–23). Capability rows distinguish observed/rejected/uncertain modes from roadmap choices; dual porosity remains required later. Section/whitespace check passed. Deviations: none. Optional scope remains a user gate.
+
+Wave 1 integration: targeted checks passed; local Markdown links/whitespace checked for 6 documents; `git diff --check` clean. No numerical tests exist.
 
 ## Plan amendments and escalations
 
