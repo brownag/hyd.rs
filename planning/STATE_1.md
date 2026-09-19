@@ -1,7 +1,7 @@
 # State — Orchestration 1
 
 Plan status: **approved by the user on 2026-09-19**.
-Execution status: **wave 1 complete; wave 2 starting**.
+Execution status: **wave 2 complete; wave 3 starting**.
 Purpose: create the master plan only; later implementation wave plans are separate.
 Last updated: 2026-09-19.
 Resume from [EXECUTION_PLAN_1.md](EXECUTION_PLAN_1.md); prompt is [PROMPT_TEMPLATE_1.md](PROMPT_TEMPLATE_1.md).
@@ -36,9 +36,9 @@ No numerical pass results or tolerances have been established.
 | 1 | 1.1.1 | Inventory source and provenance | done | gpt-5.6-luna | `a7d9f20` |
 | 1 | 1.1.2 | Trace lifecycle, calls, and owned state | done | gpt-5.6-luna | `475101c` |
 | 1 | 1.1.3 | Map physics and feature coverage | done | gpt-5.6-luna | `b485eea` |
-| 2 | 1.2.1 | Design numerical core and memory contracts | pending | — | — |
-| 2 | 1.2.2 | Design API, legacy I/O, and host boundaries | pending | — | — |
-| 2 | 1.2.3 | Specify validation and performance evidence | pending | — | — |
+| 2 | 1.2.1 | Design numerical core and memory contracts | done | gpt-5.6-luna | `dae1e3d` |
+| 2 | 1.2.2 | Design API, legacy I/O, and host boundaries | done | gpt-5.6-luna | `5a72a4b` |
+| 2 | 1.2.3 | Specify validation and performance evidence | done | gpt-5.6-luna | `c61da69` |
 | 3 | 1.3.1 | Build roadmap, risks, and requirement traceability | pending | — | — |
 | 4 | 1.4.1 | Assemble the master implementation plan | pending | — | — |
 | 5 | 1.5.1 | Review master-plan scientific and scope coverage | pending | — | — |
@@ -67,6 +67,17 @@ Done. STATE_AND_CALLS.md (1–74), task TODO (1–22). Lifecycle/call/state audi
 Done. FEATURE_MATRIX.md (1–61), task TODO (1–23). Capability rows distinguish observed/rejected/uncertain modes from roadmap choices; dual porosity remains required later. Section/whitespace check passed. Deviations: none. Optional scope remains a user gate.
 
 Wave 1 integration: targeted checks passed; local Markdown links/whitespace checked for 6 documents; `git diff --check` clean. No numerical tests exist.
+
+### 1.2.1
+Done. NUMERICAL_DESIGN.md (1–109), task TODO. Source stencil, solver/pivot, retry, balance, precision and zero-allocation boundaries designed; exact targeted headings/whitespace check passed. Deviations: none. FE terminology and mixed-precision calibration remain future gates.
+
+### 1.2.2
+Done. API_AND_IO.md (1–111), task TODO. Core, legacy adapters, five hosts and five formats specified with provisional release priorities; exact targeted check passed. Deviations: none. Host/platform choices remain user gates.
+
+### 1.2.3
+Done. VALIDATION_STRATEGY.md (1–91), task TODO. Oracle, five scenarios, tolerances, properties and performance gates specified; exact targeted check passed. Deviations: none. No fixture, numerical result or golden output exists.
+
+Wave 2 integration: three targeted checks passed; six support documents checked for headings, links and whitespace; `git diff --check` clean.
 
 ## Plan amendments and escalations
 
