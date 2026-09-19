@@ -1,12 +1,12 @@
 # State — Orchestration 1
 
 Plan status: **approved by the user on 2026-09-19**.
-Execution status: **not started**.
+Execution status: **preflight complete; wave 1 starting**.
 Purpose: create the master plan only; later implementation wave plans are separate.
 Last updated: 2026-09-19.
 Resume from [EXECUTION_PLAN_1.md](EXECUTION_PLAN_1.md); prompt is [PROMPT_TEMPLATE_1.md](PROMPT_TEMPLATE_1.md).
 Intended output: `planning/HYDRUS1D_RUST_PORT_PLAN.md` (not yet created).
-No worker task has been executed.
+No worker task has been executed yet.
 
 ## Baseline checklist
 
@@ -19,11 +19,11 @@ No worker task has been executed.
 - [x] Identify Python 3 and pdftotext for document work.
 - [x] Review the draft independently for spec and orchestration standards; resolve findings in PLAN_REVIEW_1.md.
 - [x] Obtain user approval of the numbered planning-only orchestration (2026-09-19: “this looks good”).
-- [ ] Recheck filesystem/Git/conventions for new user changes.
-- [ ] Create explicit local baseline commit on docs/master-plan, before isolated worktrees.
-- [ ] Record baseline commit ID and immutable asset hashes here.
-- [ ] Configure local scratch exclusion and per-task isolated worktrees.
-- [ ] Run/record initial documentation scope/link checks.
+- [x] Recheck filesystem/Git/conventions for new user changes; license commit f99e74a predates this run, no AGENTS.md found.
+- [x] Create explicit local baseline commit on docs/master-plan, before isolated worktrees.
+- [x] Record baseline commit ID and immutable asset hashes here. Baseline: `238b0ab56c14768b50a484926eb5f03591413db5`; source archive SHA-256 `d0c47cbcb7a298ab16c6e08010bd7ca048d5527ce2f989a749390c0c55e848cf`; original sources and PDFs are committed.
+- [x] Configure local scratch exclusion; isolated worktrees are created per task.
+- [x] Run/record initial documentation scope/link checks (existing plan artifacts only).
 
 Scientific baseline: **unavailable; not a gate for this document orchestration**.
 Future implementation baseline: harness/bootstrap tasks may establish the reproducible minimally patched oracle + provenance-backed fixtures; dependent numerical port tasks and parity acceptance must wait for that baseline. Drafting later wave plans may proceed before it exists.
