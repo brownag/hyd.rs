@@ -1,193 +1,103 @@
-# HYDRUS-1D Rust port: master implementation plan
+# HYDRUS-1D Rust port: sequential master plan
 
-## Goal and scope
+## Purpose and use
 
-This document is the technical blueprint for a future Rust port of the selected scientific subset of the supplied HYDRUS source snapshot. It seeds later implementation wave plans and authorizes no implementation by itself. The compatibility reference is the hash-pinned supplied snapshot, described as 4.08 or a derivative; the exact release identity is unverified. The 4.08 manual is the primary companion, while 4.17 is comparative only. No numerical baseline or verified parity result exists.
+This is the authoritative sequence for the Rust port. It is not an implementation plan itself. Build one subsequent plan at a time, beginning with Phase 0. A later phase is not planned in executable detail until the preceding phase has produced and reviewed its exit evidence.
 
-The confirmed first acceptance is single-domain water flow with atmospheric boundaries and root water uptake. Solute and heat follow later; hysteresis follows first water acceptance; dual porosity remains required after simpler physics. Optional density, vapor/energy, snow/interception, colloid/bacteria, inverse, special chemistry, alternate hydraulic families, and host/format priorities remain decision gates.
+The documents in `planning/master/` are reference documents for individual phases. They record audit evidence and design decisions; they do not create competing execution sequences. A subsequent plan should read this document first, then only the phase references named below.
 
-## Decisions and open gates
+The compatibility reference is the supplied, hash-pinned Fortran snapshot, described as HYDRUS-1D 4.08 or a derivative. Its exact release identity is unverified. The 4.08 manual is the primary documentation companion and the 4.17 manual is comparative only. No working oracle, input deck, golden output, numerical baseline, parity result, tolerance, or performance result exists yet.
 
-Confirmed decisions are the hash-pinned snapshot, water-first milestone, later solute/heat, later hysteresis, and required later dual porosity. Technical recommendations are: preserve the observed `Reset` half-cell stencil while reconciling its finite-difference label with manual finite-element terminology; begin with `iModel=0` van Genuchten; use a small preallocated tridiagonal kernel; retain a mixed-precision compatibility mode before considering all-`f64`; and make nonconvergence strict by default.
+## Rules for every subsequent plan
 
-Open gates are the verified release label, oracle portability/compiler, exact supported boundary combinations, alternate hydraulic and optional branch scope, precision modernization, linear algebra dependency, artifact terms, and host/serialization priorities. Each gate has an owner and milestone in [the roadmap and risk register](master/ROADMAP_AND_RISKS.md).
+1. Plan only the next incomplete phase in the sequence below.
+2. State its entry evidence, concrete outputs, checks, and exit evidence before implementation begins.
+3. Use the named reference documents for that phase; do not reopen settled scope without evidence.
+4. Record any changed technical recommendation or new user decision in the new plan and its state record.
+5. Do not claim a numerical result, fixture, release compatibility, or performance result before its producer phase has created and reviewed the evidence.
+6. Do not widen the first water acceptance to include solute, heat, hysteresis, dual porosity, or optional physics.
 
-## Source audit
+## Confirmed scope and decision gates
 
-The snapshot has ten fixed-form Fortran files and 11,053 lines. `HYDRUS.FOR` owns process setup, initialization, the coupled time loop, output and teardown. `INPUT.FOR` reads configuration and generates tables; `MATERIAL.FOR` evaluates hydraulic curves; `WATFLOW.FOR` assembles and solves water flow; `TIME.FOR` drives events and meteorology; `SINK.FOR` handles roots; `SOLUTE.FOR`, `TEMPER.FOR`, and `OUTPUT.FOR` provide later transport, heat and accounting. `HYSTER.FOR` stores hysteresis history.
+The first accepted product is single-domain water flow with atmospheric boundaries and root water uptake. Solute and heat come later. Hysteresis comes after the first water acceptance. Dual porosity remains required after the simpler physics is validated; it is distinct from the source snapshot's rejected dual-permeability selector.
 
-The lifecycle is initialization → input/profile/material/table setup → forcing and sink update → `WatFlow` trial/Picard solve (`SetMat`, `Reset`, `Shift`, `Gauss`) → optional velocity/heat/solute → balances/output → `Update` commit → event-aligned next step. The source shows trial iteration and accepted-state promotion, plus a main-loop nonconvergence counter and termination after repeated failure; it does not by itself establish complete coupled rollback semantics for every rejected step. Restoring trial state, reducing `dt`, and transactionally snapshotting all coupled fields are proposed port design obligations, to be proven by M3. Main arrays and three COMMON blocks mean state is broader than COMMON alone; DATA/static lifetime assumptions require explicit ownership in the port.
+Before the relevant phase starts, the user must decide or review these gates: the compatibility release label after provenance work; the initial supported host and legacy/schema format subset before adapter work; selected optional physics; and any all-`f64` modernization after a precision-drift study. The default recommendation is source-compatible mixed precision first, with strict typed failures for nonconvergence.
 
-The source audit records every routine, file unit, platform dependency, hash and provenance gap in [SOURCE_AUDIT.md](master/SOURCE_AUDIT.md) and [SOURCE_MANIFEST.json](master/SOURCE_MANIFEST.json). Known unmodified syntax blockers are missing `msflib.mod` and `TIME.FOR:551` scalar-logical semantics. A future isolated portability patch must record patch/compiler/executable hashes; it must not alter the originals or claim a working oracle.
+## Sequential phase plan
 
-## Architecture
+| Phase | The next plan must accomplish | Entry evidence | Exit evidence before planning the next phase | Reference documents |
+|---|---|---|---|---|
+| 0. Oracle and provenance | Create an isolated, minimally patched copy of the reference source; establish reproducible build/run provenance and fixture acquisition rules. | Pinned archive/source hashes; known `MSFLIB` and `TIME.FOR:551` blockers. | Patch, compiler, flags, executable, input/output and environment recorded; a reviewed run policy; no parity claim merely because the harness builds. | [SOURCE_AUDIT.md](master/SOURCE_AUDIT.md), [STATE_AND_CALLS.md](master/STATE_AND_CALLS.md), [VALIDATION_STRATEGY.md](master/VALIDATION_STRATEGY.md) |
+| 1. Hydraulic foundation | Implement and validate the first hydraulic path: `iModel=0` van Genuchten values, derivatives, domains and table behavior. | Phase 0 provenance process and curve source anchors. | Pointwise/property evidence, invalid-selector behavior, and a decision on the next hydraulic family or table scope. | [FEATURE_MATRIX.md](master/FEATURE_MATRIX.md), [NUMERICAL_DESIGN.md](master/NUMERICAL_DESIGN.md), [VALIDATION_STRATEGY.md](master/VALIDATION_STRATEGY.md) |
+| 2. Mesh and source stencil | Define checked mesh/profile inputs, one-based conversion, layer metrics, inclination, face averaging and the observed `Reset` stencil. | Phase 1 hydraulic contract. | A source-algebra versus manual terminology reconciliation and a reviewed mesh/stencil fixture. | [STATE_AND_CALLS.md](master/STATE_AND_CALLS.md), [NUMERICAL_DESIGN.md](master/NUMERICAL_DESIGN.md) |
+| 3. Water solver transaction | Build the Picard solver, boundary-aware tridiagonal assembly, event-aligned stepping, diagnostics, balances, and accepted/trial state handling. | Phase 2 mesh/stencil evidence. | Pivot, retry, rollback, allocation, and water-balance checks. Complete rollback is a port contract to prove; it is not assumed legacy behavior. | [NUMERICAL_DESIGN.md](master/NUMERICAL_DESIGN.md), [STATE_AND_CALLS.md](master/STATE_AND_CALLS.md), [VALIDATION_STRATEGY.md](master/VALIDATION_STRATEGY.md) |
+| 4. First water acceptance | Add the minimum atmospheric/root product and accept it only against the specified water fixtures. | Phase 3 accepted water solver and Phase 0 provenance process. | `iModel=0`; atmospheric precipitation/evaporation, ponding and switching; supported fixed-head/flux and lower fixed-head/prescribed-flux/free-drainage boundaries; Feddes or S-shaped stress with compensation; dry-column, capillary-rise, and cyclic atmosphere/root fixture evidence; explicit unsupported-combination errors. | [FEATURE_MATRIX.md](master/FEATURE_MATRIX.md), [API_AND_IO.md](master/API_AND_IO.md), [VALIDATION_STRATEGY.md](master/VALIDATION_STRATEGY.md) |
+| 5. Solute transport | Add advection/dispersion, species/reactions, sorption, and nonequilibrium transfer after water behavior is accepted. | Phase 4 water state and a solute fixture/provenance plan. | Solute balance and concentration evidence for each selected reaction/transfer combination. | [FEATURE_MATRIX.md](master/FEATURE_MATRIX.md), [NUMERICAL_DESIGN.md](master/NUMERICAL_DESIGN.md), [VALIDATION_STRATEGY.md](master/VALIDATION_STRATEGY.md) |
+| 6. Heat and temperature coupling | Add heat transport and temperature-dependent behavior; add vapor/energy only if its scope gate is accepted. | Phase 4 water behavior and heat fixture/provenance plan. | Heat/coupling balance evidence and a decision on vapor/energy scope. | [FEATURE_MATRIX.md](master/FEATURE_MATRIX.md), [NUMERICAL_DESIGN.md](master/NUMERICAL_DESIGN.md), [VALIDATION_STRATEGY.md](master/VALIDATION_STRATEGY.md) |
+| 7. Hysteresis | Add reversal history and drainage/imbibition behavior after the first water product. | Phase 4 transactional state contract and hysteresis fixture plan. | Reversal-history rollback evidence and drainage/imbibition validation. | [FEATURE_MATRIX.md](master/FEATURE_MATRIX.md), [STATE_AND_CALLS.md](master/STATE_AND_CALLS.md), [NUMERICAL_DESIGN.md](master/NUMERICAL_DESIGN.md) |
+| 8. Dual porosity | Add mobile/immobile water and exchange after validated single-domain behavior. | Phase 4 state contract plus an exchange/balance fixture plan. | Mobile/immobile balance, rollback, and transfer evidence. Never substitute rejected dual permeability. | [FEATURE_MATRIX.md](master/FEATURE_MATRIX.md), [STATE_AND_CALLS.md](master/STATE_AND_CALLS.md), [NUMERICAL_DESIGN.md](master/NUMERICAL_DESIGN.md) |
+| 9. Selected optional capabilities and adapters | Add only user-selected optional physics, serialization formats, or host bindings. | Explicit user scope decision and a capability-specific fixture or adapter contract. | The selected capability's scientific/host evidence, typed unsupported behavior, and supported-platform record. | [FEATURE_MATRIX.md](master/FEATURE_MATRIX.md), [API_AND_IO.md](master/API_AND_IO.md), [VALIDATION_STRATEGY.md](master/VALIDATION_STRATEGY.md) |
+| 10. Integration and release evidence | Complete legacy I/O, CLI, selected adapters, allocation/performance work, and release documentation for the supported set. | Evidence from each selected preceding phase. | Reproducible validation report, separate text-layout and scientific comparison results, allocation measurements, comparable benchmark results, and supported-platform statement. | [API_AND_IO.md](master/API_AND_IO.md), [VALIDATION_STRATEGY.md](master/VALIDATION_STRATEGY.md), [ROADMAP_AND_RISKS.md](master/ROADMAP_AND_RISKS.md) |
 
-```text
-legacy files / host forcing
-          |
-   hydrus-compat adapters ---> validated SimulationConfig + Forcing
-          |                                  |
-          +--------------------------> hydrus-core
-                                         |  Mesh + models
-                                         |  accepted/trial state
-                                         |  preallocated workspace
-                                         v
-                                  diagnostics + output events
-```
+## Phase-specific reference map
 
-The core owns no filesystem, process globals, or host handles. Immutable hydraulic models and configuration may be shared; each simulation owns mutable state and workspace. Independent simulations can run concurrently. The API design details boundaries and alternatives in [API_AND_IO.md](master/API_AND_IO.md), while [STATE_AND_CALLS.md](master/STATE_AND_CALLS.md) supplies the ownership evidence.
+The references above are deliberately narrow. Use this guide only when a phase needs a question answered outside its own scope.
 
-Proposed workspace/module layout (design only):
-
-```text
-hydrus-rs/
-  Cargo.toml                 # future workspace manifest
-  crates/
-    hydrus-core/             # config, mesh, hydraulics, solver, state, diagnostics
-    hydrus-compat/           # SELECTOR/ATMOSPH/PROFILE parsers and legacy writers
-    hydrus-cli/               # future command-line runner; depends on compat/core
-    hydrus-host/              # optional C/Python/R/Wasm boundary adapters
-    hydrus-validation/       # future fixture/oracle harness, never core runtime state
-```
-
-`hydrus-core` must remain filesystem-free and depend only on numerical primitives selected after benchmarking. `hydrus-compat` owns fixed-format text and file-unit translation. `hydrus-cli`, host bindings and validation are optional downstream crates; no Cargo files are created by this planning orchestration.
-
-## Rust interfaces
-
-Proposed signatures are illustrative Markdown, not implementation:
-
-```rust
-struct SimulationConfig { tolerances: Tolerances, capabilities: Capabilities, time: TimePolicy }
-struct Mesh1D { x: Vec<f64>, material: Vec<usize>, inclination: f64 }
-trait HydraulicModel: Send + Sync { /* theta, conductivity, capacity, derivatives */ }
-struct BoundaryConditions { upper: UpperBoundary, lower: LowerBoundary }
-struct SimulationState { accepted: Fields, trial: Fields, time: f64, history: History }
-struct MassBalanceTracker { input: f64, output: f64, storage: f64 }
-struct SimulationWorkspace { matrix: Tridiagonal, hydraulic: HydraulicScratch, snapshot: Snapshot }
-fn advance(state: &mut SimulationState, ws: &mut SimulationWorkspace,
-           request: StepRequest) -> Result<StepDiagnostics, StepError>;
-```
-
-Validation converts one-based legacy arrays to checked zero-based slices once. Units, coordinate orientation and flux signs are explicit in constructors. `Send + Sync` applies to immutable models and independent simulation values; one mutable simulation is exclusively borrowed during `advance`. Cancellation and host errors are reported at the boundary, never through global callbacks.
-
-## Numerical design
-
-`WATFLOW.FOR:Reset` uses half-cell boundary widths, arithmetic face conductivity by default, optional geometric averaging, gravity/inclination and storage terms. `Gauss` applies water-specific boundary rows and tiny-pivot replacement; `SOLUTE.FOR:BanSol` is a distinct tridiagonal elimination. The port should preserve these caller-specific transformations and use a reusable Thomas kernel only after assembly. The finite-difference/finite-element terminology discrepancy is an M2 algebraic reconciliation gate.
-
-Hydraulic values, derivatives, tables, interpolation endpoints and invalid domains are explicit model contracts. Start with `iModel=0` van Genuchten, then add alternate families and tables behind typed capability validation. A fixed-capacity workspace holds matrix diagonals, RHS, fields, residuals and all later module scratch. Allocation-free guarantees apply to hydraulic evaluation, assembly, Picard iterations, solve, retry and snapshot restore at fixed dimensions; setup/resizing and buffered output are outside that guarantee.
-
-The proposed port transaction is: align `dt` to forcing/print/final events; snapshot accepted coupled state; iterate hydraulics and boundary assembly; solve and test convergence; on success calculate balance, output, and commit all histories; on failure restore every coupled history and reduce `dt`, returning strict typed failure at `dtMin`. `WATFLOW.FOR:1079-1123` shows accepted-state promotion, but complete rollback and retry behavior are proposed design obligations, not verified legacy behavior. Future hysteresis reversal arrays, vapor/heat, solute/sorbed pools and dual-porosity mobile/immobile fields are part of the proposed snapshot. Full numerical contracts and alternatives are in [NUMERICAL_DESIGN.md](master/NUMERICAL_DESIGN.md).
-
-## I/O and host adapters
-
-`hydrus-compat` should parse `SELECTOR.IN`, `ATMOSPH.IN`, and `PROFILE.DAT`, and write canonical `NOD_INF.OUT`, `T_LEVEL.OUT`, and `BALANCE.OUT` records for comparison. The core receives validated in-memory forcing and emits typed diagnostics/events. JSON/YAML/TOML are proposed versioned schemas; GeoPackage and Arrow require dedicated adapters and are not automatic serde formats. Python, R, native Node, browser Wasm and C ABI boundaries remain provisional, with ownership/copying/error/thread rules documented in [API_AND_IO.md](master/API_AND_IO.md). No host or format is a release commitment.
-
-## Validation strategy
-
-M0 must create an isolated oracle harness with immutable inputs, timeout/completion checks, compiler/patch/fixture hashes, and no stale outputs. Missing input decks and expected results remain explicit gaps. The five requested scenarios are dry infiltration, capillary rise, cyclic atmosphere/root, nonequilibrium solute/degradation, and temperature-coupled heat. M4 requires dry-column, cyclic ponding/switching, and root-stress/compensation fixtures; M5/M6 add the later transport cases.
-
-| Scenario | Current provenance status | Proposed observables | Planned producer / review owner |
-|---|---|---|---|
-| Dry-column infiltration | No supplied deck or golden output; acquire a manual example or construct an independently labeled fixture | `h`, `theta`, surface flux, cumulative water balance, refinement response | M4.1 water-fixture producer / M4 acceptance owner |
-| Capillary rise / shallow water table | No supplied deck or golden output; recover from manual if possible, otherwise label independent construction | head/water-content profile, water-table position, steady flux and balance | M4.1 water-fixture producer / M4 acceptance owner |
-| Cyclic atmosphere/root | No supplied deck or golden output; source atmospheric behavior exists but fixture provenance is absent | event times, ponding/switching mode, evaporation/transpiration/root sink, `h`/`theta`, balance | M4.1 forcing/root producer / M4 acceptance owner |
-| Nonequilibrium solute/degradation | No supplied deck or baseline; construct only after water state and reaction schema exist | concentration profiles, mobile/immobile transfer, reaction mass, solute balance | M5.1 solute-fixture producer / M5 validation owner |
-| Temperature-coupled heat | No supplied deck or baseline; acquire/manual or independently label construction | temperature/vapor fields, heat flux, water/energy coupling and balance | M6.1 heat-fixture producer / M6 validation owner |
-
-These are proposed future artifacts, not official examples or existing baselines. M0.1 owns oracle/bootstrap provenance and M4.1 owns the three first-acceptance water fixtures; each producer records acquisition/construction source, expected observables, hashes and review evidence before its gate.
-
-Compare fields with per-variable absolute/relative criteria, L-infinity/L2/RMS diagnostics and a defined zero-denominator mass-balance rule. `1e-6` is only a candidate requiring calibration. Add curve derivative/property tests, conservation, analytical limits, mesh refinement, event/retry, interleaved/threaded state, allocation counting, and comparable Criterion/oracle performance experiments only after their producer milestones. Details and proposed future commands are in [VALIDATION_STRATEGY.md](master/VALIDATION_STRATEGY.md).
-
-## Risk registry
-
-| Risk | Owner | Mitigation / evidence | Gate and residual condition |
-|---|---|---|---|
-| Release identity and artifact terms are unverified | Provenance owner | Pin source/archive/PDF hashes; preserve notices; review each artifact | M0; no release parity or license claim until resolved |
-| No numerical baseline; source syntax blockers | Oracle owner | Isolated MSFLIB/logical portability patch, manifest compiler/flags/outputs | M0; tolerance work waits for reviewed baseline |
-| Manual FE terminology conflicts with `Reset` stencil | Numerical owner | Algebraic derivation and half-cell fixture; preserve observed source behavior | M2; unresolved equivalence remains user gate |
-| Mixed REAL/REAL*8 and `sngl` drift | Numerical/validation owner | Compatibility precision mode, f64 comparison and calibrated tolerances | M1/M3; no universal 1e-6 claim |
-| Boundary rows or tiny pivots fail | Solver owner | Caller-specific assembly, typed pivot diagnostics, singular fixtures | M3; strict failure behavior reviewed |
-| Rejected retries mutate coupled state | State owner | Accepted/trial twin buffers and transactional snapshot of histories, balances and modes | M3/M4; event/retry tests pass |
-| One-based indexing, signs, units and inclination are mishandled | Mesh/API owner | One-time checked conversion, dimensional/sign fixtures, explicit units | M2/M4; all supported boundaries covered |
-| State exists outside COMMON or relies on compiler lifetime | State migration owner | Audit main arrays/DATA, explicit per-simulation ownership, no globals | M3; static-lifetime assumptions resolved |
-| Inner-loop allocations reduce determinism/performance | Workspace owner | Fixed-capacity scratch, allocation counting, output outside solve | M3/M10; measured boundaries documented |
-| Optional branch combinations silently fall back | Feature owner | Capability matrix, typed unsupported errors, independent fixtures | M4 onward; every selected combination declared |
-| Platform APIs and file units are not portable | Host/I/O owner | Isolate MSFLIB, file-unit map, host cancellation/error contract | M0/M10; supported platforms explicitly gated |
-| Required later physics are omitted by subset selection | Roadmap owner | Dedicated solute/heat/hysteresis/dual-porosity milestones and traceability | Roadmap review; no silent deferral |
-| Host/format scope is overcommitted | API owner | Versioned schemas and provisional adapters; demand-based gates | M9/M10; user chooses release priorities |
-
-No risk is closed by a structural document check; each gate requires the evidence named above.
-
-## Implementation roadmap
-
-| Phase | Exact checklist and dependencies |
+| Question | Reference document |
 |---|---|
-| 0 Harness/oracle | [ ] preserve/hash inputs; [ ] isolate minimally patched oracle; [ ] record compiler/flags/patch/executable; [ ] run timeout/completion checks; [ ] review fixture provenance and baseline before parity claims. |
-| 1 Hydraulic curves | [ ] implement/test `iModel=0` values, derivatives and domains; [ ] generate/interpolate tables; [ ] test saturation/dry limits and invalid selectors; [ ] gate alternate families and tables with independent evidence. |
-| 2 Mesh/stencil | [ ] validate coordinates/layers/material indices; [ ] convert one-based inputs once; [ ] implement half-cell metrics, inclination and face averaging; [ ] compare algebra against manual/source fixture; [ ] review matrix coefficients. |
-| 3 Water solver | [ ] assemble boundary-aware rows; [ ] implement reusable tridiagonal kernel and pivot errors; [ ] implement Picard diagnostics; [ ] align events and adaptive retries; [ ] snapshot/restore all coupled state; [ ] calculate balances; [ ] validate dry infiltration/capillary cases. |
-| 4 Atmosphere/root | [ ] support `iModel=0`; [ ] support atmospheric rain/evaporation, ponding and switching; [ ] support fixed-head/flux upper modes; [ ] support lower fixed-head, prescribed-flux and free-drainage variants; [ ] test Feddes/S-shaped stress and compensation; [ ] pass dry-column, cyclic ponding/switching and root-stress fixtures; [ ] reject unsupported combinations. |
-| 5 Solute/heat | [ ] add solute advection/dispersion/reaction; [ ] add sorption and nonequilibrium transfer; [ ] add heat/temperature coupling; [ ] add vapor/energy only behind its scope gate; [ ] validate each balance and coupling order; [ ] keep all outside first acceptance. |
-| 6 I/O/polish | [ ] parse/write legacy formats; [ ] compare text layouts separately from science; [ ] add CLI and selected host adapters; [ ] count allocations; [ ] benchmark comparable work; [ ] document supported platforms and release evidence. |
-| Later required | [ ] add hysteresis reversal/rollback after M4; [ ] add mobile/immobile dual porosity after validated single-domain physics; [ ] keep dual permeability rejected; [ ] gate density, snow/interception, colloid/bacteria, inverse and special chemistry individually. |
+| What is actually in the supplied source, and what is its provenance? | [SOURCE_AUDIT.md](master/SOURCE_AUDIT.md) and [SOURCE_MANIFEST.json](master/SOURCE_MANIFEST.json) |
+| Where does state live, what calls what, and what must be transactional? | [STATE_AND_CALLS.md](master/STATE_AND_CALLS.md) |
+| Which physics is observed, required later, optional, rejected, or uncertain? | [FEATURE_MATRIX.md](master/FEATURE_MATRIX.md) |
+| What are the numerical, precision, memory, solver, and rollback contracts? | [NUMERICAL_DESIGN.md](master/NUMERICAL_DESIGN.md) |
+| What is the core/adapter boundary, legacy I/O approach, and host policy? | [API_AND_IO.md](master/API_AND_IO.md) |
+| What evidence is needed for oracle, fixtures, tolerances, allocations, and performance? | [VALIDATION_STRATEGY.md](master/VALIDATION_STRATEGY.md) |
+| What risks, alternatives, and deferred decisions remain? | [ROADMAP_AND_RISKS.md](master/ROADMAP_AND_RISKS.md) |
 
-The detailed DAG, entry/exit evidence, dependency reasons, and exact checklist are in [ROADMAP_AND_RISKS.md](master/ROADMAP_AND_RISKS.md). The first acceptance excludes solute, heat, hysteresis, dual porosity, and optional chemistry even though those remain planned work.
+## Cross-phase architecture constraints
+
+The Rust core is filesystem-free and owns no process-global or foreign host state. Immutable configuration and hydraulic models may be shared; every simulation owns its mutable state and workspace. The core boundary includes `SimulationConfig`, `Mesh1D`, `HydraulicModel`, `BoundaryConditions`, `SimulationState`, `MassBalanceTracker`, diagnostics, typed errors, and a preallocated workspace. Legacy fixed-format input/output, CLI behavior, and host bindings stay outside the core.
+
+At fixed dimensions, the allocation-free boundary covers hydraulic evaluation, assembly, Picard iterations, linear solve, accepted/rejected retries, and snapshot restore. Setup, resize, buffered output, and error construction are outside that boundary. The source's trial iteration and accepted-state promotion are observed; the full accepted/trial snapshot and rollback transaction is a port design obligation to be validated in Phase 3.
+
+## Reference scenario sequence
+
+These fixtures are future artifacts, not existing examples or baselines. Their producer plan must record input provenance, expected observables, hashes, and review evidence.
+
+| Scenario | Producer phase | Required observables |
+|---|---|---|
+| Dry-column infiltration | 4 | Pressure head, water content, surface flux, cumulative water balance, refinement response |
+| Capillary rise / shallow water table | 4 | Head/water-content profile, water-table position, steady flux, balance |
+| Cyclic atmosphere/root | 4 | Event times, ponding/switching, evaporation/transpiration/root sink, head/water content, balance |
+| Nonequilibrium solute/degradation | 5 | Concentration profiles, mobile/immobile transfer, reaction mass, solute balance |
+| Temperature-coupled heat | 6 | Temperature/vapor fields, heat flux, water/energy coupling, balance |
 
 ## Requirement traceability
 
-| ID | Master destination |
+| Requirement | Sequence location |
 |---|---|
-| R01 | Goal/scope, Source audit, M0 provenance |
-| R02 | Source audit and lifecycle overview |
-| R03 | Architecture, Rust interfaces, M3 ownership |
-| R04 | Rust interfaces and numerical ownership |
-| R05 | Numerical design, Phase 1 |
-| R06 | Numerical design, Phase 2/3 |
-| R07 | Numerical design transaction and Phase 3/4 |
-| R08 | Numerical design memory contract and validation |
-| R09 | I/O and host adapters, Phase 4/6 |
-| R10 | I/O serialization gate |
-| R11 | Host adapters and validation platform tests |
-| R12 | Validation strategy and Phases 4/5 |
-| R13 | Numerical precision and validation tolerance policy |
-| R14 | Validation component/property tests |
-| R15 | Decisions, roadmap first/later ordering |
-| R16 | Risk registry and optional roadmap gates |
-| R17 | Implementation roadmap and future waves |
-| R18 | Architecture, Rust interfaces, roadmap |
-| R19 | Goal/scope planning-only statement |
-| R20 | Decisions/open gates and roadmap decision register |
+| R01 | Phase 0 source identity and provenance |
+| R02 | Phase 0 source/call evidence |
+| R03 | Phases 0 and 3 state ownership evidence |
+| R04 | Phases 1–4 core architecture and interfaces |
+| R05 | Phase 1 hydraulic foundation |
+| R06 | Phases 2–3 mesh, stencil, and solver |
+| R07 | Phases 3–4 stepping, retries, and boundaries |
+| R08 | Phases 3 and 10 allocation boundary and measurements |
+| R09 | Phases 4 and 10 legacy I/O |
+| R10 | Phase 9 schema and serialization choices |
+| R11 | Phases 9–10 host boundary and platform choices |
+| R12 | Phases 0 and 4–6 scenario evidence |
+| R13 | Phases 0, 1, and 3 precision and tolerance calibration |
+| R14 | Phases 1 and 4–6 property, derivative, and conservation tests |
+| R15 | Phases 4–8 water-first ordering and later required physics |
+| R16 | Phase 9 optional capability decisions |
+| R17 | The full phase sequence and Phase 10 integration |
+| R18 | This master plus the API, numerical, and risk references |
+| R19 | Planning-only scope of this master and all subsequent plans |
+| R20 | Explicit decision gates in this master and future plans |
 
-Atomic prompt traceability:
+The five requested blueprint outputs are retained as references: architecture/module layout and signatures in [API_AND_IO.md](master/API_AND_IO.md), numerical contracts in [NUMERICAL_DESIGN.md](master/NUMERICAL_DESIGN.md), risks in [ROADMAP_AND_RISKS.md](master/ROADMAP_AND_RISKS.md), and the actionable checklist in the sequential phase table above.
 
-| Prompt item | Destination / disposition |
-|---|---|
-| Discovery: source files and modules | Source audit inventory; Phase 0. |
-| Discovery: initialization/input lifecycle | Source audit and lifecycle; Phases 0–3. |
-| Discovery: lookup tables and time loop | Numerical design; Phases 1/3. |
-| Discovery: output flushing and teardown | Source audit; I/O Phase 6. |
-| Discovery: COMMON/global/static state domains | Architecture and numerical ownership; Phase 3. |
-| Architecture: domain structs | Rust interfaces; Phase 3. |
-| Architecture: re-entrant `Send + Sync` core | Rust interfaces/host contracts; Phase 6. |
-| Architecture: tridiagonal versus crates | Numerical design alternatives; Phase 3 benchmark gate. |
-| Architecture: zero inner-loop allocation | Numerical memory contract; Phases 3/6. |
-| Architecture: legacy parsers/writers | I/O and host adapters; Phases 4/6. |
-| Architecture: serde/schema/dynamic forcing | I/O and host adapters; later format gate. |
-| Verification: five named scenarios | Validation strategy; Phases 4/5. |
-| Verification: norms/tolerances/precision drift | Validation and numerical design; Phases 0/3. |
-| Verification: derivative/property/conservation tests | Validation; Phases 1/4/5. |
-| Roadmap Phases 0–6 | Implementation roadmap above. |
-| Output 1: diagrams | Architecture diagram above. |
-| Output 2: Cargo/module layout | Proposed workspace layout above. |
-| Output 3: core signatures | Rust interfaces above. |
-| Output 4: risk registry | Detailed table above. |
-| Output 5: exact phase checklist | Checklist table above. |
-| Global: evidence/recommendation/decision separation | Goal, decisions, evidence links and future gates; applies throughout. |
+## Immediate next step
 
-## Future wave plans
-
-Future plans should use vertical slices: M0 provenance/oracle, M1 curves, M2 mesh/stencil, M3 water solver, M4 first water acceptance, M5 solute, M6 heat, M7 hysteresis, M8 dual porosity, M9 optional/host adapters, and M10 integration. Each plan must name immutable inputs, fixture producers, entry/exit evidence, allocation and rollback boundaries, and user decisions. A later plan may refine a milestone but may not silently broaden M4 or convert recommendations into release commitments.
-
-The supporting reports remain the detailed evidence appendices: [SOURCE_AUDIT.md](master/SOURCE_AUDIT.md), [STATE_AND_CALLS.md](master/STATE_AND_CALLS.md), [FEATURE_MATRIX.md](master/FEATURE_MATRIX.md), [NUMERICAL_DESIGN.md](master/NUMERICAL_DESIGN.md), [API_AND_IO.md](master/API_AND_IO.md), [VALIDATION_STRATEGY.md](master/VALIDATION_STRATEGY.md), and [ROADMAP_AND_RISKS.md](master/ROADMAP_AND_RISKS.md).
-
-Future command ownership is explicit by planning label: M0.1 creates and runs the oracle harness; M4.1 creates water fixture/parity commands; M5.1 creates solute commands; M6.1 creates heat commands; M3.1 owns state-isolation, rollback and allocation-count commands; M10.1 owns comparable performance and host-equivalence commands. These labels are planning ownership only, not new execution plans. Each command remains proposed until its producer artifact and prerequisite manifest exist. Host and format selection stays a user gate; before adapter implementation, the user must choose the initial host and legacy/schema subset from the provisional candidates.
+Create the Phase 0 plan only. Its scope is the isolated oracle and provenance process. It must not begin the Rust solver, Cargo workspace, fixtures, or parity claims. Once Phase 0 exit evidence is reviewed, return to this document and create the Phase 1 plan.
