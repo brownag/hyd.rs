@@ -1,12 +1,11 @@
 # State — Orchestration 1
 
 Plan status: **approved by the user on 2026-09-19**.
-Execution status: **wave 4 complete; independent reviews starting**.
+Execution status: **complete; master plan ready for user review**.
 Purpose: create the master plan only; later implementation wave plans are separate.
 Last updated: 2026-09-19.
 Resume from [EXECUTION_PLAN_1.md](EXECUTION_PLAN_1.md); prompt is [PROMPT_TEMPLATE_1.md](PROMPT_TEMPLATE_1.md).
-Intended output: `planning/HYDRUS1D_RUST_PORT_PLAN.md` (not yet created).
-No worker task has been executed yet.
+Intended output: `planning/HYDRUS1D_RUST_PORT_PLAN.md` (created and technically reviewed).
 
 ## Baseline checklist
 
@@ -41,9 +40,9 @@ No numerical pass results or tolerances have been established.
 | 2 | 1.2.3 | Specify validation and performance evidence | done | gpt-5.6-luna | `c61da69` |
 | 3 | 1.3.1 | Build roadmap, risks, and requirement traceability | done | gpt-5.6-luna | `d433c0f` |
 | 4 | 1.4.1 | Assemble the master implementation plan | done | gpt-5.6-luna | `026e9fa` |
-| 5 | 1.5.1 | Review master-plan scientific and scope coverage | pending | — | — |
-| 5 | 1.5.2 | Review master-plan architecture and execution readiness | pending | — | — |
-| 6 | 1.6.1 | Resolve reviews and finalize the master for user review | pending | — | — |
+| 5 | 1.5.1 | Review master-plan scientific and scope coverage | done | gpt-5.6-luna | `127a131` |
+| 5 | 1.5.2 | Review master-plan architecture and execution readiness | done | gpt-5.6-luna | `f55bec2` |
+| 6 | 1.6.1 | Resolve reviews and finalize the master for user review | done | gpt-5.6-luna | `02f1a92` |
 
 ## Execution decisions
 
@@ -85,13 +84,24 @@ Done after one substantive verification retry. ROADMAP_AND_RISKS.md (1–140), t
 ### 1.4.1
 Done after one substantive verification retry. HYDRUS1D_RUST_PORT_PLAN.md (1–181), task TODO. Initial draft deferred required Cargo/risk/checklist/trace detail to appendices; revised master includes these sections. Both targeted checks, local links and whitespace passed; no implementation edits. Commit `026e9fa`.
 
+### 1.5.1
+Done. REVIEW_SPEC.md (1–62), task TODO. Scientific review checked R01–R20 and found two medium issues: evidence wording for retries/rollback and missing scenario provenance/observables in the master. Section/whitespace and diff checks passed. Commit `127a131`.
+
+### 1.5.2
+Done after one report correction caused by an incorrect worktree-path claim. REVIEW_STANDARDS.md (1–55), task TODO. Architecture review found planning gaps for fixture/oracle and command ownership, plus a host-scope gate. All 16 local master links resolved; no baseline or performance claims found. Commit `f55bec2`.
+
+### 1.6.1
+Done. HYDRUS1D_RUST_PORT_PLAN.md (1–193), REVIEW_RESOLUTION.md (1–31), task TODO. Resolved F-01/F-02 and S-01/S-02; S-03 remains a user decision. Master, R01–R20, resolution, link and whitespace checks passed across 14 documents. Commit `02f1a92`.
+
+Wave 5/6 integration: both independent reports were reviewed; all findings are either resolved or recorded as specific user gates. `git diff --check` clean; no numerical tests, oracle builds, fixtures or implementation files were created.
+
 ## Plan amendments and escalations
 
 <!-- Record any approved rescoping, dependency changes, model substitutions and retries. -->
 
 ## Final handoff
 
-- Master technical review: pending.
-- Consequential user decisions: to be identified in the master.
+- Master technical review: complete; resolution recorded in REVIEW_RESOLUTION.md.
+- Consequential user decisions: compatibility release label; initial host/format subset; optional feature scope; precision modernization policy.
 - User approval of completed master: pending.
 - Implementation authorization: not granted by this orchestration.
