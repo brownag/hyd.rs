@@ -57,7 +57,7 @@ fn table_and_evaluation_boundaries_are_typed() {
     ));
     let model = VanGenuchtenModel::new(parameters()).unwrap();
     assert!(matches!(
-        hydrus_core::HydraulicModel::theta(&model, 0.0),
+        hydrus_core::HydraulicModel::theta(&model, f64::NAN),
         Err(HydraulicError::InvalidEvaluationDomain { .. })
     ));
 }

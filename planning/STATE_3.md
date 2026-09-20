@@ -26,7 +26,7 @@ Scientific baseline: **unavailable.** Phase 0 smoke output is provenance only; P
 | 1 | 3.1.1 | Hydraulic-core workspace and typed contract | done | — |
 | 2 | 3.2.1 | Analytic `iModel=0` curves and tests | done | — |
 | 3 | 3.3.1 | Generated analytic table and tests | done | — |
-| 4 | 3.4.1 | Phase 1 evidence and Phase 2 handoff | pending | — |
+| 4 | 3.4.1 | Phase 1 evidence and Phase 2 handoff | done | — |
 
 ## Task reports
 
@@ -62,6 +62,16 @@ Scientific baseline: **unavailable.** Phase 0 smoke output is provenance only; P
 - `cargo test -p hydrus-core --test hydraulic_tables`: passed (4 tests).
 - `cargo fmt --check`, `cargo clippy -p hydrus-core --all-targets -- -D warnings`, and `git diff --check`: passed.
 - Only approved hydraulic source, focused tests, task todo, and this report changed; source-reference, solver, mesh, I/O, and host files remain untouched.
+
+## 3.4.1
+
+- Status: done; Phase 1 hydraulic evidence and Phase 2 handoff recorded.
+- Evidence covers the typed model-0 contract, source anchors, f64/sngl limitation, formula/property checks, invalid domains/selectors, and generated-table boundary.
+- Recommends Phase 2 mesh/stencil work; alternate analytic families and general tables remain deferred.
+- `cargo test -p hydrus-core`: passed (13 tests, 0 failed).
+- `cargo fmt --check`, clippy, evidence structure assertion, and `git diff --check`: passed.
+- Corrected stale API contract assertion so saturated head `0.0` matches the source-style nonnegative-head policy.
+- No Fortran parity, fixture parity, release compatibility, tolerance calibration, or performance claim is made.
 
 ## Escalations and amendments
 
