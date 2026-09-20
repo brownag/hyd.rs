@@ -1,7 +1,7 @@
 # State — Orchestration 2: Phase 0 Fortran reference executable
 
 Plan status: **approved by the user on 2026-09-19.**
-Execution status: **not started.**
+Execution status: **complete; Phase 0 evidence handoff recorded.**
 Master authority: [HYDRUS1D_RUST_PORT_PLAN.md](HYDRUS1D_RUST_PORT_PLAN.md), Phase 0.
 
 ## Baseline checklist
@@ -22,7 +22,7 @@ Master authority: [HYDRUS1D_RUST_PORT_PLAN.md](HYDRUS1D_RUST_PORT_PLAN.md), Phas
 | 1 | 2.1.1 | Portability patch series | done | committed |
 | 2 | 2.2.1 | Stage/build harness | done | committed |
 | 3 | 2.3.1 | Noncanonical smoke run | done | committed |
-| 4 | 2.4.1 | Phase 0 evidence handoff | pending | — |
+| 4 | 2.4.1 | Phase 0 evidence handoff | done | committed |
 
 ## Task reports
 
@@ -57,6 +57,13 @@ Master authority: [HYDRUS1D_RUST_PORT_PLAN.md](HYDRUS1D_RUST_PORT_PLAN.md), Phas
 - Completion evidence: required legacy output `end` markers plus `BALANCE.OUT` calculation-time record; output/capture hashes are recorded.
 - Warning retained: `IEEE_OVERFLOW_FLAG`; it makes no scientific, fixture, parity, tolerance, baseline, release, or redistribution claim.
 - Inputs are explicitly independently constructed and noncanonical; source snapshot remains clean and `git diff --check` passed.
+
+## 2.4.1
+
+- Status: done; Phase 0 evidence handoff reviewed by the orchestrator.
+- Files: `planning/master/PHASE_0_REFERENCE_EVIDENCE.md`, `planning/tasks/2.4.1.todo.md`.
+- Orchestrator pass: required six headings and no trailing whitespace (`Phase 0 evidence structure clean`); `git diff --check` passed.
+- Handoff links source/archive/patch/build/smoke evidence, preserves the non-scientific-smoke limitation, and states Phase 1 remains unplanned.
 
 ## Escalations and amendments
 
