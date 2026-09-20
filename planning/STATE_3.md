@@ -25,7 +25,7 @@ Scientific baseline: **unavailable.** Phase 0 smoke output is provenance only; P
 |---|---|---|---|---|
 | 1 | 3.1.1 | Hydraulic-core workspace and typed contract | done | — |
 | 2 | 3.2.1 | Analytic `iModel=0` curves and tests | done | — |
-| 3 | 3.3.1 | Generated analytic table and tests | pending | — |
+| 3 | 3.3.1 | Generated analytic table and tests | done | — |
 | 4 | 3.4.1 | Phase 1 evidence and Phase 2 handoff | pending | — |
 
 ## Task reports
@@ -52,6 +52,16 @@ Scientific baseline: **unavailable.** Phase 0 smoke output is provenance only; P
 - `cargo clippy -p hydrus-core --all-targets -- -D warnings`: passed.
 - `git diff --check`: passed; only approved hydraulic source/tests and task todo changed.
 - Alternate selectors, generated tables, Fortran comparators, solver, mesh, I/O, and host work remain out of scope.
+
+## 3.3.1
+
+- Status: done; immutable source-style model-0 analytic hydraulic tables implemented.
+- Generated exact-endpoint logarithmic head grids and finite theta/conductivity/capacity values from `VanGenuchtenModel`.
+- Inclusive endpoints and linear interval interpolation are supported; non-finite, out-of-range, invalid configurations, and unsupported selectors are typed failures.
+- General/user-supplied tables, extrapolation, and implicit saturation extension remain unsupported.
+- `cargo test -p hydrus-core --test hydraulic_tables`: passed (4 tests).
+- `cargo fmt --check`, `cargo clippy -p hydrus-core --all-targets -- -D warnings`, and `git diff --check`: passed.
+- Only approved hydraulic source, focused tests, task todo, and this report changed; source-reference, solver, mesh, I/O, and host files remain untouched.
 
 ## Escalations and amendments
 

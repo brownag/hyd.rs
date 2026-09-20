@@ -1,3 +1,4 @@
+mod table;
 mod types;
 mod van_genuchten;
 
@@ -81,18 +82,4 @@ impl VanGenuchtenModel {
     }
 }
 
-/// Immutable table contract reserved for the generated-table milestone.
-#[derive(Clone, Debug, PartialEq)]
-pub struct HydraulicTables;
-
-impl HydraulicTables {
-    pub fn from_selector(selector: i32) -> Result<Self, HydraulicError> {
-        Err(HydraulicError::UnsupportedSelector { selector })
-    }
-
-    pub fn empty() -> Result<Self, HydraulicError> {
-        Err(HydraulicError::InvalidTableConfiguration {
-            reason: "no table data",
-        })
-    }
-}
+pub use table::HydraulicTables;
