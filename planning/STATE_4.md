@@ -23,7 +23,13 @@ Scientific baseline: **unavailable.** Phase 2 source-algebra and property tests 
 | Wave | Task | Deliverable | Status | Commit |
 |---|---|---|---|---|
 | 1 | 4.1.1 | Validated Mesh1D and one-based conversion | done | c1180fc |
-| 2 | 4.2.1 | Geometry, layer metrics, and face averaging | done | pending |
+| 2 | 4.2.1 | Geometry, layer metrics, and face averaging | done | 6d2337c |
+| 3 | 4.3.1 | Source `Reset` stencil | done | b60b6ef |
+| 4 | 4.4.1 | Phase 2 evidence and Phase 3 handoff | done | 5132d37 |
+
+## Task reports
+
+<!-- Orchestrator appends concise task reports here. -->
 
 ## 4.2.1
 
@@ -32,7 +38,6 @@ Scientific baseline: **unavailable.** Phase 2 source-algebra and property tests 
 - Layer metrics use the approved contiguous first-to-last coordinate span convention.
 - Verification: targeted geometry tests passed (7); fmt, clippy, and `git diff --check` passed.
 - No boundary, stencil, solver, filesystem, parity, or performance behavior added.
-| 3 | 4.3.1 | Source `Reset` stencil | done | pending |
 
 ## 4.3.1
 
@@ -40,11 +45,15 @@ Scientific baseline: **unavailable.** Phase 2 source-algebra and property tests 
 - Files: `crates/hydrus-core/src/hydraulics/stencil.rs`, `mod.rs`, `reset_stencil.rs`, and task TODO.
 - Preserves arithmetic default and explicit geometric averaging; boundary rows, `Shift`, solves, retries, and parity remain deferred.
 - Verification: targeted stencil tests passed (5); fmt, clippy, and `git diff --check` passed.
-| 4 | 4.4.1 | Phase 2 evidence and Phase 3 handoff | pending | — |
 
-## Task reports
+## 4.4.1
 
-<!-- Orchestrator appends concise task reports here. -->
+- Status: done; recorded reviewed Phase 2 mesh/stencil evidence and the bounded Phase 3 handoff in `master/PHASE_2_MESH_STENCIL_EVIDENCE.md`.
+- Evidence covers the validated `Mesh1D` contract, explicit one-based source conversion, geometry/layer metrics, inclination/sign convention, arithmetic/geometric face averaging, typed failures, and the interior source `Reset` algebra.
+- Explicitly preserves the finite-difference versus finite-element terminology reconciliation as an open validation item and states that source-algebra tests are not a Fortran parity result.
+- Phase 3 handoff recommends boundary-aware tridiagonal assembly and transactional Picard stepping; boundary transformation, elimination, convergence/retry, rollback, and coupled-process evidence remain deferred.
+- Verification: `cargo test --workspace` passed; `cargo fmt --check` passed; `cargo clippy --workspace --all-targets -- -D warnings` passed; `git diff --check` passed; required evidence headings/phrases assertion passed.
+- Scope remained limited to the Phase 2 evidence file, this state report, and the task TODO; implementation source/tests were not modified.
 
 ## 4.1.1
 
