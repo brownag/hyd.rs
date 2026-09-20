@@ -1,0 +1,11 @@
+Pcp_File_Version=4
+*** BLOCK I: ATMOSPHERIC INFORMATION ***********************************
+MaxAL
+1
+DailyVar SinusVar lLAI lBCCycles lInterc
+f f f f f
+hCritS
+0
+tAtm Prec rSoil rRoot hCritA rB hB ht RootDepth
+0.01 0 0 0 100000 0 0 0 0
+end

@@ -21,7 +21,7 @@ Master authority: [HYDRUS1D_RUST_PORT_PLAN.md](HYDRUS1D_RUST_PORT_PLAN.md), Phas
 |---|---|---|---|---|
 | 1 | 2.1.1 | Portability patch series | done | committed |
 | 2 | 2.2.1 | Stage/build harness | done | committed |
-| 3 | 2.3.1 | Noncanonical smoke run | pending | — |
+| 3 | 2.3.1 | Noncanonical smoke run | done | committed |
 | 4 | 2.4.1 | Phase 0 evidence handoff | pending | — |
 
 ## Task reports
@@ -48,6 +48,15 @@ Master authority: [HYDRUS1D_RUST_PORT_PLAN.md](HYDRUS1D_RUST_PORT_PLAN.md), Phas
 - Orchestrator pass: `python3 tools/stage_fortran_reference.py --output .development/reference-build`; `sh tools/build_fortran_reference.sh --build-dir .development/reference-build`.
 - Source/archive hashes were independently rechecked against `master/SOURCE_MANIFEST.json`; `git diff --check` passed and immutable sources remain clean.
 - Artifact-notice status remains explicitly unreviewed; build success makes no fixture, parity, or scientific-validation claim.
+
+## 2.3.1
+
+- Status: done; noncanonical smoke deck, isolated runner, and run record reviewed by the orchestrator.
+- Files: four `reference/fortran_reference/smoke/` inputs, its README, `tools/run_fortran_reference.py`, `SMOKE_RUN.md`, and task TODO.
+- Orchestrator pass: `python3 tools/run_fortran_reference.py --smoke --timeout-seconds 60` exited 0 within the limit and regenerated the provenance record.
+- Completion evidence: required legacy output `end` markers plus `BALANCE.OUT` calculation-time record; output/capture hashes are recorded.
+- Warning retained: `IEEE_OVERFLOW_FLAG`; it makes no scientific, fixture, parity, tolerance, baseline, release, or redistribution claim.
+- Inputs are explicitly independently constructed and noncanonical; source snapshot remains clean and `git diff --check` passed.
 
 ## Escalations and amendments
 

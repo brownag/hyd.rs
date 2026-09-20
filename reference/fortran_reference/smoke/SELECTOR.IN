@@ -1,0 +1,37 @@
+Pcp_File_Version=4
+*** BLOCK A: BASIC INFORMATION *****************************************
+noncanonical smoke run
+Independently constructed execution-only input; not a scientific case.
+LUnit TUnit MUnit
+cm
+days
+mmol
+lWat lChem lTemp lSink lRoot lShort lWDep lScreen lVariabBC lEquil
+t f f f f f f f f f
+lSnow lHP1 lMeteo lVapor lActiveU lFluxes
+f f f f f f
+NMat NLay CosAlpha
+1 1 1
+*** BLOCK B: WATER FLOW INFORMATION ************************************
+MaxIt TolTh TolH
+20 0.001 1
+TopInf WLayer KodTop InitCond
+f f 1 f
+BotInf qGWLF FreeD SeepF KodBot DrainF hSeep
+f f f f 1 f 0
+hTab1 hTabN
+0.0001 100
+Model Hysteresis
+0 0
+thr ths Alfa n Ks l
+0.08 0.43 0.015 1.875 2.0 0.5
+*** BLOCK C: TIME INFORMATION ******************************************
+dt dtMin dtMax DMul DMul2 ItMin ItMax MPL
+0.01 0.001 0.01 1.2 0.5 1 20 1
+tInit tMax
+0 0.01
+lPrintD nPrintSteps tPrintInterval lEnter
+f 1 0.01 f
+TPrint(1)
+0.01
+*** END OF INPUT FILE 'SELECTOR.IN' ************************************
