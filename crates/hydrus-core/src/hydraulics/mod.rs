@@ -1,7 +1,12 @@
+mod geometry;
 mod table;
 mod types;
 mod van_genuchten;
 
+pub use geometry::{
+    adjacent_distance, arithmetic_face_conductivity, boundary_half_cell_width,
+    geometric_face_conductivity, gravity_metric, layer_metrics, Boundary, LayerMetric,
+};
 pub use types::{Evaluation, HydraulicDerivatives, Mesh1D, VanGenuchtenParameters};
 use van_genuchten::evaluate_model_zero;
 

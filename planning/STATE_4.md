@@ -22,8 +22,16 @@ Scientific baseline: **unavailable.** Phase 2 source-algebra and property tests 
 
 | Wave | Task | Deliverable | Status | Commit |
 |---|---|---|---|---|
-| 1 | 4.1.1 | Validated Mesh1D and one-based conversion | pending | — |
-| 2 | 4.2.1 | Geometry, layer metrics, and face averaging | pending | — |
+| 1 | 4.1.1 | Validated Mesh1D and one-based conversion | done | c1180fc |
+| 2 | 4.2.1 | Geometry, layer metrics, and face averaging | done | pending |
+
+## 4.2.1
+
+- Status: done; geometry helpers and explicit face averaging implemented.
+- Files: `crates/hydrus-core/src/hydraulics/geometry.rs`, `mod.rs`, `mesh_geometry.rs`, and task TODO.
+- Layer metrics use the approved contiguous first-to-last coordinate span convention.
+- Verification: targeted geometry tests passed (7); fmt, clippy, and `git diff --check` passed.
+- No boundary, stencil, solver, filesystem, parity, or performance behavior added.
 | 3 | 4.3.1 | Source `Reset` stencil | pending | — |
 | 4 | 4.4.1 | Phase 2 evidence and Phase 3 handoff | pending | — |
 
