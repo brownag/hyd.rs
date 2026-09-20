@@ -17,6 +17,10 @@ pub enum HydraulicError {
     InvalidTableConfiguration {
         reason: &'static str,
     },
+    InvalidMesh {
+        name: &'static str,
+        reason: &'static str,
+    },
     UnsupportedSelector {
         selector: i32,
     },
@@ -34,6 +38,9 @@ impl fmt::Display for HydraulicError {
             }
             Self::InvalidTableConfiguration { reason } => {
                 write!(formatter, "invalid table configuration: {reason}")
+            }
+            Self::InvalidMesh { name, reason } => {
+                write!(formatter, "invalid mesh {name}: {reason}")
             }
             Self::UnsupportedSelector { selector } => {
                 write!(formatter, "unsupported hydraulic selector: {selector}")

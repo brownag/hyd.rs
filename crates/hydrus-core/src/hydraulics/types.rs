@@ -81,3 +81,168 @@ pub struct HydraulicDerivatives {
     pub dconductivity_dhead: f64,
     pub dcapacity_dhead: f64,
 }
+
+/// Validated one-dimensional profile data used by later geometry and stencil
+/// contracts. Indices exposed by this type are always zero-based.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Mesh1D {
+    coordinates: Vec<f64>,
+    material_indices: Vec<usize>,
+    layer_indices: Option<Vec<usize>>,
+    material_count: usize,
+    layer_count: usize,
+    inclination_cosine: f64,
+}
+
+impl Mesh1D {
+    /// Constructs a mesh from already zero-based indices.
+    pub fn new(
+        coordinates: Vec<f64>,
+        material_indices: Vec<usize>,
+        layer_indices: Option<Vec<usize>>,
+        material_count: usize,
+        layer_count: usize,
+        inclination_cosine: f64,
+    ) -> Result<Self, HydraulicError> {
+        let mesh = Self {
+            coordinates,
+            material_indices,
+            layer_indices,
+            material_count,
+            layer_count,
+            inclination_cosine,
+        };
+        mesh.validate()?;
+        Ok(mesh)
+    }
+
+    /// Converts one-based source profile indices into the zero-based contract.
+    pub fn from_source_one_based(
+        coordinates: Vec<f64>,
+        material_indices: &[usize],
+        layer_indices: Option<&[usize]>,
+        material_count: usize,
+        layer_count: usize,
+        inclination_cosine: f64,
+    ) -> Result<Self, HydraulicError> {
+        let materials =
+            convert_source_indices(material_indices, material_count, "material_indices")?;
+        let layers = layer_indices
+            .map(|indices| convert_source_indices(indices, layer_count, "layer_indices"))
+            .transpose()?;
+        Self::new(
+            coordinates,
+            materials,
+            layers,
+            material_count,
+            layer_count,
+            inclination_cosine,
+        )
+    }
+
+    pub fn coordinates(&self) -> &[f64] {
+        &self.coordinates
+    }
+
+    pub fn material_indices(&self) -> &[usize] {
+        &self.material_indices
+    }
+
+    pub fn layer_indices(&self) -> Option<&[usize]> {
+        self.layer_indices.as_deref()
+    }
+
+    pub fn material_count(&self) -> usize {
+        self.material_count
+    }
+
+    pub fn layer_count(&self) -> usize {
+        self.layer_count
+    }
+
+    pub fn inclination_cosine(&self) -> f64 {
+        self.inclination_cosine
+    }
+
+    fn validate(&self) -> Result<(), HydraulicError> {
+        if self.coordinates.is_empty() {
+            return Err(mesh_error("coordinates", "must not be empty"));
+        }
+        if self.coordinates.len() != self.material_indices.len() {
+            return Err(mesh_error(
+                "material_indices",
+                "length must match coordinates",
+            ));
+        }
+        if let Some(layers) = &self.layer_indices {
+            if layers.len() != self.coordinates.len() {
+                return Err(mesh_error("layer_indices", "length must match coordinates"));
+            }
+            if self.layer_count == 0 {
+                return Err(mesh_error(
+                    "layer_count",
+                    "must be positive when layers exist",
+                ));
+            }
+        }
+        if self.material_count == 0 {
+            return Err(mesh_error("material_count", "must be positive"));
+        }
+        for coordinate in &self.coordinates {
+            if !coordinate.is_finite() {
+                return Err(mesh_error("coordinates", "must be finite"));
+            }
+        }
+        for pair in self.coordinates.windows(2) {
+            if pair[1] <= pair[0] {
+                return Err(mesh_error("coordinates", "must be strictly increasing"));
+            }
+        }
+        validate_indices(
+            &self.material_indices,
+            self.material_count,
+            "material_indices",
+        )?;
+        if let Some(layers) = &self.layer_indices {
+            validate_indices(layers, self.layer_count, "layer_indices")?;
+        }
+        if !self.inclination_cosine.is_finite() {
+            return Err(mesh_error("inclination_cosine", "must be finite"));
+        }
+        Ok(())
+    }
+}
+
+fn convert_source_indices(
+    indices: &[usize],
+    count: usize,
+    name: &'static str,
+) -> Result<Vec<usize>, HydraulicError> {
+    indices
+        .iter()
+        .map(|&index| {
+            if index == 0 {
+                return Err(mesh_error(name, "source indices must be one-based"));
+            }
+            if index > count {
+                return Err(mesh_error(name, "source index is out of range"));
+            }
+            Ok(index - 1)
+        })
+        .collect()
+}
+
+fn validate_indices(
+    indices: &[usize],
+    count: usize,
+    name: &'static str,
+) -> Result<(), HydraulicError> {
+    if indices.iter().any(|&index| index >= count) {
+        return Err(mesh_error(name, "zero-based index is out of range"));
+    }
+    Ok(())
+}
+
+fn mesh_error(name: &'static str, reason: &'static str) -> HydraulicError {
+    HydraulicError::InvalidMesh { name, reason }
+}

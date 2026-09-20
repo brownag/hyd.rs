@@ -2,7 +2,7 @@ mod table;
 mod types;
 mod van_genuchten;
 
-pub use types::{Evaluation, HydraulicDerivatives, VanGenuchtenParameters};
+pub use types::{Evaluation, HydraulicDerivatives, Mesh1D, VanGenuchtenParameters};
 use van_genuchten::evaluate_model_zero;
 
 use crate::HydraulicError;
