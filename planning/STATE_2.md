@@ -20,7 +20,7 @@ Master authority: [HYDRUS1D_RUST_PORT_PLAN.md](HYDRUS1D_RUST_PORT_PLAN.md), Phas
 | Wave | Task | Deliverable | Status | Commit |
 |---|---|---|---|---|
 | 1 | 2.1.1 | Portability patch series | done | committed |
-| 2 | 2.2.1 | Stage/build harness | pending | — |
+| 2 | 2.2.1 | Stage/build harness | done | committed |
 | 3 | 2.3.1 | Noncanonical smoke run | pending | — |
 | 4 | 2.4.1 | Phase 0 evidence handoff | pending | — |
 
@@ -38,6 +38,16 @@ Master authority: [HYDRUS1D_RUST_PORT_PLAN.md](HYDRUS1D_RUST_PORT_PLAN.md), Phas
 - Originals remain clean; patch touches only `HYDRUS.FOR` and `TIME.FOR`; `git diff --check` passed.
 - Deviation: `GETARG` became standard `GET_COMMAND_ARGUMENT` with default-integer status; documented in notes.
 - Gotchas: path backslashes and legacy `NARGS`, `getdat`, and `gettim` remain deferred; no GNU signal-handler replacement is supplied.
+
+## 2.2.1
+
+- Status: done; deterministic stage/build harness reviewed by the orchestrator.
+- Files: `tools/stage_fortran_reference.py`, `tools/build_fortran_reference.sh`, `reference/fortran_reference/README.md`, `planning/tasks/2.2.1.todo.md`.
+- Stage verifies ten source/archive hashes, archive-member byte equality, and applies the patch only under `.development/reference-build/src_reference`.
+- Build uses explicit GNU Fortran flags and writes executable, JSON manifests, and an untracked compatibility shim for retained legacy entry points.
+- Orchestrator pass: `python3 tools/stage_fortran_reference.py --output .development/reference-build`; `sh tools/build_fortran_reference.sh --build-dir .development/reference-build`.
+- Source/archive hashes were independently rechecked against `master/SOURCE_MANIFEST.json`; `git diff --check` passed and immutable sources remain clean.
+- Artifact-notice status remains explicitly unreviewed; build success makes no fixture, parity, or scientific-validation claim.
 
 ## Escalations and amendments
 
