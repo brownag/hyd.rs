@@ -24,7 +24,7 @@ Scientific baseline: **unavailable.** Phase 0 smoke output is provenance only; P
 | Wave | Task | Deliverable | Status | Commit |
 |---|---|---|---|---|
 | 1 | 3.1.1 | Hydraulic-core workspace and typed contract | done | — |
-| 2 | 3.2.1 | Analytic `iModel=0` curves and tests | pending | — |
+| 2 | 3.2.1 | Analytic `iModel=0` curves and tests | done | — |
 | 3 | 3.3.1 | Generated analytic table and tests | pending | — |
 | 4 | 3.4.1 | Phase 1 evidence and Phase 2 handoff | pending | — |
 
@@ -41,6 +41,17 @@ Scientific baseline: **unavailable.** Phase 0 smoke output is provenance only; P
 - `cargo clippy -p hydrus-core --all-targets -- -D warnings`: passed.
 - `git diff --check`: passed; no source-reference, Fortran, solver, mesh, I/O, or host files changed.
 - Formula and generated-table evaluation remain explicitly deferred; selectors do not fall back to model 0.
+
+## 3.2.1
+
+- Status: done; analytic `iModel=0` van Genuchten curves and focused tests implemented.
+- Implemented source-anchored FK/FC/FQ/FH behavior with explicit saturated, dry-floor, finite-domain, and inverse-head policy.
+- Internal/public calculations remain `f64`; legacy `sngl` locations and source `1.e-37` floors are documented, without parity claims.
+- `cargo test -p hydrus-core --test hydraulic_curves`: passed (5 tests).
+- `cargo fmt --check`: passed.
+- `cargo clippy -p hydrus-core --all-targets -- -D warnings`: passed.
+- `git diff --check`: passed; only approved hydraulic source/tests and task todo changed.
+- Alternate selectors, generated tables, Fortran comparators, solver, mesh, I/O, and host work remain out of scope.
 
 ## Escalations and amendments
 

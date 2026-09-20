@@ -1,6 +1,8 @@
 mod types;
+mod van_genuchten;
 
 pub use types::{Evaluation, HydraulicDerivatives, VanGenuchtenParameters};
+use van_genuchten::evaluate_model_zero;
 
 use crate::HydraulicError;
 
@@ -28,7 +30,7 @@ pub trait HydraulicModel: Send + Sync {
     fn derivatives(&self, head: f64) -> Result<HydraulicDerivatives, HydraulicError>;
 }
 
-/// Validated model-0 contract. Formula evaluation is deliberately deferred.
+/// Validated analytic `iModel=0` van Genuchten contract.
 #[derive(Clone, Debug, PartialEq)]
 pub struct VanGenuchtenModel {
     parameters: VanGenuchtenParameters,
@@ -47,38 +49,35 @@ impl VanGenuchtenModel {
 
 impl HydraulicModel for VanGenuchtenModel {
     fn theta(&self, head: f64) -> Result<f64, HydraulicError> {
-        Err(HydraulicError::InvalidEvaluationDomain {
-            name: "head (formula pending)",
-            value: head,
-        })
+        Ok(evaluate_model_zero(&self.parameters, head)?.theta)
     }
 
     fn conductivity(&self, head: f64) -> Result<f64, HydraulicError> {
-        Err(HydraulicError::InvalidEvaluationDomain {
-            name: "head (formula pending)",
-            value: head,
-        })
+        Ok(evaluate_model_zero(&self.parameters, head)?.conductivity)
     }
 
     fn capacity(&self, head: f64) -> Result<f64, HydraulicError> {
-        Err(HydraulicError::InvalidEvaluationDomain {
-            name: "head (formula pending)",
-            value: head,
-        })
+        Ok(evaluate_model_zero(&self.parameters, head)?.capacity)
     }
 
     fn evaluate(&self, head: f64) -> Result<Evaluation, HydraulicError> {
-        Err(HydraulicError::InvalidEvaluationDomain {
-            name: "head (formula pending)",
-            value: head,
+        let evaluation = evaluate_model_zero(&self.parameters, head)?;
+        Ok(Evaluation {
+            theta: evaluation.theta,
+            conductivity: evaluation.conductivity,
+            capacity: evaluation.capacity,
         })
     }
 
     fn derivatives(&self, head: f64) -> Result<HydraulicDerivatives, HydraulicError> {
-        Err(HydraulicError::InvalidEvaluationDomain {
-            name: "head (formula pending)",
-            value: head,
-        })
+        Ok(evaluate_model_zero(&self.parameters, head)?.derivatives)
+    }
+}
+
+impl VanGenuchtenModel {
+    /// Invert model-0 theta; endpoint `Qr` uses the finite source-style dry floor.
+    pub fn head(&self, theta: f64) -> Result<f64, HydraulicError> {
+        van_genuchten::inverse_head(&self.parameters, theta)
     }
 }
 
