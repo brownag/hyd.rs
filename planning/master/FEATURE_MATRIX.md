@@ -27,7 +27,7 @@ Status uses **observed** for behavior found in the supplied source, **documented
 | density-dependent flow/transport | `lDensity`; `WATFLOW:Reset/SetMat`; `INPUT:Init`; manual density discussion | implemented branch | fluid property and solute coupling | density-gradient test | optional recommendation; defer pending scope gate |
 | meteorology, variable forcing, evaporation | `TIME:Meteo/MeteoInt/Evapor`; `lMeteo`; manual atmospheric chapter | implemented branch | atmospheric forcing adapter | cyclic atmospheric forcing | include atmospheric subset first; full meteo later |
 | snow and interception | `TIME:Snow`, interception routines; `lSnow`; manual atmospheric sections | implemented branch | temperature/meteo state | snow/interception event deck | optional recommendation; defer pending review |
-| inverse estimation | manual Chapters 5–6; no confirmed corresponding source workflow in named snapshot | documented-only / uncertain | parameter API and oracle evidence | inverse benchmark to be designed | defer; explicit user gate |
+| inverse estimation | manual Chapters 5–6; no confirmed corresponding source workflow in named snapshot | documented-only / uncertain | parameter API and reference-executable evidence | inverse benchmark to be designed | defer; explicit user gate |
 | special chemistry | manual Chapter 9; source chemical flags require detailed audit | documented-only / uncertain | solute schema and provenance | chemistry-specific fixture | defer or unsupported per feature audit; user gate |
 
 ## First acceptance

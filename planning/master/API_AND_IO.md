@@ -90,7 +90,7 @@ Keep `hydrus-core` `no_std`-adjacent where practical but do not promise `no_std`
 ## Alternatives
 
 1. A single `hydrus-core` plus adapter crates is the recommended starting shape because it keeps the numerical boundary deep and limits dependency leakage.
-2. One monolithic CLI is simpler for legacy parity but prevents clean host reuse and Wasm packaging; it remains an alternative for an oracle wrapper only.
+2. One monolithic CLI is simpler for legacy parity but prevents clean host reuse and Wasm packaging; it remains an alternative for a reference-executable wrapper only.
 3. Direct host callbacks during stepping could reduce copies but would make timing, cancellation, reentrancy, and thread guarantees fragile; defer unless a measured integration need appears.
 4. Zero-copy foreign views may improve throughput, but copied batched arrays provide clearer lifetimes and are the provisional binding baseline.
 
@@ -106,6 +106,6 @@ Keep `hydrus-core` `no_std`-adjacent where practical but do not promise `no_std`
 
 1. User gate: choose initial shipped hosts among Python, R, browser Wasm, native Node, and C ABI; retain others as future adapters.
 2. User gate: select JSON-only first interchange or add YAML/TOML at the first release; defer GeoPackage and Arrow until schemas and use cases are approved.
-3. Oracle-portability owner: confirm canonical legacy filenames, file-unit mapping, path handling, and source-compatible error/exit behavior.
+3. Fortran-reference portability owner: confirm canonical legacy filenames, file-unit mapping, path handling, and source-compatible error/exit behavior.
 4. Numerical/API design owner: reconcile exact `advance_to` report shape, forcing interpolation, retry visibility, and checkpoint contents with numerical contracts.
 5. User gate: approve supported OS/architecture and binding packaging matrix after a minimal core and adapter prototype exists.

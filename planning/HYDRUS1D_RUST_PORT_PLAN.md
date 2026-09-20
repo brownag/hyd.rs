@@ -6,7 +6,7 @@ This is the authoritative sequence for the Rust port. It is not an implementatio
 
 The documents in `planning/master/` are reference documents for individual phases. They record audit evidence and design decisions; they do not create competing execution sequences. A subsequent plan should read this document first, then only the phase references named below.
 
-The compatibility reference is the supplied, hash-pinned Fortran snapshot, described as HYDRUS-1D 4.08 or a derivative. Its exact release identity is unverified. The 4.08 manual is the primary documentation companion and the 4.17 manual is comparative only. No working oracle, input deck, golden output, numerical baseline, parity result, tolerance, or performance result exists yet.
+The compatibility reference is the supplied, hash-pinned Fortran snapshot, described as HYDRUS-1D 4.08 or a derivative. Its exact release identity is unverified. The 4.08 manual is the primary documentation companion and the 4.17 manual is comparative only. No working Fortran reference executable, input deck, golden output, numerical baseline, parity result, tolerance, or performance result exists yet.
 
 ## Rules for every subsequent plan
 
@@ -27,7 +27,7 @@ Before the relevant phase starts, the user must decide or review these gates: th
 
 | Phase | The next plan must accomplish | Entry evidence | Exit evidence before planning the next phase | Reference documents |
 |---|---|---|---|---|
-| 0. Oracle and provenance | Create an isolated, minimally patched copy of the reference source; establish reproducible build/run provenance and fixture acquisition rules. | Pinned archive/source hashes; known `MSFLIB` and `TIME.FOR:551` blockers. | Patch, compiler, flags, executable, input/output and environment recorded; a reviewed run policy; no parity claim merely because the harness builds. | [SOURCE_AUDIT.md](master/SOURCE_AUDIT.md), [STATE_AND_CALLS.md](master/STATE_AND_CALLS.md), [VALIDATION_STRATEGY.md](master/VALIDATION_STRATEGY.md) |
+| 0. Fortran reference executable and provenance | Create an isolated, minimally patched copy of the reference source; establish reproducible build/run provenance and fixture acquisition rules. | Pinned archive/source hashes; known `MSFLIB` and `TIME.FOR:551` blockers. | Patch, compiler, flags, executable, input/output and environment recorded; a reviewed run policy; no parity claim merely because the harness builds. | [SOURCE_AUDIT.md](master/SOURCE_AUDIT.md), [STATE_AND_CALLS.md](master/STATE_AND_CALLS.md), [VALIDATION_STRATEGY.md](master/VALIDATION_STRATEGY.md) |
 | 1. Hydraulic foundation | Implement and validate the first hydraulic path: `iModel=0` van Genuchten values, derivatives, domains and table behavior. | Phase 0 provenance process and curve source anchors. | Pointwise/property evidence, invalid-selector behavior, and a decision on the next hydraulic family or table scope. | [FEATURE_MATRIX.md](master/FEATURE_MATRIX.md), [NUMERICAL_DESIGN.md](master/NUMERICAL_DESIGN.md), [VALIDATION_STRATEGY.md](master/VALIDATION_STRATEGY.md) |
 | 2. Mesh and source stencil | Define checked mesh/profile inputs, one-based conversion, layer metrics, inclination, face averaging and the observed `Reset` stencil. | Phase 1 hydraulic contract. | A source-algebra versus manual terminology reconciliation and a reviewed mesh/stencil fixture. | [STATE_AND_CALLS.md](master/STATE_AND_CALLS.md), [NUMERICAL_DESIGN.md](master/NUMERICAL_DESIGN.md) |
 | 3. Water solver transaction | Build the Picard solver, boundary-aware tridiagonal assembly, event-aligned stepping, diagnostics, balances, and accepted/trial state handling. | Phase 2 mesh/stencil evidence. | Pivot, retry, rollback, allocation, and water-balance checks. Complete rollback is a port contract to prove; it is not assumed legacy behavior. | [NUMERICAL_DESIGN.md](master/NUMERICAL_DESIGN.md), [STATE_AND_CALLS.md](master/STATE_AND_CALLS.md), [VALIDATION_STRATEGY.md](master/VALIDATION_STRATEGY.md) |
@@ -50,7 +50,7 @@ The references above are deliberately narrow. Use this guide only when a phase n
 | Which physics is observed, required later, optional, rejected, or uncertain? | [FEATURE_MATRIX.md](master/FEATURE_MATRIX.md) |
 | What are the numerical, precision, memory, solver, and rollback contracts? | [NUMERICAL_DESIGN.md](master/NUMERICAL_DESIGN.md) |
 | What is the core/adapter boundary, legacy I/O approach, and host policy? | [API_AND_IO.md](master/API_AND_IO.md) |
-| What evidence is needed for oracle, fixtures, tolerances, allocations, and performance? | [VALIDATION_STRATEGY.md](master/VALIDATION_STRATEGY.md) |
+| What evidence is needed for the Fortran reference executable, fixtures, tolerances, allocations, and performance? | [VALIDATION_STRATEGY.md](master/VALIDATION_STRATEGY.md) |
 | What risks, alternatives, and deferred decisions remain? | [ROADMAP_AND_RISKS.md](master/ROADMAP_AND_RISKS.md) |
 
 ## Cross-phase architecture constraints
@@ -100,4 +100,4 @@ The five requested blueprint outputs are retained as references: architecture/mo
 
 ## Immediate next step
 
-Create the Phase 0 plan only. Its scope is the isolated oracle and provenance process. It must not begin the Rust solver, Cargo workspace, fixtures, or parity claims. Once Phase 0 exit evidence is reviewed, return to this document and create the Phase 1 plan.
+Create the Phase 0 plan only. Its scope is the isolated Fortran reference executable and provenance process. It must not begin the Rust solver, Cargo workspace, fixtures, or parity claims. Once Phase 0 exit evidence is reviewed, return to this document and create the Phase 1 plan.

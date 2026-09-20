@@ -1,16 +1,16 @@
 # Validation and performance strategy
 
-## Oracle harness
+## Fortran reference harness
 
-The future oracle is a separately identified copy of the pinned ten-file snapshot. A bootstrap task must first preserve the originals, apply only reviewable portability changes for `MSFLIB`, `iMetHour`, date/time, arguments, paths, and signals, and record patch hash, source/archive hashes, compiler, flags, executable hash, host, and date. It must not silently promote precision or rewrite algorithms. The current syntax check fails before simulation (`MSFLIB` and `TIME.FOR:551`), so no oracle result exists yet.
+The future Fortran reference executable is a separately identified copy of the pinned ten-file snapshot. A bootstrap task must first preserve the originals, apply only reviewable portability changes for `MSFLIB`, `iMetHour`, date/time, arguments, paths, and signals, and record patch hash, source/archive hashes, compiler, flags, executable hash, host, and date. It must not silently promote precision or rewrite algorithms. The current syntax check fails before simulation (`MSFLIB` and `TIME.FOR:551`), so no reference-executable result exists yet.
 
-Each fixture runs in its own temporary output directory with immutable input copies, an explicit wall-clock timeout, captured stdout/stderr, exit status, expected completion marker (`CloseOutput`/`end` where applicable), file inventory, and no stale outputs. A manifest records fixture ID, input provenance, source and patch hashes, compiler/toolchain, flags, precision mode, platform, command, timeout, output hashes, and observed warnings. A run is incomplete if it times out, exits nonzero, omits required outputs, or writes malformed/truncated records. Future commands are proposed and require the oracle/bootstrap milestone.
+Each fixture runs in its own temporary output directory with immutable input copies, an explicit wall-clock timeout, captured stdout/stderr, exit status, expected completion marker (`CloseOutput`/`end` where applicable), file inventory, and no stale outputs. A manifest records fixture ID, input provenance, source and patch hashes, compiler/toolchain, flags, precision mode, platform, command, timeout, output hashes, and observed warnings. A run is incomplete if it times out, exits nonzero, omits required outputs, or writes malformed/truncated records. Future commands are proposed and require the Fortran-reference bootstrap milestone.
 
 ## Fixture matrix
 
 | Fixture | Input provenance status | Observables and checks | Producer/prerequisite |
 |---|---|---|---|
-| Dry-column infiltration | 4.08 Chapter 11.1 parameters are documented; machine-readable deck absent | `h`, water content, surface flux, cumulative balance, accepted times and iterations | construct/recover deck; oracle bootstrap + water solver |
+| Dry-column infiltration | 4.08 Chapter 11.1 parameters are documented; machine-readable deck absent | `h`, water content, surface flux, cumulative balance, accepted times and iterations | construct/recover deck; Fortran-reference bootstrap + water solver |
 | Capillary rise / shallow water table | proposed independent fixture, not a claimed manual example | equilibrium gradient, transient heads, gravity/sign convention, balance and refinement | fixture design + mesh/water path |
 | Cyclic atmospheric forcing with roots | manual Chapter 11.2 provenance; complete deck absent | atmospheric mode switches, ponding, root uptake/stress/compensation, `SubReg` balance and outputs | forcing/root adapter + water acceptance |
 | Solute reaction/sorption | manual Chapters 11.3–11.5; decks absent | species masses, sorbed/mobile/immobile pools, fluxes, reaction residuals | later solute implementation and fixture recovery |
@@ -35,7 +35,7 @@ Property checks should cover hydrostatic equilibrium, conservation, refinement t
 
 Report per-variable units before comparison: pressure head and coordinates in the configured length unit, water content dimensionless, flux and cumulative water in configured length/time and length, concentration and sorbed mass in their declared units, temperature in degrees, and relative balance as dimensionless. For each scalar/vector field use paired acceptance `abs(a-b) <= atol + rtol * max(abs(a), abs(b))`, plus normalized L-infinity, RMS, and mesh-weighted L2 where applicable. State vector normalization and node weights explicitly; do not compare rounded text as if it were full precision.
 
-Use absolute residual criteria when a mass-balance denominator is zero or near zero, and record the denominator and normalization branch. Compare accepted times, event times, boundary modes, iteration counts, retries, timestep history, termination status, and balances as diagnostics even when physical-result tolerances permit trajectory differences. The prompt's `1e-6` is a calibration candidate, not a universal or achieved threshold. Calibrate per field after a real oracle and fixture baseline, including mixed-precision versus f64 compiler comparisons.
+Use absolute residual criteria when a mass-balance denominator is zero or near zero, and record the denominator and normalization branch. Compare accepted times, event times, boundary modes, iteration counts, retries, timestep history, termination status, and balances as diagnostics even when physical-result tolerances permit trajectory differences. The prompt's `1e-6` is a calibration candidate, not a universal or achieved threshold. Calibrate per field after a real Fortran-reference executable and fixture baseline, including mixed-precision versus f64 compiler comparisons.
 
 Text-layout checks are separate: verify filenames, headers, column count, delimiters, units, end markers, line endings, numeric width/precision, and deterministic ordering. A text mismatch does not by itself prove scientific mismatch; a text match does not prove numerical correctness.
 
@@ -45,7 +45,7 @@ Run the same in-memory fixture through the core API and each selected Python/R/J
 
 ## Allocation and performance
 
-Allocation counting is a future implementation test, not an assertion about the current repository. Instrument the inner time/Picard loop and verify zero allocations for fixed-size stepping, while separately measuring setup, retries, output, error construction, and dynamic resizing. A failing allocation budget must report call site and phase. Criterion experiments should benchmark equivalent numerical work: same mesh, physics, forcing, accepted steps, iteration limits, output disabled/enabled as separate cases, and recorded iteration/retry counts. Compare against the patched Fortran oracle only after parity is established, separating initialization, stepping, formatting, wrapper copies, and ensemble throughput. Report distributions, hardware, compiler flags, precision, and problem size; claim no speedup until workloads and results are comparable.
+Allocation counting is a future implementation test, not an assertion about the current repository. Instrument the inner time/Picard loop and verify zero allocations for fixed-size stepping, while separately measuring setup, retries, output, error construction, and dynamic resizing. A failing allocation budget must report call site and phase. Criterion experiments should benchmark equivalent numerical work: same mesh, physics, forcing, accepted steps, iteration limits, output disabled/enabled as separate cases, and recorded iteration/retry counts. Compare against the patched Fortran reference executable only after parity is established, separating initialization, stepping, formatting, wrapper copies, and ensemble throughput. Report distributions, hardware, compiler flags, precision, and problem size; claim no speedup until workloads and results are comparable.
 
 ## Future commands and prerequisites
 
@@ -53,9 +53,9 @@ The following are proposed commands, not executable checks today:
 
 | Command | Purpose | Prerequisite |
 |---|---|---|
-| `python3 tools/run_oracle.py --fixture <id> --manifest <path>` | isolated oracle run and provenance capture | oracle bootstrap, tool script and fixture |
+| `python3 tools/run_reference.py --fixture <id> --manifest <path>` | isolated Fortran-reference run and provenance capture | Fortran-reference bootstrap, tool script and fixture |
 | `cargo test -p hydrus-core --test hydraulic_curves` | curve/property tests | Rust core and test files |
-| `cargo test -p hydrus-core --test fixture_parity -- --nocapture` | paired oracle comparison | oracle outputs, parser and tolerance policy |
+| `cargo test -p hydrus-core --test fixture_parity -- --nocapture` | paired reference comparison | reference outputs, parser and tolerance policy |
 | `cargo test -p hydrus-core --test state_isolation` | interleaved/threaded independence | re-entrant core and host decision |
 | `cargo bench -p hydrus-core --bench solver` | Criterion performance | benchmark harness and parity-approved case |
 | `python3 tools/check_outputs.py --layout ...` | text-layout validation | canonical writer and expected schema |
@@ -64,9 +64,9 @@ The current document structural check validates documentation only; it is not nu
 
 ## Acceptance gates
 
-1. Provenance gate: immutable source/archive hashes, artifact notices, patch manifest, and reproducible oracle command exist.
+1. Provenance gate: immutable source/archive hashes, artifact notices, patch manifest, and reproducible Fortran-reference command exist.
 2. Fixture gate: each required scenario has a reviewed input source, expected observables, and isolated run contract; missing decks remain explicitly blocked.
-3. Water gate: single-domain water, atmosphere, root uptake, mesh, events, rollback, and balance pass independent and oracle comparisons after tolerance calibration.
+3. Water gate: single-domain water, atmosphere, root uptake, mesh, events, rollback, and balance pass independent and Fortran-reference comparisons after tolerance calibration.
 4. Later-physics gates: solute/heat, hysteresis, and required dual porosity each receive separate fixtures and coupling/rollback evidence; no feature is inferred from inventory alone.
 5. Host gate: selected bindings pass equivalence, invalid-input, concurrency, cancellation, and resource tests.
 6. Performance gate: allocation and benchmark results use comparable numerical work and are reported with reproducible environment metadata.
@@ -86,6 +86,6 @@ Recommendations become implementation commitments only after the corresponding g
 
 1. Who owns construction/recovery and review of missing decks and expected results, and which independent fixtures are acceptable?
 2. Which compiler, precision modes, operating systems, and host bindings are release targets?
-3. What per-field tolerances and mass-balance zero-denominator policy are accepted after oracle calibration?
+3. What per-field tolerances and mass-balance zero-denominator policy are accepted after Fortran-reference calibration?
 4. Which optional physics and output formats receive performance and host-equivalence commitments?
-5. Which exact patched-oracle semantics are permitted for MSFLIB and the `iMetHour` blocker?
+5. Which exact patched-reference semantics are permitted for MSFLIB and the `iMetHour` blocker?

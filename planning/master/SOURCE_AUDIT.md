@@ -38,7 +38,7 @@ Every declared program/routine, grouped by source and with declaration line, is 
 
 Intrinsic and compiler/library calls include date/time (`getdat`, `gettim`), argument (`GETARG`), formatted/unformatted I/O, `STOP`, and math operations. Project calls are the routines in this table; calls such as `Table`, `Evapor`, `Snow`, `MeteoInt`, `CloseOutput`, `CloseFiles`, and `Exclusion` are source-level dependencies even where branches are optional. `MSFLIB` signal handlers (`SIGNALQQ`, `SIGFPE`, `SIGTERM` paths) and any compiler-provided date/time/argument extensions are unresolved portability dependencies. No call edge was silently treated as a project routine when only a compiler/library implementation was observed.
 
-Observed external or unresolved symbols include `MSFLIB`/signal APIs, platform date/time and argument extensions, and branch-referenced routines absent from this ten-file set (for example commented or optional `DayMeteoOut`-adjacent integrations). They require investigation in a future oracle-portability task.
+Observed external or unresolved symbols include `MSFLIB`/signal APIs, platform date/time and argument extensions, and branch-referenced routines absent from this ten-file set (for example commented or optional `DayMeteoOut`-adjacent integrations). They require investigation in a future Fortran-reference portability task.
 
 ## Provenance
 
@@ -50,7 +50,7 @@ The main header identifies an internal “version 7.0” and an October 2009 mod
 
 The unmodified syntax check recorded in the research evidence (`gfortran -fsyntax-only -std=legacy -ffixed-line-length-none src_reference/*.FOR`) exits 1 at `HYDRUS.FOR:29` because `msflib.mod` is unavailable and at `TIME.FOR:551` because `if(iMetHour)` supplies a non-scalar logical expression. This is not a link, runtime, or numerical baseline. Additional unresolved symbols may appear after those blockers are addressed.
 
-The minimal future oracle-portability plan is a separately identified copy: replace or isolate MSFLIB signal handling; verify `iMetHour` semantics before changing it; audit `GETARG`, `getdat`, `gettim`, `CloseOutput`, Windows path separators, command arguments, and compiler-specific logical behavior; then record patch hash, compiler/flags, executable hash, inputs, and outputs. Do not alter these originals, silently promote REAL precision, rewrite algorithms, or claim a working oracle here.
+The minimal future Fortran-reference portability plan is a separately identified copy: replace or isolate MSFLIB signal handling; verify `iMetHour` semantics before changing it; audit `GETARG`, `getdat`, `gettim`, `CloseOutput`, Windows path separators, command arguments, and compiler-specific logical behavior; then record patch hash, compiler/flags, executable hash, inputs, and outputs. Do not alter these originals, silently promote REAL precision, rewrite algorithms, or claim a working reference executable here.
 
 Observed file/platform coupling includes input units 10, 30–36 and 35, output units 43–45, 50, 70–72, 75–78, 80+i, 99, and inquiry of 81–83 and 41–42; filenames are assembled from `cDataPath`/`cFileName`, with legacy path and status/error conventions. The main program opens input/profile/atmospheric/material/solute and output/error files, while `OpenSoluteFiles` allocates units 80+i. Unit ownership and canonical names must be confirmed during future adapter design.
 
@@ -65,7 +65,7 @@ Observed file/platform coupling includes input units 10, 30–36 and 35, output 
 
 ## Open decisions
 
-1. Confirm the intended compatibility release label and whether the working lineage should remain “4.08 or derivative”; ownership: user/release decision before oracle fixtures.
-2. Decide the supported host/compiler and exact MSFLIB replacement policy after semantic review of signal and date/time behavior; ownership: oracle-portability task.
+1. Confirm the intended compatibility release label and whether the working lineage should remain “4.08 or derivative”; ownership: user/release decision before reference fixtures.
+2. Decide the supported host/compiler and exact MSFLIB replacement policy after semantic review of signal and date/time behavior; ownership: Fortran-reference portability task.
 3. Confirm canonical input/output filename and file-unit mapping for a future compatibility adapter; ownership: I/O design task.
 4. Determine artifact-specific notices and redistribution terms from the source/archive/manual custodians; ownership: provenance review, with no license inferred here.

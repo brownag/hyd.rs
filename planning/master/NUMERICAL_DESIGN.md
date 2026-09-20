@@ -66,7 +66,7 @@ Water storage, boundary fluxes, sinks and drainage must produce a mass-balance r
 
 Use separate accepted and trial state, with copy-on-write or preallocated twin buffers. A rejected step restores all coupled histories, boundary modes, hysteresis state, balances and event cursors. Future dual porosity needs mobile/immobile arrays and exchange workspaces; it cannot alias single-domain water state. Thread-safe immutable models and independently owned mutable simulations can be `Send + Sync`; one simulation's workspace is exclusively mutable during stepping.
 
-Compatibility mode should retain source-like `f32` field conversion points and `f64` accumulators where observed; modernization may use `f64` throughout only with calibrated tolerances and independent checks. Do not claim either mode passes without a future oracle baseline.
+Compatibility mode should retain source-like `f32` field conversion points and `f64` accumulators where observed; modernization may use `f64` throughout only with calibrated tolerances and independent checks. Do not claim either mode passes without a future Fortran-reference baseline.
 
 ## Interfaces
 
@@ -87,7 +87,7 @@ The core accepts validated arrays and forcing views, owns no files or global sta
 |---|---|---|
 | Stencil | Preserve `Reset` half-cell stencil and document FE terminology reconciliation | Derive an algebraically equivalent FE form only after manual/source fixture agreement |
 | Solver | Small reusable Thomas kernel with caller boundary assembly | `faer`/`ndarray` if wider systems or benchmark evidence justify dependency |
-| Precision | Mixed compatibility mode first; optional f64 modernization | f64-only after oracle and independent convergence/refinement evidence |
+| Precision | Mixed compatibility mode first; optional f64 modernization | f64-only after Fortran-reference and independent convergence/refinement evidence |
 | Failure | Strict typed nonconvergence at minimum step | Legacy continuation behind explicit policy and diagnostics |
 | Memory | Preallocated twin accepted/trial workspaces | COW snapshots only if allocation counts prove equivalent |
 
@@ -103,7 +103,7 @@ The core accepts validated arrays and forcing views, owns no files or global sta
 ## Open decisions
 
 1. Confirm the algebraic compatibility interpretation of the source finite-difference stencil versus manual finite-element language; owner: numerical validation, gate: independent stencil fixture.
-2. Choose compatibility precision and exact f64 modernization policy; owner: roadmap/user, gate: oracle baseline and drift study.
+2. Choose compatibility precision and exact f64 modernization policy; owner: roadmap/user, gate: Fortran-reference baseline and drift study.
 3. Set minimum-pivot and nonconvergence behavior for strict and legacy modes; owner: solver design, gate: singular/near-singular fixtures.
 4. Decide whether a third-party linear algebra crate is justified after comparable benchmark evidence; owner: performance task, gate: future implementation prototype.
 5. Confirm the complete coupled snapshot boundary for later hysteresis, heat, solute, vapor and dual porosity; owner: transport/state design, gate: feature-specific rollback tests.
