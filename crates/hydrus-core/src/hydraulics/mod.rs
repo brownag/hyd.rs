@@ -1,4 +1,5 @@
 mod geometry;
+mod stencil;
 mod table;
 mod types;
 mod van_genuchten;
@@ -7,6 +8,7 @@ pub use geometry::{
     adjacent_distance, arithmetic_face_conductivity, boundary_half_cell_width,
     geometric_face_conductivity, gravity_metric, layer_metrics, Boundary, LayerMetric,
 };
+pub use stencil::{assemble_reset_stencil, FaceAveraging, ResetRow, ResetStencilInput};
 pub use types::{Evaluation, HydraulicDerivatives, Mesh1D, VanGenuchtenParameters};
 use van_genuchten::evaluate_model_zero;
 

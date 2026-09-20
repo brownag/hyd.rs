@@ -32,7 +32,14 @@ Scientific baseline: **unavailable.** Phase 2 source-algebra and property tests 
 - Layer metrics use the approved contiguous first-to-last coordinate span convention.
 - Verification: targeted geometry tests passed (7); fmt, clippy, and `git diff --check` passed.
 - No boundary, stencil, solver, filesystem, parity, or performance behavior added.
-| 3 | 4.3.1 | Source `Reset` stencil | pending | — |
+| 3 | 4.3.1 | Source `Reset` stencil | done | pending |
+
+## 4.3.1
+
+- Status: done; pure interior `Reset` stencil assembly implemented with typed finite/domain validation.
+- Files: `crates/hydrus-core/src/hydraulics/stencil.rs`, `mod.rs`, `reset_stencil.rs`, and task TODO.
+- Preserves arithmetic default and explicit geometric averaging; boundary rows, `Shift`, solves, retries, and parity remain deferred.
+- Verification: targeted stencil tests passed (5); fmt, clippy, and `git diff --check` passed.
 | 4 | 4.4.1 | Phase 2 evidence and Phase 3 handoff | pending | — |
 
 ## Task reports
