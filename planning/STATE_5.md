@@ -24,7 +24,7 @@ Scientific baseline: **unavailable.** Phase 3 tests are source-algebra and Rust 
 | Wave | Task | Deliverable | Status | Commit |
 |---|---|---|---|---|
 | 1 | 5.1.1 | Generic boundary-row contract | done | pending |
-| 2 | 5.2.1 | Preallocated water tridiagonal kernel | pending | — |
+| 2 | 5.2.1 | Preallocated water tridiagonal kernel | done | pending |
 | 3 | 5.3.1 | Transactional Picard stepping and balances | pending | — |
 | 4 | 5.4.1 | Phase 3 evidence and Phase 4 handoff | pending | — |
 
@@ -40,6 +40,15 @@ Scientific baseline: **unavailable.** Phase 3 tests are source-algebra and Rust 
 - Checks: fmt, scoped Clippy, workspace Clippy, and `git diff --check` passed.
 - Deviations: none; physical boundary policy remains deferred to Phase 4.
 - Gotcha: caller supplies signed flux; natural/free preserves its prepared row.
+
+## 5.2.1
+
+- Status: done; in-place Thomas kernel and pivot diagnostics implemented.
+- Files: `hydraulics/linear.rs`, `hydraulics/mod.rs`, `tests/tridiagonal.rs`, task TODO.
+- Tests: `cargo test -p hydrus-core --test tridiagonal` (5 passed); workspace (40 passed).
+- Checks: fmt, scoped Clippy, workspace Clippy, and `git diff --check` passed.
+- Deviations: one exact pivot comparison corrected to tolerance-based; no scope change.
+- Gotcha: `TridiagonalError` is exported from `hydraulics`; RHS and diagonal are mutated.
 
 ## Escalations and amendments
 
