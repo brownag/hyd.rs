@@ -11,6 +11,7 @@ pub use hydraulics::{
     Mesh1D, UnitSymbol, VanGenuchtenModel, VanGenuchtenParameters,
 };
 pub use water_solver::{
-    advance_water_step, WaterBalance, WaterStepInput, WaterStepPolicy, WaterStepReport,
+    advance_water_step, WaterBalance, WaterProductConfig, WaterStepInput, WaterStepPolicy,
+    WaterStepReport,
 };
 pub use water_state::{WaterAccounting, WaterState, WaterWorkspace};

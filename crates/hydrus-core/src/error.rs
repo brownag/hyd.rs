@@ -88,6 +88,10 @@ pub enum WaterStepError {
     InvalidPolicy {
         name: &'static str,
     },
+    UnsupportedConfiguration {
+        name: &'static str,
+        value: usize,
+    },
     DimensionMismatch,
     NonFiniteInput {
         name: &'static str,
@@ -112,6 +116,9 @@ impl fmt::Display for WaterStepError {
             Self::InvalidState { reason } => write!(formatter, "invalid water state: {reason}"),
             Self::InvalidWorkspace { reason } => write!(formatter, "invalid water workspace: {reason}"),
             Self::InvalidPolicy { name } => write!(formatter, "invalid water-step policy: {name}"),
+            Self::UnsupportedConfiguration { name, value } => {
+                write!(formatter, "unsupported water configuration {name}={value}")
+            }
             Self::DimensionMismatch => write!(formatter, "water-step dimensions differ"),
             Self::NonFiniteInput { name } => write!(formatter, "non-finite water-step input: {name}"),
             Self::InvalidTargetTime {

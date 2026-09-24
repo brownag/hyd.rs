@@ -6,6 +6,34 @@ use crate::hydraulics::{
 use crate::water_state::validate_finite;
 use crate::{WaterState, WaterStepError, WaterWorkspace};
 
+/// Validated capability contract for the first single-domain water product.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct WaterProductConfig {
+    hydraulic_model: crate::HydraulicModelSelector,
+}
+
+impl WaterProductConfig {
+    /// Accepts only `iModel=0` and exactly one water domain.
+    pub fn new(i_model: i32, domain_count: usize) -> Result<Self, WaterStepError> {
+        let hydraulic_model = crate::HydraulicModelSelector::from_i32(i_model)?;
+        if domain_count != 1 {
+            return Err(WaterStepError::UnsupportedConfiguration {
+                name: "domain_count",
+                value: domain_count,
+            });
+        }
+        Ok(Self { hydraulic_model })
+    }
+
+    pub fn hydraulic_model(self) -> crate::HydraulicModelSelector {
+        self.hydraulic_model
+    }
+
+    pub fn domain_count(self) -> usize {
+        1
+    }
+}
+
 /// Fixed policy for Picard convergence, pivot checks, and adaptive retry.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct WaterStepPolicy {
