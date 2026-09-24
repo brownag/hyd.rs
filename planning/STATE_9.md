@@ -1,7 +1,7 @@
 # State — Orchestration 9: Phase 4 atmospheric remediation and completion
 
 Plan status: **approved by the user on 2026-09-24.**
-Execution status: **Waves 1–4 complete; Wave 5 pending.**
+Execution status: **Waves 1–5 complete.**
 Plan: [EXECUTION_PLAN_9.md](EXECUTION_PLAN_9.md); worker prompt: [PROMPT_TEMPLATE_9.md](PROMPT_TEMPLATE_9.md).
 Diagnosis: [ATMOSPHERIC_NONCONVERGENCE_FINDINGS.md](ATMOSPHERIC_NONCONVERGENCE_FINDINGS.md).
 Historical blocker: [STATE_8.md](STATE_8.md), task 8.2.1.
@@ -24,7 +24,7 @@ Scientific baseline: **unavailable.** No Fortran executable, calibrated toleranc
 | 2 | 9.2.1 | Supported lower boundary modes | done | committed |
 | 3 | 9.3.1 | Feddes stress and compensation | done | committed |
 | 4 | 9.4.1 | Four first-water acceptance fixtures | done | committed |
-| 5 | 9.5.1 | Phase 4 evidence and Phase 5 handoff | pending | — |
+| 5 | 9.5.1 | Phase 4 evidence and Phase 5 handoff | done | committed |
 
 ## Task reports
 
@@ -83,6 +83,16 @@ Scientific baseline: **unavailable.** No Fortran executable, calibrated toleranc
 - `cargo fmt --check`, `cargo clippy --workspace --all-targets -- -D warnings`, and `git diff --check`: passed.
 - Deviations: corrected a singular Neumann fixture row and stale target time; formatted only the new test file after the first wave gate.
 - Limitation: all fixture values are independent in-memory contract scenarios, not recovered HYDRUS example decks.
+
+## 9.5.1 — Phase 4 evidence and Phase 5 handoff
+
+- Status: complete; evidence record structurally reviewed against task acceptance.
+- Added `planning/master/PHASE_4_WATER_ACCEPTANCE_EVIDENCE.md`; task micro-plan in `tasks/9.5.1.todo.md`.
+- Assesses Phase 4 exit criteria with explicit evidence limits; records delivered APIs, supported/unsupported modes, fixture provenance, accounting signs, exact tests, and scientific limitations.
+- Phase 5 readiness is planning-only and conditional; no Phase 5 implementation authorization or scientific validation claim is made.
+- Final `cargo test --workspace`: all passed (88 integration tests; 0 failed).
+- Final `cargo fmt --check`, `cargo clippy --workspace --all-targets -- -D warnings`, and `git diff --check`: passed.
+- No parity oracle, calibrated tolerance, or canonical Phase 4 manual decks/outputs are available; these remain evidence gaps.
 
 ## Amendments and blockers
 
