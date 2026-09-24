@@ -6,6 +6,7 @@ use crate::hydraulics::{
     PivotDiagnostics, ResetRow, ResetRowInput,
 };
 use crate::lower_boundary::{lower_flux_row, LowerBoundaryMode, LowerFluxRowInput};
+use crate::root_uptake::RootUptakeInput;
 use crate::water_state::validate_finite;
 use crate::{WaterState, WaterStepError, WaterWorkspace};
 
@@ -54,6 +55,8 @@ pub struct WaterStepInput<'a> {
     pub mesh: &'a Mesh1D,
     pub materials: &'a [&'a dyn HydraulicModel],
     pub sink: &'a [f64],
+    /// Optional Feddes root uptake added to the caller-provided sink field.
+    pub root_uptake: Option<&'a RootUptakeInput<'a>>,
     pub timestep: f64,
     /// Caller-selected time that this step must not pass.
     pub target_time: f64,
@@ -402,6 +405,21 @@ fn assemble(
         workspace.evaluated_conductivity[node] = evaluation.conductivity;
         workspace.evaluated_capacity[node] = evaluation.capacity;
     }
+    if let Some(root_uptake) = input.root_uptake {
+        root_uptake.fill_trial_sink(
+            input.mesh,
+            input.materials,
+            &workspace.trial_heads,
+            &workspace.trial_water,
+            timestep,
+            &mut workspace.trial_sink,
+        )?;
+        for node in 0..count {
+            workspace.trial_sink[node] += input.sink[node];
+        }
+    } else {
+        workspace.trial_sink.copy_from_slice(input.sink);
+    }
     let lower_boundary_flux = input.lower_boundary_mode.flux_into_domain(
         workspace.evaluated_conductivity[0],
         workspace.evaluated_conductivity[1],
@@ -429,7 +447,7 @@ fn assemble(
                 head: workspace.trial_heads[0],
                 theta: workspace.evaluated_theta[0],
                 old_theta: state.water_contents[0],
-                sink: input.sink[0],
+                sink: workspace.trial_sink[0],
                 spacing,
                 gravity: input.mesh.inclination_cosine(),
                 timestep,
@@ -509,7 +527,7 @@ fn assemble(
             h_new: workspace.trial_heads[node],
             theta_new: workspace.evaluated_theta[node],
             theta_old: state.water_contents[node],
-            sink: input.sink[node],
+            sink: workspace.trial_sink[node],
             timestep,
             face_averaging: input.face_averaging,
         })?;
@@ -540,7 +558,7 @@ fn atmospheric_top_flux(
         * ((workspace.trial_heads[top] - workspace.trial_heads[previous]) / dx
             + input.mesh.inclination_cosine())
         + (workspace.evaluated_theta[top] - state.water_contents[top]) * dx / (2.0 * timestep)
-        + input.sink[top] * dx / 2.0
+        + workspace.trial_sink[top] * dx / 2.0
 }
 
 fn atmospheric_top_flux_for_heads(
@@ -567,7 +585,7 @@ fn atmospheric_top_flux_for_heads(
         * ((workspace.trial_heads[top] - workspace.trial_heads[previous]) / dx
             + input.mesh.inclination_cosine())
         + (top_evaluation.theta - state.water_contents[top]) * dx / (2.0 * timestep)
-        + input.sink[top] * dx / 2.0)
+        + workspace.trial_sink[top] * dx / 2.0)
 }
 
 fn atmospheric_mode(
@@ -616,7 +634,7 @@ fn atmospheric_top_row(
         rhs: capacity * dx / timestep * head
             - theta_change * dx / timestep
             - conductivity * input.mesh.inclination_cosine()
-            - input.sink[top] * dx,
+            - workspace.trial_sink[top] * dx,
     };
     validate_finite(
         "atmospheric top row",
@@ -651,7 +669,7 @@ fn balance(
     for node in 0..input.mesh.coordinates().len() {
         let width = nodal_control_volume_width(input.mesh, node)?;
         soil_storage_change += (workspace.trial_water[node] - state.water_contents[node]) * width;
-        sink_integral += input.sink[node] * width;
+        sink_integral += workspace.trial_sink[node] * width;
     }
     let upper_flux = atmospheric_flux.unwrap_or(input.upper_boundary_flux);
     let boundary_flux = (lower_boundary_flux + upper_flux) * timestep;
@@ -722,6 +740,9 @@ fn validate(
     }
     if input.sink.len() != count {
         return Err(WaterStepError::DimensionMismatch);
+    }
+    if let Some(root_uptake) = input.root_uptake {
+        root_uptake.validate(count)?;
     }
     validate_finite(
         "boundary_fluxes",

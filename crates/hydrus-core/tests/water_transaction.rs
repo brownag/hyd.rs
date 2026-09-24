@@ -73,6 +73,7 @@ fn input<'a>(mesh: &'a Mesh1D, timestep: f64) -> WaterStepInput<'a> {
         mesh,
         materials: &MATERIALS,
         sink: &[0.0; 3],
+        root_uptake: None,
         timestep,
         target_time: 10.0,
         face_averaging: FaceAveraging::Arithmetic,

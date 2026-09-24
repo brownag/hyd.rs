@@ -45,6 +45,7 @@ fn setup<'a>(
         mesh,
         materials,
         sink,
+        root_uptake: None,
         timestep: 2.0,
         target_time: 2.0,
         face_averaging: FaceAveraging::Arithmetic,

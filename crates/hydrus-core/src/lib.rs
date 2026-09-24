@@ -5,6 +5,7 @@ pub mod error;
 pub mod forcing;
 pub mod hydraulics;
 pub mod lower_boundary;
+pub mod root_uptake;
 mod water_solver;
 mod water_state;
 
@@ -16,6 +17,7 @@ pub use hydraulics::{
     Mesh1D, UnitSymbol, VanGenuchtenModel, VanGenuchtenParameters,
 };
 pub use lower_boundary::{LowerBoundaryMode, UnsupportedLowerBoundaryMode};
+pub use root_uptake::{feddes_reduction, RootUptakeInput, RootUptakeModel};
 pub use water_solver::{
     advance_water_step, WaterBalance, WaterProductConfig, WaterStepInput, WaterStepPolicy,
     WaterStepReport,

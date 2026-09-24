@@ -57,6 +57,7 @@ fn input<'a>(
         mesh,
         materials,
         sink,
+        root_uptake: None,
         timestep: 0.25,
         target_time: 0.25,
         face_averaging: FaceAveraging::Arithmetic,

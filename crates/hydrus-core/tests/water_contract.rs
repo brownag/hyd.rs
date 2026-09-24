@@ -72,6 +72,7 @@ fn invalid_dimensions_do_not_mutate_accepted_state() {
         mesh: &mesh,
         materials: &materials,
         sink: &sink,
+        root_uptake: None,
         timestep: 1.0,
         target_time: 2.0,
         face_averaging: FaceAveraging::Arithmetic,

@@ -110,6 +110,12 @@ pub enum WaterStepError {
     UnsupportedAtmosphericInput {
         name: &'static str,
     },
+    InvalidRootUptake {
+        name: &'static str,
+    },
+    UnsupportedRootUptake {
+        option: usize,
+    },
     DimensionMismatch,
     NonFiniteInput {
         name: &'static str,
@@ -152,6 +158,12 @@ impl fmt::Display for WaterStepError {
             }
             Self::UnsupportedAtmosphericInput { name } => {
                 write!(formatter, "unsupported atmospheric input: {name}")
+            }
+            Self::InvalidRootUptake { name } => {
+                write!(formatter, "invalid root-uptake input: {name}")
+            }
+            Self::UnsupportedRootUptake { option } => {
+                write!(formatter, "unsupported root-uptake option: {option}")
             }
             Self::DimensionMismatch => write!(formatter, "water-step dimensions differ"),
             Self::NonFiniteInput { name } => write!(formatter, "non-finite water-step input: {name}"),
