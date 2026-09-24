@@ -22,7 +22,7 @@ Scientific baseline: **unavailable.** Fixture provenance and numerical parity li
 | Wave | Task | Deliverable | Status | Commit |
 |---|---|---|---|---|
 | 1 | 8.1.1 | Validated water product configuration | done | `91b33da` |
-| 2 | 8.2.1 | Event-aligned atmospheric forcing and upper switching | blocked | `pending checkpoint` |
+| 2 | 8.2.1 | Event-aligned atmospheric forcing and upper switching | blocked | `75d7df5` (checkpoint) |
 | 3 | 8.3.1 | Supported lower boundary modes | pending | — |
 | 4 | 8.4.1 | Feddes root stress and compensation | pending | — |
 | 5 | 8.5.1 | Four first-water acceptance fixtures | pending | — |
@@ -48,6 +48,7 @@ Scientific baseline: **unavailable.** Fixture provenance and numerical parity li
 - Earlier revision passed 7/7 targeted tests and workspace gates, but was rejected in review for missing accepted ponding and supply-limited evaporation balance coverage.
 - Deviations: none authorized. The current implementation remains partial and unaccepted. No workspace gates were run after escalation edits.
 - Disposition: stopped at the escalation cap; a plan amendment or revised task approach is needed before dependent waves can proceed.
+- Checkpoint commit: `75d7df5` (`feat(core): checkpoint atmospheric boundary work`); this preserves investigation material and is not task acceptance.
 
 ## Escalations and amendments
 
