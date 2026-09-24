@@ -1,7 +1,7 @@
 # State — Orchestration 9: Phase 4 atmospheric remediation and completion
 
 Plan status: **approved by the user on 2026-09-24.**
-Execution status: **Waves 1–3 complete; Waves 4–5 pending.**
+Execution status: **Waves 1–4 complete; Wave 5 pending.**
 Plan: [EXECUTION_PLAN_9.md](EXECUTION_PLAN_9.md); worker prompt: [PROMPT_TEMPLATE_9.md](PROMPT_TEMPLATE_9.md).
 Diagnosis: [ATMOSPHERIC_NONCONVERGENCE_FINDINGS.md](ATMOSPHERIC_NONCONVERGENCE_FINDINGS.md).
 Historical blocker: [STATE_8.md](STATE_8.md), task 8.2.1.
@@ -23,7 +23,7 @@ Scientific baseline: **unavailable.** No Fortran executable, calibrated toleranc
 | 1 | 9.1.1 | Atmospheric active-set and balance remediation | done | committed |
 | 2 | 9.2.1 | Supported lower boundary modes | done | committed |
 | 3 | 9.3.1 | Feddes stress and compensation | done | committed |
-| 4 | 9.4.1 | Four first-water acceptance fixtures | pending | — |
+| 4 | 9.4.1 | Four first-water acceptance fixtures | done | committed |
 | 5 | 9.5.1 | Phase 4 evidence and Phase 5 handoff | pending | — |
 
 ## Task reports
@@ -70,6 +70,19 @@ Scientific baseline: **unavailable.** No Fortran executable, calibrated toleranc
 - `cargo fmt --check`, `cargo clippy --workspace --all-targets -- -D warnings`, and `git diff --check`: passed.
 - Deviations: added the optional input, workspace buffer, existing caller fixtures, and two Clippy-driven private argument/iteration cleanups after plan amendments/review.
 - Root weights are per-length densities, potential uptake is positive depth/time, and sink rates are positive extraction; source algebra does not establish executable parity.
+
+## 9.4.1 — First-water acceptance fixtures
+
+- Status: complete after fixture corrections and a mid-tier formatting cleanup.
+- Added `tests/water_acceptance.rs`; no production source or external fixture files changed.
+- Four in-memory scenarios cover dry-column infiltration, capillary-rise direction, cyclic atmospheric switching/rollback, and cyclic atmosphere with Feddes stress/compensation; a fifth test checks typed seepage/water-table rejection.
+- Each scenario records input provenance, units, observables, balance convention, relevant accepted/event times, and limitations. No manual decks, calibrated expected outputs, or Fortran parity are claimed.
+- The combined cyclic/root case verifies active stress, compensation domain, positive realized sink, event progression, and balance closure.
+- `cargo test -p hydrus-core --test water_acceptance -- --nocapture`: 5 passed, 0 failed.
+- `cargo test --workspace`: all tests passed (88 integration tests; 0 failed).
+- `cargo fmt --check`, `cargo clippy --workspace --all-targets -- -D warnings`, and `git diff --check`: passed.
+- Deviations: corrected a singular Neumann fixture row and stale target time; formatted only the new test file after the first wave gate.
+- Limitation: all fixture values are independent in-memory contract scenarios, not recovered HYDRUS example decks.
 
 ## Amendments and blockers
 
