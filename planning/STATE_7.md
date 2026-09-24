@@ -1,7 +1,7 @@
 # State — Orchestration 7: Phase 3 solver correction and closure
 
 Plan status: **approved by the user on 2026-09-23.**
-Execution status: **Wave 1 complete; Wave 2 ready to start.**
+Execution status: **Wave 1 complete; Wave 2 implementation integrated, workspace gate pending amended transaction fixture migration.**
 Planning baseline revision: `5066dad`, reviewed 2026-09-23. The worktree was clean before these three draft artifacts were created.
 Master authority: [HYDRUS1D_RUST_PORT_PLAN.md](HYDRUS1D_RUST_PORT_PLAN.md), Phase 3.
 Resume from [EXECUTION_PLAN_7.md](EXECUTION_PLAN_7.md); worker prompt: [PROMPT_TEMPLATE_7.md](PROMPT_TEMPLATE_7.md).
@@ -56,3 +56,4 @@ Scientific baseline: **unavailable.** This orchestration must not claim Fortran 
 
 - **7.1.2 escalation:** Initial `gpt-6-luna` worker's focused table test failed twice (5/6 tests, derivative tolerance assertion). Per the one-retry policy, the task was escalated once to `gpt-6-sol`; it corrected segment selection for interior knots and the final endpoint. Re-run passed 6/6. No scope change.
 - **Wave 1 baseline issue resolved:** the formerly intermittent allocation assertion passes in its isolated one-test binary and during the serial workspace run.
+- **7.2.1 scope amendment (D08, approved 2026-09-23):** Include `crates/hydrus-core/tests/water_transaction.rs` to migrate its `WaterStepInput` fixture after conductivity/capacity fields were replaced by hydraulic models. The first workspace run after integrating solver task `1643ee1` failed at compile time with three stale-field errors. Preserve retry, rollback, and invalid-input no-mutation coverage, and add the transaction integration binary to Wave 2 targeted gates.
