@@ -82,6 +82,7 @@ fn input<'a>(
         materials,
         sink: &[0.0; 3],
         timestep,
+        target_time: 10.0,
         face_averaging: FaceAveraging::Arithmetic,
         lower_row: BoundaryRow {
             lower: 0.0,

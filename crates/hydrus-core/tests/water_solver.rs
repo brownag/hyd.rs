@@ -67,6 +67,7 @@ fn input<'a>(
         materials,
         sink,
         timestep,
+        target_time: 10.0,
         face_averaging: FaceAveraging::Arithmetic,
         lower_row: BoundaryRow {
             lower: 0.0,
@@ -302,4 +303,92 @@ fn public_contract_has_no_filesystem_surface() {
     let source = include_str!("../src/water_solver.rs");
     assert!(!source.contains("std::fs"));
     assert!(!source.contains("File::"));
+}
+
+#[test]
+fn clips_requested_step_to_target_and_lands_exactly() {
+    let mesh = mesh();
+    let model = LinearModel {
+        conductivity: 1.0,
+        conductivity_slope: 0.0,
+        theta_offset: 0.0,
+        capacity: 0.0,
+    };
+    let materials: [&dyn HydraulicModel; 1] = [&model];
+    let sink = [0.0; 3];
+    let mut state = WaterState::new(2.0, vec![0.0; 3], vec![0.0; 3]).unwrap();
+    let mut workspace = WaterWorkspace::new(3).unwrap();
+    let request = WaterStepInput {
+        target_time: 2.25,
+        ..input(&mesh, &materials, &sink, 1.0, 0.0)
+    };
+    let report = advance_water_step(&mut state, &mut workspace, request, policy()).unwrap();
+    assert_eq!(report.timestep, 0.25);
+    assert_eq!(report.accepted_time, 2.25);
+    assert_eq!(state.time(), 2.25);
+}
+
+#[test]
+fn target_beyond_requested_step_advances_one_step_and_can_be_repeated() {
+    let mesh = mesh();
+    let model = LinearModel {
+        conductivity: 1.0,
+        conductivity_slope: 0.0,
+        theta_offset: 0.0,
+        capacity: 0.0,
+    };
+    let materials: [&dyn HydraulicModel; 1] = [&model];
+    let sink = [0.0; 3];
+    let mut state = WaterState::new(0.0, vec![0.0; 3], vec![0.0; 3]).unwrap();
+    let mut workspace = WaterWorkspace::new(3).unwrap();
+    let request = WaterStepInput {
+        target_time: 2.5,
+        ..input(&mesh, &materials, &sink, 1.0, 0.0)
+    };
+    let first = advance_water_step(&mut state, &mut workspace, request, policy()).unwrap();
+    assert_eq!(first.timestep, 1.0);
+    assert_eq!(first.accepted_time, 1.0);
+    let second = advance_water_step(&mut state, &mut workspace, request, policy()).unwrap();
+    assert_eq!(second.timestep, 1.0);
+    let third = advance_water_step(&mut state, &mut workspace, request, policy()).unwrap();
+    assert_eq!(third.timestep, 0.5);
+    assert_eq!(third.accepted_time, 2.5);
+}
+
+#[test]
+fn rejects_nonfuture_and_nonfinite_targets_without_mutation() {
+    let mesh = mesh();
+    let model = LinearModel {
+        conductivity: 1.0,
+        conductivity_slope: 0.0,
+        theta_offset: 0.0,
+        capacity: 0.0,
+    };
+    let materials: [&dyn HydraulicModel; 1] = [&model];
+    let sink = [0.0; 3];
+    let mut state = WaterState::new(2.0, vec![0.0; 3], vec![0.0; 3]).unwrap();
+    let original = state.clone();
+    let mut workspace = WaterWorkspace::new(3).unwrap();
+    for target_time in [2.0, 1.0] {
+        let request = WaterStepInput {
+            target_time,
+            ..input(&mesh, &materials, &sink, 1.0, 0.0)
+        };
+        assert!(matches!(
+            advance_water_step(&mut state, &mut workspace, request, policy()),
+            Err(WaterStepError::InvalidTargetTime { .. })
+        ));
+        assert_eq!(state, original);
+    }
+    let request = WaterStepInput {
+        target_time: f64::NAN,
+        ..input(&mesh, &materials, &sink, 1.0, 0.0)
+    };
+    assert!(matches!(
+        advance_water_step(&mut state, &mut workspace, request, policy()),
+        Err(WaterStepError::NonFiniteInput {
+            name: "target_time"
+        })
+    ));
+    assert_eq!(state, original);
 }

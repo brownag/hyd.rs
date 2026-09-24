@@ -92,6 +92,10 @@ pub enum WaterStepError {
     NonFiniteInput {
         name: &'static str,
     },
+    InvalidTargetTime {
+        current_time: f64,
+        target_time: f64,
+    },
     NonFiniteDiagnostic,
     NonConverged {
         timestep: f64,
@@ -110,6 +114,13 @@ impl fmt::Display for WaterStepError {
             Self::InvalidPolicy { name } => write!(formatter, "invalid water-step policy: {name}"),
             Self::DimensionMismatch => write!(formatter, "water-step dimensions differ"),
             Self::NonFiniteInput { name } => write!(formatter, "non-finite water-step input: {name}"),
+            Self::InvalidTargetTime {
+                current_time,
+                target_time,
+            } => write!(
+                formatter,
+                "target time {target_time} must be greater than current time {current_time}"
+            ),
             Self::NonFiniteDiagnostic => write!(formatter, "non-finite water-step diagnostic"),
             Self::NonConverged { timestep, minimum_timestep, retries } => write!(formatter, "water step did not converge at dt={timestep} with dt_min={minimum_timestep} after {retries} retries"),
             Self::Hydraulic(error) => error.fmt(formatter),

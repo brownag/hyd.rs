@@ -24,6 +24,8 @@ pub struct WaterStepInput<'a> {
     pub materials: &'a [&'a dyn HydraulicModel],
     pub sink: &'a [f64],
     pub timestep: f64,
+    /// Caller-selected time that this step must not pass.
+    pub target_time: f64,
     pub face_averaging: FaceAveraging,
     pub lower_row: BoundaryRow,
     pub lower_condition: BoundaryCondition,
@@ -70,7 +72,8 @@ pub fn advance_water_step(
     policy: WaterStepPolicy,
 ) -> Result<WaterStepReport, WaterStepError> {
     validate(state, workspace, input, policy)?;
-    let mut timestep = input.timestep;
+    let remaining = input.target_time - state.time;
+    let mut timestep = input.timestep.min(remaining);
     let mut retries = 0;
     loop {
         workspace.snapshot(state);
@@ -79,14 +82,24 @@ pub fn advance_water_step(
                 let balance = balance(state, workspace, input, timestep)?;
                 state.heads.copy_from_slice(&workspace.trial_heads);
                 state.water_contents.copy_from_slice(&workspace.trial_water);
-                state.time += timestep;
+                let accepted_time = if timestep >= input.target_time - state.time {
+                    input.target_time
+                } else {
+                    let next_time = state.time + timestep;
+                    if next_time >= input.target_time {
+                        input.target_time
+                    } else {
+                        next_time
+                    }
+                };
+                state.time = accepted_time;
                 state.accounting.accepted_steps += 1;
                 state.accounting.cumulative_iterations += trial.iterations as u64;
                 state.accounting.cumulative_storage_change += balance.storage_change;
                 state.accounting.cumulative_boundary_flux += balance.boundary_flux;
                 state.accounting.cumulative_sink += balance.sink;
                 return Ok(WaterStepReport {
-                    accepted_time: state.time,
+                    accepted_time,
                     timestep,
                     iterations: trial.iterations,
                     retries,
@@ -98,7 +111,8 @@ pub fn advance_water_step(
             }
             None => {
                 workspace.restore(state);
-                let next = timestep / policy.retry_factor;
+                let remaining = input.target_time - state.time;
+                let next = (timestep / policy.retry_factor).min(remaining);
                 if next < policy.minimum_timestep {
                     return Err(WaterStepError::NonConverged {
                         timestep,
@@ -308,6 +322,13 @@ fn validate(
         return Err(WaterStepError::DimensionMismatch);
     }
     validate_finite("sink", input.sink)?;
+    validate_finite("target_time", &[input.target_time])?;
+    if input.target_time <= state.time {
+        return Err(WaterStepError::InvalidTargetTime {
+            current_time: state.time,
+            target_time: input.target_time,
+        });
+    }
     if input.sink.len() != count {
         return Err(WaterStepError::DimensionMismatch);
     }

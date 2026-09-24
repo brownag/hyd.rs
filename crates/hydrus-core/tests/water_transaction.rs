@@ -74,6 +74,7 @@ fn input<'a>(mesh: &'a Mesh1D, timestep: f64) -> WaterStepInput<'a> {
         materials: &MATERIALS,
         sink: &[0.0; 3],
         timestep,
+        target_time: 10.0,
         face_averaging: FaceAveraging::Arithmetic,
         lower_row: BoundaryRow {
             lower: 0.0,
@@ -111,6 +112,22 @@ fn retries_with_reduced_dt_and_commits_only_on_acceptance() {
     assert!((report.max_head_residual - 0.4).abs() < 1e-12);
     assert_eq!(state.accounting().accepted_steps, 1);
     assert_eq!(state.accounting().cumulative_iterations, 1);
+}
+
+#[test]
+fn retries_clip_to_target_and_never_accept_past_it() {
+    let mesh = mesh();
+    let mut state = WaterState::new(0.0, vec![0.0; 3], vec![0.0; 3]).unwrap();
+    let mut workspace = WaterWorkspace::new(3).unwrap();
+    let request = WaterStepInput {
+        target_time: 0.75,
+        ..input(&mesh, 9.0)
+    };
+    let report = advance_water_step(&mut state, &mut workspace, request, policy(1, 0.1)).unwrap();
+    assert_eq!(report.timestep, 0.25);
+    assert_eq!(report.accepted_time, 0.25);
+    assert_eq!(state.time(), 0.25);
+    assert!(report.retries > 0);
 }
 
 #[test]
