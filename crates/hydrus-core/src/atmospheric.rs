@@ -6,11 +6,27 @@ use crate::{
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum UpperBoundaryMode {
+    /// Apply the signed atmospheric demand directly as the upper soil flux.
     AtmosphericFlux,
+    /// Constrain top head to the caller-declared critical head while supply or storage limits apply.
     PondedHead,
 }
 
+/// Trial state recorded when the atmospheric active set selects another mode.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct AtmosphericTransition {
+    pub from_mode: UpperBoundaryMode,
+    pub to_mode: UpperBoundaryMode,
+    pub demand: f64,
+    pub top_head: f64,
+    pub soil_flux: f64,
+    pub candidate_surface_storage: f64,
+}
+
 /// Accepted atmospheric history attached to a water simulation.
+///
+/// Candidate mode and surface storage remain local to one nonlinear trial and
+/// are copied here only when that trial is accepted.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct AtmosphericState {
     pub event_cursor: usize,
@@ -31,14 +47,16 @@ impl Default for AtmosphericState {
 /// Advances to the earlier of the requested target and next forcing event.
 /// The schedule uses caller-declared time and depth-rate units without conversion.
 /// `input.upper_condition` must be `Dirichlet`; its value is the caller-declared
-/// atmospheric critical head used by the upper flux/head switch.
-pub fn advance_atmospheric_step(
+/// critical head used by the upper flux/head switch. Its
+/// physical interpretation for evaporation remains unresolved by available
+/// source evidence.
+pub fn advance_atmospheric_step<'a>(
     state: &mut WaterState,
-    workspace: &mut WaterWorkspace,
+    workspace: &'a mut WaterWorkspace,
     input: WaterStepInput<'_>,
     policy: WaterStepPolicy,
     schedule: &ForcingSchedule<'_>,
-) -> Result<WaterStepReport, WaterStepError> {
+) -> Result<WaterStepReport<'a>, WaterStepError> {
     if state.atmospheric.event_cursor > schedule.events().len() {
         return Err(WaterStepError::InvalidForcing {
             name: "event_cursor",

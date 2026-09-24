@@ -1,7 +1,9 @@
-use crate::atmospheric::AtmosphericState;
+use crate::atmospheric::{AtmosphericState, AtmosphericTransition, UpperBoundaryMode};
 use crate::WaterStepError;
 
 /// Accepted single-domain water fields and accepted-only accounting.
+/// Atmospheric mode and surface storage share the same acceptance boundary:
+/// rejected nonlinear trials never alter either field.
 #[derive(Clone, Debug, PartialEq)]
 pub struct WaterState {
     pub(crate) time: f64,
@@ -77,11 +79,23 @@ pub struct WaterWorkspace {
     snapshot_water: Vec<f64>,
     snapshot_time: f64,
     snapshot_accounting: WaterAccounting,
+    /// Snapshot includes the complete accepted atmospheric history.
     snapshot_atmospheric: AtmosphericState,
+    pub(crate) atmospheric_transitions: Vec<AtmosphericTransition>,
+    pub(crate) atmospheric_transition_count: usize,
 }
 
 impl WaterWorkspace {
     pub fn new(node_count: usize) -> Result<Self, WaterStepError> {
+        Self::with_transition_capacity(node_count, 0)
+    }
+
+    /// Preallocates room for a complete atmospheric trace. Provision at least
+    /// `WaterStepPolicy::max_iterations` entries before an atmospheric step.
+    pub fn with_transition_capacity(
+        node_count: usize,
+        transition_capacity: usize,
+    ) -> Result<Self, WaterStepError> {
         if node_count < 3 {
             return Err(WaterStepError::InvalidWorkspace {
                 reason: "node count must be at least three",
@@ -102,6 +116,18 @@ impl WaterWorkspace {
             snapshot_time: 0.0,
             snapshot_accounting: WaterAccounting::default(),
             snapshot_atmospheric: AtmosphericState::default(),
+            atmospheric_transitions: vec![
+                AtmosphericTransition {
+                    from_mode: UpperBoundaryMode::AtmosphericFlux,
+                    to_mode: UpperBoundaryMode::AtmosphericFlux,
+                    demand: 0.0,
+                    top_head: 0.0,
+                    soil_flux: 0.0,
+                    candidate_surface_storage: 0.0,
+                };
+                transition_capacity
+            ],
+            atmospheric_transition_count: 0,
         })
     }
 

@@ -85,6 +85,10 @@ pub enum WaterStepError {
     InvalidWorkspace {
         reason: &'static str,
     },
+    InsufficientAtmosphericTraceCapacity {
+        required: usize,
+        available: usize,
+    },
     InvalidPolicy {
         name: &'static str,
     },
@@ -96,6 +100,7 @@ pub enum WaterStepError {
         name: &'static str,
         reason: &'static str,
     },
+    /// Atmospheric APIs currently require a caller-declared Dirichlet critical head.
     UnsupportedAtmosphericInput {
         name: &'static str,
     },
@@ -122,6 +127,10 @@ impl fmt::Display for WaterStepError {
         match self {
             Self::InvalidState { reason } => write!(formatter, "invalid water state: {reason}"),
             Self::InvalidWorkspace { reason } => write!(formatter, "invalid water workspace: {reason}"),
+            Self::InsufficientAtmosphericTraceCapacity { required, available } => write!(
+                formatter,
+                "atmospheric trace capacity {available} is below required {required}"
+            ),
             Self::InvalidPolicy { name } => write!(formatter, "invalid water-step policy: {name}"),
             Self::UnsupportedConfiguration { name, value } => {
                 write!(formatter, "unsupported water configuration {name}={value}")

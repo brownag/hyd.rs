@@ -143,26 +143,68 @@ fn accepted_rain_infiltrates_then_excess_builds_ponded_storage() {
     input.target_time = 1.0;
     input.upper_condition = BoundaryCondition::Dirichlet { value: 0.1 };
     let mut state = WaterState::new(0.0, vec![0.0; 3], vec![0.2; 3]).unwrap();
-    let mut workspace = WaterWorkspace::new(3).unwrap();
+    let mut workspace =
+        WaterWorkspace::with_transition_capacity(3, policy().max_iterations).unwrap();
 
     let rain = constant_schedule(0.01, 0.0);
-    let first = advance_atmospheric_step(&mut state, &mut workspace, input, policy(), &rain).unwrap();
-    assert_eq!(state.atmospheric().upper_mode, UpperBoundaryMode::AtmosphericFlux);
+    let first =
+        advance_atmospheric_step(&mut state, &mut workspace, input, policy(), &rain).unwrap();
+    assert_eq!(
+        state.atmospheric().upper_mode,
+        UpperBoundaryMode::AtmosphericFlux
+    );
     assert!(state.heads()[2] > 0.0);
     assert_close(state.atmospheric().ponded_depth, 0.0);
     assert_close(first.balance.boundary_flux, 0.01);
+    assert_close(first.balance.soil_boundary_flux, 0.01);
+    assert_close(first.balance.atmospheric_exchange, 0.01);
+    assert_eq!(first.balance.soil_boundary_flux, 0.01);
     assert!(first.balance.absolute_residual < 1e-9, "{first:?}");
 
     input.target_time = 2.0;
     no_flow_lower(&mut input, state.heads()[0]);
     let heavy_rain = constant_schedule(1.0, 0.0);
     let before_ponding = state.atmospheric().ponded_depth;
+    let before_heads = state.heads().to_vec();
     let second =
         advance_atmospheric_step(&mut state, &mut workspace, input, policy(), &heavy_rain).unwrap();
-    assert_eq!(state.atmospheric().upper_mode, UpperBoundaryMode::PondedHead);
+    assert_eq!(
+        state.atmospheric().upper_mode,
+        UpperBoundaryMode::PondedHead
+    );
     assert_close(state.heads()[2], 0.1);
+    assert!(second.atmospheric_mode_transitions > 0);
+    assert_eq!(
+        second.atmospheric_transitions.len(),
+        second.atmospheric_mode_transitions
+    );
+    for transition in second.atmospheric_transitions {
+        assert_eq!(transition.demand, 1.0);
+        assert_eq!(transition.from_mode, UpperBoundaryMode::AtmosphericFlux);
+        assert_eq!(transition.to_mode, UpperBoundaryMode::PondedHead);
+        assert!(transition.top_head > 0.1, "{transition:?}");
+        assert_eq!(transition.soil_flux, transition.demand);
+        assert_eq!(transition.candidate_surface_storage, 0.0);
+    }
     assert!(state.atmospheric().ponded_depth > before_ponding);
     assert_close(second.balance.boundary_flux, 1.0);
+    assert_close(second.balance.atmospheric_exchange, 1.0);
+    assert!(second.balance.soil_boundary_flux < second.balance.atmospheric_exchange);
+    let expected_head_limited_flux =
+        (state.heads()[2] - state.heads()[1]) + 0.05 * (state.heads()[2] - before_heads[2]);
+    assert_close(
+        second.balance.soil_boundary_flux,
+        expected_head_limited_flux,
+    );
+    assert_eq!(state.heads()[2], 0.1);
+    assert_close(
+        second.balance.surface_storage_change,
+        state.atmospheric().ponded_depth - before_ponding,
+    );
+    assert_close(
+        second.balance.soil_storage_change + second.balance.surface_storage_change,
+        second.balance.boundary_flux,
+    );
     assert!(second.balance.absolute_residual < 1e-9, "{second:?}");
 }
 
@@ -178,7 +220,8 @@ fn accepted_evaporation_is_limited_by_soil_supply_and_balanced() {
     input.target_time = 1.0;
     input.upper_condition = BoundaryCondition::Dirichlet { value: -0.01 };
     let mut state = WaterState::new(0.0, vec![0.0; 3], vec![0.2; 3]).unwrap();
-    let mut workspace = WaterWorkspace::new(3).unwrap();
+    let mut workspace =
+        WaterWorkspace::with_transition_capacity(3, policy().max_iterations).unwrap();
 
     let report = advance_atmospheric_step(
         &mut state,
@@ -188,11 +231,32 @@ fn accepted_evaporation_is_limited_by_soil_supply_and_balanced() {
         &constant_schedule(0.0, 0.2),
     )
     .unwrap();
-    assert_eq!(state.atmospheric().upper_mode, UpperBoundaryMode::PondedHead);
+    assert_eq!(
+        state.atmospheric().upper_mode,
+        UpperBoundaryMode::PondedHead
+    );
     assert_close(state.heads()[2], -0.01);
     assert_close(state.atmospheric().ponded_depth, 0.0);
     assert!(report.balance.boundary_flux < 0.0);
     assert!(report.balance.boundary_flux > -0.2);
+    assert_close(
+        report.balance.atmospheric_exchange,
+        report.balance.soil_boundary_flux,
+    );
+    assert!(report.atmospheric_mode_transitions > 0);
+    assert_eq!(
+        report.atmospheric_transitions.len(),
+        report.atmospheric_mode_transitions
+    );
+    for transition in report.atmospheric_transitions {
+        assert_eq!(transition.demand, -0.2);
+        assert_eq!(transition.from_mode, UpperBoundaryMode::AtmosphericFlux);
+        assert_eq!(transition.to_mode, UpperBoundaryMode::PondedHead);
+        assert!(transition.top_head < -0.01, "{transition:?}");
+        assert_eq!(transition.soil_flux, transition.demand);
+        assert_eq!(transition.candidate_surface_storage, 0.0);
+    }
+    assert_close(report.balance.surface_storage_change, 0.0);
     assert_close(report.balance.boundary_flux, report.balance.storage_change);
     assert!(report.balance.absolute_residual < 1e-9, "{report:?}");
 }
@@ -205,7 +269,8 @@ fn clips_to_event_then_advances_cursor_only_after_acceptance() {
     let sink = [0.0; 3];
     let mut input = setup(&mesh, &materials, &sink);
     let mut state = WaterState::new(0.0, vec![0.0; 3], vec![0.2; 3]).unwrap();
-    let mut workspace = WaterWorkspace::new(3).unwrap();
+    let mut workspace =
+        WaterWorkspace::with_transition_capacity(3, policy().max_iterations).unwrap();
     let first =
         advance_atmospheric_step(&mut state, &mut workspace, input, policy(), &schedule()).unwrap();
     assert_eq!(first.accepted_time, 1.0);
@@ -245,7 +310,8 @@ fn dry_surface_keeps_evaporative_demand_as_a_negative_flux() {
     )
     .unwrap();
     let mut state = WaterState::new(0.0, vec![0.0; 3], vec![0.2; 3]).unwrap();
-    let mut workspace = WaterWorkspace::new(3).unwrap();
+    let mut workspace =
+        WaterWorkspace::with_transition_capacity(3, policy().max_iterations).unwrap();
     let report =
         advance_atmospheric_step(&mut state, &mut workspace, input, policy(), &schedule).unwrap();
     assert_eq!(report.balance.boundary_flux, -20.0);
@@ -300,7 +366,8 @@ fn unsupported_upper_boundary_kind_is_rejected() {
     let mut input = setup(&mesh, &materials, &sink);
     input.upper_condition = BoundaryCondition::Neumann { flux: 0.0 };
     let mut state = WaterState::new(0.0, vec![0.0; 3], vec![0.2; 3]).unwrap();
-    let mut workspace = WaterWorkspace::new(3).unwrap();
+    let mut workspace =
+        WaterWorkspace::with_transition_capacity(3, policy().max_iterations).unwrap();
     assert!(matches!(
         advance_atmospheric_step(&mut state, &mut workspace, input, policy(), &schedule()),
         Err(WaterStepError::UnsupportedAtmosphericInput { .. })
@@ -316,7 +383,25 @@ fn failed_trial_does_not_advance_atmospheric_cursor_or_mode() {
     let input = setup(&mesh, &materials, &sink);
     let mut state = WaterState::new(0.0, vec![0.0; 3], vec![0.2; 3]).unwrap();
     let original = state.clone();
-    let mut workspace = WaterWorkspace::new(3).unwrap();
+    let mut undersized_workspace = WaterWorkspace::new(3).unwrap();
+    let valid_sink = [0.0; 3];
+    let valid_input = setup(&mesh, &materials, &valid_sink);
+    assert!(matches!(
+        advance_atmospheric_step(
+            &mut state,
+            &mut undersized_workspace,
+            valid_input,
+            policy(),
+            &schedule()
+        ),
+        Err(WaterStepError::InsufficientAtmosphericTraceCapacity {
+            required: 8,
+            available: 0
+        })
+    ));
+    assert_eq!(state, original);
+    let mut workspace =
+        WaterWorkspace::with_transition_capacity(3, policy().max_iterations).unwrap();
     assert!(
         advance_atmospheric_step(&mut state, &mut workspace, input, policy(), &schedule()).is_err()
     );
@@ -350,7 +435,8 @@ fn rejected_trial_restores_accepted_atmospheric_history() {
     .unwrap();
     let mut state = WaterState::new(0.0, vec![0.0; 3], vec![0.2; 3]).unwrap();
     let original = state.clone();
-    let mut workspace = WaterWorkspace::new(3).unwrap();
+    let mut workspace =
+        WaterWorkspace::with_transition_capacity(3, policy().max_iterations).unwrap();
     let strict = WaterStepPolicy {
         max_iterations: 1,
         minimum_timestep: 1.1,
@@ -364,7 +450,7 @@ fn rejected_trial_restores_accepted_atmospheric_history() {
 }
 
 #[test]
-fn evaporation_switch_retries_without_promoting_trial_mode_or_storage() {
+fn rejected_evaporation_trial_does_not_promote_mode_or_storage() {
     let mesh = Mesh1D::new(vec![0.0, 1.0, 2.0], vec![0; 3], None, 1, 0, 0.0).unwrap();
     let model = LinearModel;
     let materials: [&dyn HydraulicModel; 1] = [&model];
@@ -385,8 +471,14 @@ fn evaporation_switch_retries_without_promoting_trial_mode_or_storage() {
     .unwrap();
     let mut state = WaterState::new(0.0, vec![0.0; 3], vec![0.2; 3]).unwrap();
     let original = state.clone();
-    let mut workspace = WaterWorkspace::new(3).unwrap();
-    let result = advance_atmospheric_step(&mut state, &mut workspace, input, policy(), &schedule);
-    assert!(matches!(result, Err(WaterStepError::NonConverged { retries, .. }) if retries > 0));
+    let mut workspace =
+        WaterWorkspace::with_transition_capacity(3, policy().max_iterations).unwrap();
+    let strict = WaterStepPolicy {
+        max_iterations: 1,
+        minimum_timestep: 1.1,
+        ..policy()
+    };
+    let result = advance_atmospheric_step(&mut state, &mut workspace, input, strict, &schedule);
+    assert!(matches!(result, Err(WaterStepError::NonConverged { .. })));
     assert_eq!(state, original);
 }
