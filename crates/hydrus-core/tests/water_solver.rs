@@ -3,8 +3,8 @@ use hydrus_core::hydraulics::{
     HydraulicDerivatives, Mesh1D, ResetStencilInput,
 };
 use hydrus_core::{
-    advance_water_step, HydraulicError, HydraulicModel, WaterState, WaterStepError, WaterStepInput,
-    WaterStepPolicy, WaterWorkspace,
+    advance_water_step, HydraulicError, HydraulicModel, LowerBoundaryMode, WaterState,
+    WaterStepError, WaterStepInput, WaterStepPolicy, WaterWorkspace,
 };
 
 struct LinearModel {
@@ -75,7 +75,7 @@ fn input<'a>(
             upper: 0.0,
             rhs: 0.0,
         },
-        lower_condition: BoundaryCondition::Dirichlet { value: 0.0 },
+        lower_boundary_mode: LowerBoundaryMode::FixedHead { head: 0.0 },
         upper_row: BoundaryRow {
             lower: 0.0,
             diagonal: 0.0,

@@ -1,7 +1,7 @@
 # State — Orchestration 9: Phase 4 atmospheric remediation and completion
 
 Plan status: **approved by the user on 2026-09-24.**
-Execution status: **Wave 1 complete; Waves 2–5 pending.**
+Execution status: **Waves 1–2 complete; Waves 3–5 pending.**
 Plan: [EXECUTION_PLAN_9.md](EXECUTION_PLAN_9.md); worker prompt: [PROMPT_TEMPLATE_9.md](PROMPT_TEMPLATE_9.md).
 Diagnosis: [ATMOSPHERIC_NONCONVERGENCE_FINDINGS.md](ATMOSPHERIC_NONCONVERGENCE_FINDINGS.md).
 Historical blocker: [STATE_8.md](STATE_8.md), task 8.2.1.
@@ -12,7 +12,7 @@ Historical blocker: [STATE_8.md](STATE_8.md), task 8.2.1.
 - [x] Atmospheric failure diagnosis reproduced both exact failures at `dt=0.015625`, `dt_min=0.01`, after six retries; full atmospheric suite was 7 passed / 2 failed.
 - [x] Findings identify active-set alternation caused by switching against accepted pond storage and list unresolved sign/balance science.
 - [x] Before Wave 1: recorded `git status --short`; initial workspace run reproduced the known atmospheric 7 passed / 2 failed; initial fmt check reported drift in the Wave 1 files; initial Clippy and diff check passed. Wave 1 resolved the test and formatting failures.
-- [x] User approved this plan; implementation remains unstarted pending the Wave 1 entry gate.
+- [x] User approved this plan; implementation began after the Wave 1 entry gate passed.
 
 Scientific baseline: **unavailable.** No Fortran executable, calibrated tolerance, or reviewed oracle outputs exist.
 
@@ -21,7 +21,7 @@ Scientific baseline: **unavailable.** No Fortran executable, calibrated toleranc
 | Wave | Task | Deliverable | Status | Commit |
 |---|---|---|---|---|
 | 1 | 9.1.1 | Atmospheric active-set and balance remediation | done | committed |
-| 2 | 9.2.1 | Supported lower boundary modes | pending | — |
+| 2 | 9.2.1 | Supported lower boundary modes | done | committed |
 | 3 | 9.3.1 | Feddes stress and compensation | pending | — |
 | 4 | 9.4.1 | Four first-water acceptance fixtures | pending | — |
 | 5 | 9.5.1 | Phase 4 evidence and Phase 5 handoff | pending | — |
@@ -44,6 +44,20 @@ Scientific baseline: **unavailable.** No Fortran executable, calibrated toleranc
 - Gotcha: callers must finish reading `WaterStepReport.atmospheric_transitions` before mutably reusing its workspace.
 - Evaporation critical-head physical semantics and Fortran parity remain unresolved; no tolerances or iteration limits changed.
 
+## 9.2.1 — Supported lower boundary modes
+
+- Status: complete after a task-scope amendment and one mid-tier Clippy cleanup.
+- Changed `lower_boundary.rs`, `water_solver.rs`, `error.rs`, `lib.rs`, `tests/lower_boundary.rs`, and existing input fixtures in allocation, atmospheric, water contract, solver, and transaction tests.
+- Added explicit fixed-head, prescribed-flux, and free-drainage modes; seepage-face and water-table selections return typed unsupported errors.
+- Positive lower flux is into the domain. Free-drainage exchange follows the source row sign mapping; this is algebra-derived behavior, not executable parity.
+- Fixed-head mode preserves caller-supplied measured exchange; accepted reports include selected mode and signed boundary balance.
+- `cargo test -p hydrus-core --test lower_boundary`: 5 passed, 0 failed.
+- `cargo test --workspace`: all tests passed (76 integration tests; 0 failed).
+- `cargo fmt --check`, `cargo clippy --workspace --all-targets -- -D warnings`, and `git diff --check`: passed.
+- Scope amendment added `WaterStepInput` construction call sites after the original input type had no physical lower-mode selector.
+- Clippy cleanup grouped row and balance arguments in private input structs; behavior unchanged.
+- No new gotchas for dependents beyond selecting an explicit `LowerBoundaryMode` at every `WaterStepInput` construction.
+
 ## Amendments and blockers
 
-<!-- Record plan amendments, retries, escalations, and external blockers here. -->
+- 9.2.1 scope amended after the first plan review found `WaterStepInput` has no explicit physical lower-mode selector. The task now includes the existing struct-literal test call sites that must retain behavior after the new field is added. No implementation changes were made during the blocked attempt.

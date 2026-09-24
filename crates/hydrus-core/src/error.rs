@@ -100,6 +100,12 @@ pub enum WaterStepError {
         name: &'static str,
         reason: &'static str,
     },
+    InvalidLowerBoundary {
+        name: &'static str,
+    },
+    UnsupportedLowerBoundary {
+        mode: &'static str,
+    },
     /// Atmospheric APIs currently require a caller-declared Dirichlet critical head.
     UnsupportedAtmosphericInput {
         name: &'static str,
@@ -137,6 +143,12 @@ impl fmt::Display for WaterStepError {
             }
             Self::InvalidForcing { name, reason } => {
                 write!(formatter, "invalid atmospheric forcing {name}: {reason}")
+            }
+            Self::InvalidLowerBoundary { name } => {
+                write!(formatter, "invalid lower boundary parameter: {name}")
+            }
+            Self::UnsupportedLowerBoundary { mode } => {
+                write!(formatter, "unsupported lower boundary mode: {mode}")
             }
             Self::UnsupportedAtmosphericInput { name } => {
                 write!(formatter, "unsupported atmospheric input: {name}")

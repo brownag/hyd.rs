@@ -4,6 +4,7 @@ pub mod atmospheric;
 pub mod error;
 pub mod forcing;
 pub mod hydraulics;
+pub mod lower_boundary;
 mod water_solver;
 mod water_state;
 
@@ -14,6 +15,7 @@ pub use hydraulics::{
     Evaluation, HydraulicDerivatives, HydraulicModel, HydraulicModelSelector, HydraulicTables,
     Mesh1D, UnitSymbol, VanGenuchtenModel, VanGenuchtenParameters,
 };
+pub use lower_boundary::{LowerBoundaryMode, UnsupportedLowerBoundaryMode};
 pub use water_solver::{
     advance_water_step, WaterBalance, WaterProductConfig, WaterStepInput, WaterStepPolicy,
     WaterStepReport,

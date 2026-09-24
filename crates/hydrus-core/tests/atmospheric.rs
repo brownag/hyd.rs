@@ -4,8 +4,8 @@ use hydrus_core::hydraulics::{
 };
 use hydrus_core::{
     advance_atmospheric_step, AtmosphericRates, ForcingEvent, ForcingSchedule, ForcingUnits,
-    HydraulicError, UpperBoundaryMode, WaterState, WaterStepError, WaterStepInput, WaterStepPolicy,
-    WaterWorkspace,
+    HydraulicError, LowerBoundaryMode, UpperBoundaryMode, WaterState, WaterStepError,
+    WaterStepInput, WaterStepPolicy, WaterWorkspace,
 };
 
 struct LinearModel;
@@ -54,7 +54,7 @@ fn setup<'a>(
             upper: 0.0,
             rhs: 0.0,
         },
-        lower_condition: BoundaryCondition::Dirichlet { value: 0.0 },
+        lower_boundary_mode: LowerBoundaryMode::FixedHead { head: 0.0 },
         upper_row: BoundaryRow {
             lower: 0.0,
             diagonal: 1.0,
@@ -121,7 +121,7 @@ fn no_flow_lower(input: &mut WaterStepInput<'_>, old_bottom_head: f64) {
         upper: -1.0,
         rhs: 0.05 * old_bottom_head,
     };
-    input.lower_condition = BoundaryCondition::Neumann { flux: 0.0 };
+    input.lower_boundary_mode = LowerBoundaryMode::PrescribedFlux { flux: 0.0 };
 }
 
 fn assert_close(actual: f64, expected: f64) {

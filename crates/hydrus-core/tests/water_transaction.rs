@@ -2,8 +2,8 @@ use hydrus_core::hydraulics::{
     BoundaryCondition, BoundaryRow, Evaluation, FaceAveraging, HydraulicDerivatives, Mesh1D,
 };
 use hydrus_core::{
-    advance_water_step, HydraulicError, HydraulicModel, WaterState, WaterStepError, WaterStepInput,
-    WaterStepPolicy, WaterWorkspace,
+    advance_water_step, HydraulicError, HydraulicModel, LowerBoundaryMode, WaterState,
+    WaterStepError, WaterStepInput, WaterStepPolicy, WaterWorkspace,
 };
 
 struct TransactionModel {
@@ -82,7 +82,7 @@ fn input<'a>(mesh: &'a Mesh1D, timestep: f64) -> WaterStepInput<'a> {
             upper: 0.0,
             rhs: 0.0,
         },
-        lower_condition: BoundaryCondition::Dirichlet { value: 0.0 },
+        lower_boundary_mode: LowerBoundaryMode::FixedHead { head: 0.0 },
         upper_row: BoundaryRow {
             lower: 0.0,
             diagonal: 0.0,

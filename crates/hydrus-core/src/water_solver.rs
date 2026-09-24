@@ -5,6 +5,7 @@ use crate::hydraulics::{
     BoundaryCondition, BoundaryRow, BoundaryRowLocation, FaceAveraging, HydraulicModel, Mesh1D,
     PivotDiagnostics, ResetRow, ResetRowInput,
 };
+use crate::lower_boundary::{lower_flux_row, LowerBoundaryMode, LowerFluxRowInput};
 use crate::water_state::validate_finite;
 use crate::{WaterState, WaterStepError, WaterWorkspace};
 
@@ -58,10 +59,12 @@ pub struct WaterStepInput<'a> {
     pub target_time: f64,
     pub face_averaging: FaceAveraging,
     pub lower_row: BoundaryRow,
-    pub lower_condition: BoundaryCondition,
+    pub lower_boundary_mode: LowerBoundaryMode,
     pub upper_row: BoundaryRow,
     pub upper_condition: BoundaryCondition,
     /// Signed water entering the domain through the lower endpoint.
+    /// Signed measured lower exchange for fixed-head steps; positive into the domain.
+    /// Prescribed-flux and free-drainage modes derive this value from their mode.
     pub lower_boundary_flux: f64,
     /// Signed water entering the domain through the upper endpoint.
     pub upper_boundary_flux: f64,
@@ -100,6 +103,7 @@ pub struct WaterStepReport<'a> {
     pub max_head_residual: f64,
     pub max_water_residual: f64,
     pub minimum_absolute_pivot: f64,
+    pub lower_boundary_mode: LowerBoundaryMode,
     /// Number of atmospheric flux/head mode changes during the accepted solve.
     pub atmospheric_mode_transitions: usize,
     /// Trial-state values that caused each active-set mode change.
@@ -161,10 +165,13 @@ fn advance_water_step_impl<'a>(
                     state,
                     workspace,
                     input,
-                    timestep,
-                    upper_flux,
-                    soil_upper_flux,
-                    next_ponded - state.atmospheric.ponded_depth,
+                    BalanceInput {
+                        timestep,
+                        atmospheric_flux: upper_flux,
+                        soil_atmospheric_flux: soil_upper_flux,
+                        lower_boundary_flux: trial.lower_boundary_flux,
+                        surface_storage_change: next_ponded - state.atmospheric.ponded_depth,
+                    },
                 )?;
                 state.heads.copy_from_slice(&workspace.trial_heads);
                 state.water_contents.copy_from_slice(&workspace.trial_water);
@@ -196,6 +203,7 @@ fn advance_water_step_impl<'a>(
                     max_head_residual: trial.head_residual,
                     max_water_residual: trial.water_residual,
                     minimum_absolute_pivot: trial.pivots.minimum_absolute_pivot,
+                    lower_boundary_mode: input.lower_boundary_mode,
                     atmospheric_mode_transitions: workspace.atmospheric_transition_count,
                     atmospheric_transitions: &workspace.atmospheric_transitions
                         [..workspace.atmospheric_transition_count],
@@ -230,6 +238,7 @@ struct Trial {
     ponded_depth: f64,
     soil_flux: f64,
     atmospheric_exchange: f64,
+    lower_boundary_flux: f64,
 }
 
 #[derive(Clone, Copy)]
@@ -253,7 +262,7 @@ fn solve_trial(
     let mut atmospheric_exchange = 0.0;
     workspace.atmospheric_transition_count = 0;
     for iteration in 1..=policy.max_iterations {
-        upper_mode = assemble(
+        let (assembled_upper_mode, lower_boundary_flux) = assemble(
             workspace,
             state,
             input,
@@ -265,6 +274,7 @@ fn solve_trial(
                 ponded_depth,
             }),
         )?;
+        upper_mode = assembled_upper_mode;
         let pivots = solve_tridiagonal_in_place(
             &workspace.lower,
             &mut workspace.diagonal,
@@ -288,7 +298,10 @@ fn solve_trial(
             }
             let next_water = next_evaluation.theta;
             let prescribed_head = (index == 0
-                && matches!(input.lower_condition, BoundaryCondition::Dirichlet { .. }))
+                && matches!(
+                    input.lower_boundary_mode,
+                    LowerBoundaryMode::FixedHead { .. }
+                ))
                 || (index == workspace.node_count() - 1
                     && matches!(input.upper_condition, BoundaryCondition::Dirichlet { .. }));
             if !prescribed_head {
@@ -360,6 +373,7 @@ fn solve_trial(
                 ponded_depth,
                 soil_flux,
                 atmospheric_exchange,
+                lower_boundary_flux,
             }));
         }
     }
@@ -373,7 +387,7 @@ fn assemble(
     minimum_pivot: f64,
     timestep: f64,
     atmospheric: Option<AtmosphericAssembly>,
-) -> Result<UpperBoundaryMode, WaterStepError> {
+) -> Result<(UpperBoundaryMode, f64), WaterStepError> {
     let count = workspace.node_count();
     for node in 0..count {
         let material = input.mesh.material_indices()[node];
@@ -388,11 +402,45 @@ fn assemble(
         workspace.evaluated_conductivity[node] = evaluation.conductivity;
         workspace.evaluated_capacity[node] = evaluation.capacity;
     }
+    let lower_boundary_flux = input.lower_boundary_mode.flux_into_domain(
+        workspace.evaluated_conductivity[0],
+        workspace.evaluated_conductivity[1],
+        input.mesh.inclination_cosine(),
+        input.face_averaging,
+        input.lower_boundary_flux,
+    )?;
+    let lower_condition = input.lower_boundary_mode.condition(lower_boundary_flux)?;
+    let lower_row = match input.lower_boundary_mode {
+        LowerBoundaryMode::FixedHead { .. } => input.lower_row,
+        _ => {
+            let face_conductivity = match input.face_averaging {
+                FaceAveraging::Arithmetic => {
+                    (workspace.evaluated_conductivity[0] + workspace.evaluated_conductivity[1])
+                        / 2.0
+                }
+                FaceAveraging::Geometric => (workspace.evaluated_conductivity[0]
+                    * workspace.evaluated_conductivity[1])
+                    .sqrt(),
+            };
+            let spacing = input.mesh.coordinates()[1] - input.mesh.coordinates()[0];
+            lower_flux_row(LowerFluxRowInput {
+                face_conductivity,
+                capacity: workspace.evaluated_capacity[0],
+                head: workspace.trial_heads[0],
+                theta: workspace.evaluated_theta[0],
+                old_theta: state.water_contents[0],
+                sink: input.sink[0],
+                spacing,
+                gravity: input.mesh.inclination_cosine(),
+                timestep,
+            })?
+        }
+    };
     let lower = transform_boundary_row(
         count,
         BoundaryRowLocation::Lower,
-        input.lower_row,
-        input.lower_condition,
+        lower_row,
+        lower_condition,
         minimum_pivot,
     )?;
     let (upper_condition, upper_row, upper_mode) = if let Some(assembly) = atmospheric {
@@ -474,7 +522,7 @@ fn assemble(
     validate_finite("assembled coefficients", &workspace.diagonal)?;
     validate_finite("assembled coefficients", &workspace.upper)?;
     validate_finite("assembled rhs", &workspace.rhs)?;
-    Ok(upper_mode)
+    Ok((upper_mode, lower_boundary_flux))
 }
 
 fn atmospheric_top_flux(
@@ -577,15 +625,27 @@ fn atmospheric_top_row(
     Ok(row)
 }
 
+struct BalanceInput {
+    timestep: f64,
+    atmospheric_flux: Option<f64>,
+    soil_atmospheric_flux: Option<f64>,
+    lower_boundary_flux: f64,
+    surface_storage_change: f64,
+}
+
 fn balance(
     state: &WaterState,
     workspace: &WaterWorkspace,
     input: WaterStepInput<'_>,
-    timestep: f64,
-    atmospheric_flux: Option<f64>,
-    soil_atmospheric_flux: Option<f64>,
-    surface_storage_change: f64,
+    exchange: BalanceInput,
 ) -> Result<WaterBalance, WaterStepError> {
+    let BalanceInput {
+        timestep,
+        atmospheric_flux,
+        soil_atmospheric_flux,
+        lower_boundary_flux,
+        surface_storage_change,
+    } = exchange;
     let mut soil_storage_change = 0.0;
     let mut sink_integral = 0.0;
     for node in 0..input.mesh.coordinates().len() {
@@ -594,8 +654,8 @@ fn balance(
         sink_integral += input.sink[node] * width;
     }
     let upper_flux = atmospheric_flux.unwrap_or(input.upper_boundary_flux);
-    let boundary_flux = (input.lower_boundary_flux + upper_flux) * timestep;
-    let soil_boundary_flux = (input.lower_boundary_flux
+    let boundary_flux = (lower_boundary_flux + upper_flux) * timestep;
+    let soil_boundary_flux = (lower_boundary_flux
         + soil_atmospheric_flux.unwrap_or(input.upper_boundary_flux))
         * timestep;
     let atmospheric_exchange = upper_flux * timestep;
@@ -687,13 +747,26 @@ fn validate(
             name: "iteration/retry/timestep",
         });
     }
-    transform_boundary_row(
-        count,
-        BoundaryRowLocation::Lower,
-        input.lower_row,
-        input.lower_condition,
-        policy.minimum_pivot,
-    )?;
+    input.lower_boundary_mode.validate()?;
+    if matches!(input.lower_boundary_mode, LowerBoundaryMode::FreeDrainage) && count < 2 {
+        return Err(WaterStepError::InvalidLowerBoundary {
+            name: "free_drainage_mesh",
+        });
+    }
+    if matches!(
+        input.lower_boundary_mode,
+        LowerBoundaryMode::FixedHead { .. }
+    ) {
+        transform_boundary_row(
+            count,
+            BoundaryRowLocation::Lower,
+            input.lower_row,
+            input
+                .lower_boundary_mode
+                .condition(input.lower_boundary_flux)?,
+            policy.minimum_pivot,
+        )?;
+    }
     transform_boundary_row(
         count,
         BoundaryRowLocation::Upper,
