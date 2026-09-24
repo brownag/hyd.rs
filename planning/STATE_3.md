@@ -1,15 +1,15 @@
 # State — Orchestration 3: Phase 1 hydraulic foundation
 
 Plan status: **approved by the user on 2026-09-19.**
-Execution status: **not started.**
+Execution status: **complete; Phase 1 evidence handoff recorded.**
 Master authority: [HYDRUS1D_RUST_PORT_PLAN.md](HYDRUS1D_RUST_PORT_PLAN.md), Phase 1.
 Resume from [EXECUTION_PLAN_3.md](EXECUTION_PLAN_3.md); worker prompt: [PROMPT_TEMPLATE_3.md](PROMPT_TEMPLATE_3.md).
 
 ## Baseline checklist
 
 - [x] Confirm Phase 0 handoff is complete in `STATE_2.md` and `master/PHASE_0_REFERENCE_EVIDENCE.md`.
-- [x] Confirm this is the next incomplete master phase: hydraulic foundation.
-- [x] Record absent Rust workspace, Rust source/test suite, and project convention file at planning time.
+- [x] Confirm this was the next incomplete master phase: hydraulic foundation.
+- [x] Record the absent Rust workspace, Rust source/test suite, and project convention file at planning time.
 - [x] Record hydraulic source anchors: `MATERIAL.FOR:FK/FC/FQ/FH`; `INPUT.FOR:MatIn/GenMat`; `WATFLOW.FOR:SetMat`.
 - [x] Before Wave 1, record clean worktree result with `git status --short` (empty output).
 - [x] Before Wave 1, record matching archive/source hashes with `sha256sum planning/H1D_Src.zip src_reference/*.FOR` (recorded in execution log; no changes).
