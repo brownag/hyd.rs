@@ -1,7 +1,7 @@
 use crate::hydraulics::{
-    arithmetic_face_conductivity, geometric_face_conductivity, solve_tridiagonal_in_place,
-    transform_boundary_row, BoundaryCondition, BoundaryRow, BoundaryRowLocation, FaceAveraging,
-    HydraulicModel, Mesh1D, PivotDiagnostics,
+    nodal_control_volume_width, solve_tridiagonal_in_place, transform_boundary_row,
+    BoundaryCondition, BoundaryRow, BoundaryRowLocation, FaceAveraging, HydraulicModel, Mesh1D,
+    PivotDiagnostics, ResetRow, ResetRowInput,
 };
 use crate::water_state::validate_finite;
 use crate::{WaterState, WaterStepError, WaterWorkspace};
@@ -35,11 +35,15 @@ pub struct WaterStepInput<'a> {
     pub upper_boundary_flux: f64,
 }
 
-/// Accepted-step water-balance diagnostic.
+/// Accepted-step water-balance diagnostic, with all quantities per unit
+/// cross-sectional area.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct WaterBalance {
+    /// Mesh-integrated change in water storage per unit cross-sectional area.
     pub storage_change: f64,
+    /// Signed endpoint flux integrated over the accepted timestep.
     pub boundary_flux: f64,
+    /// Mesh-integrated sink over the accepted timestep per unit cross-sectional area.
     pub sink: f64,
     pub absolute_residual: f64,
     /// `absolute_residual` when every balance term is zero; otherwise residual divided by term magnitude.
@@ -217,42 +221,32 @@ fn assemble(
     workspace.diagonal[count - 1] = upper.diagonal;
     workspace.upper[count - 1] = upper.upper;
     workspace.rhs[count - 1] = upper.rhs;
-    let coordinates = input.mesh.coordinates();
     let gravity = input.mesh.inclination_cosine();
     for node in 1..count - 1 {
-        let dx_a = coordinates[node] - coordinates[node - 1];
-        let dx_b = coordinates[node + 1] - coordinates[node];
-        let width = (dx_a + dx_b) / 2.0;
-        let con_a = face(
-            workspace.evaluated_conductivity[node - 1],
-            workspace.evaluated_conductivity[node],
-            input.face_averaging,
-        )?;
-        let con_b = face(
-            workspace.evaluated_conductivity[node],
-            workspace.evaluated_conductivity[node + 1],
-            input.face_averaging,
-        )?;
-        let storage = workspace.evaluated_capacity[node] * width / timestep;
-        workspace.lower[node] = -con_a / dx_a;
-        workspace.diagonal[node] = con_a / dx_a + con_b / dx_b + storage;
-        workspace.upper[node] = -con_b / dx_b;
-        workspace.rhs[node] = storage * workspace.trial_heads[node]
-            - (workspace.evaluated_theta[node] - state.water_contents[node]) * width / timestep
-            - (con_a - con_b) * gravity
-            - input.sink[node] * width;
+        let row = ResetRow::calculate(ResetRowInput {
+            dx_a: input.mesh.coordinates()[node] - input.mesh.coordinates()[node - 1],
+            dx_b: input.mesh.coordinates()[node + 1] - input.mesh.coordinates()[node],
+            gravity,
+            conductivity_a: workspace.evaluated_conductivity[node - 1],
+            conductivity_node: workspace.evaluated_conductivity[node],
+            conductivity_b: workspace.evaluated_conductivity[node + 1],
+            capacity: workspace.evaluated_capacity[node],
+            h_new: workspace.trial_heads[node],
+            theta_new: workspace.evaluated_theta[node],
+            theta_old: state.water_contents[node],
+            sink: input.sink[node],
+            timestep,
+            face_averaging: input.face_averaging,
+        })?;
+        workspace.lower[node] = row.lower;
+        workspace.diagonal[node] = row.diagonal;
+        workspace.upper[node] = row.upper;
+        workspace.rhs[node] = row.rhs;
     }
     validate_finite("assembled coefficients", &workspace.lower)?;
     validate_finite("assembled coefficients", &workspace.diagonal)?;
     validate_finite("assembled coefficients", &workspace.upper)?;
     validate_finite("assembled rhs", &workspace.rhs)
-}
-
-fn face(left: f64, right: f64, averaging: FaceAveraging) -> Result<f64, WaterStepError> {
-    Ok(match averaging {
-        FaceAveraging::Arithmetic => arithmetic_face_conductivity(left, right)?,
-        FaceAveraging::Geometric => geometric_face_conductivity(left, right)?,
-    })
 }
 
 fn balance(
@@ -261,14 +255,15 @@ fn balance(
     input: WaterStepInput<'_>,
     timestep: f64,
 ) -> Result<WaterBalance, WaterStepError> {
-    let storage_change = workspace
-        .trial_water
-        .iter()
-        .zip(&state.water_contents)
-        .map(|(trial, accepted)| trial - accepted)
-        .sum::<f64>();
+    let mut storage_change = 0.0;
+    let mut sink_integral = 0.0;
+    for node in 0..input.mesh.coordinates().len() {
+        let width = nodal_control_volume_width(input.mesh, node)?;
+        storage_change += (workspace.trial_water[node] - state.water_contents[node]) * width;
+        sink_integral += input.sink[node] * width;
+    }
     let boundary_flux = (input.lower_boundary_flux + input.upper_boundary_flux) * timestep;
-    let sink = input.sink.iter().sum::<f64>() * timestep;
+    let sink = sink_integral * timestep;
     let absolute_residual = (storage_change - boundary_flux + sink).abs();
     let denominator = storage_change.abs() + boundary_flux.abs() + sink.abs();
     let normalized_residual = if denominator == 0.0 {

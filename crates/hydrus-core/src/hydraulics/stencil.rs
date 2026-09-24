@@ -35,6 +35,51 @@ pub struct ResetRow {
     pub rhs: f64,
 }
 
+#[derive(Clone, Copy)]
+pub(crate) struct ResetRowInput {
+    pub dx_a: f64,
+    pub dx_b: f64,
+    pub gravity: f64,
+    pub conductivity_a: f64,
+    pub conductivity_node: f64,
+    pub conductivity_b: f64,
+    pub capacity: f64,
+    pub h_new: f64,
+    pub theta_new: f64,
+    pub theta_old: f64,
+    pub sink: f64,
+    pub timestep: f64,
+    pub face_averaging: FaceAveraging,
+}
+
+/// Calculates one interior row without allocating, shared by stencil and
+/// water-solver assembly.
+impl ResetRow {
+    pub(crate) fn calculate(input: ResetRowInput) -> Result<Self, HydraulicError> {
+        let con_a = face_conductivity(
+            input.conductivity_a,
+            input.conductivity_node,
+            input.face_averaging,
+        )?;
+        let con_b = face_conductivity(
+            input.conductivity_node,
+            input.conductivity_b,
+            input.face_averaging,
+        )?;
+        let width = (input.dx_a + input.dx_b) / 2.0;
+        let storage = input.capacity * width / input.timestep;
+        Ok(Self {
+            lower: -con_a / input.dx_a,
+            diagonal: con_a / input.dx_a + con_b / input.dx_b + storage,
+            upper: -con_b / input.dx_b,
+            rhs: storage * input.h_new
+                - (input.theta_new - input.theta_old) * width / input.timestep
+                - (con_a - con_b) * input.gravity
+                - input.sink * width,
+        })
+    }
+}
+
 /// Assemble the pure, source-style interior finite-difference `Reset` stencil.
 ///
 /// This preserves the observed `WATFLOW.FOR:232-256` algebra. It is stencil
@@ -73,30 +118,21 @@ pub fn assemble_reset_stencil(
     for node in 1..node_count - 1 {
         let dx_a = coordinates[node] - coordinates[node - 1];
         let dx_b = coordinates[node + 1] - coordinates[node];
-        let dx = (dx_a + dx_b) / 2.0;
-        let con_a = face_conductivity(
-            input.conductivities[node - 1],
-            input.conductivities[node],
-            input.face_averaging,
-        )?;
-        let con_b = face_conductivity(
-            input.conductivities[node],
-            input.conductivities[node + 1],
-            input.face_averaging,
-        )?;
-        let b = (con_a - con_b) * gravity;
-        let a2 = con_a / dx_a + con_b / dx_b;
-        let a3 = -con_b / dx_b;
-        let f2 = input.capacities[node] * dx / input.timestep;
-        let row = ResetRow {
-            lower: -con_a / dx_a,
-            diagonal: a2 + f2,
-            upper: a3,
-            rhs: f2 * input.h_new[node]
-                - (input.theta_new[node] - input.theta_old[node]) * dx / input.timestep
-                - b
-                - input.sink[node] * dx,
-        };
+        let row = ResetRow::calculate(ResetRowInput {
+            dx_a,
+            dx_b,
+            gravity,
+            conductivity_a: input.conductivities[node - 1],
+            conductivity_node: input.conductivities[node],
+            conductivity_b: input.conductivities[node + 1],
+            capacity: input.capacities[node],
+            h_new: input.h_new[node],
+            theta_new: input.theta_new[node],
+            theta_old: input.theta_old[node],
+            sink: input.sink[node],
+            timestep: input.timestep,
+            face_averaging: input.face_averaging,
+        })?;
         if ![row.lower, row.diagonal, row.upper, row.rhs]
             .iter()
             .all(|value| value.is_finite())

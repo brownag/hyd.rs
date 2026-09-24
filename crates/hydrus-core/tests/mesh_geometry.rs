@@ -1,7 +1,8 @@
 use hydrus_core::{
     hydraulics::{
         adjacent_distance, arithmetic_face_conductivity, boundary_half_cell_width,
-        geometric_face_conductivity, gravity_metric, layer_metrics, Boundary, LayerMetric, Mesh1D,
+        geometric_face_conductivity, gravity_metric, layer_metrics, nodal_control_volume_width,
+        Boundary, LayerMetric, Mesh1D,
     },
     HydraulicError,
 };
@@ -42,6 +43,42 @@ fn distances_reject_out_of_range_and_single_node_boundaries() {
     let single = Mesh1D::new(vec![0.0], vec![0], None, 1, 0, 1.0).unwrap();
     assert!(matches!(
         boundary_half_cell_width(&single, Boundary::Lower),
+        Err(HydraulicError::InvalidMesh { .. })
+    ));
+}
+
+#[test]
+fn nodal_control_volume_widths_use_half_cells_and_internal_means() {
+    let uniform = Mesh1D::new(vec![0.0, 2.0, 4.0], vec![0; 3], None, 1, 0, 1.0).unwrap();
+    assert_eq!(nodal_control_volume_width(&uniform, 0).unwrap(), 1.0);
+    assert_eq!(nodal_control_volume_width(&uniform, 1).unwrap(), 2.0);
+    assert_eq!(nodal_control_volume_width(&uniform, 2).unwrap(), 1.0);
+
+    let mesh = mesh();
+    assert_eq!(nodal_control_volume_width(&mesh, 0).unwrap(), 1.0);
+    assert_eq!(nodal_control_volume_width(&mesh, 1).unwrap(), 2.5);
+    assert_eq!(nodal_control_volume_width(&mesh, 2).unwrap(), 3.5);
+    assert_eq!(nodal_control_volume_width(&mesh, 4).unwrap(), 2.0);
+    assert!(matches!(
+        nodal_control_volume_width(&mesh, 5),
+        Err(HydraulicError::InvalidMesh { .. })
+    ));
+    let single = Mesh1D::new(vec![0.0], vec![0], None, 1, 0, 1.0).unwrap();
+    assert!(matches!(
+        nodal_control_volume_width(&single, 0),
+        Err(HydraulicError::InvalidMesh { .. })
+    ));
+    let overflowing = Mesh1D::new(
+        vec![-1.7e308, -0.5e308, 0.7e308, 1.7e308],
+        vec![0; 4],
+        None,
+        1,
+        0,
+        1.0,
+    )
+    .unwrap();
+    assert!(matches!(
+        nodal_control_volume_width(&overflowing, 1),
         Err(HydraulicError::InvalidMesh { .. })
     ));
 }

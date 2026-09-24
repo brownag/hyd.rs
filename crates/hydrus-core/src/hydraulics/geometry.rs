@@ -49,6 +49,23 @@ pub fn boundary_half_cell_width(mesh: &Mesh1D, boundary: Boundary) -> Result<f64
     finite_geometry(distance / 2.0, "boundary_half_cell")
 }
 
+/// Returns the nodal control-volume width: half an adjacent spacing at an
+/// endpoint, and the mean of the adjacent spacings at an interior node.
+pub fn nodal_control_volume_width(mesh: &Mesh1D, node: usize) -> Result<f64, HydraulicError> {
+    let count = mesh.coordinates().len();
+    if count < 2 || node >= count {
+        return Err(geometry_error("node", "index is out of range"));
+    }
+    let width = if node == 0 {
+        boundary_half_cell_width(mesh, Boundary::Lower)?
+    } else if node == count - 1 {
+        boundary_half_cell_width(mesh, Boundary::Upper)?
+    } else {
+        (adjacent_distance(mesh, node - 1)? + adjacent_distance(mesh, node)?) / 2.0
+    };
+    finite_geometry(width, "nodal_control_volume_width")
+}
+
 /// Returns the gravity metric using the source convention `Grav = CosAlf`.
 pub fn gravity_metric(mesh: &Mesh1D) -> Result<f64, HydraulicError> {
     finite_geometry(mesh.inclination_cosine(), "inclination_cosine")

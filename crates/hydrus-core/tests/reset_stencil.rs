@@ -162,6 +162,25 @@ fn invalid_inputs_are_rejected() {
 }
 
 #[test]
+fn derived_non_finite_row_is_rejected() {
+    let mesh = mesh(vec![0.0, 1.0, 2.0], 0.0);
+    assert!(assemble_reset_stencil(
+        &mesh,
+        input(
+            &[1.0; 3],
+            &[0.0; 3],
+            &[0.0; 3],
+            &[0.0, 1.0e308, 0.0],
+            &[0.0, -1.0e308, 0.0],
+            &[0.0; 3],
+            1.0,
+            FaceAveraging::Arithmetic,
+        ),
+    )
+    .is_err());
+}
+
+#[test]
 fn source_algebra_note_is_explicit() {
     let documentation = include_str!("../src/hydraulics/stencil.rs");
     assert!(documentation.contains("not a Fortran parity result"));

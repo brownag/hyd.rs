@@ -9,9 +9,11 @@ mod van_genuchten;
 pub use boundary::{transform_boundary_row, BoundaryCondition, BoundaryRow, BoundaryRowLocation};
 pub use geometry::{
     adjacent_distance, arithmetic_face_conductivity, boundary_half_cell_width,
-    geometric_face_conductivity, gravity_metric, layer_metrics, Boundary, LayerMetric,
+    geometric_face_conductivity, gravity_metric, layer_metrics, nodal_control_volume_width,
+    Boundary, LayerMetric,
 };
 pub use linear::{solve_tridiagonal_in_place, PivotDiagnostics, TridiagonalError};
+pub(crate) use stencil::ResetRowInput;
 pub use stencil::{assemble_reset_stencil, FaceAveraging, ResetRow, ResetStencilInput};
 pub use types::{Evaluation, HydraulicDerivatives, Mesh1D, VanGenuchtenParameters};
 use van_genuchten::evaluate_model_zero;

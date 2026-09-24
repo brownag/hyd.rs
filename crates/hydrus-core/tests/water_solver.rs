@@ -1,5 +1,6 @@
 use hydrus_core::hydraulics::{
-    BoundaryCondition, BoundaryRow, Evaluation, FaceAveraging, HydraulicDerivatives, Mesh1D,
+    assemble_reset_stencil, BoundaryCondition, BoundaryRow, Evaluation, FaceAveraging,
+    HydraulicDerivatives, Mesh1D, ResetStencilInput,
 };
 use hydrus_core::{
     advance_water_step, HydraulicError, HydraulicModel, WaterState, WaterStepError, WaterStepInput,
@@ -106,7 +107,7 @@ fn converges_a_deterministic_picard_step_and_reports_balance() {
     let report = advance_water_step(
         &mut state,
         &mut workspace,
-        input(&mesh, &materials, &sink, 1.0, 8.0 / 3.0),
+        input(&mesh, &materials, &sink, 1.0, 5.0 / 3.0),
         policy(),
     )
     .unwrap();
@@ -114,10 +115,82 @@ fn converges_a_deterministic_picard_step_and_reports_balance() {
     assert_eq!(report.iterations, 2);
     close(state.heads()[1], 2.0 / 3.0);
     close(state.water_contents()[1], 2.0 / 3.0);
+    close(report.balance.storage_change, 5.0 / 3.0);
     close(report.balance.absolute_residual, 0.0);
     close(report.balance.normalized_residual, 0.0);
     assert!(report.minimum_absolute_pivot.is_finite());
     assert_eq!(state.accounting().accepted_steps, 1);
+}
+
+#[test]
+fn solver_interior_row_matches_the_reset_stencil_row() {
+    let mesh = mesh();
+    let model = LinearModel {
+        conductivity: 1.0,
+        conductivity_slope: 0.0,
+        theta_offset: 0.2,
+        capacity: 0.0,
+    };
+    let materials: [&dyn HydraulicModel; 1] = [&model];
+    let sink = [0.0, 0.25, 0.0];
+    let mut state = WaterState::new(0.0, vec![0.0; 3], vec![0.0; 3]).unwrap();
+    let mut workspace = WaterWorkspace::new(3).unwrap();
+    let report = advance_water_step(
+        &mut state,
+        &mut workspace,
+        input(&mesh, &materials, &sink, 1.0, 0.0),
+        policy(),
+    )
+    .unwrap();
+
+    let row = assemble_reset_stencil(
+        &mesh,
+        ResetStencilInput {
+            conductivities: &[1.0; 3],
+            capacities: &[0.0; 3],
+            h_new: &[0.0; 3],
+            theta_new: &[0.2; 3],
+            theta_old: &[0.0; 3],
+            sink: &sink,
+            timestep: 1.0,
+            face_averaging: FaceAveraging::Arithmetic,
+        },
+    )
+    .unwrap()[0];
+    // Both callers use lower=-1, diagonal=2, upper=-1, rhs=-0.2-0.25.
+    let stencil_solution = (row.rhs - row.upper * 2.0) / row.diagonal;
+    close(state.heads()[1], stencil_solution);
+    close(report.balance.storage_change, 0.4);
+}
+
+#[test]
+fn nonuniform_mesh_balance_uses_control_volumes() {
+    let mesh = Mesh1D::new(vec![0.0, 1.0, 4.0, 8.0], vec![0, 1, 2, 3], None, 4, 0, 0.0).unwrap();
+    let models = [1.0, 2.0, 3.0, 4.0].map(|theta_offset| LinearModel {
+        conductivity: 1.0,
+        conductivity_slope: 0.0,
+        theta_offset,
+        capacity: 0.0,
+    });
+    let materials: [&dyn HydraulicModel; 4] = [&models[0], &models[1], &models[2], &models[3]];
+    let sink = [1.0, 2.0, 3.0, 4.0];
+    let mut state = WaterState::new(0.0, vec![0.0; 4], vec![0.0; 4]).unwrap();
+    let mut workspace = WaterWorkspace::new(4).unwrap();
+    let request = WaterStepInput {
+        upper_condition: BoundaryCondition::Dirichlet { value: 0.0 },
+        lower_boundary_flux: 2.0,
+        upper_boundary_flux: -0.5,
+        ..input(&mesh, &materials, &sink, 2.0, 0.0)
+    };
+    let report = advance_water_step(&mut state, &mut workspace, request, policy()).unwrap();
+
+    // Widths are [0.5, 2, 3.5, 2], so storage is 23 and sink is 23 * 2 = 46.
+    // The old unweighted sums would be 10 for storage and 10 * 2 for sink.
+    close(report.balance.storage_change, 23.0);
+    close(report.balance.sink, 46.0);
+    close(report.balance.boundary_flux, 3.0);
+    close(report.balance.absolute_residual, 66.0);
+    close(report.balance.normalized_residual, 11.0 / 12.0);
 }
 
 #[test]
