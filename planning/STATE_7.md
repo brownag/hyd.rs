@@ -1,7 +1,7 @@
 # State — Orchestration 7: Phase 3 solver correction and closure
 
 Plan status: **approved by the user on 2026-09-23.**
-Execution status: **Wave 3 complete; Wave 4 ready to start.**
+Execution status: **Wave 4 complete; Wave 5 ready to start.**
 Planning baseline revision: `5066dad`, reviewed 2026-09-23. The worktree was clean before these three draft artifacts were created.
 Master authority: [HYDRUS1D_RUST_PORT_PLAN.md](HYDRUS1D_RUST_PORT_PLAN.md), Phase 3.
 Resume from [EXECUTION_PLAN_7.md](EXECUTION_PLAN_7.md); worker prompt: [PROMPT_TEMPLATE_7.md](PROMPT_TEMPLATE_7.md).
@@ -26,7 +26,7 @@ Scientific baseline: **unavailable.** This orchestration must not claim Fortran 
 | 1 | 7.1.3 | Isolated accepted-step allocation test binary | done | `672b2bb` |
 | 2 | 7.2.1 | Trial-head, per-material hydraulic Picard evaluation | done | `61e433e` |
 | 3 | 7.3.1 | Weighted balances and shared row assembly | done | `aeaf195` |
-| 4 | 7.4.1 | Caller target-time alignment | pending | — |
+| 4 | 7.4.1 | Caller target-time alignment | done | `26ae9bb` |
 | 5 | 7.5.1 | Stable allocation evidence across retries and accepted steps | pending | — |
 | 6 | 7.6.1 | Corrected Phase 3 evidence and Phase 4 gate | pending | — |
 
@@ -37,7 +37,7 @@ Scientific baseline: **unavailable.** This orchestration must not claim Fortran 
 | 1 | `672b2bb` | `api_contract` 4/4; `hydraulic_tables` 6/6; `allocation_contract` 1/1; `water_transaction` 3/3 | `cargo test --workspace`: 49 passed, 0 failed | `cargo fmt --check`: passed | `cargo clippy --workspace --all-targets -- -D warnings`: passed | `git diff --check`: passed |
 | 2 | `61e433e` | `water_solver` 5/5; `allocation_contract` 1/1; `water_transaction` 3/3 | `cargo test --workspace`: 51 passed, 0 failed | `cargo fmt --check`: passed | `cargo clippy --workspace --all-targets -- -D warnings`: passed | `git diff --check`: passed |
 | 3 | `aeaf195` | `reset_stencil` 6/6; `mesh_geometry` 8/8; `water_solver` 7/7 | `cargo test --workspace`: 55 passed, 0 failed | `cargo fmt --check`: passed | `cargo clippy --workspace --all-targets -- -D warnings`: passed | `git diff --check`: passed |
-| 4 | — | pending | pending | pending | pending | pending |
+| 4 | `26ae9bb` | `water_solver` 10/10; `water_transaction` 4/4; `allocation_contract` 1/1 | `cargo test --workspace`: 59 passed, 0 failed | `cargo fmt --check`: passed | `cargo clippy --workspace --all-targets -- -D warnings`: passed | `git diff --check`: passed |
 | 5 | — | pending | pending | pending | pending | pending |
 | 6 | — | pending | pending | pending | pending | pending |
 
@@ -53,6 +53,8 @@ Scientific baseline: **unavailable.** This orchestration must not claim Fortran 
 - **Wave 2 gate:** workspace tests 51 passed; formatting, warning-denied Clippy, and diff checks passed.
 - **7.3.1:** Added checked nodal control-volume widths, factored shared interior-row calculation, and integrated storage/sink balances with mesh widths while retaining signed flux, residual normalization, and zero-denominator behavior. Added nonuniform hand calculation, geometry cases, row equivalence, and derived-row overflow coverage. Targeted tests: reset stencil 6, mesh geometry 8, water solver 7 passed. Commit `aeaf195`.
 - **Wave 3 gate:** workspace tests 55 passed; formatting, warning-denied Clippy, and diff checks passed.
+- **7.4.1:** Added a finite caller target time, typed rejection of non-future targets, clipping of initial/retry steps, and exact accepted-time promotion on landing. Tests cover within-step clipping, repeated calls toward a farther target, invalid targets without mutation, retry clipping, and allocation test API continuity. Targeted tests: solver 10, transaction 4, allocation 1 passed. Commit `26ae9bb`.
+- **Wave 4 gate:** workspace tests 59 passed; formatting, warning-denied Clippy, and diff checks passed.
 
 ## Escalations and amendments
 
