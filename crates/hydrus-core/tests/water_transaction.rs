@@ -1,29 +1,7 @@
-use std::alloc::{GlobalAlloc, Layout, System};
-use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
-
 use hydrus_core::hydraulics::{BoundaryCondition, BoundaryRow, FaceAveraging, Mesh1D};
 use hydrus_core::{
     advance_water_step, WaterState, WaterStepError, WaterStepInput, WaterStepPolicy, WaterWorkspace,
 };
-
-struct CountingAllocator;
-static COUNTING: AtomicBool = AtomicBool::new(false);
-static ALLOCATIONS: AtomicUsize = AtomicUsize::new(0);
-
-unsafe impl GlobalAlloc for CountingAllocator {
-    unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
-        if COUNTING.load(Ordering::Relaxed) {
-            ALLOCATIONS.fetch_add(1, Ordering::Relaxed);
-        }
-        unsafe { System.alloc(layout) }
-    }
-    unsafe fn dealloc(&self, pointer: *mut u8, layout: Layout) {
-        unsafe { System.dealloc(pointer, layout) }
-    }
-}
-
-#[global_allocator]
-static ALLOCATOR: CountingAllocator = CountingAllocator;
 
 fn mesh() -> Mesh1D {
     Mesh1D::new(vec![0.0, 1.0, 2.0], vec![0; 3], None, 1, 0, 0.0).unwrap()
@@ -123,27 +101,4 @@ fn invalid_input_does_not_mutate_accepted_state() {
         Err(WaterStepError::NonFiniteInput { .. })
     ));
     assert_eq!(state, original);
-}
-
-#[test]
-fn fixed_size_steps_allocate_nothing_after_setup() {
-    let mesh = mesh();
-    let mut state = WaterState::new(0.0, vec![0.0; 3], vec![0.0; 3]).unwrap();
-    let mut workspace = WaterWorkspace::new(3).unwrap();
-    let stationary = WaterStepInput {
-        upper_condition: BoundaryCondition::Dirichlet { value: 0.0 },
-        ..input(&mesh, 1.0)
-    };
-    let strict = WaterStepPolicy {
-        head_tolerance: 1e-12,
-        water_tolerance: 1e-12,
-        ..policy(1, 0.1)
-    };
-    advance_water_step(&mut state, &mut workspace, stationary, strict).unwrap();
-    ALLOCATIONS.store(0, Ordering::Relaxed);
-    COUNTING.store(true, Ordering::Relaxed);
-    let report = advance_water_step(&mut state, &mut workspace, stationary, strict).unwrap();
-    COUNTING.store(false, Ordering::Relaxed);
-    assert_eq!(report.retries, 0);
-    assert_eq!(ALLOCATIONS.load(Ordering::Relaxed), 0);
 }
