@@ -1,7 +1,7 @@
 # State — Orchestration 8: Phase 4 first water acceptance
 
 Plan status: **approved by the user on 2026-09-24.**
-Execution status: **Wave 1 in progress; task 8.1.1 micro-plan requested.**
+Execution status: **Wave 1 complete; Wave 2 is next.**
 Master authority: [HYDRUS1D_RUST_PORT_PLAN.md](HYDRUS1D_RUST_PORT_PLAN.md), Phase 4.
 Phase 3 entry evidence: [PHASE_3_WATER_SOLVER_EVIDENCE.md](master/PHASE_3_WATER_SOLVER_EVIDENCE.md).
 Plan: [EXECUTION_PLAN_8.md](EXECUTION_PLAN_8.md); worker prompt: [PROMPT_TEMPLATE_8.md](PROMPT_TEMPLATE_8.md).
@@ -21,7 +21,7 @@ Scientific baseline: **unavailable.** Fixture provenance and numerical parity li
 
 | Wave | Task | Deliverable | Status | Commit |
 |---|---|---|---|---|
-| 1 | 8.1.1 | Validated water product configuration | done | pending local commit |
+| 1 | 8.1.1 | Validated water product configuration | done | `91b33da` |
 | 2 | 8.2.1 | Event-aligned atmospheric forcing and upper switching | pending | — |
 | 3 | 8.3.1 | Supported lower boundary modes | pending | — |
 | 4 | 8.4.1 | Feddes root stress and compensation | pending | — |
@@ -38,7 +38,7 @@ Scientific baseline: **unavailable.** Fixture provenance and numerical parity li
 - Wave gate: `cargo test --workspace` — 62 passed, 0 failed; fmt, warning-denied Clippy, and `git diff --check` passed.
 - Retry: first wave gate found rustfmt differences in the new test; one correction applied, all gates then passed.
 - Deviations: none. Downstream: capability boundary exists; event and physical boundary logic remains for later tasks.
-- Commit: pending.
+- Commit: `91b33da` (`feat(core): define first water capability`).
 
 ## Escalations and amendments
 
