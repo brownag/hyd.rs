@@ -1,7 +1,7 @@
 # State — Orchestration 5: Phase 3 Richards/Picard water solver
 
 Plan status: **approved by the user on 2026-09-23.**
-Execution status: **not started.**
+Execution status: **complete.**
 Master authority: [HYDRUS1D_RUST_PORT_PLAN.md](HYDRUS1D_RUST_PORT_PLAN.md), Phase 3.
 Resume from [EXECUTION_PLAN_5.md](EXECUTION_PLAN_5.md); worker prompt: [PROMPT_TEMPLATE_5.md](PROMPT_TEMPLATE_5.md).
 
@@ -26,7 +26,7 @@ Scientific baseline: **unavailable.** Phase 3 tests are source-algebra and Rust 
 | 1 | 5.1.1 | Generic boundary-row contract | done | pending |
 | 2 | 5.2.1 | Preallocated water tridiagonal kernel | done | pending |
 | 3 | 5.3.1 | Transactional Picard stepping and balances | done | pending |
-| 4 | 5.4.1 | Phase 3 evidence and Phase 4 handoff | pending | — |
+| 4 | 5.4.1 | Phase 3 evidence and Phase 4 handoff | done | pending |
 
 ## Task reports
 
@@ -64,3 +64,11 @@ Scientific baseline: **unavailable.** Phase 3 tests are source-algebra and Rust 
 <!-- Record retries, escalations, scope amendments, and pre-wave blockers here. -->
 
 - 5.3.1 escalated once after two identical targeted transaction-test failures; mid-tier correction passed all checks.
+
+## 5.4.1
+
+- Status: done; Phase 3 evidence and Phase 4 handoff recorded in `master/PHASE_3_WATER_SOLVER_EVIDENCE.md`.
+- Evidence: boundary 6, tridiagonal 5, water solver 3, transaction 4; workspace 47 tests passed.
+- Checks: fmt, workspace Clippy, `git diff --check`, and required structure assertions passed.
+- Limitations recorded: source-algebra/Rust-contract evidence only; no parity, calibration, fixture, benchmark, release, or performance claim.
+- Phase 4 handoff covers forcing, event alignment, physical boundaries, roots, fixtures, mass-balance sign-off, and unsupported combinations.
