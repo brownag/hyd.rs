@@ -92,6 +92,13 @@ pub enum WaterStepError {
         name: &'static str,
         value: usize,
     },
+    InvalidForcing {
+        name: &'static str,
+        reason: &'static str,
+    },
+    UnsupportedAtmosphericInput {
+        name: &'static str,
+    },
     DimensionMismatch,
     NonFiniteInput {
         name: &'static str,
@@ -118,6 +125,12 @@ impl fmt::Display for WaterStepError {
             Self::InvalidPolicy { name } => write!(formatter, "invalid water-step policy: {name}"),
             Self::UnsupportedConfiguration { name, value } => {
                 write!(formatter, "unsupported water configuration {name}={value}")
+            }
+            Self::InvalidForcing { name, reason } => {
+                write!(formatter, "invalid atmospheric forcing {name}: {reason}")
+            }
+            Self::UnsupportedAtmosphericInput { name } => {
+                write!(formatter, "unsupported atmospheric input: {name}")
             }
             Self::DimensionMismatch => write!(formatter, "water-step dimensions differ"),
             Self::NonFiniteInput { name } => write!(formatter, "non-finite water-step input: {name}"),

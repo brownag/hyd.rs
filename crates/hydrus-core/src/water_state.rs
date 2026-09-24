@@ -1,3 +1,4 @@
+use crate::atmospheric::AtmosphericState;
 use crate::WaterStepError;
 
 /// Accepted single-domain water fields and accepted-only accounting.
@@ -7,6 +8,7 @@ pub struct WaterState {
     pub(crate) heads: Vec<f64>,
     pub(crate) water_contents: Vec<f64>,
     pub(crate) accounting: WaterAccounting,
+    pub(crate) atmospheric: AtmosphericState,
 }
 
 /// Counters and cumulative diagnostics changed only by accepted steps.
@@ -38,6 +40,7 @@ impl WaterState {
             heads,
             water_contents,
             accounting: WaterAccounting::default(),
+            atmospheric: AtmosphericState::default(),
         })
     }
 
@@ -52,6 +55,9 @@ impl WaterState {
     }
     pub fn accounting(&self) -> WaterAccounting {
         self.accounting
+    }
+    pub fn atmospheric(&self) -> AtmosphericState {
+        self.atmospheric
     }
 }
 
@@ -71,6 +77,7 @@ pub struct WaterWorkspace {
     snapshot_water: Vec<f64>,
     snapshot_time: f64,
     snapshot_accounting: WaterAccounting,
+    snapshot_atmospheric: AtmosphericState,
 }
 
 impl WaterWorkspace {
@@ -94,6 +101,7 @@ impl WaterWorkspace {
             snapshot_water: vec![0.0; node_count],
             snapshot_time: 0.0,
             snapshot_accounting: WaterAccounting::default(),
+            snapshot_atmospheric: AtmosphericState::default(),
         })
     }
 
@@ -106,6 +114,7 @@ impl WaterWorkspace {
         self.snapshot_water.copy_from_slice(&state.water_contents);
         self.snapshot_time = state.time;
         self.snapshot_accounting = state.accounting;
+        self.snapshot_atmospheric = state.atmospheric;
         self.trial_heads.copy_from_slice(&state.heads);
         self.trial_water.copy_from_slice(&state.water_contents);
     }
@@ -115,6 +124,7 @@ impl WaterWorkspace {
         state.water_contents.copy_from_slice(&self.snapshot_water);
         state.time = self.snapshot_time;
         state.accounting = self.snapshot_accounting;
+        state.atmospheric = self.snapshot_atmospheric;
         self.trial_heads.copy_from_slice(&self.snapshot_heads);
         self.trial_water.copy_from_slice(&self.snapshot_water);
     }

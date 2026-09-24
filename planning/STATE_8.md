@@ -22,7 +22,7 @@ Scientific baseline: **unavailable.** Fixture provenance and numerical parity li
 | Wave | Task | Deliverable | Status | Commit |
 |---|---|---|---|---|
 | 1 | 8.1.1 | Validated water product configuration | done | `91b33da` |
-| 2 | 8.2.1 | Event-aligned atmospheric forcing and upper switching | blocked | — |
+| 2 | 8.2.1 | Event-aligned atmospheric forcing and upper switching | blocked | `pending checkpoint` |
 | 3 | 8.3.1 | Supported lower boundary modes | pending | — |
 | 4 | 8.4.1 | Feddes root stress and compensation | pending | — |
 | 5 | 8.5.1 | Four first-water acceptance fixtures | pending | — |
@@ -42,11 +42,11 @@ Scientific baseline: **unavailable.** Fixture provenance and numerical parity li
 
 ### 8.2.1 — blocked; implementation unaccepted
 
-- Status: stopped after the small-worker attempt and one mid-tier escalation; two added accepted-step scenarios still fail to converge.
+- Status: stopped after the small-worker attempt and one mid-tier escalation; partial implementation saved in checkpoint commit, acceptance remains blocked.
 - Scope touched: `error.rs`, `lib.rs`, `water_solver.rs`, `water_state.rs`, new `atmospheric.rs`, `forcing.rs`, `tests/atmospheric.rs`, and `tasks/8.2.1.todo.md`.
 - Targeted command after escalation: `cargo test -p hydrus-core --test atmospheric` — 7 passed, 2 failed on each of two consecutive runs; rain/ponding balance first had residual `0.003225806451612934`, then both new accepted scenarios returned `NonConverged` after six retries.
 - Earlier revision passed 7/7 targeted tests and workspace gates, but was rejected in review for missing accepted ponding and supply-limited evaporation balance coverage.
-- Deviations: none authorized. The current implementation remains partial, uncommitted, and unaccepted. No workspace gates were run after escalation edits.
+- Deviations: none authorized. The current implementation remains partial and unaccepted. No workspace gates were run after escalation edits.
 - Disposition: stopped at the escalation cap; a plan amendment or revised task approach is needed before dependent waves can proceed.
 
 ## Escalations and amendments
