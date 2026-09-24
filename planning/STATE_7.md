@@ -1,7 +1,7 @@
 # State — Orchestration 7: Phase 3 solver correction and closure
 
 Plan status: **approved by the user on 2026-09-23.**
-Execution status: **Wave 2 complete; Wave 3 ready to start.**
+Execution status: **Wave 3 complete; Wave 4 ready to start.**
 Planning baseline revision: `5066dad`, reviewed 2026-09-23. The worktree was clean before these three draft artifacts were created.
 Master authority: [HYDRUS1D_RUST_PORT_PLAN.md](HYDRUS1D_RUST_PORT_PLAN.md), Phase 3.
 Resume from [EXECUTION_PLAN_7.md](EXECUTION_PLAN_7.md); worker prompt: [PROMPT_TEMPLATE_7.md](PROMPT_TEMPLATE_7.md).
@@ -25,7 +25,7 @@ Scientific baseline: **unavailable.** This orchestration must not claim Fortran 
 | 1 | 7.1.2 | Unit-tagged tables, correct derivatives, no failing constructors | done | `4f46441` |
 | 1 | 7.1.3 | Isolated accepted-step allocation test binary | done | `672b2bb` |
 | 2 | 7.2.1 | Trial-head, per-material hydraulic Picard evaluation | done | `61e433e` |
-| 3 | 7.3.1 | Weighted balances and shared row assembly | pending | — |
+| 3 | 7.3.1 | Weighted balances and shared row assembly | done | `aeaf195` |
 | 4 | 7.4.1 | Caller target-time alignment | pending | — |
 | 5 | 7.5.1 | Stable allocation evidence across retries and accepted steps | pending | — |
 | 6 | 7.6.1 | Corrected Phase 3 evidence and Phase 4 gate | pending | — |
@@ -36,7 +36,7 @@ Scientific baseline: **unavailable.** This orchestration must not claim Fortran 
 |---|---|---|---|---|---|---|
 | 1 | `672b2bb` | `api_contract` 4/4; `hydraulic_tables` 6/6; `allocation_contract` 1/1; `water_transaction` 3/3 | `cargo test --workspace`: 49 passed, 0 failed | `cargo fmt --check`: passed | `cargo clippy --workspace --all-targets -- -D warnings`: passed | `git diff --check`: passed |
 | 2 | `61e433e` | `water_solver` 5/5; `allocation_contract` 1/1; `water_transaction` 3/3 | `cargo test --workspace`: 51 passed, 0 failed | `cargo fmt --check`: passed | `cargo clippy --workspace --all-targets -- -D warnings`: passed | `git diff --check`: passed |
-| 3 | — | pending | pending | pending | pending | pending |
+| 3 | `aeaf195` | `reset_stencil` 6/6; `mesh_geometry` 8/8; `water_solver` 7/7 | `cargo test --workspace`: 55 passed, 0 failed | `cargo fmt --check`: passed | `cargo clippy --workspace --all-targets -- -D warnings`: passed | `git diff --check`: passed |
 | 4 | — | pending | pending | pending | pending | pending |
 | 5 | — | pending | pending | pending | pending | pending |
 | 6 | — | pending | pending | pending | pending | pending |
@@ -51,6 +51,8 @@ Scientific baseline: **unavailable.** This orchestration must not claim Fortran 
 - **Wave 1 gate:** workspace tests 49 passed; formatting, warning-denied Clippy, and diff checks passed.
 - **7.2.1:** `WaterStepInput` now accepts material models, evaluation buffers are allocated in `WaterWorkspace`, and every Picard pass evaluates per-node hydraulics at trial heads; theta updates and water convergence use model-evaluated values. Material mapping/count and nonlinear trial-head behavior are tested. The amended transaction fixture preserves retry, rollback, and no-mutation checks. Targeted tests: solver 5, allocation 1, transaction 3 passed. Commit `61e433e`.
 - **Wave 2 gate:** workspace tests 51 passed; formatting, warning-denied Clippy, and diff checks passed.
+- **7.3.1:** Added checked nodal control-volume widths, factored shared interior-row calculation, and integrated storage/sink balances with mesh widths while retaining signed flux, residual normalization, and zero-denominator behavior. Added nonuniform hand calculation, geometry cases, row equivalence, and derived-row overflow coverage. Targeted tests: reset stencil 6, mesh geometry 8, water solver 7 passed. Commit `aeaf195`.
+- **Wave 3 gate:** workspace tests 55 passed; formatting, warning-denied Clippy, and diff checks passed.
 
 ## Escalations and amendments
 
@@ -59,3 +61,4 @@ Scientific baseline: **unavailable.** This orchestration must not claim Fortran 
 - **7.1.2 escalation:** Initial `gpt-6-luna` worker's focused table test failed twice (5/6 tests, derivative tolerance assertion). Per the one-retry policy, the task was escalated once to `gpt-6-sol`; it corrected segment selection for interior knots and the final endpoint. Re-run passed 6/6. No scope change.
 - **Wave 1 baseline issue resolved:** the formerly intermittent allocation assertion passes in its isolated one-test binary and during the serial workspace run.
 - **7.2.1 scope amendment (D08, approved 2026-09-23):** Include `crates/hydrus-core/tests/water_transaction.rs` to migrate its `WaterStepInput` fixture after conductivity/capacity fields were replaced by hydraulic models. The first workspace run after integrating solver task `1643ee1` failed at compile time with three stale-field errors. Preserve retry, rollback, and invalid-input no-mutation coverage, and add the transaction integration binary to Wave 2 targeted gates.
+- **7.3.1 escalation:** The initial small worker's `water_solver` fixture failed twice after the balance became weighted; it corrected the expected fixture and then passed. Per policy, one `gpt-6-sol` escalation reviewed the final changes and reran the targeted tests. The workspace Clippy gate then found an oversized helper signature; the orchestrator converted it to a typed `ResetRowInput`. Final targeted and all Wave 3 gates passed.
