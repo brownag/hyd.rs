@@ -58,6 +58,7 @@ These findings come from the review of `git diff 14d3545...HEAD` at `5066dad` on
 | D05 | (2026-09-23) Allow at most two concurrent workers in Wave 1, in isolated worktrees; all later waves are serial because they share solver/evidence files. |
 | D06 | (2026-09-23) Use `gpt-6-luna` workers; after the established one-retry limit, escalate once to `gpt-6-sol`. |
 | D07 | (2026-09-23) Each wave requires targeted tests and serial workspace tests, formatting, Clippy with warnings denied, and diff checks before completion. |
+| D08 | (2026-09-23) Amend 7.2.1 to include migrating `tests/water_transaction.rs` fixtures to the hydraulic-model input API and rerunning its targeted test. The public `WaterStepInput` migration otherwise leaves that integration test uncompilable; retain its transaction and no-mutation assertions. |
 
 ## Wave table
 
@@ -128,14 +129,14 @@ Wave 1 tasks have pairwise-disjoint file lists. Task 7.1.1 exclusively owns `api
 
 - **Repo:** `/home/andrew/AI/hyd.rs`.
 - **Depends on:** 7.1.1, 7.1.2, and 7.1.3.
-- **Must edit:** `crates/hydrus-core/src/water_solver.rs`, `crates/hydrus-core/src/water_state.rs`, `crates/hydrus-core/src/lib.rs`, `crates/hydrus-core/tests/water_solver.rs`, `crates/hydrus-core/tests/allocation_contract.rs`.
+- **Must edit:** `crates/hydrus-core/src/water_solver.rs`, `crates/hydrus-core/src/water_state.rs`, `crates/hydrus-core/src/lib.rs`, `crates/hydrus-core/tests/water_solver.rs`, `crates/hydrus-core/tests/allocation_contract.rs`, `crates/hydrus-core/tests/water_transaction.rs`.
 - **Can create:** `planning/tasks/7.2.1.todo.md`.
 - **Scratch only:** `.development/7.2.1/`.
 - **Anchors:** `rg -n 'WaterStepInput|WaterWorkspace|solve_trial|assemble\(|conductivities|capacities|HydraulicModel|material_indices' crates/hydrus-core/src/water_solver.rs crates/hydrus-core/src/water_state.rs crates/hydrus-core/src/hydraulics crates/hydrus-core/tests/water_solver.rs`.
 - **Reference:** `VanGenuchtenModel::evaluate` in `hydraulics/mod.rs` as the concrete `HydraulicModel` implementation; `Mesh1D::material_indices()` in `hydraulics/types.rs`; and `WaterWorkspace::new` in `water_state.rs` for setup-time buffers.
 - **Spec:** Replace caller-frozen conductivity/capacity arrays with a caller-owned model slice indexed by mesh material indices. Validate model count against `material_count`; on every Picard iteration evaluate each node's selected model at that node's current trial head and assemble from the resulting theta, conductivity, and capacity. Use model-evaluated theta for trial water contents and their convergence diagnostic; do not treat capacity as a frozen external input or derive final trial water solely from `C × Δh`. Allocate/reuse all per-node evaluation buffers in `WaterWorkspace::new`, not inside the solve loop. Preserve sink input, transaction ownership, typed hydraulic error propagation, and filesystem-free boundary. Export the trait at the crate root if required by the public input type.
-- **Do not touch:** balance formula, time-target API, boundary policy, stencil implementation, tests outside `water_solver.rs`, or dependencies.
-- **Acceptance:** `cargo test -p hydrus-core --test water_solver` and `cargo test -p hydrus-core --test allocation_contract -- --test-threads=1`; tests prove trial-head changes affect subsequent hydraulic values and theta, material mapping is honored, invalid model/material counts reject, and the isolated accepted-step allocation test remains green. Full wave checks also pass.
+- **Do not touch:** balance formula, time-target API, boundary policy, stencil implementation, tests other than `water_solver.rs`, `allocation_contract.rs`, and the amended `water_transaction.rs`, or dependencies.
+- **Acceptance:** `cargo test -p hydrus-core --test water_solver`, `cargo test -p hydrus-core --test allocation_contract -- --test-threads=1`, and `cargo test -p hydrus-core --test water_transaction`; tests prove trial-head changes affect subsequent hydraulic values and theta, material mapping is honored, invalid model/material counts reject, transaction and no-mutation assertions remain covered, and the isolated accepted-step allocation test remains green. Full wave checks also pass.
 
 ### 7.3.1 — Weight water balance by mesh control volumes and share row assembly
 

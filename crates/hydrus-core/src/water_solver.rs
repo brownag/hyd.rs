@@ -1,7 +1,7 @@
 use crate::hydraulics::{
     arithmetic_face_conductivity, geometric_face_conductivity, solve_tridiagonal_in_place,
     transform_boundary_row, BoundaryCondition, BoundaryRow, BoundaryRowLocation, FaceAveraging,
-    Mesh1D, PivotDiagnostics,
+    HydraulicModel, Mesh1D, PivotDiagnostics,
 };
 use crate::water_state::validate_finite;
 use crate::{WaterState, WaterStepError, WaterWorkspace};
@@ -17,12 +17,11 @@ pub struct WaterStepPolicy {
     pub minimum_pivot: f64,
 }
 
-/// Deterministic caller-provided fields used by the Phase 3 water solver.
-#[derive(Clone, Copy, Debug)]
+/// Caller-owned hydraulic models and deterministic fields used by the Phase 3 water solver.
+#[derive(Clone, Copy)]
 pub struct WaterStepInput<'a> {
     pub mesh: &'a Mesh1D,
-    pub conductivities: &'a [f64],
-    pub capacities: &'a [f64],
+    pub materials: &'a [&'a dyn HydraulicModel],
     pub sink: &'a [f64],
     pub timestep: f64,
     pub face_averaging: FaceAveraging,
@@ -138,9 +137,17 @@ fn solve_trial(
         let mut water_residual: f64 = 0.0;
         for index in 0..workspace.node_count() {
             let previous_head = workspace.trial_heads[index];
-            let previous_water = workspace.trial_water[index];
+            let previous_water = workspace.evaluated_theta[index];
             let next_head = workspace.rhs[index];
-            let next_water = previous_water + input.capacities[index] * (next_head - previous_head);
+            let material = input.mesh.material_indices()[index];
+            let next_evaluation = input.materials[material].evaluate(next_head)?;
+            if !next_evaluation.theta.is_finite()
+                || !next_evaluation.conductivity.is_finite()
+                || !next_evaluation.capacity.is_finite()
+            {
+                return Err(WaterStepError::NonFiniteDiagnostic);
+            }
+            let next_water = next_evaluation.theta;
             let prescribed_head = (index == 0
                 && matches!(input.lower_condition, BoundaryCondition::Dirichlet { .. }))
                 || (index == workspace.node_count() - 1
@@ -175,6 +182,19 @@ fn assemble(
     timestep: f64,
 ) -> Result<(), WaterStepError> {
     let count = workspace.node_count();
+    for node in 0..count {
+        let material = input.mesh.material_indices()[node];
+        let evaluation = input.materials[material].evaluate(workspace.trial_heads[node])?;
+        if !evaluation.theta.is_finite()
+            || !evaluation.conductivity.is_finite()
+            || !evaluation.capacity.is_finite()
+        {
+            return Err(WaterStepError::NonFiniteDiagnostic);
+        }
+        workspace.evaluated_theta[node] = evaluation.theta;
+        workspace.evaluated_conductivity[node] = evaluation.conductivity;
+        workspace.evaluated_capacity[node] = evaluation.capacity;
+    }
     let lower = transform_boundary_row(
         count,
         BoundaryRowLocation::Lower,
@@ -204,21 +224,21 @@ fn assemble(
         let dx_b = coordinates[node + 1] - coordinates[node];
         let width = (dx_a + dx_b) / 2.0;
         let con_a = face(
-            input.conductivities[node - 1],
-            input.conductivities[node],
+            workspace.evaluated_conductivity[node - 1],
+            workspace.evaluated_conductivity[node],
             input.face_averaging,
         )?;
         let con_b = face(
-            input.conductivities[node],
-            input.conductivities[node + 1],
+            workspace.evaluated_conductivity[node],
+            workspace.evaluated_conductivity[node + 1],
             input.face_averaging,
         )?;
-        let storage = input.capacities[node] * width / timestep;
+        let storage = workspace.evaluated_capacity[node] * width / timestep;
         workspace.lower[node] = -con_a / dx_a;
         workspace.diagonal[node] = con_a / dx_a + con_b / dx_b + storage;
         workspace.upper[node] = -con_b / dx_b;
         workspace.rhs[node] = storage * workspace.trial_heads[node]
-            - (workspace.trial_water[node] - state.water_contents[node]) * width / timestep
+            - (workspace.evaluated_theta[node] - state.water_contents[node]) * width / timestep
             - (con_a - con_b) * gravity
             - input.sink[node] * width;
     }
@@ -287,14 +307,15 @@ fn validate(
     if input.mesh.coordinates().len() != count || workspace.node_count() != count {
         return Err(WaterStepError::DimensionMismatch);
     }
-    for values in [input.conductivities, input.capacities, input.sink] {
-        if values.len() != count {
-            return Err(WaterStepError::DimensionMismatch);
-        }
+    if input.mesh.material_indices().len() != count
+        || input.materials.len() != input.mesh.material_count()
+    {
+        return Err(WaterStepError::DimensionMismatch);
     }
-    validate_finite("conductivities", input.conductivities)?;
-    validate_finite("capacities", input.capacities)?;
     validate_finite("sink", input.sink)?;
+    if input.sink.len() != count {
+        return Err(WaterStepError::DimensionMismatch);
+    }
     validate_finite(
         "boundary_fluxes",
         &[input.lower_boundary_flux, input.upper_boundary_flux],

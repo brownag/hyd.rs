@@ -1,10 +1,41 @@
 use std::alloc::{GlobalAlloc, Layout, System};
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
-use hydrus_core::hydraulics::{BoundaryCondition, BoundaryRow, FaceAveraging, Mesh1D};
-use hydrus_core::{
-    advance_water_step, WaterState, WaterStepInput, WaterStepPolicy, WaterWorkspace,
+use hydrus_core::hydraulics::{
+    BoundaryCondition, BoundaryRow, Evaluation, FaceAveraging, HydraulicDerivatives, Mesh1D,
 };
+use hydrus_core::{
+    advance_water_step, HydraulicError, HydraulicModel, WaterState, WaterStepInput,
+    WaterStepPolicy, WaterWorkspace,
+};
+
+struct AllocationModel;
+
+impl HydraulicModel for AllocationModel {
+    fn theta(&self, head: f64) -> Result<f64, HydraulicError> {
+        Ok(head)
+    }
+    fn conductivity(&self, _head: f64) -> Result<f64, HydraulicError> {
+        Ok(1.0)
+    }
+    fn capacity(&self, _head: f64) -> Result<f64, HydraulicError> {
+        Ok(1.0)
+    }
+    fn evaluate(&self, head: f64) -> Result<Evaluation, HydraulicError> {
+        Ok(Evaluation {
+            theta: head,
+            conductivity: 1.0,
+            capacity: 1.0,
+        })
+    }
+    fn derivatives(&self, _head: f64) -> Result<HydraulicDerivatives, HydraulicError> {
+        Ok(HydraulicDerivatives {
+            dtheta_dhead: 1.0,
+            dconductivity_dhead: 0.0,
+            dcapacity_dhead: 0.0,
+        })
+    }
+}
 
 struct CountingAllocator;
 static COUNTING: AtomicBool = AtomicBool::new(false);
@@ -41,11 +72,14 @@ fn policy(max_iterations: usize, minimum_timestep: f64) -> WaterStepPolicy {
     }
 }
 
-fn input<'a>(mesh: &'a Mesh1D, timestep: f64) -> WaterStepInput<'a> {
+fn input<'a>(
+    mesh: &'a Mesh1D,
+    materials: &'a [&'a dyn HydraulicModel],
+    timestep: f64,
+) -> WaterStepInput<'a> {
     WaterStepInput {
         mesh,
-        conductivities: &[1.0; 3],
-        capacities: &[0.0, 1.0, 0.0],
+        materials,
         sink: &[0.0; 3],
         timestep,
         face_averaging: FaceAveraging::Arithmetic,
@@ -71,11 +105,13 @@ fn input<'a>(mesh: &'a Mesh1D, timestep: f64) -> WaterStepInput<'a> {
 #[test]
 fn fixed_size_steps_allocate_nothing_after_setup() {
     let mesh = mesh();
+    let model = AllocationModel;
+    let materials: [&dyn HydraulicModel; 1] = [&model];
     let mut state = WaterState::new(0.0, vec![0.0; 3], vec![0.0; 3]).unwrap();
     let mut workspace = WaterWorkspace::new(3).unwrap();
     let stationary = WaterStepInput {
         upper_condition: BoundaryCondition::Dirichlet { value: 0.0 },
-        ..input(&mesh, 1.0)
+        ..input(&mesh, &materials, 1.0)
     };
     let strict = WaterStepPolicy {
         head_tolerance: 1e-12,

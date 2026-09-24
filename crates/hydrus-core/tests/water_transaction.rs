@@ -1,10 +1,62 @@
-use hydrus_core::hydraulics::{BoundaryCondition, BoundaryRow, FaceAveraging, Mesh1D};
+use hydrus_core::hydraulics::{
+    BoundaryCondition, BoundaryRow, Evaluation, FaceAveraging, HydraulicDerivatives, Mesh1D,
+};
 use hydrus_core::{
-    advance_water_step, WaterState, WaterStepError, WaterStepInput, WaterStepPolicy, WaterWorkspace,
+    advance_water_step, HydraulicError, HydraulicModel, WaterState, WaterStepError, WaterStepInput,
+    WaterStepPolicy, WaterWorkspace,
 };
 
+struct TransactionModel {
+    conductivity: f64,
+    capacity: f64,
+}
+
+impl HydraulicModel for TransactionModel {
+    fn theta(&self, head: f64) -> Result<f64, HydraulicError> {
+        Ok(self.capacity * head)
+    }
+
+    fn conductivity(&self, _head: f64) -> Result<f64, HydraulicError> {
+        Ok(self.conductivity)
+    }
+
+    fn capacity(&self, _head: f64) -> Result<f64, HydraulicError> {
+        Ok(self.capacity)
+    }
+
+    fn evaluate(&self, head: f64) -> Result<Evaluation, HydraulicError> {
+        Ok(Evaluation {
+            theta: self.theta(head)?,
+            conductivity: self.conductivity(head)?,
+            capacity: self.capacity(head)?,
+        })
+    }
+
+    fn derivatives(&self, _head: f64) -> Result<HydraulicDerivatives, HydraulicError> {
+        Ok(HydraulicDerivatives {
+            dtheta_dhead: self.capacity,
+            dconductivity_dhead: 0.0,
+            dcapacity_dhead: 0.0,
+        })
+    }
+}
+
+static LOWER_MODEL: TransactionModel = TransactionModel {
+    conductivity: 1.0,
+    capacity: 0.0,
+};
+static INTERIOR_MODEL: TransactionModel = TransactionModel {
+    conductivity: 1.0,
+    capacity: 1.0,
+};
+static UPPER_MODEL: TransactionModel = TransactionModel {
+    conductivity: 1.0,
+    capacity: 0.0,
+};
+static MATERIALS: [&dyn HydraulicModel; 3] = [&LOWER_MODEL, &INTERIOR_MODEL, &UPPER_MODEL];
+
 fn mesh() -> Mesh1D {
-    Mesh1D::new(vec![0.0, 1.0, 2.0], vec![0; 3], None, 1, 0, 0.0).unwrap()
+    Mesh1D::new(vec![0.0, 1.0, 2.0], vec![0, 1, 2], None, 3, 0, 0.0).unwrap()
 }
 fn policy(max_iterations: usize, minimum_timestep: f64) -> WaterStepPolicy {
     WaterStepPolicy {
@@ -19,8 +71,7 @@ fn policy(max_iterations: usize, minimum_timestep: f64) -> WaterStepPolicy {
 fn input<'a>(mesh: &'a Mesh1D, timestep: f64) -> WaterStepInput<'a> {
     WaterStepInput {
         mesh,
-        conductivities: &[1.0; 3],
-        capacities: &[0.0, 1.0, 0.0],
+        materials: &MATERIALS,
         sink: &[0.0; 3],
         timestep,
         face_averaging: FaceAveraging::Arithmetic,
@@ -92,8 +143,9 @@ fn invalid_input_does_not_mutate_accepted_state() {
     let mut state = WaterState::new(0.0, vec![0.0; 3], vec![0.0; 3]).unwrap();
     let original = state.clone();
     let mut workspace = WaterWorkspace::new(3).unwrap();
+    let sink = [0.0, f64::NAN, 0.0];
     let invalid = WaterStepInput {
-        capacities: &[1.0, f64::NAN, 1.0],
+        sink: &sink,
         ..input(&mesh, 1.0)
     };
     assert!(matches!(
