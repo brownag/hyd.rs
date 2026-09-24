@@ -1,7 +1,7 @@
 # State — Orchestration 7: Phase 3 solver correction and closure
 
 Plan status: **approved by the user on 2026-09-23.**
-Execution status: **Wave 5 complete; Wave 6 ready to start.**
+Execution status: **complete; Phase 4 planning may resume, execution remains pending.**
 Planning baseline revision: `5066dad`, reviewed 2026-09-23. The worktree was clean before these three draft artifacts were created.
 Master authority: [HYDRUS1D_RUST_PORT_PLAN.md](HYDRUS1D_RUST_PORT_PLAN.md), Phase 3.
 Resume from [EXECUTION_PLAN_7.md](EXECUTION_PLAN_7.md); worker prompt: [PROMPT_TEMPLATE_7.md](PROMPT_TEMPLATE_7.md).
@@ -28,7 +28,7 @@ Scientific baseline: **unavailable.** This orchestration must not claim Fortran 
 | 3 | 7.3.1 | Weighted balances and shared row assembly | done | `aeaf195` |
 | 4 | 7.4.1 | Caller target-time alignment | done | `26ae9bb` |
 | 5 | 7.5.1 | Stable allocation evidence across retries and accepted steps | done | `2a3b422` |
-| 6 | 7.6.1 | Corrected Phase 3 evidence and Phase 4 gate | pending | — |
+| 6 | 7.6.1 | Corrected Phase 3 evidence and Phase 4 gate | done | `ed7e72f` |
 
 ## Wave verification
 
@@ -39,7 +39,7 @@ Scientific baseline: **unavailable.** This orchestration must not claim Fortran 
 | 3 | `aeaf195` | `reset_stencil` 6/6; `mesh_geometry` 8/8; `water_solver` 7/7 | `cargo test --workspace`: 55 passed, 0 failed | `cargo fmt --check`: passed | `cargo clippy --workspace --all-targets -- -D warnings`: passed | `git diff --check`: passed |
 | 4 | `26ae9bb` | `water_solver` 10/10; `water_transaction` 4/4; `allocation_contract` 1/1 | `cargo test --workspace`: 59 passed, 0 failed | `cargo fmt --check`: passed | `cargo clippy --workspace --all-targets -- -D warnings`: passed | `git diff --check`: passed |
 | 5 | `2a3b422` | `allocation_contract` 1/1; `water_transaction` 4/4 | `cargo test --workspace`: 59 passed, 0 failed | `cargo fmt --check`: passed | `cargo clippy --workspace --all-targets -- -D warnings`: passed | `git diff --check`: passed |
-| 6 | — | pending | pending | pending | pending | pending |
+| 6 | `ed7e72f` | Evidence/source/test provenance cross-check; Phase 4 planning readiness recorded | `cargo test --workspace`: 59 passed, 0 failed | `cargo fmt --check`: passed | `cargo clippy --workspace --all-targets -- -D warnings`: passed | `git diff --check`: passed |
 
 ## Task reports
 
@@ -57,6 +57,8 @@ Scientific baseline: **unavailable.** This orchestration must not claim Fortran 
 - **Wave 4 gate:** workspace tests 59 passed; formatting, warning-denied Clippy, and diff checks passed.
 - **7.5.1:** Extended the single-test allocation binary to measure a normal accepted step and a successful rejected-trial/retry path, asserting zero allocations after each counting window. Targeted allocation test 1/1 and transaction suite 4/4 passed. Commit `2a3b422`.
 - **Wave 5 gate:** workspace tests 59 passed; formatting, warning-denied Clippy, and diff checks passed.
+- **7.6.1:** Refreshed Phase 3 evidence against the completed contracts and test records. `STATE_6.md` records that Phase 4 planning may resume, while Phase 4 execution and all five Wave 6/Orchestration 6 tasks remain pending/not started. Scientific parity, calibration, release compatibility, and performance evidence remain unavailable. Commit `ed7e72f`.
+- **Final gate:** workspace tests 59 passed; formatting, warning-denied Clippy, and diff checks passed at `ed7e72f`.
 
 ## Escalations and amendments
 
