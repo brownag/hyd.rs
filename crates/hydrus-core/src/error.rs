@@ -1,5 +1,7 @@
 use core::fmt;
 
+use crate::hydraulics::TridiagonalError;
+
 /// Errors raised while constructing or evaluating a hydraulic contract.
 #[derive(Clone, Debug, PartialEq)]
 pub enum HydraulicError {
@@ -73,3 +75,59 @@ impl fmt::Display for HydraulicError {
 }
 
 impl std::error::Error for HydraulicError {}
+
+/// Errors raised by the filesystem-free transactional water-step contract.
+#[derive(Clone, Debug, PartialEq)]
+pub enum WaterStepError {
+    InvalidState {
+        reason: &'static str,
+    },
+    InvalidWorkspace {
+        reason: &'static str,
+    },
+    InvalidPolicy {
+        name: &'static str,
+    },
+    DimensionMismatch,
+    NonFiniteInput {
+        name: &'static str,
+    },
+    NonFiniteDiagnostic,
+    NonConverged {
+        timestep: f64,
+        minimum_timestep: f64,
+        retries: usize,
+    },
+    Hydraulic(HydraulicError),
+    Linear(TridiagonalError),
+}
+
+impl fmt::Display for WaterStepError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::InvalidState { reason } => write!(formatter, "invalid water state: {reason}"),
+            Self::InvalidWorkspace { reason } => write!(formatter, "invalid water workspace: {reason}"),
+            Self::InvalidPolicy { name } => write!(formatter, "invalid water-step policy: {name}"),
+            Self::DimensionMismatch => write!(formatter, "water-step dimensions differ"),
+            Self::NonFiniteInput { name } => write!(formatter, "non-finite water-step input: {name}"),
+            Self::NonFiniteDiagnostic => write!(formatter, "non-finite water-step diagnostic"),
+            Self::NonConverged { timestep, minimum_timestep, retries } => write!(formatter, "water step did not converge at dt={timestep} with dt_min={minimum_timestep} after {retries} retries"),
+            Self::Hydraulic(error) => error.fmt(formatter),
+            Self::Linear(error) => error.fmt(formatter),
+        }
+    }
+}
+
+impl std::error::Error for WaterStepError {}
+
+impl From<HydraulicError> for WaterStepError {
+    fn from(error: HydraulicError) -> Self {
+        Self::Hydraulic(error)
+    }
+}
+
+impl From<TridiagonalError> for WaterStepError {
+    fn from(error: TridiagonalError) -> Self {
+        Self::Linear(error)
+    }
+}

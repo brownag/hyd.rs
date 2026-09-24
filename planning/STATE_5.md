@@ -25,7 +25,7 @@ Scientific baseline: **unavailable.** Phase 3 tests are source-algebra and Rust 
 |---|---|---|---|---|
 | 1 | 5.1.1 | Generic boundary-row contract | done | pending |
 | 2 | 5.2.1 | Preallocated water tridiagonal kernel | done | pending |
-| 3 | 5.3.1 | Transactional Picard stepping and balances | pending | — |
+| 3 | 5.3.1 | Transactional Picard stepping and balances | done | pending |
 | 4 | 5.4.1 | Phase 3 evidence and Phase 4 handoff | pending | — |
 
 ## Task reports
@@ -50,6 +50,17 @@ Scientific baseline: **unavailable.** Phase 3 tests are source-algebra and Rust 
 - Deviations: one exact pivot comparison corrected to tolerance-based; no scope change.
 - Gotcha: `TridiagonalError` is exported from `hydraulics`; RHS and diagonal are mutated.
 
+## 5.3.1
+
+- Status: done after mid-tier escalation; transactional Picard step and balances implemented.
+- Files: `water_state.rs`, `water_solver.rs`, `lib.rs`, `error.rs`, both water tests, task TODO.
+- Tests: `water_solver` (3 passed); `water_transaction` (4 passed); workspace (47 passed).
+- Checks: fmt, workspace Clippy, and `git diff --check` passed.
+- Deviation: initial worker failed the retry test twice; escalation excluded prescribed Dirichlet jumps from nonlinear head residuals.
+- Gotcha: reported head residual covers free nodes; endpoint water residuals remain part of convergence.
+
 ## Escalations and amendments
 
 <!-- Record retries, escalations, scope amendments, and pre-wave blockers here. -->
+
+- 5.3.1 escalated once after two identical targeted transaction-test failures; mid-tier correction passed all checks.
