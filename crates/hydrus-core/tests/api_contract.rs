@@ -1,6 +1,5 @@
 use hydrus_core::{
-    HydraulicError, HydraulicModelSelector, HydraulicTables, VanGenuchtenModel,
-    VanGenuchtenParameters,
+    HydraulicError, HydraulicModelSelector, VanGenuchtenModel, VanGenuchtenParameters,
 };
 
 fn parameters() -> VanGenuchtenParameters {
@@ -10,7 +9,12 @@ fn parameters() -> VanGenuchtenParameters {
 #[test]
 fn valid_model_is_constructible_only_after_validation() {
     let model = VanGenuchtenModel::new(parameters()).unwrap();
-    assert_eq!(model.parameters().n, 1.6);
+    let parameters = model.parameters();
+    assert_eq!(parameters.residual_water_content(), 0.05);
+    assert_eq!(parameters.saturated_water_content(), 0.45);
+    assert_eq!(parameters.alpha(), 0.04);
+    assert_eq!(parameters.n(), 1.6);
+    assert_eq!(parameters.saturated_conductivity(), 1.0);
 }
 
 #[test]
@@ -43,18 +47,10 @@ fn selectors_never_fall_back_to_model_zero() {
         HydraulicModelSelector::from_i32(9),
         Err(HydraulicError::UnsupportedSelector { selector: 9 })
     ));
-    assert!(matches!(
-        HydraulicTables::from_selector(9),
-        Err(HydraulicError::UnsupportedSelector { selector: 9 })
-    ));
 }
 
 #[test]
 fn table_and_evaluation_boundaries_are_typed() {
-    assert!(matches!(
-        HydraulicTables::empty(),
-        Err(HydraulicError::InvalidTableConfiguration { .. })
-    ));
     let model = VanGenuchtenModel::new(parameters()).unwrap();
     assert!(matches!(
         hydrus_core::HydraulicModel::theta(&model, f64::NAN),

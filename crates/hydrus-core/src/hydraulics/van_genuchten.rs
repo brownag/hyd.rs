@@ -22,11 +22,11 @@ pub(super) fn evaluate_model_zero(
         });
     }
 
-    let delta = parameters.saturated_water_content - parameters.residual_water_content;
+    let delta = parameters.saturated_water_content() - parameters.residual_water_content();
     if head >= 0.0 {
         return Ok(ModelZeroEvaluation {
-            theta: parameters.saturated_water_content,
-            conductivity: parameters.saturated_conductivity,
+            theta: parameters.saturated_water_content(),
+            conductivity: parameters.saturated_conductivity(),
             capacity: 0.0,
             derivatives: HydraulicDerivatives {
                 dtheta_dhead: 0.0,
@@ -36,13 +36,13 @@ pub(super) fn evaluate_model_zero(
         });
     }
 
-    let x = -parameters.alpha * head;
-    let m = 1.0 - 1.0 / parameters.n; // MATERIAL.FOR: m=1.d0-1.d0/n.
-    let a = 1.0 + x.powf(parameters.n);
+    let x = -parameters.alpha() * head;
+    let m = 1.0 - 1.0 / parameters.n(); // MATERIAL.FOR: m=1.d0-1.d0/n.
+    let a = 1.0 + x.powf(parameters.n());
     let se = a.powf(-m);
-    let theta = parameters.residual_water_content + delta * se;
+    let theta = parameters.residual_water_content() + delta * se;
     let dse_dhead =
-        m * parameters.n * parameters.alpha * x.powf(parameters.n - 1.0) * a.powf(-m - 1.0);
+        m * parameters.n() * parameters.alpha() * x.powf(parameters.n() - 1.0) * a.powf(-m - 1.0);
     let capacity = delta * dse_dhead;
 
     let root = se.sqrt();
@@ -51,18 +51,18 @@ pub(super) fn evaluate_model_zero(
     let relative = se * root * bend * bend;
     // MATERIAL.FOR applies `sngl` at FK/FC/FQ/FH returns; this port keeps f64
     // throughout, while retaining the source's 1.e-37 floor semantics.
-    let conductivity = (parameters.saturated_conductivity * relative).max(SOURCE_VALUE_FLOOR);
+    let conductivity = (parameters.saturated_conductivity() * relative).max(SOURCE_VALUE_FLOOR);
 
     let dcapacity_dhead = capacity
-        * (-(parameters.n - 1.0) / x
-            + (m + 1.0) * parameters.n * parameters.alpha * x.powf(parameters.n - 1.0) / a);
-    let dconductivity_dhead = if parameters.saturated_conductivity == 0.0 {
+        * (-(parameters.n() - 1.0) / x
+            + (m + 1.0) * parameters.n() * parameters.alpha() * x.powf(parameters.n() - 1.0) / a);
+    let dconductivity_dhead = if parameters.saturated_conductivity() == 0.0 {
         0.0
     } else {
         let d_bend_dse = inner.powf(m - 1.0) * se.powf(1.0 / m - 1.0);
         let d_relative_dse =
             relative * (1.5 / se + 2.0 * d_bend_dse / bend.max(SOURCE_VALUE_FLOOR));
-        (parameters.saturated_conductivity * d_relative_dse * dse_dhead).max(0.0)
+        (parameters.saturated_conductivity() * d_relative_dse * dse_dhead).max(0.0)
     };
 
     Ok(ModelZeroEvaluation {
@@ -87,20 +87,20 @@ pub(super) fn inverse_head(
             value: theta,
         });
     }
-    if theta < parameters.residual_water_content || theta > parameters.saturated_water_content {
+    if theta < parameters.residual_water_content() || theta > parameters.saturated_water_content() {
         return Err(HydraulicError::InvalidEvaluationDomain {
             name: "theta",
             value: theta,
         });
     }
-    if theta == parameters.saturated_water_content {
+    if theta == parameters.saturated_water_content() {
         return Ok(0.0);
     }
-    if theta == parameters.residual_water_content {
+    if theta == parameters.residual_water_content() {
         return Ok(DRY_HEAD_FLOOR);
     }
-    let m = 1.0 - 1.0 / parameters.n;
-    let se = (theta - parameters.residual_water_content)
-        / (parameters.saturated_water_content - parameters.residual_water_content);
-    Ok((-1.0 / parameters.alpha) * (se.powf(-1.0 / m) - 1.0).powf(1.0 / parameters.n))
+    let m = 1.0 - 1.0 / parameters.n();
+    let se = (theta - parameters.residual_water_content())
+        / (parameters.saturated_water_content() - parameters.residual_water_content());
+    Ok((-1.0 / parameters.alpha()) * (se.powf(-1.0 / m) - 1.0).powf(1.0 / parameters.n()))
 }

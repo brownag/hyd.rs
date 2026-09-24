@@ -2,11 +2,11 @@ use crate::HydraulicError;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct VanGenuchtenParameters {
-    pub residual_water_content: f64,
-    pub saturated_water_content: f64,
-    pub alpha: f64,
-    pub n: f64,
-    pub saturated_conductivity: f64,
+    residual_water_content: f64,
+    saturated_water_content: f64,
+    alpha: f64,
+    n: f64,
+    saturated_conductivity: f64,
 }
 
 impl VanGenuchtenParameters {
@@ -65,6 +65,26 @@ impl VanGenuchtenParameters {
             });
         }
         Ok(())
+    }
+
+    pub fn residual_water_content(&self) -> f64 {
+        self.residual_water_content
+    }
+
+    pub fn saturated_water_content(&self) -> f64 {
+        self.saturated_water_content
+    }
+
+    pub fn alpha(&self) -> f64 {
+        self.alpha
+    }
+
+    pub fn n(&self) -> f64 {
+        self.n
+    }
+
+    pub fn saturated_conductivity(&self) -> f64 {
+        self.saturated_conductivity
     }
 }
 
