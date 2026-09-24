@@ -1,9 +1,11 @@
+mod boundary;
 mod geometry;
 mod stencil;
 mod table;
 mod types;
 mod van_genuchten;
 
+pub use boundary::{transform_boundary_row, BoundaryCondition, BoundaryRow, BoundaryRowLocation};
 pub use geometry::{
     adjacent_distance, arithmetic_face_conductivity, boundary_half_cell_width,
     geometric_face_conductivity, gravity_metric, layer_metrics, Boundary, LayerMetric,

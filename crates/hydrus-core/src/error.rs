@@ -24,6 +24,17 @@ pub enum HydraulicError {
     UnsupportedSelector {
         selector: i32,
     },
+    InvalidBoundary {
+        name: &'static str,
+        reason: &'static str,
+    },
+    UnsupportedBoundary {
+        selector: i32,
+    },
+    SingularBoundaryPivot {
+        value: f64,
+        minimum: f64,
+    },
 }
 
 impl fmt::Display for HydraulicError {
@@ -44,6 +55,18 @@ impl fmt::Display for HydraulicError {
             }
             Self::UnsupportedSelector { selector } => {
                 write!(formatter, "unsupported hydraulic selector: {selector}")
+            }
+            Self::InvalidBoundary { name, reason } => {
+                write!(formatter, "invalid boundary {name}: {reason}")
+            }
+            Self::UnsupportedBoundary { selector } => {
+                write!(formatter, "unsupported boundary selector: {selector}")
+            }
+            Self::SingularBoundaryPivot { value, minimum } => {
+                write!(
+                    formatter,
+                    "boundary pivot {value} is below minimum {minimum}"
+                )
             }
         }
     }
