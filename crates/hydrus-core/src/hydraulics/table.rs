@@ -3,10 +3,35 @@ use crate::HydraulicError;
 
 /// Immutable, source-shaped lookup tables generated from the analytic model-0
 /// contract. The generated domain contains only negative finite heads.
+/// Water content is dimensionless; the other unit symbols are caller-declared
+/// metadata and do not change table values.
 #[derive(Clone, Debug, PartialEq)]
 pub struct HydraulicTables {
     heads: Vec<f64>,
     values: Vec<Evaluation>,
+    head_unit: UnitSymbol,
+    conductivity_unit: UnitSymbol,
+    capacity_unit: UnitSymbol,
+}
+
+/// Caller-declared unit label for a hydraulic table quantity.
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct UnitSymbol(String);
+
+impl UnitSymbol {
+    pub fn new(symbol: impl Into<String>) -> Result<Self, HydraulicError> {
+        let symbol = symbol.into();
+        if symbol.trim().is_empty() {
+            return Err(HydraulicError::InvalidTableConfiguration {
+                reason: "unit symbols must not be empty",
+            });
+        }
+        Ok(Self(symbol))
+    }
+
+    pub fn as_str(&self) -> &str {
+        &self.0
+    }
 }
 
 impl HydraulicTables {
@@ -17,6 +42,9 @@ impl HydraulicTables {
         h_min: f64,
         h_max: f64,
         points: usize,
+        head_unit: UnitSymbol,
+        conductivity_unit: UnitSymbol,
+        capacity_unit: UnitSymbol,
     ) -> Result<Self, HydraulicError> {
         if !h_min.is_finite() || !h_max.is_finite() {
             return Err(HydraulicError::InvalidTableConfiguration {
@@ -50,7 +78,25 @@ impl HydraulicTables {
             heads.push(head);
             values.push(model.evaluate(head)?);
         }
-        Ok(Self { heads, values })
+        Ok(Self {
+            heads,
+            values,
+            head_unit,
+            conductivity_unit,
+            capacity_unit,
+        })
+    }
+
+    pub fn head_unit(&self) -> &UnitSymbol {
+        &self.head_unit
+    }
+
+    pub fn conductivity_unit(&self) -> &UnitSymbol {
+        &self.conductivity_unit
+    }
+
+    pub fn capacity_unit(&self) -> &UnitSymbol {
+        &self.capacity_unit
     }
 
     pub fn heads(&self) -> &[f64] {
@@ -91,14 +137,24 @@ impl HydraulicTables {
         })
     }
 
-    pub fn from_selector(selector: i32) -> Result<Self, HydraulicError> {
-        Err(HydraulicError::UnsupportedSelector { selector })
-    }
-
-    pub fn empty() -> Result<Self, HydraulicError> {
-        Err(HydraulicError::InvalidTableConfiguration {
-            reason: "no table data",
-        })
+    /// Selects the right segment at internal knots and the left segment at the
+    /// final endpoint, where no right segment exists.
+    fn segment(&self, head: f64) -> Result<usize, HydraulicError> {
+        if !head.is_finite() || head < self.heads[0] || head > self.heads[self.heads.len() - 1] {
+            return Err(HydraulicError::InvalidEvaluationDomain {
+                name: "head",
+                value: head,
+            });
+        }
+        let last = self.heads.len() - 1;
+        if head == self.heads[last] {
+            return Ok(last - 1);
+        }
+        if head == self.heads[0] {
+            return Ok(0);
+        }
+        let upper = self.heads.partition_point(|&node| node <= head);
+        Ok(upper - 1)
     }
 }
 
@@ -120,11 +176,15 @@ impl HydraulicModel for HydraulicTables {
     }
 
     fn derivatives(&self, head: f64) -> Result<HydraulicDerivatives, HydraulicError> {
-        let evaluation = self.evaluate(head)?;
+        let lower = self.segment(head)?;
+        let upper = lower + 1;
+        let width = self.heads[upper] - self.heads[lower];
+        let left = self.values[lower];
+        let right = self.values[upper];
         Ok(HydraulicDerivatives {
-            dtheta_dhead: evaluation.capacity,
-            dconductivity_dhead: 0.0,
-            dcapacity_dhead: 0.0,
+            dtheta_dhead: (right.theta - left.theta) / width,
+            dconductivity_dhead: (right.conductivity - left.conductivity) / width,
+            dcapacity_dhead: (right.capacity - left.capacity) / width,
         })
     }
 }

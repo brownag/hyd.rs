@@ -93,4 +93,4 @@ impl VanGenuchtenModel {
     }
 }
 
-pub use table::HydraulicTables;
+pub use table::{HydraulicTables, UnitSymbol};

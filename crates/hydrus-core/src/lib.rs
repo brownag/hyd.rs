@@ -8,7 +8,7 @@ mod water_state;
 pub use error::{HydraulicError, WaterStepError};
 pub use hydraulics::{
     Evaluation, HydraulicDerivatives, HydraulicModel, HydraulicModelSelector, HydraulicTables,
-    Mesh1D, VanGenuchtenModel, VanGenuchtenParameters,
+    Mesh1D, UnitSymbol, VanGenuchtenModel, VanGenuchtenParameters,
 };
 pub use water_solver::{
     advance_water_step, WaterBalance, WaterStepInput, WaterStepPolicy, WaterStepReport,
