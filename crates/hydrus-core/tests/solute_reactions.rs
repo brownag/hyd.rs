@@ -76,6 +76,7 @@ fn run(
                 water_contents: &water,
                 face_fluxes: &[0.0; 4],
             },
+            start_water_contents: &water,
             face_dispersion: &dispersion,
             timestep,
             minimum_pivot: 1e-12,

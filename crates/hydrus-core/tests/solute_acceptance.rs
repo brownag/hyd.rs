@@ -51,12 +51,24 @@ fn input<'a>(
     dispersion: &'a [f64],
     timestep: f64,
 ) -> SoluteTransportInput<'a> {
+    input_with_start(time, theta, theta, faces, dispersion, timestep)
+}
+
+fn input_with_start<'a>(
+    time: f64,
+    start_theta: &'a [f64],
+    end_theta: &'a [f64],
+    faces: &'a [f64],
+    dispersion: &'a [f64],
+    timestep: f64,
+) -> SoluteTransportInput<'a> {
     SoluteTransportInput {
         accepted_water: AcceptedWaterSnapshot {
             accepted_time: time,
-            water_contents: theta,
+            water_contents: end_theta,
             face_fluxes: faces,
         },
+        start_water_contents: start_theta,
         face_dispersion: dispersion,
         timestep,
         minimum_pivot: 1e-12,
@@ -122,6 +134,33 @@ fn conservative_transport_reports_signed_total_boundary_mass_and_closure() {
     );
     assert_eq!(state.accounting().accepted_steps(), 1);
     assert_eq!(state.time(), timestep);
+}
+
+#[test]
+fn changing_water_content_uses_both_interval_endpoints_in_storage_balance() {
+    let config = config(
+        vec![species("tracer", 0.0, EquilibriumSorption::None, None)],
+        Boundary::TotalFlux { flux: 0.0 },
+        Boundary::TotalFlux { flux: 0.0 },
+    );
+    let mesh = mesh();
+    let mut state = SoluteState::new(&config, &mesh, 0.0, vec![2.0; 3], vec![0.0; 3]).unwrap();
+    let mut workspace = SoluteWorkspace::new(3, 1).unwrap();
+    advance_solute_step_with_processes(
+        &mut state,
+        &mut workspace,
+        &mesh,
+        &config,
+        input_with_start(0.1, &[0.2; 3], &[0.3; 3], &[0.0; 4], &[0.0; 2], 0.1),
+        None,
+    )
+    .unwrap();
+
+    // Control-volume widths sum to 2; (0.3 - 0.2) * C(2) * 2 = 0.4.
+    let balance = state.accounting().last_step()[0];
+    close(balance.storage_change, 0.4, 1e-12);
+    close(balance.boundary_exchange, 0.0, 1e-12);
+    close(balance.absolute_residual, 0.4, 1e-12);
 }
 
 #[test]
@@ -254,4 +293,35 @@ fn mismatched_accepted_time_rejects_before_mutation_and_unsupported_modes_are_ty
         unsupported,
         Err(SoluteConfigError::Unsupported { .. })
     ));
+}
+
+#[test]
+fn malformed_start_water_contents_reject_before_accepted_state_mutation() {
+    let config = config(
+        vec![species("tracer", 0.0, EquilibriumSorption::None, None)],
+        Boundary::TotalFlux { flux: 0.0 },
+        Boundary::TotalFlux { flux: 0.0 },
+    );
+    let mesh = mesh();
+    let mut state = SoluteState::new(&config, &mesh, 1.0, vec![0.2; 3], vec![0.0; 3]).unwrap();
+    let before = state.clone();
+    let mut workspace = SoluteWorkspace::new(3, 1).unwrap();
+
+    for start_theta in [
+        &[0.3, 0.3][..],
+        &[0.3, f64::NAN, 0.3][..],
+        &[0.3, 0.0, 0.3][..],
+    ] {
+        let error = advance_solute_step_with_processes(
+            &mut state,
+            &mut workspace,
+            &mesh,
+            &config,
+            input_with_start(1.1, start_theta, &[0.3; 3], &[0.0; 4], &[0.0; 2], 0.1),
+            None,
+        )
+        .unwrap_err();
+        assert!(matches!(error, SoluteStepError::Configuration(_)));
+        assert_eq!(state, before);
+    }
 }

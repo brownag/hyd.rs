@@ -601,6 +601,8 @@ pub struct AcceptedWaterSnapshot<'a> {
 #[derive(Clone, Copy, Debug)]
 pub struct SoluteTransportInput<'a> {
     pub accepted_water: AcceptedWaterSnapshot<'a>,
+    /// Water contents at the current solute-state time, before this interval.
+    pub start_water_contents: &'a [f64],
     /// Effective dispersion coefficient at each interior face, length `node_count - 1`.
     pub face_dispersion: &'a [f64],
     pub timestep: f64,
@@ -693,7 +695,7 @@ pub fn advance_solute_step_with_processes(
                 species,
                 mesh,
                 config,
-                input,
+                input.start_water_contents,
                 process_input,
             )?;
         }
@@ -743,6 +745,12 @@ fn validate_transport_input(
         ));
     }
     workspace.validate_state_dimensions(state)?;
+    if input.start_water_contents.len() != node_count {
+        return Err(invalid_transport(
+            "start water contents",
+            "length must equal mesh node count",
+        ));
+    }
     if input.accepted_water.water_contents.len() != node_count {
         return Err(invalid_transport(
             "water contents",
@@ -788,6 +796,13 @@ fn validate_transport_input(
         return Err(invalid_transport(
             "minimum pivot",
             "must be finite and positive",
+        ));
+    }
+    validate_solute_values("start water contents", input.start_water_contents)?;
+    if input.start_water_contents.iter().any(|theta| *theta <= 0.0) {
+        return Err(invalid_transport(
+            "start water contents",
+            "must be positive",
         ));
     }
     validate_solute_values(
@@ -877,7 +892,7 @@ fn species_storage(
     species: usize,
     mesh: &Mesh1D,
     config: &SoluteConfig,
-    input: SoluteTransportInput<'_>,
+    water_contents: &[f64],
     process_input: Option<SoluteProcessInput<'_>>,
 ) -> Result<f64, SoluteStepError> {
     let nodes = mesh.coordinates().len();
@@ -891,7 +906,7 @@ fn species_storage(
             concentration,
         )?
         .0;
-        let mass_per_volume = input.accepted_water.water_contents[node] * concentration
+        let mass_per_volume = water_contents[node] * concentration
             + density * (equilibrium + kinetic_sorbed[offset + node]);
         total += control_volume_width(mesh.coordinates(), node) * mass_per_volume;
     }
@@ -935,7 +950,7 @@ fn update_step_balances(
             species,
             mesh,
             config,
-            input,
+            input.accepted_water.water_contents,
             process_input,
         )?;
         let storage_change = storage_after - workspace.storage_before[species];

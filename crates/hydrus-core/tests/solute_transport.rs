@@ -65,6 +65,7 @@ fn run(
                 water_contents: &water,
                 face_fluxes: &fluxes,
             },
+            start_water_contents: &water,
             face_dispersion: &dispersion,
             timestep,
             minimum_pivot,
@@ -234,6 +235,7 @@ fn invalid_inputs_and_pivot_failure_leave_accepted_state_unchanged() {
                     water_contents,
                     face_fluxes
                 },
+                start_water_contents: &water,
                 face_dispersion: dispersion,
                 timestep: 0.1,
                 minimum_pivot: 1e-12,
@@ -254,6 +256,7 @@ fn invalid_inputs_and_pivot_failure_leave_accepted_state_unchanged() {
                 water_contents: &water,
                 face_fluxes: &[0.0; 4],
             },
+            start_water_contents: &water,
             face_dispersion: &[0.0; 2],
             timestep: 0.1,
             minimum_pivot: 10.0,
