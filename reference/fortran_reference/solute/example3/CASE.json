@@ -1,0 +1,128 @@
+{
+  "case_id": "example3_sequential_decay_derived_grid",
+  "status": "derived executable case; not a recovered manual deck or manual reproduction",
+  "motivation": {
+    "source": "HYDRUS 1D 4.08 manual, section 11.3, printed pages 157-159 (PDF pages 193-195)",
+    "manual_case": "NH4 -> NO2 -> NO3 sequential first-order decay under steady unidirectional saturated flow",
+    "manual_claim": "HYDRUS profiles at 50, 100, and 200 hours duplicated the CHAIN analytical results",
+    "missing_artifacts": [
+      "original Example 3 machine-readable input deck",
+      "manual mesh, finite domain, and spatial discretization",
+      "numeric CHAIN reference arrays"
+    ]
+  },
+  "evidence_scope": {
+    "intended": "source-snapshot parity for the selected single-domain linear transport and ordered-chain reaction profile; separate analytical comparison only after the finite-domain/grid mapping is reviewed",
+    "not_established": [
+      "manual deck reproduction",
+      "experimental or general physical validation",
+      "text-layout compatibility",
+      "HYDRUS release compatibility",
+      "calibrated tolerances"
+    ]
+  },
+  "units": {
+    "length": {"value": "cm", "provenance": "manual-transcribed unit"},
+    "time": {"value": "hour", "provenance": "manual-transcribed unit"},
+    "concentration": {"value": "dimensionless normalized concentration", "provenance": "manual Table 11.1 marks concentration and inlet concentration dimensionless"},
+    "sorbed_mass": {"value": "normalized concentration mass per soil mass, compatible with bulk density", "provenance": "derived bookkeeping basis; manual gives no sorbed pool values"},
+    "water_flux": {"value": "cm/hour", "provenance": "derived from selected saturated water content and manual pore-water velocity"}
+  },
+  "species": [
+    {"name": "NH4", "manual_symbol": "NH4+", "position": 1, "decay_rate_per_hour": {"value": 0.005, "provenance": "manual Table 11.1"}, "retardation_factor": {"value": 2.0, "provenance": "manual Table 11.1"}, "linear_kd_cm3_per_g": {"value": 0.5375, "provenance": "derived as (R-1)*theta/bulk_density using derived theta=0.43 and bulk_density=0.8 g/cm3"}},
+    {"name": "NO2", "manual_symbol": "NO2-", "position": 2, "decay_rate_per_hour": {"value": 0.1, "provenance": "manual Table 11.1"}, "retardation_factor": {"value": 1.0, "provenance": "manual Table 11.1"}, "linear_kd_cm3_per_g": {"value": 0.0, "provenance": "derived from R=1 with selected positive bulk density and water content"}},
+    {"name": "NO3", "manual_symbol": "NO3-", "position": 3, "decay_rate_per_hour": {"value": 0.0, "provenance": "manual Table 11.1"}, "retardation_factor": {"value": 1.0, "provenance": "manual Table 11.1"}, "linear_kd_cm3_per_g": {"value": 0.0, "provenance": "derived from R=1 with selected positive bulk density and water content"}}
+  ],
+  "transport": {
+    "pore_water_velocity_cm_per_hour": {"value": 1.0, "provenance": "manual Table 11.1"},
+    "effective_dispersion_cm2_per_hour": {"value": 0.18, "provenance": "manual Table 11.1"},
+    "mapping": "For the selected saturated state, theta=0.43 and Ks=0.43 cm/hour give target Darcy flux magnitude 0.43 cm/hour and pore velocity magnitude 1 cm/hour. Dispersivity alpha=0.18 cm with zero molecular diffusion gives D=alpha*|q|/theta=0.18 cm2/hour. Recheck realized output velocity/dispersion in the Fortran run before comparison.",
+    "dispersivity_cm": {"value": 0.18, "provenance": "derived from manual D and v using selected saturated water content; source equation Disp=alpha*abs(v_Darcy)/theta plus molecular diffusion"},
+    "molecular_diffusion_cm2_per_hour": {"value": 0.0, "provenance": "derived choice to represent the manual effective D with dispersivity only"},
+    "tortuosity": {"value": false, "provenance": "derived choice; no tortuosity correction is specified in the manual case"},
+    "upstream_weighting": {"value": true, "provenance": "derived numerical-stability choice; record as source-run configuration, not a manual parameter"},
+    "artificial_dispersion": {"value": false, "provenance": "derived choice to avoid an additional dispersion mechanism"}
+  },
+  "domain_and_grid": {
+    "node_count": {"value": 1001, "provenance": "derived choice; maximum supported node count in the pinned HYDRUS main program"},
+    "flow_distance_cm": {"start": {"value": 0.0, "provenance": "derived coordinate origin at the inlet"}, "end": {"value": 250.0, "provenance": "derived finite-domain truncation, not specified by manual"}, "spacing_cm": {"value": 0.25, "provenance": "derived uniform mesh from domain length and node count"}},
+    "fortran_coordinate_mapping": "The PROFILE.DAT coordinate is reversed relative to flow-distance: the top/inlet is native x=0 and the bottom/outlet is native x=-250 cm. Normalize to flow-distance s=-x before pairing with Rust.",
+    "geometry": {"value": "homogeneous, isotropic, one-dimensional vertical column", "provenance": "manual equation assumptions; vertical column orientation is the derived executable mapping"},
+    "material": {
+      "residual_water_content": {"value": 0.08, "provenance": "derived hydraulic parameter, copied from the repository's noncanonical smoke setup"},
+      "saturated_water_content": {"value": 0.43, "provenance": "derived hydraulic parameter, copied from the repository's noncanonical smoke setup; selected as saturated theta for velocity mapping"},
+      "van_genuchten_alpha_per_cm": {"value": 0.015, "provenance": "derived hydraulic parameter, copied from the repository's noncanonical smoke setup"},
+      "van_genuchten_n": {"value": 1.875, "provenance": "derived hydraulic parameter, copied from the repository's noncanonical smoke setup"},
+      "saturated_conductivity_cm_per_hour": {"value": 0.43, "provenance": "derived from theta*manual pore-water velocity to target saturated Darcy flux"},
+      "pore_connectivity": {"value": 0.5, "provenance": "derived hydraulic parameter, copied from the repository's noncanonical smoke setup"},
+      "bulk_density_g_per_cm3": {"value": 0.8, "provenance": "derived parameter selected to encode R1=2 through linear equilibrium sorption"}
+    },
+    "initial_pressure_head_cm": {"value": 0.0, "provenance": "derived choice; uniform saturation for steady gravity-driven flow"},
+    "initial_water_content": {"value": 0.43, "provenance": "derived as saturated water content from selected material"},
+    "initial_dissolved_concentration": {"value": 0.0, "provenance": "manual §11.3 states initially solute-free medium"},
+    "initial_equilibrium_sorbed_concentration": {"value": 0.0, "provenance": "derived from zero initial dissolved concentration and linear equilibrium sorption"},
+    "initial_kinetic_sorbed_concentration": {"value": 0.0, "provenance": "derived; kinetic sorption is disabled"}
+  },
+  "boundaries": {
+    "upper_inlet": {
+      "hydraulic": {"value": "fixed pressure head 0 cm", "provenance": "derived executable setup; source input KodTop=1"},
+      "solute": {"value": "third-type total-flux boundary; NH4 concentration 1, NO2 and NO3 concentration 0", "provenance": "manual equations (11.4) and Table 11.1; concentration values transcribed, type mapped to source kTopCh=-1"},
+      "pulse_end_hour": {"value": 200.0, "provenance": "derived; keep inlet active through the final manual observation time"}
+    },
+    "lower_outlet": {
+      "hydraulic": {"value": "fixed pressure head 0 cm", "provenance": "derived executable setup; source input KodBot=1"},
+      "solute": {"value": "third-type zero-gradient outflow boundary; zero prescribed external concentration", "provenance": "manual equations (11.4) mapped to source kBotCh=-1; verify boundary sign and realized outflow in reference run"}
+    }
+  },
+  "time": {
+    "start_hour": {"value": 0.0, "provenance": "derived initial time"},
+    "end_hour": {"value": 200.0, "provenance": "manual latest reported profile time"},
+    "observation_times_hour": [{"value": 50.0, "provenance": "manual §11.3 Fig. 11.9"}, {"value": 100.0, "provenance": "manual §11.3 Fig. 11.9"}, {"value": 200.0, "provenance": "manual §11.3 Figs. 11.8-11.9"}],
+    "initial_step_hour": {"value": 0.1, "provenance": "derived numerical setting"},
+    "minimum_step_hour": {"value": 0.01, "provenance": "derived numerical setting"},
+    "maximum_step_hour": {"value": 0.5, "provenance": "derived numerical setting"},
+    "print_interval_hours": {"value": 50.0, "provenance": "derived to coincide with manual observation times"}
+  },
+  "fortran_input_settings": {
+    "selector_version": {"value": 4, "provenance": "derived file-format choice supported by pinned INPUT.FOR"},
+    "declared_mass_unit_label": {"value": "mmol", "provenance": "derived display label copied from repository smoke input; normalized concentrations remain dimensionless"},
+    "vertical_cosine": {"value": 1.0, "provenance": "derived vertical-column orientation"},
+    "water_solver_max_iterations": {"value": 20, "provenance": "derived numerical setting"},
+    "water_solver_theta_tolerance": {"value": 0.001, "provenance": "derived numerical setting"},
+    "water_solver_head_tolerance": {"value": 1.0, "provenance": "derived numerical setting"},
+    "fixed_upper_and_lower_pressure_heads_cm": {"value": 0.0, "provenance": "derived saturated steady-flow boundary setup"},
+    "water_table_lookup_head_limits": {"value": [0.0001, 100.0], "provenance": "derived table-generation controls copied from repository smoke input"},
+    "retention_model_and_hysteresis_selector": {"value": [0, 0], "provenance": "derived choice: van Genuchten model with hysteresis disabled"},
+    "pore_connectivity": {"value": 0.5, "provenance": "derived hydraulic parameter copied from repository smoke input"},
+    "time_step_multipliers": {"value": [1.2, 0.5], "provenance": "derived time-step adaptation settings"},
+    "time_step_iteration_limits": {"value": [1, 20], "provenance": "derived time-step adaptation settings"},
+    "solute_theta_method": {"value": 0.5, "provenance": "derived averaging parameter, following the repository smoke-case convention"},
+    "solute_concentration_tolerances": {"value": [0.000001, 0.000001], "provenance": "derived solver controls only; not comparison acceptance tolerances"},
+    "solute_max_iterations": {"value": 20, "provenance": "derived solver control"},
+    "solute_peclet_threshold": {"value": 100.0, "provenance": "derived solver control; source clamps this to at least 0.1"},
+    "species_count": {"value": 3, "provenance": "manual Example 3 has three chain species"},
+    "fraction_equilibrium_sorption": {"value": 1.0, "provenance": "derived source coefficient selecting all-equilibrium sorption"},
+    "immobile_water_content": {"value": 0.0, "provenance": "derived source coefficient disabling immobile-water transport"},
+    "initial_temperature_c": {"value": 20.0, "provenance": "derived constant temperature because temperature-dependent processes are disabled"},
+    "profile_auxiliary_fields": {"value": [0.0, 1.0, 1.0], "provenance": "derived neutral/default profile values copied from repository smoke input; root-distribution field is inactive"},
+    "disabled_reaction_and_transport_coefficients": {"value": "All unlisted zero-order, gas-phase, temperature-dependent, nonlinear-sorption, kinetic-sorption, mobile-immobile, and moisture-dependent coefficients are explicitly zero/disabled in SELECTOR.IN.", "provenance": "derived scope restriction to the selected M5 profile"},
+    "selector_boolean_switches": {"value": "Water and solute on; heat, sink, root, short output, moisture-dependent transport, variable boundary, tortuosity, artificial dispersion, and optional biology/filtration off; upstream weighting on.", "provenance": "derived scope and numerical settings encoded in SELECTOR.IN"},
+    "profile_node_record_layout": {"value": "1001 nodes, 3 species, one material/layer; nodes are uniformly spaced by 0.25 cm from native x=0 to -250 cm.", "provenance": "derived fixture dimensions and native-coordinate mapping"},
+    "profile_header_parameters": {"value": [1001, 0, 3], "provenance": "derived record values: node count and species count are fixture dimensions; the middle zero is a source-format placeholder copied from the smoke input"},
+    "profile_comment_records_skipped": {"value": 1, "provenance": "source input-format convention copied from repository smoke input"},
+    "profile_observation_node_count": {"value": 0, "provenance": "derived choice; full nodal output is requested at print times instead"}
+  },
+  "expected_observables": [
+    "dissolved NH4, NO2, and NO3 profiles at 50, 100, and 200 h on common flow-distance coordinates",
+    "water-content and face-flux history to verify the intended steady saturated flow and provide matched Rust inputs",
+    "species-specific integrated inventories and independently recomputed balances",
+    "Fortran per-species solute output and run diagnostics, once output formats are verified"
+  ],
+  "known_mapping_limits": [
+    "Manual Example 3 is an infinite-domain analytical configuration; this source deck uses a finite 250 cm domain and a derived 0.25 cm grid.",
+    "No original deck or numeric CHAIN output arrays are available in the workspace; this case cannot claim manual reproduction or an exact analytical golden array.",
+    "Retardation factors map to Rust linear equilibrium sorption using a constant theta and bulk density. Validate the source and Rust storage/reaction mappings before claiming parity.",
+    "Confirm the Fortran run realizes the target water velocity and dispersion; the water solution is coupled and its trajectory must be paired with Rust.",
+    "No tolerance is assigned in this fixture definition."
+  ]
+}

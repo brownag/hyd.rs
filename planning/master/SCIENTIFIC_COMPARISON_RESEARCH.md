@@ -28,6 +28,14 @@ The printed pages below are the page numbers printed in the manual; PDF page num
 
 **Selection proposal:** begin with Example 3 for an analytical transport/reaction comparison; concurrently build a small source-matched Fortran/Rust harness fixture to isolate M5 contract paths. Add Example 5 only after a parameter mapping is documented. Defer Example 4 unless competitive cation-exchange chemistry is expressly brought into supported scope. The manual's figures and literature provenance make these cases scientifically motivated, but do not by themselves supply reproducible numerical arrays.
 
+### Orchestration 12 fixture audit result
+
+Task 12.1.1 created [`reference/fortran_reference/solute/example3/`](../../reference/fortran_reference/solute/example3/), a **derived executable case motivated by Example 3**, not a recovered deck or manual reproduction. The local workspace contained no original Example 3 input deck or numeric CHAIN arrays. `CASE.json` attributes each manual-transcribed or derived fixture value; `SELECTOR.IN` and `PROFILE.DAT` form the newly authored source input bundle. This bundle has not yet been run through Fortran.
+
+The selected equation profile maps to Rust M5 in principle: with constant `theta` and bulk density, linear equilibrium sorption gives `R = 1 + rho_b*Kd/theta`; the chosen `Kd=0.5375 cm3/g`, `rho_b=0.8 g/cm3`, and `theta=0.43` encode the manual's NH4 retardation factor 2, while zero Kd encodes the NO2/NO3 factors 1. The source `SOLUTE.FOR` transport assembly uses the species retardation in accumulation and forms the sequential source from prior-species first-order liquid and sorbed terms (`GamL1`/`GamS1`); setting both phases to the same rate represents decay/transfer on the selected total species mass. The source dispersion expression is `alpha*abs(v_Darcy)/theta + Dw*TauW`; derived `alpha=0.18 cm`, `Dw=0`, and target `q/theta=1 cm/hour` encode the manual's effective dispersion. These mappings are hypotheses to verify against the actual run's coefficients, realized water trajectory, output and boundary signs before comparing.
+
+The domain length, grid, hydraulic material and boundary pressure heads are derived choices for a finite saturated source run. They differ from the manual's infinite-domain analytical setting. Preserve this distinction in future run reports; compare against an independently calculated analytical solution only after finite-domain, discretization and coordinate effects are characterized. No comparison tolerance or scientific pass is established by defining this case.
+
 ## Observable set and extraction
 
 ### Compare at matching physical locations and times
@@ -60,6 +68,7 @@ Potential data hazards to check during parser implementation: Fortran output can
 Verified repository gaps at this writing:
 
 - No recovered/manual Chapter 11.3–11.5 machine-readable input decks or reviewed expected output arrays; current M5 fixtures are constructed in-memory contract cases. [M5 evidence](PHASE_5_SOLUTE_EVIDENCE.md#transactions-and-fixture-inventory).
+- A derived Example 3 motivated input bundle is now authored for the Orchestration 12 source run, but its source-input validity and realized physics remain unverified until task 12.2.1 executes it. [Derived fixture record](../../reference/fortran_reference/solute/example3/CASE.json).
 - No paired solute run against the Phase 0 executable and no solute scientific output parser/comparison test identified in the current plan/evidence.
 - Phase 0 output completion evidence covers water smoke outputs; it does not establish the exact solute-output inventory/markers needed for a fixture runner.
 - The reference lineage is 4.08 or derivative, not verified exact release; local 4.17 is comparative documentation, not the pinned source oracle. [Source audit](SOURCE_AUDIT.md#provenance).
