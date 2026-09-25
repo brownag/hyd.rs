@@ -1,4 +1,6 @@
-use crate::hydraulics::{BoundaryCondition, BoundaryRow, FaceAveraging};
+use crate::hydraulics::{
+    transform_boundary_row, BoundaryCondition, BoundaryRow, BoundaryRowLocation, FaceAveraging,
+};
 use crate::WaterStepError;
 
 /// Physical lower-boundary selections supported by the transactional water solver.
@@ -89,51 +91,114 @@ pub(crate) fn lower_flux_row(input: LowerFluxRowInput) -> Result<BoundaryRow, Wa
 }
 
 impl LowerBoundaryMode {
-    pub(crate) fn validate(self) -> Result<(), WaterStepError> {
-        match self {
+    pub(crate) fn prepare(
+        self,
+        count: usize,
+        row: BoundaryRow,
+        minimum_pivot: f64,
+    ) -> Result<LowerBoundaryPlan, WaterStepError> {
+        let mode = match self {
             Self::FixedHead { head } if !head.is_finite() => {
-                Err(WaterStepError::InvalidLowerBoundary { name: "head" })
+                return Err(WaterStepError::InvalidLowerBoundary { name: "head" });
             }
             Self::PrescribedFlux { flux } if !flux.is_finite() => {
-                Err(WaterStepError::InvalidLowerBoundary { name: "flux" })
+                return Err(WaterStepError::InvalidLowerBoundary { name: "flux" });
             }
             Self::Unsupported(UnsupportedLowerBoundaryMode::SeepageFace) => {
-                Err(WaterStepError::UnsupportedLowerBoundary {
+                return Err(WaterStepError::UnsupportedLowerBoundary {
                     mode: "seepage_face",
-                })
+                });
             }
             Self::Unsupported(UnsupportedLowerBoundaryMode::WaterTable) => {
-                Err(WaterStepError::UnsupportedLowerBoundary {
+                return Err(WaterStepError::UnsupportedLowerBoundary {
                     mode: "water_table",
+                });
+            }
+            Self::FixedHead { head } => PreparedLowerBoundaryMode::FixedHead { head },
+            Self::PrescribedFlux { flux } => PreparedLowerBoundaryMode::PrescribedFlux { flux },
+            Self::FreeDrainage => PreparedLowerBoundaryMode::FreeDrainage,
+        };
+        let plan = LowerBoundaryPlan { mode };
+        plan.validate_mesh_and_row(count, row, minimum_pivot)?;
+        Ok(plan)
+    }
+}
+
+#[derive(Clone, Copy)]
+pub(crate) enum LowerBoundaryRowStrategy {
+    CallerProvided,
+    Flux,
+}
+
+#[derive(Clone, Copy)]
+pub(crate) struct LowerBoundaryPlan {
+    mode: PreparedLowerBoundaryMode,
+}
+
+#[derive(Clone, Copy)]
+enum PreparedLowerBoundaryMode {
+    FixedHead { head: f64 },
+    PrescribedFlux { flux: f64 },
+    FreeDrainage,
+}
+
+pub(crate) struct PreparedLowerBoundary {
+    pub condition: BoundaryCondition,
+    pub exchange_flux: f64,
+    pub row_strategy: LowerBoundaryRowStrategy,
+}
+
+impl LowerBoundaryPlan {
+    pub(crate) fn fixes_head(self) -> bool {
+        matches!(self.mode, PreparedLowerBoundaryMode::FixedHead { .. })
+    }
+
+    fn validate_mesh_and_row(
+        self,
+        count: usize,
+        row: BoundaryRow,
+        minimum_pivot: f64,
+    ) -> Result<(), WaterStepError> {
+        match self.mode {
+            PreparedLowerBoundaryMode::FixedHead { head } => {
+                transform_boundary_row(
+                    count,
+                    BoundaryRowLocation::Lower,
+                    row,
+                    BoundaryCondition::Dirichlet { value: head },
+                    minimum_pivot,
+                )?;
+                Ok(())
+            }
+            PreparedLowerBoundaryMode::FreeDrainage if count < 2 => {
+                Err(WaterStepError::InvalidLowerBoundary {
+                    name: "free_drainage_mesh",
                 })
             }
             _ => Ok(()),
         }
     }
 
-    pub(crate) fn condition(self, flux: f64) -> Result<BoundaryCondition, WaterStepError> {
-        self.validate()?;
-        match self {
-            Self::FixedHead { head } => Ok(BoundaryCondition::Dirichlet { value: head }),
-            Self::PrescribedFlux { flux } => Ok(BoundaryCondition::Neumann { flux }),
-            Self::FreeDrainage => Ok(BoundaryCondition::Neumann { flux }),
-            Self::Unsupported(_) => unreachable!("validated above"),
-        }
-    }
-
-    pub(crate) fn flux_into_domain(
+    pub(crate) fn prepare_step(
         self,
         conductivity_a: f64,
         conductivity_b: f64,
         gravity: f64,
         averaging: FaceAveraging,
         fixed_head_flux: f64,
-    ) -> Result<f64, WaterStepError> {
-        self.validate()?;
-        let flux = match self {
-            Self::FixedHead { .. } => fixed_head_flux,
-            Self::PrescribedFlux { flux } => flux,
-            Self::FreeDrainage => {
+    ) -> Result<PreparedLowerBoundary, WaterStepError> {
+        let (condition, flux, row_strategy) = match self.mode {
+            PreparedLowerBoundaryMode::FixedHead { head } => (
+                BoundaryCondition::Dirichlet { value: head },
+                fixed_head_flux,
+                LowerBoundaryRowStrategy::CallerProvided,
+            ),
+            PreparedLowerBoundaryMode::PrescribedFlux { flux } => (
+                BoundaryCondition::Neumann { flux },
+                flux,
+                LowerBoundaryRowStrategy::Flux,
+            ),
+            PreparedLowerBoundaryMode::FreeDrainage => {
                 if !conductivity_a.is_finite()
                     || !conductivity_b.is_finite()
                     || conductivity_a <= 0.0
@@ -151,13 +216,21 @@ impl LowerBoundaryMode {
                 // WATFLOW.FOR Reset adds rBot=-ConB*Grav to its lower RHS.
                 // Rust defines positive boundary flux as entering the domain,
                 // so the source-derived free-drainage exchange is -K_face*g.
-                -conductivity * gravity
+                let flux = -conductivity * gravity;
+                (
+                    BoundaryCondition::Neumann { flux },
+                    flux,
+                    LowerBoundaryRowStrategy::Flux,
+                )
             }
-            Self::Unsupported(_) => unreachable!("validated above"),
         };
         if !flux.is_finite() {
             return Err(WaterStepError::InvalidLowerBoundary { name: "flux" });
         }
-        Ok(flux)
+        Ok(PreparedLowerBoundary {
+            condition,
+            exchange_flux: flux,
+            row_strategy,
+        })
     }
 }
