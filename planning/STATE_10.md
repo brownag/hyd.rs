@@ -1,7 +1,7 @@
 # State — Orchestration 10: M5 single-domain solute transport
 
 Plan status: **approved by the user on 2026-09-24.**
-Execution status: **Waves 1–3 complete; Waves 4–6 pending.**
+Execution status: **Waves 1–4 complete; Waves 5–6 pending.**
 Plan: [EXECUTION_PLAN_10.md](EXECUTION_PLAN_10.md); worker prompt: [PROMPT_TEMPLATE_10.md](PROMPT_TEMPLATE_10.md).
 
 ## Baseline checklist
@@ -21,7 +21,7 @@ Plan: [EXECUTION_PLAN_10.md](EXECUTION_PLAN_10.md); worker prompt: [PROMPT_TEMPL
 | 1 | 10.1.1 | Validated solute capability contract | done | pending |
 | 2 | 10.2.1 | Transactional state/workspace | done | pending |
 | 3 | 10.3.1 | Advection/dispersion and boundary solve | done | pending |
-| 4 | 10.4.1 | Species reaction, sorption and transfer | pending | — |
+| 4 | 10.4.1 | Species reaction, sorption and transfer | done | pending |
 | 5 | 10.5.1 | Solute balance and acceptance fixtures | pending | — |
 | 6 | 10.6.1 | M5 evidence and handoff | pending | — |
 
@@ -53,6 +53,14 @@ Plan: [EXECUTION_PLAN_10.md](EXECUTION_PLAN_10.md); worker prompt: [PROMPT_TEMPL
 - **Deviations:** none; one initial targeted run failed on a missing test config argument and was corrected; formatting was fixed within scope.
 - **Gotcha:** accepted water faces are `node_count + 1`, lower/internal/upper, signed toward +x; prescribed solute boundary flux is positive inward at either endpoint.
 
+## 10.4.1
+- **Status:** done; sequential decay, equilibrium/kinetic sorption, bulk-density conversion, nonlinear bounded iteration, and rollback are implemented.
+- **Files:** `solute.rs`, new `tests/solute_reactions.rs`, `tasks/10.4.1.todo.md`.
+- **Tests:** `cargo test -p hydrus-core --test solute_reactions` — 6 passed, 0 failed; `cargo test --workspace` — 106 passed, 0 failed.
+- **Gates:** `cargo fmt --check`, `cargo clippy --workspace --all-targets -- -D warnings`, and `git diff --check` passed.
+- **Deviations:** none; escalated from small worker to mid-tier after two failed compile attempts. Test assertions were corrected to compare nonlinear retardation with a nonsorbing case and to record signed net species reaction mass.
+- **Gotchas:** reaction accounting is signed net mass change by species; nonlinear exponents below 1 at zero concentration produce a typed infinite-derivative rejection. 10.5.1 must include all supported sorbed pools and use these signed terms.
+
 ## Amendments and blockers
 
-- User approved the plan on 2026-09-24. Waves 1–3 passed verification; no active blockers.
+- User approved the plan on 2026-09-24. Waves 1–4 passed verification; no active blockers.

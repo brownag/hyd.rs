@@ -38,7 +38,9 @@ pub enum EquilibriumSorption {
 /// `transfer_rate` has inverse-time units compatible with the declared time unit.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct KineticSorption {
+    /// `Kd` in sorbed-mass units per concentration unit.
     pub capacity_coefficient: f64,
+    /// `omega` in inverse units of the caller's time unit.
     pub transfer_rate: f64,
 }
 
@@ -334,6 +336,8 @@ pub struct SoluteWorkspace {
     diagonal: Vec<f64>,
     upper: Vec<f64>,
     rhs: Vec<f64>,
+    previous_species_mass: Vec<f64>,
+    reaction_source: Vec<f64>,
 }
 
 impl SoluteWorkspace {
@@ -366,6 +370,8 @@ impl SoluteWorkspace {
             diagonal: vec![0.0; node_count],
             upper: vec![0.0; node_count],
             rhs: vec![0.0; node_count],
+            previous_species_mass: vec![0.0; node_count],
+            reaction_source: vec![0.0; node_count],
         })
     }
 
@@ -558,11 +564,28 @@ pub struct SoluteTransportInput<'a> {
     pub minimum_pivot: f64,
 }
 
+/// Per-node solid density and deterministic nonlinear solve limits for M5 processes.
+#[derive(Clone, Copy, Debug)]
+pub struct SoluteProcessInput<'a> {
+    /// Solid mass per soil volume, compatible with `SoluteUnits::sorbed_mass` so
+    /// `bulk_density * sorbed_mass` converts to concentration-volume storage.
+    pub bulk_density: &'a [f64],
+    pub max_iterations: usize,
+    /// Absolute concentration-change threshold in the declared concentration units.
+    /// This is a deterministic solver setting, not a calibrated physical tolerance.
+    pub nonlinear_tolerance: f64,
+}
+
 /// Errors returned by a dissolved-solute transport step.
 #[derive(Clone, Debug, PartialEq)]
 pub enum SoluteStepError {
     Configuration(SoluteConfigError),
     Linear(TridiagonalError),
+    NonConverged {
+        species: usize,
+        iterations: usize,
+        residual: f64,
+    },
 }
 
 impl core::fmt::Display for SoluteStepError {
@@ -570,6 +593,10 @@ impl core::fmt::Display for SoluteStepError {
         match self {
             Self::Configuration(error) => error.fmt(formatter),
             Self::Linear(error) => error.fmt(formatter),
+            Self::NonConverged { species, iterations, residual } => write!(
+                formatter,
+                "solute nonlinear solve for species {species} did not converge after {iterations} iterations (change={residual})"
+            ),
         }
     }
 }
@@ -598,13 +625,38 @@ pub fn advance_solute_step(
     config: &SoluteConfig,
     input: SoluteTransportInput<'_>,
 ) -> Result<(), SoluteStepError> {
+    advance_solute_step_with_processes(state, workspace, mesh, config, input, None)
+}
+
+/// Advances transport with the configured M5 reaction and sorption processes.
+/// `process_input` supplies bulk density and a bounded nonlinear solve policy.
+pub fn advance_solute_step_with_processes(
+    state: &mut SoluteState,
+    workspace: &mut SoluteWorkspace,
+    mesh: &Mesh1D,
+    config: &SoluteConfig,
+    input: SoluteTransportInput<'_>,
+    process_input: Option<SoluteProcessInput<'_>>,
+) -> Result<(), SoluteStepError> {
     let species_count = config.species.len();
-    validate_transport_input(state, workspace, mesh, config, input)?;
+    validate_transport_input(state, workspace, mesh, config, input, process_input)?;
 
     workspace.begin_trial(state)?;
     let solve_result = (|| {
         for species in 0..species_count {
-            assemble_and_solve_species(state, workspace, mesh, config, input, species)?;
+            if let Some(process_input) = process_input {
+                assemble_and_solve_species_with_processes(
+                    state,
+                    workspace,
+                    mesh,
+                    config,
+                    input,
+                    process_input,
+                    species,
+                )?;
+            } else {
+                assemble_and_solve_species(state, workspace, mesh, config, input, species)?;
+            }
         }
         validate_solute_values("trial concentrations", &workspace.trial_concentrations)?;
         workspace.accept_trial(state, input.accepted_water.accepted_time)?;
@@ -622,6 +674,7 @@ fn validate_transport_input(
     mesh: &Mesh1D,
     config: &SoluteConfig,
     input: SoluteTransportInput<'_>,
+    process_input: Option<SoluteProcessInput<'_>>,
 ) -> Result<(), SoluteStepError> {
     let node_count = mesh.coordinates().len();
     let species_count = config.species.len();
@@ -692,6 +745,54 @@ fn validate_transport_input(
     validate_solute_values("face dispersion", input.face_dispersion)?;
     if input.face_dispersion.iter().any(|value| *value < 0.0) {
         return Err(invalid_transport("face dispersion", "must be nonnegative"));
+    }
+    let processes_configured = config.species.iter().any(|species| {
+        species.decay_rate > 0.0
+            || species.kinetic_sorption.is_some()
+            || !matches!(species.equilibrium_sorption, EquilibriumSorption::None)
+    });
+    match process_input {
+        None if processes_configured => {
+            return Err(invalid_transport(
+                "process input",
+                "bulk density and nonlinear policy are required for configured reaction/sorption",
+            ));
+        }
+        Some(process) => {
+            if process.bulk_density.len() != node_count {
+                return Err(invalid_transport(
+                    "bulk density",
+                    "length must equal mesh node count",
+                ));
+            }
+            validate_solute_values("bulk density", process.bulk_density)?;
+            if process.bulk_density.iter().any(|density| *density <= 0.0) {
+                return Err(invalid_transport("bulk density", "must be positive"));
+            }
+            if process.max_iterations == 0 {
+                return Err(invalid_transport(
+                    "nonlinear iteration limit",
+                    "must be positive",
+                ));
+            }
+            if !process.nonlinear_tolerance.is_finite() || process.nonlinear_tolerance <= 0.0 {
+                return Err(invalid_transport(
+                    "nonlinear tolerance",
+                    "must be finite and positive",
+                ));
+            }
+            validate_solute_values("accepted concentrations", &state.concentrations)?;
+            validate_solute_values("accepted kinetic sorbed pool", &state.kinetic_sorbed)?;
+            if state.concentrations.iter().any(|value| *value < 0.0)
+                || state.kinetic_sorbed.iter().any(|value| *value < 0.0)
+            {
+                return Err(invalid_transport(
+                    "accepted pools",
+                    "concentration and sorbed pool values must be nonnegative",
+                ));
+            }
+        }
+        None => {}
     }
     for boundary in [config.boundaries.upper, config.boundaries.lower] {
         if let SoluteBoundaryMode::Concentration { value } = boundary {
@@ -786,6 +887,324 @@ fn assemble_and_solve_species(
     )?;
     validate_solute_values("solved concentrations", &workspace.rhs)?;
     workspace.trial_concentrations[offset..offset + count].copy_from_slice(&workspace.rhs);
+    Ok(())
+}
+
+fn assemble_and_solve_species_with_processes(
+    state: &SoluteState,
+    workspace: &mut SoluteWorkspace,
+    mesh: &Mesh1D,
+    config: &SoluteConfig,
+    input: SoluteTransportInput<'_>,
+    process: SoluteProcessInput<'_>,
+    species: usize,
+) -> Result<(), SoluteStepError> {
+    let count = workspace.node_count;
+    let offset = species * count;
+    let species_config = &config.species[species];
+    let nonlinear = matches!(
+        species_config.equilibrium_sorption,
+        EquilibriumSorption::Nonlinear { .. }
+    );
+    let decay = species_config.decay_rate;
+    if species == 0 {
+        workspace.reaction_source.fill(0.0);
+    } else {
+        let previous_decay = config.species[species - 1].decay_rate;
+        for node in 0..count {
+            workspace.reaction_source[node] =
+                previous_decay * workspace.previous_species_mass[node];
+        }
+    }
+    validate_solute_values("sequential reaction source", &workspace.reaction_source)?;
+
+    let iteration_limit = if nonlinear { process.max_iterations } else { 1 };
+    let mut converged = !nonlinear;
+    let mut residual: f64 = 0.0;
+    for iteration in 0..iteration_limit {
+        assemble_flux_operator(workspace, mesh, input);
+        let coordinates = mesh.coordinates();
+        for node in 0..count {
+            let width = control_volume_width(coordinates, node);
+            let theta = input.accepted_water.water_contents[node];
+            let density = process.bulk_density[node];
+            let old_concentration = state.concentrations[offset + node];
+            let old_sorbed = state.kinetic_sorbed[offset + node];
+            let guess = workspace.trial_concentrations[offset + node];
+            let (old_mass, _, _) = local_mass_terms(
+                species_config,
+                theta,
+                density,
+                old_concentration,
+                old_sorbed,
+                0.0,
+            )?;
+            let (guess_mass, derivative, intercept) = local_mass_terms(
+                species_config,
+                theta,
+                density,
+                guess,
+                old_sorbed,
+                input.timestep,
+            )?;
+            let gamma = 1.0 / input.timestep + decay;
+            let source = workspace.reaction_source[node];
+            workspace.diagonal[node] += width * gamma * derivative;
+            if nonlinear {
+                workspace.rhs[node] = width
+                    * (old_mass / input.timestep
+                        + source
+                        + gamma * (derivative * guess - guess_mass));
+            } else {
+                workspace.rhs[node] =
+                    width * (old_mass / input.timestep + source - gamma * intercept);
+            }
+        }
+        apply_process_boundary_rows(workspace, config, count);
+        validate_solute_values("reaction/sorption coefficients", &workspace.lower)?;
+        validate_solute_values("reaction/sorption coefficients", &workspace.diagonal)?;
+        validate_solute_values("reaction/sorption coefficients", &workspace.upper)?;
+        validate_solute_values("reaction/sorption rhs", &workspace.rhs)?;
+        solve_tridiagonal_in_place(
+            &workspace.lower,
+            &mut workspace.diagonal,
+            &workspace.upper,
+            &mut workspace.rhs,
+            input.minimum_pivot,
+        )?;
+        validate_nonnegative_concentrations(&workspace.rhs)?;
+        residual = 0.0;
+        for node in 0..count {
+            residual = residual
+                .max((workspace.rhs[node] - workspace.trial_concentrations[offset + node]).abs());
+        }
+        workspace.trial_concentrations[offset..offset + count].copy_from_slice(&workspace.rhs);
+        if !nonlinear || residual <= process.nonlinear_tolerance {
+            converged = true;
+            break;
+        }
+        if iteration + 1 == iteration_limit {
+            return Err(SoluteStepError::NonConverged {
+                species,
+                iterations: iteration_limit,
+                residual,
+            });
+        }
+    }
+    if !converged {
+        return Err(SoluteStepError::NonConverged {
+            species,
+            iterations: iteration_limit,
+            residual,
+        });
+    }
+
+    let coordinates = mesh.coordinates();
+    let mut reaction_mass_delta = 0.0;
+    for node in 0..count {
+        let concentration = workspace.trial_concentrations[offset + node];
+        let old_sorbed = state.kinetic_sorbed[offset + node];
+        let kinetic = species_config.kinetic_sorption;
+        let new_sorbed = match kinetic {
+            Some(parameters) => {
+                let transfer = input.timestep * parameters.transfer_rate;
+                (old_sorbed + transfer * parameters.capacity_coefficient * concentration)
+                    / (1.0 + transfer)
+            }
+            None => old_sorbed,
+        };
+        if !new_sorbed.is_finite() || new_sorbed < 0.0 {
+            return Err(invalid_transport(
+                "trial kinetic sorbed pool",
+                "must remain finite and nonnegative",
+            ));
+        }
+        workspace.trial_kinetic_sorbed[offset + node] = new_sorbed;
+        let (new_mass, _, _) = local_mass_terms(
+            species_config,
+            input.accepted_water.water_contents[node],
+            process.bulk_density[node],
+            concentration,
+            old_sorbed,
+            input.timestep,
+        )?;
+        workspace.previous_species_mass[node] = new_mass;
+        let incoming = workspace.reaction_source[node];
+        let outgoing = decay * new_mass;
+        reaction_mass_delta +=
+            (incoming - outgoing) * control_volume_width(coordinates, node) * input.timestep;
+    }
+    workspace.trial_reaction_mass_mut()[species] += reaction_mass_delta;
+    if !workspace.trial_accounting().cumulative_reaction_mass()[species].is_finite() {
+        return Err(invalid_transport(
+            "reaction accounting",
+            "result must remain finite",
+        ));
+    }
+    Ok(())
+}
+
+fn assemble_flux_operator(
+    workspace: &mut SoluteWorkspace,
+    mesh: &Mesh1D,
+    input: SoluteTransportInput<'_>,
+) {
+    let count = workspace.node_count;
+    workspace.lower.fill(0.0);
+    workspace.diagonal.fill(0.0);
+    workspace.upper.fill(0.0);
+    workspace.rhs.fill(0.0);
+    let coordinates = mesh.coordinates();
+    for face in 1..count {
+        let left = face - 1;
+        let right = face;
+        let theta_face = (input.accepted_water.water_contents[left]
+            + input.accepted_water.water_contents[right])
+            / 2.0;
+        let dispersion =
+            theta_face * input.face_dispersion[left] / (coordinates[right] - coordinates[left]);
+        let water_flux = input.accepted_water.face_fluxes[face];
+        let left_coefficient = water_flux.max(0.0) + dispersion;
+        let right_coefficient = water_flux.min(0.0) - dispersion;
+        workspace.diagonal[left] += left_coefficient;
+        workspace.upper[left] += right_coefficient;
+        workspace.lower[right] -= left_coefficient;
+        workspace.diagonal[right] -= right_coefficient;
+    }
+}
+
+fn apply_process_boundary_rows(
+    workspace: &mut SoluteWorkspace,
+    config: &SoluteConfig,
+    node_count: usize,
+) {
+    match config.boundaries.lower {
+        SoluteBoundaryMode::Concentration { value } => {
+            workspace.diagonal[0] = 1.0;
+            workspace.upper[0] = 0.0;
+            workspace.rhs[0] = value;
+        }
+        SoluteBoundaryMode::TotalFlux { flux } => workspace.rhs[0] += flux,
+    }
+    let upper = node_count - 1;
+    match config.boundaries.upper {
+        SoluteBoundaryMode::Concentration { value } => {
+            workspace.lower[upper] = 0.0;
+            workspace.diagonal[upper] = 1.0;
+            workspace.rhs[upper] = value;
+        }
+        SoluteBoundaryMode::TotalFlux { flux } => workspace.rhs[upper] += flux,
+    }
+}
+
+/// Returns total local mass per soil volume, its concentration derivative, and
+/// the affine intercept. The latter supports exact linear isotherm/kinetic rows.
+fn local_mass_terms(
+    species: &SoluteSpecies,
+    water_content: f64,
+    bulk_density: f64,
+    concentration: f64,
+    old_kinetic_sorbed: f64,
+    timestep: f64,
+) -> Result<(f64, f64, f64), SoluteStepError> {
+    if concentration < 0.0 || !concentration.is_finite() {
+        return Err(invalid_transport(
+            "sorption concentration",
+            "must be finite and nonnegative",
+        ));
+    }
+    let (equilibrium_sorbed, equilibrium_derivative) =
+        equilibrium_sorption_value(&species.equilibrium_sorption, concentration)?;
+    let (kinetic_sorbed, kinetic_derivative) = match species.kinetic_sorption {
+        Some(parameters) => {
+            let transfer = timestep * parameters.transfer_rate;
+            let denominator = 1.0 + transfer;
+            (
+                (old_kinetic_sorbed + transfer * parameters.capacity_coefficient * concentration)
+                    / denominator,
+                transfer * parameters.capacity_coefficient / denominator,
+            )
+        }
+        None => (old_kinetic_sorbed, 0.0),
+    };
+    let mass = water_content * concentration + bulk_density * (equilibrium_sorbed + kinetic_sorbed);
+    let derivative = water_content + bulk_density * (equilibrium_derivative + kinetic_derivative);
+    let intercept = mass - derivative * concentration;
+    if !mass.is_finite() || !derivative.is_finite() || !intercept.is_finite() || derivative <= 0.0 {
+        return Err(invalid_transport(
+            "sorption evaluation",
+            "mass and positive derivative must remain finite",
+        ));
+    }
+    Ok((mass, derivative, intercept))
+}
+
+fn equilibrium_sorption_value(
+    isotherm: &EquilibriumSorption,
+    concentration: f64,
+) -> Result<(f64, f64), SoluteStepError> {
+    let value = match *isotherm {
+        EquilibriumSorption::None => (0.0, 0.0),
+        EquilibriumSorption::Linear {
+            distribution_coefficient,
+        } => (
+            distribution_coefficient * concentration,
+            distribution_coefficient,
+        ),
+        EquilibriumSorption::Nonlinear {
+            fraction,
+            coefficient,
+            saturation,
+            exponent,
+        } => {
+            let power = concentration.powf(exponent);
+            let denominator = 1.0 + saturation * power;
+            if !power.is_finite() || !denominator.is_finite() || denominator <= 0.0 {
+                return Err(invalid_transport(
+                    "equilibrium sorption",
+                    "power and denominator must remain finite and positive",
+                ));
+            }
+            let sorbed = fraction * coefficient * power / denominator;
+            let derivative = if concentration == 0.0 && exponent < 1.0 {
+                f64::INFINITY
+            } else if concentration == 0.0 && exponent > 1.0 {
+                0.0
+            } else {
+                fraction * coefficient * exponent * concentration.powf(exponent - 1.0)
+                    / (denominator * denominator)
+            };
+            (sorbed, derivative)
+        }
+    };
+    if value.0.is_finite() && value.1.is_finite() {
+        Ok(value)
+    } else {
+        Err(invalid_transport(
+            "equilibrium sorption",
+            "isotherm value and derivative must remain finite",
+        ))
+    }
+}
+
+fn control_volume_width(coordinates: &[f64], node: usize) -> f64 {
+    if node == 0 {
+        (coordinates[1] - coordinates[0]) / 2.0
+    } else if node + 1 == coordinates.len() {
+        (coordinates[node] - coordinates[node - 1]) / 2.0
+    } else {
+        (coordinates[node + 1] - coordinates[node - 1]) / 2.0
+    }
+}
+
+fn validate_nonnegative_concentrations(values: &[f64]) -> Result<(), SoluteStepError> {
+    validate_solute_values("solved concentrations", values)?;
+    if values.iter().any(|value| *value < 0.0) {
+        return Err(invalid_transport(
+            "solved concentrations",
+            "must be nonnegative; values are never clipped",
+        ));
+    }
     Ok(())
 }
 
