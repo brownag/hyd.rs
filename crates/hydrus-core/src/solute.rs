@@ -1017,12 +1017,8 @@ fn assemble_and_solve_species(
 ) -> Result<(), SoluteStepError> {
     let count = workspace.node_count;
     let offset = species * count;
-    workspace.lower.fill(0.0);
-    workspace.diagonal.fill(0.0);
-    workspace.upper.fill(0.0);
-    workspace.rhs.fill(0.0);
-
     let coordinates = mesh.coordinates();
+    assemble_flux_operator(workspace, mesh, input);
     for node in 0..count {
         let width = if node == 0 {
             (coordinates[1] - coordinates[0]) / 2.0
@@ -1032,47 +1028,11 @@ fn assemble_and_solve_species(
             (coordinates[node + 1] - coordinates[node - 1]) / 2.0
         };
         let storage = input.accepted_water.water_contents[node] * width / input.timestep;
-        workspace.diagonal[node] = storage;
+        workspace.diagonal[node] += storage;
         workspace.rhs[node] = storage * state.concentrations[offset + node];
     }
 
-    // Face k joins nodes k-1 and k; its positive water-flux direction is +x.
-    for face in 1..count {
-        let left = face - 1;
-        let right = face;
-        let spacing = coordinates[right] - coordinates[left];
-        let theta_face = (input.accepted_water.water_contents[left]
-            + input.accepted_water.water_contents[right])
-            / 2.0;
-        let dispersive = theta_face * input.face_dispersion[left] / spacing;
-        let water_flux = input.accepted_water.face_fluxes[face];
-        let left_coefficient = water_flux.max(0.0) + dispersive;
-        let right_coefficient = water_flux.min(0.0) - dispersive;
-        workspace.diagonal[left] += left_coefficient;
-        workspace.upper[left] += right_coefficient;
-        workspace.lower[right] -= left_coefficient;
-        workspace.diagonal[right] -= right_coefficient;
-    }
-
-    match config.boundaries.lower {
-        SoluteBoundaryMode::Concentration { value } => {
-            workspace.diagonal[0] = 1.0;
-            workspace.upper[0] = 0.0;
-            workspace.rhs[0] = value;
-        }
-        SoluteBoundaryMode::TotalFlux { flux } => workspace.rhs[0] += flux,
-    }
-    let upper_node = count - 1;
-    match config.boundaries.upper {
-        SoluteBoundaryMode::Concentration { value } => {
-            workspace.lower[upper_node] = 0.0;
-            workspace.diagonal[upper_node] = 1.0;
-            workspace.rhs[upper_node] = value;
-        }
-        // The configured flux is positive into the domain. In +x coordinates
-        // this is a negative flux at the upper endpoint, hence +flux on RHS.
-        SoluteBoundaryMode::TotalFlux { flux } => workspace.rhs[upper_node] += flux,
-    }
+    apply_endpoint_boundary_rows(workspace, config, count);
 
     validate_solute_values("assembled transport coefficients", &workspace.lower)?;
     validate_solute_values("assembled transport coefficients", &workspace.diagonal)?;
@@ -1160,7 +1120,7 @@ fn assemble_and_solve_species_with_processes(
                     width * (old_mass / input.timestep + source - gamma * intercept);
             }
         }
-        apply_process_boundary_rows(workspace, config, count);
+        apply_endpoint_boundary_rows(workspace, config, count);
         validate_solute_values("reaction/sorption coefficients", &workspace.lower)?;
         validate_solute_values("reaction/sorption coefficients", &workspace.diagonal)?;
         validate_solute_values("reaction/sorption coefficients", &workspace.upper)?;
@@ -1273,7 +1233,7 @@ fn assemble_flux_operator(
     }
 }
 
-fn apply_process_boundary_rows(
+fn apply_endpoint_boundary_rows(
     workspace: &mut SoluteWorkspace,
     config: &SoluteConfig,
     node_count: usize,
@@ -1293,6 +1253,8 @@ fn apply_process_boundary_rows(
             workspace.diagonal[upper] = 1.0;
             workspace.rhs[upper] = value;
         }
+        // The configured flux is positive into the domain. In +x coordinates
+        // this is a negative flux at the upper endpoint, hence +flux on RHS.
         SoluteBoundaryMode::TotalFlux { flux } => workspace.rhs[upper] += flux,
     }
 }

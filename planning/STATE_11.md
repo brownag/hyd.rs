@@ -1,6 +1,6 @@
 # State — Orchestration 11: M5 solute review follow-up
 
-Plan status: **approved; execution in progress.**
+Plan status: **approved; all waves complete.**
 Plan: [EXECUTION_PLAN_11.md](EXECUTION_PLAN_11.md); worker prompt: [PROMPT_TEMPLATE_11.md](PROMPT_TEMPLATE_11.md).
 
 ## Baseline checklist
@@ -15,12 +15,21 @@ Plan: [EXECUTION_PLAN_11.md](EXECUTION_PLAN_11.md); worker prompt: [PROMPT_TEMPL
 
 | Wave | Task | Deliverable | Status | Commit |
 |---|---|---|---|---|
-| 1 | 11.1.1 | Correct storage accounting across changing water content | done | this commit |
-| 2 | 11.2.1 | Shared transport and boundary assembly | planned | — |
+| 1 | 11.1.1 | Correct storage accounting across changing water content | done | `6d67ae7` |
+| 2 | 11.2.1 | Shared transport and boundary assembly | done | this commit |
 
 ## Task reports
 
 <!-- Append each accepted worker report here, at most 15 lines per task. -->
+
+## 11.2.1
+
+- **Status:** done; transport-only and process paths share flux and endpoint-boundary assembly.
+- **Changed:** `crates/hydrus-core/src/solute.rs` (1010–1050, 1120, 1236–1260); task TODO.
+- **Tests:** `cargo test -p hydrus-core --test solute_transport` — 5 passed, 0 failed; `cargo test -p hydrus-core --test solute_reactions` — 6 passed, 0 failed.
+- **Gates:** `cargo test --workspace` — 112 passed, 0 failed; `cargo fmt --check`, `cargo clippy --workspace --all-targets -- -D warnings`, `git diff --check` passed.
+- **Deviations:** none. First transport run caught storage overwriting the shared flux diagonal; changed storage assembly to accumulate and reran successfully.
+- **Dependent-task note:** both solve paths still use preallocated workspace arrays and the unchanged tridiagonal solver.
 
 ## 11.1.1
 
