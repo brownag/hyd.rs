@@ -6,11 +6,12 @@ pub mod forcing;
 pub mod hydraulics;
 pub mod lower_boundary;
 pub mod root_uptake;
+pub mod solute;
 mod water_solver;
 mod water_state;
 
 pub use atmospheric::{advance_atmospheric_step, AtmosphericState, UpperBoundaryMode};
-pub use error::{HydraulicError, WaterStepError};
+pub use error::{HydraulicError, SoluteConfigError, WaterStepError};
 pub use forcing::{AtmosphericRates, ForcingEvent, ForcingSchedule, ForcingUnits};
 pub use hydraulics::{
     Evaluation, HydraulicDerivatives, HydraulicModel, HydraulicModelSelector, HydraulicTables,
@@ -18,6 +19,10 @@ pub use hydraulics::{
 };
 pub use lower_boundary::{LowerBoundaryMode, UnsupportedLowerBoundaryMode};
 pub use root_uptake::{feddes_reduction, RootUptakeInput, RootUptakeModel};
+pub use solute::{
+    DeferredSoluteFeature, EquilibriumSorption, KineticSorption, SoluteBoundaries,
+    SoluteBoundaryMode, SoluteConfig, SoluteSpecies, SoluteUnits,
+};
 pub use water_solver::{
     advance_water_step, WaterBalance, WaterProductConfig, WaterStepInput, WaterStepPolicy,
     WaterStepReport,

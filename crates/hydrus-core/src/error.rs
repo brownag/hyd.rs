@@ -134,6 +134,31 @@ pub enum WaterStepError {
     Linear(TridiagonalError),
 }
 
+/// Errors raised while validating the public single-domain solute contract.
+#[derive(Clone, Debug, PartialEq)]
+pub enum SoluteConfigError {
+    Invalid {
+        name: &'static str,
+        reason: &'static str,
+    },
+    Unsupported {
+        option: &'static str,
+    },
+}
+
+impl fmt::Display for SoluteConfigError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Invalid { name, reason } => write!(formatter, "invalid solute {name}: {reason}"),
+            Self::Unsupported { option } => {
+                write!(formatter, "unsupported solute option: {option}")
+            }
+        }
+    }
+}
+
+impl std::error::Error for SoluteConfigError {}
+
 impl fmt::Display for WaterStepError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
