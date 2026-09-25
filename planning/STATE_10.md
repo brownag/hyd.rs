@@ -1,7 +1,7 @@
 # State — Orchestration 10: M5 single-domain solute transport
 
 Plan status: **approved by the user on 2026-09-24.**
-Execution status: **Waves 1–5 complete; Wave 6 pending.**
+Execution status: **all waves complete.**
 Plan: [EXECUTION_PLAN_10.md](EXECUTION_PLAN_10.md); worker prompt: [PROMPT_TEMPLATE_10.md](PROMPT_TEMPLATE_10.md).
 
 ## Baseline checklist
@@ -18,12 +18,12 @@ Plan: [EXECUTION_PLAN_10.md](EXECUTION_PLAN_10.md); worker prompt: [PROMPT_TEMPL
 
 | Wave | Task | Deliverable | Status | Commit |
 |---|---|---|---|---|
-| 1 | 10.1.1 | Validated solute capability contract | done | pending |
-| 2 | 10.2.1 | Transactional state/workspace | done | pending |
-| 3 | 10.3.1 | Advection/dispersion and boundary solve | done | pending |
-| 4 | 10.4.1 | Species reaction, sorption and transfer | done | pending |
-| 5 | 10.5.1 | Solute balance and acceptance fixtures | done | — |
-| 6 | 10.6.1 | M5 evidence and handoff | pending | — |
+| 1 | 10.1.1 | Validated solute capability contract | done | `4eebff2` |
+| 2 | 10.2.1 | Transactional state/workspace | done | `065c714` |
+| 3 | 10.3.1 | Advection/dispersion and boundary solve | done | `8a21927` |
+| 4 | 10.4.1 | Species reaction, sorption and transfer | done | `e23fb6b` |
+| 5 | 10.5.1 | Solute balance and acceptance fixtures | done | `da4070e` |
+| 6 | 10.6.1 | M5 evidence and handoff | done | this commit |
 
 ## Task reports
 
@@ -69,6 +69,14 @@ Plan: [EXECUTION_PLAN_10.md](EXECUTION_PLAN_10.md); worker prompt: [PROMPT_TEMPL
 - **Deviations:** none. Water accepted-time matching uses an 8-ULP-scale roundoff bound; concentration-boundary exchange is inferred from balance closure, not independently observed.
 - **Gotcha:** acceptance fixtures use constructed in-memory inputs; manual decks and expected outputs are absent, so no calibration or parity claim follows.
 
+## 10.6.1
+- **Status:** done; `master/PHASE_5_SOLUTE_EVIDENCE.md` maps each selected M5 deliverable to accepted reports/tests or explicit limitations.
+- **Files:** `master/PHASE_5_SOLUTE_EVIDENCE.md`, `tasks/10.6.1.todo.md`.
+- **Tests:** no task-specific test; documentation received structural review. Final `cargo test --workspace` — 110 passed, 0 failed.
+- **Gates:** final `cargo fmt --check`, `cargo clippy --workspace --all-targets -- -D warnings`, and `git diff --check` passed.
+- **Deviations:** none. Evidence records no scientific validation, calibration, manual expected-output comparison, Fortran parity, release compatibility, or performance claim.
+- **Gotcha:** concentration-boundary exchange is inferred; storage closure under changing water content lacks a prior water-content snapshot.
+
 ## Amendments and blockers
 
-- User approved the plan on 2026-09-24. Waves 1–5 passed verification; no active blockers.
+- User approved the plan on 2026-09-24. All six waves passed their scoped review and final workspace gates; no active blockers.
