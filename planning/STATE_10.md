@@ -1,7 +1,7 @@
 # State — Orchestration 10: M5 single-domain solute transport
 
 Plan status: **approved by the user on 2026-09-24.**
-Execution status: **Waves 1–4 complete; Waves 5–6 pending.**
+Execution status: **Waves 1–5 complete; Wave 6 pending.**
 Plan: [EXECUTION_PLAN_10.md](EXECUTION_PLAN_10.md); worker prompt: [PROMPT_TEMPLATE_10.md](PROMPT_TEMPLATE_10.md).
 
 ## Baseline checklist
@@ -22,7 +22,7 @@ Plan: [EXECUTION_PLAN_10.md](EXECUTION_PLAN_10.md); worker prompt: [PROMPT_TEMPL
 | 2 | 10.2.1 | Transactional state/workspace | done | pending |
 | 3 | 10.3.1 | Advection/dispersion and boundary solve | done | pending |
 | 4 | 10.4.1 | Species reaction, sorption and transfer | done | pending |
-| 5 | 10.5.1 | Solute balance and acceptance fixtures | pending | — |
+| 5 | 10.5.1 | Solute balance and acceptance fixtures | done | — |
 | 6 | 10.6.1 | M5 evidence and handoff | pending | — |
 
 ## Task reports
@@ -61,6 +61,14 @@ Plan: [EXECUTION_PLAN_10.md](EXECUTION_PLAN_10.md); worker prompt: [PROMPT_TEMPL
 - **Deviations:** none; escalated from small worker to mid-tier after two failed compile attempts. Test assertions were corrected to compare nonlinear retardation with a nonsorbing case and to record signed net species reaction mass.
 - **Gotchas:** reaction accounting is signed net mass change by species; nonlinear exponents below 1 at zero concentration produce a typed infinite-derivative rejection. 10.5.1 must include all supported sorbed pools and use these signed terms.
 
+## 10.5.1
+- **Status:** done; accepted-step per-species storage, boundary, reaction, and residual diagnostics with deterministic contract fixtures.
+- **Files:** `solute.rs`, new `tests/solute_acceptance.rs`, `tasks/10.5.1.todo.md`.
+- **Tests:** `cargo test -p hydrus-core --test solute_acceptance` — 4 passed, 0 failed; `cargo test --workspace` — 110 passed, 0 failed.
+- **Gates:** `cargo fmt --check`, `cargo clippy --workspace --all-targets -- -D warnings`, and `git diff --check` passed.
+- **Deviations:** none. Water accepted-time matching uses an 8-ULP-scale roundoff bound; concentration-boundary exchange is inferred from balance closure, not independently observed.
+- **Gotcha:** acceptance fixtures use constructed in-memory inputs; manual decks and expected outputs are absent, so no calibration or parity claim follows.
+
 ## Amendments and blockers
 
-- User approved the plan on 2026-09-24. Waves 1–4 passed verification; no active blockers.
+- User approved the plan on 2026-09-24. Waves 1–5 passed verification; no active blockers.

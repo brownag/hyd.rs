@@ -239,6 +239,21 @@ pub struct SoluteAccounting {
     accepted_steps: u64,
     cumulative_boundary_mass: Vec<f64>,
     cumulative_reaction_mass: Vec<f64>,
+    last_step: Vec<SoluteSpeciesBalance>,
+}
+
+/// Accepted-step mass diagnostic for one configured species.
+///
+/// All terms use the caller-declared compatible mass basis integrated over the
+/// one-dimensional column. Boundary and reaction changes are signed positive
+/// into the species inventory; the residual is storage change minus both.
+#[derive(Clone, Copy, Debug, Default, PartialEq)]
+pub struct SoluteSpeciesBalance {
+    pub storage_change: f64,
+    pub boundary_exchange: f64,
+    pub reaction_change: f64,
+    pub absolute_residual: f64,
+    pub normalized_residual: f64,
 }
 
 impl SoluteAccounting {
@@ -250,6 +265,10 @@ impl SoluteAccounting {
     }
     pub fn cumulative_reaction_mass(&self) -> &[f64] {
         &self.cumulative_reaction_mass
+    }
+    /// Balance terms for the most recently accepted step, in species order.
+    pub fn last_step(&self) -> &[SoluteSpeciesBalance] {
+        &self.last_step
     }
 }
 
@@ -294,6 +313,7 @@ impl SoluteState {
                 accepted_steps: 0,
                 cumulative_boundary_mass: vec![0.0; species_count],
                 cumulative_reaction_mass: vec![0.0; species_count],
+                last_step: vec![SoluteSpeciesBalance::default(); species_count],
             },
         })
     }
@@ -338,6 +358,7 @@ pub struct SoluteWorkspace {
     rhs: Vec<f64>,
     previous_species_mass: Vec<f64>,
     reaction_source: Vec<f64>,
+    storage_before: Vec<f64>,
 }
 
 impl SoluteWorkspace {
@@ -372,6 +393,7 @@ impl SoluteWorkspace {
             rhs: vec![0.0; node_count],
             previous_species_mass: vec![0.0; node_count],
             reaction_source: vec![0.0; node_count],
+            storage_before: vec![0.0; species_count],
         })
     }
 
@@ -499,6 +521,7 @@ fn zero_accounting(species_count: usize) -> SoluteAccounting {
         accepted_steps: 0,
         cumulative_boundary_mass: vec![0.0; species_count],
         cumulative_reaction_mass: vec![0.0; species_count],
+        last_step: vec![SoluteSpeciesBalance::default(); species_count],
     }
 }
 
@@ -510,6 +533,7 @@ fn copy_accounting(destination: &mut SoluteAccounting, source: &SoluteAccounting
     destination
         .cumulative_reaction_mass
         .copy_from_slice(&source.cumulative_reaction_mass);
+    destination.last_step.copy_from_slice(&source.last_step);
 }
 
 fn validate_solute_values(name: &'static str, values: &[f64]) -> Result<(), SoluteConfigError> {
@@ -528,6 +552,7 @@ fn validate_accounting(
 ) -> Result<(), SoluteConfigError> {
     if accounting.cumulative_boundary_mass.len() != species_count
         || accounting.cumulative_reaction_mass.len() != species_count
+        || accounting.last_step.len() != species_count
     {
         return Err(SoluteConfigError::Invalid {
             name: "trial accounting dimensions",
@@ -541,7 +566,25 @@ fn validate_accounting(
     validate_solute_values(
         "trial reaction accounting",
         &accounting.cumulative_reaction_mass,
-    )
+    )?;
+    for balance in &accounting.last_step {
+        if ![
+            balance.storage_change,
+            balance.boundary_exchange,
+            balance.reaction_change,
+            balance.absolute_residual,
+            balance.normalized_residual,
+        ]
+        .iter()
+        .all(|value| value.is_finite())
+        {
+            return Err(SoluteConfigError::Invalid {
+                name: "trial balance",
+                reason: "balance terms must be finite",
+            });
+        }
+    }
+    Ok(())
 }
 
 /// Borrowed accepted water values used to couple one solute step.
@@ -644,6 +687,17 @@ pub fn advance_solute_step_with_processes(
     workspace.begin_trial(state)?;
     let solve_result = (|| {
         for species in 0..species_count {
+            workspace.storage_before[species] = species_storage(
+                workspace.trial_concentrations(),
+                workspace.trial_kinetic_sorbed(),
+                species,
+                mesh,
+                config,
+                input,
+                process_input,
+            )?;
+        }
+        for species in 0..species_count {
             if let Some(process_input) = process_input {
                 assemble_and_solve_species_with_processes(
                     state,
@@ -659,6 +713,7 @@ pub fn advance_solute_step_with_processes(
             }
         }
         validate_solute_values("trial concentrations", &workspace.trial_concentrations)?;
+        update_step_balances(state, workspace, mesh, config, input, process_input)?;
         workspace.accept_trial(state, input.accepted_water.accepted_time)?;
         Ok(())
     })();
@@ -709,12 +764,21 @@ fn validate_transport_input(
             "length must equal node_count - 1",
         ));
     }
+    let expected_end_time = state.time + input.timestep;
+    if !expected_end_time.is_finite() {
+        return Err(invalid_transport(
+            "expected accepted water time",
+            "state time plus timestep must remain finite",
+        ));
+    }
+    let time_scale = state.time.abs().max(expected_end_time.abs());
+    let roundoff_bound = 8.0 * f64::EPSILON * time_scale;
     if !input.accepted_water.accepted_time.is_finite()
-        || input.accepted_water.accepted_time <= state.time
+        || (input.accepted_water.accepted_time - expected_end_time).abs() > roundoff_bound
     {
         return Err(invalid_transport(
             "accepted water time",
-            "must be finite and after solute state time",
+            "must match solute state time plus timestep within roundoff",
         ));
     }
     if !input.timestep.is_finite() || input.timestep <= 0.0 {
@@ -803,6 +867,127 @@ fn validate_transport_input(
                 ));
             }
         }
+    }
+    Ok(())
+}
+
+fn species_storage(
+    concentrations: &[f64],
+    kinetic_sorbed: &[f64],
+    species: usize,
+    mesh: &Mesh1D,
+    config: &SoluteConfig,
+    input: SoluteTransportInput<'_>,
+    process_input: Option<SoluteProcessInput<'_>>,
+) -> Result<f64, SoluteStepError> {
+    let nodes = mesh.coordinates().len();
+    let offset = species * nodes;
+    let mut total = 0.0;
+    for node in 0..nodes {
+        let density = process_input.map_or(0.0, |process| process.bulk_density[node]);
+        let concentration = concentrations[offset + node];
+        let equilibrium = equilibrium_sorption_value(
+            &config.species[species].equilibrium_sorption,
+            concentration,
+        )?
+        .0;
+        let mass_per_volume = input.accepted_water.water_contents[node] * concentration
+            + density * (equilibrium + kinetic_sorbed[offset + node]);
+        total += control_volume_width(mesh.coordinates(), node) * mass_per_volume;
+    }
+    if total.is_finite() {
+        Ok(total)
+    } else {
+        Err(invalid_transport(
+            "species storage",
+            "integrated storage must remain finite",
+        ))
+    }
+}
+
+fn update_step_balances(
+    state: &SoluteState,
+    workspace: &mut SoluteWorkspace,
+    mesh: &Mesh1D,
+    config: &SoluteConfig,
+    input: SoluteTransportInput<'_>,
+    process_input: Option<SoluteProcessInput<'_>>,
+) -> Result<(), SoluteStepError> {
+    let has_concentration_boundary = matches!(
+        config.boundaries.lower,
+        SoluteBoundaryMode::Concentration { .. }
+    ) || matches!(
+        config.boundaries.upper,
+        SoluteBoundaryMode::Concentration { .. }
+    );
+    let prescribed_boundary = [config.boundaries.lower, config.boundaries.upper]
+        .iter()
+        .map(|boundary| match boundary {
+            SoluteBoundaryMode::TotalFlux { flux } => flux * input.timestep,
+            SoluteBoundaryMode::Concentration { .. } => 0.0,
+        })
+        .sum::<f64>();
+
+    for species in 0..config.species.len() {
+        let storage_after = species_storage(
+            &workspace.trial_concentrations,
+            &workspace.trial_kinetic_sorbed,
+            species,
+            mesh,
+            config,
+            input,
+            process_input,
+        )?;
+        let storage_change = storage_after - workspace.storage_before[species];
+        let reaction_change = workspace.trial_accounting.cumulative_reaction_mass[species]
+            - state.accounting.cumulative_reaction_mass[species];
+        // Configured total-solute flux is already positive inward at either
+        // endpoint, so sum those values directly. The water face snapshot uses
+        // +x signs for advection and does not change this solute-boundary mode.
+        // Concentration rows provide no measured solute flux; infer their net
+        // exchange from the solved discrete balance after known fluxes.
+        let concentration_exchange = if has_concentration_boundary {
+            storage_change - reaction_change - prescribed_boundary
+        } else {
+            0.0
+        };
+        let boundary_exchange = prescribed_boundary + concentration_exchange;
+        let absolute_residual = (storage_change - boundary_exchange - reaction_change).abs();
+        let denominator = storage_change.abs() + boundary_exchange.abs() + reaction_change.abs();
+        let normalized_residual = if denominator == 0.0 {
+            absolute_residual
+        } else {
+            absolute_residual / denominator
+        };
+        if ![
+            storage_change,
+            reaction_change,
+            boundary_exchange,
+            absolute_residual,
+            normalized_residual,
+        ]
+        .iter()
+        .all(|value| value.is_finite())
+        {
+            return Err(invalid_transport(
+                "species balance",
+                "balance terms must remain finite",
+            ));
+        }
+        workspace.trial_accounting.cumulative_boundary_mass[species] += boundary_exchange;
+        if !workspace.trial_accounting.cumulative_boundary_mass[species].is_finite() {
+            return Err(invalid_transport(
+                "boundary accounting",
+                "cumulative boundary mass must remain finite",
+            ));
+        }
+        workspace.trial_accounting.last_step[species] = SoluteSpeciesBalance {
+            storage_change,
+            boundary_exchange,
+            reaction_change,
+            absolute_residual,
+            normalized_residual,
+        };
     }
     Ok(())
 }
