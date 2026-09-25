@@ -20,8 +20,9 @@ pub use hydraulics::{
 pub use lower_boundary::{LowerBoundaryMode, UnsupportedLowerBoundaryMode};
 pub use root_uptake::{feddes_reduction, RootUptakeInput, RootUptakeModel};
 pub use solute::{
-    DeferredSoluteFeature, EquilibriumSorption, KineticSorption, SoluteBoundaries,
-    SoluteBoundaryMode, SoluteConfig, SoluteSpecies, SoluteUnits,
+    DeferredSoluteFeature, EquilibriumSorption, KineticSorption, SoluteAccounting,
+    SoluteBoundaries, SoluteBoundaryMode, SoluteConfig, SoluteSpecies, SoluteState, SoluteUnits,
+    SoluteWorkspace,
 };
 pub use water_solver::{
     advance_water_step, WaterBalance, WaterProductConfig, WaterStepInput, WaterStepPolicy,
