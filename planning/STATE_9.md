@@ -1,7 +1,7 @@
 # State — Orchestration 9: Phase 4 atmospheric remediation and completion
 
 Plan status: **approved by the user on 2026-09-24.**
-Execution status: **Waves 1–5 complete.**
+Execution status: **Waves 1–7 complete.**
 Plan: [EXECUTION_PLAN_9.md](EXECUTION_PLAN_9.md); worker prompt: [PROMPT_TEMPLATE_9.md](PROMPT_TEMPLATE_9.md).
 Diagnosis: [ATMOSPHERIC_NONCONVERGENCE_FINDINGS.md](ATMOSPHERIC_NONCONVERGENCE_FINDINGS.md).
 Historical blocker: [STATE_8.md](STATE_8.md), task 8.2.1.
@@ -25,10 +25,31 @@ Scientific baseline: **unavailable.** No Fortran executable, calibrated toleranc
 | 3 | 9.3.1 | Feddes stress and compensation | done | committed |
 | 4 | 9.4.1 | Four first-water acceptance fixtures | done | committed |
 | 5 | 9.5.1 | Phase 4 evidence and Phase 5 handoff | done | committed |
+| 6 | 9.6.1 | Consolidate lower-boundary mode dispatch | done | 2751218 |
+| 7 | 9.7.1 | Add isolated atmospheric row/flux consistency cases | done | 39b2e78 |
 
 ## Task reports
 
 <!-- Append each accepted worker report here, at most 15 lines per task. -->
+
+## 9.6.1 — Consolidate lower-boundary mode dispatch
+
+- Status: complete; private preparation seam reviewed and committed as `2751218`.
+- Changed `lower_boundary.rs`, `water_solver.rs`, and `tasks/9.6.1.todo.md`; public API and tests unchanged.
+- `LowerBoundaryMode::prepare` validates once and returns a plan; each trial prepares condition, exchange flux, and row strategy for solver consumption.
+- Fixed-head caller row/exchange, prescribed-flux signs, free-drainage averaging/sign, mesh validation, and typed unsupported errors are preserved.
+- `cargo test -p hydrus-core --test lower_boundary`: 5 passed; `cargo test -p hydrus-core --test water_solver`: 10 passed.
+- Wave gate `cargo test --workspace`: all passed (88 integration tests); fmt, warning-denied Clippy, and `git diff --check` passed.
+- No deviations or new dependent-task gotchas.
+
+## 9.7.1 — Add isolated atmospheric row/flux consistency cases
+
+- Status: complete; test changes reviewed and committed as `39b2e78`.
+- Added separate demand-limited `AtmosphericFlux` and accepted `PondedHead` row/flux tests in `tests/atmospheric.rs`.
+- Tests assert accepted mode/state, signed soil and external fluxes, top head, discrete top-face flux expression, and balance closure.
+- `cargo test -p hydrus-core --test atmospheric`: 11 passed, 0 failed.
+- Final wave gate `cargo test --workspace`: all passed; `cargo fmt --check`, warning-denied workspace Clippy, and `git diff --check` passed.
+- No production changes, deviations, or new gotchas.
 
 ## 9.1.1 — Atmospheric active-set and balance remediation
 
@@ -98,3 +119,5 @@ Scientific baseline: **unavailable.** No Fortran executable, calibrated toleranc
 
 - 9.2.1 scope amended after the first plan review found `WaterStepInput` has no explicit physical lower-mode selector. The task now includes the existing struct-literal test call sites that must retain behavior after the new field is added. No implementation changes were made during the blocked attempt.
 - 9.3.1 scope amended at plan review because trial-dependent uptake requires an optional root input and workspace-owned trial-sink storage. The task now includes `water_state.rs` and all existing `WaterStepInput` test call sites; no implementation changes were made before approval.
+- Code-review follow-up approved by the user on 2026-09-24 after review of `7dbc60c...HEAD`: add dedicated atmospheric upper flux/head consistency tests for the missing 9.1.1 acceptance criterion, and consolidate repeated lower-boundary mode dispatch as a user-selected cleanup of a judgment-call smell. No implementation changes are included in this amendment.
+- Follow-up baseline at `a7377c9` passed; Waves 6–7 completed in commits `2751218` and `39b2e78` with all wave gates passing.
