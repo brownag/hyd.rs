@@ -1,7 +1,7 @@
 # State — Orchestration 10: M5 single-domain solute transport
 
 Plan status: **approved by the user on 2026-09-24.**
-Execution status: **Waves 1–2 complete; Waves 3–6 pending.**
+Execution status: **Waves 1–3 complete; Waves 4–6 pending.**
 Plan: [EXECUTION_PLAN_10.md](EXECUTION_PLAN_10.md); worker prompt: [PROMPT_TEMPLATE_10.md](PROMPT_TEMPLATE_10.md).
 
 ## Baseline checklist
@@ -20,7 +20,7 @@ Plan: [EXECUTION_PLAN_10.md](EXECUTION_PLAN_10.md); worker prompt: [PROMPT_TEMPL
 |---|---|---|---|---|
 | 1 | 10.1.1 | Validated solute capability contract | done | pending |
 | 2 | 10.2.1 | Transactional state/workspace | done | pending |
-| 3 | 10.3.1 | Advection/dispersion and boundary solve | pending | — |
+| 3 | 10.3.1 | Advection/dispersion and boundary solve | done | pending |
 | 4 | 10.4.1 | Species reaction, sorption and transfer | pending | — |
 | 5 | 10.5.1 | Solute balance and acceptance fixtures | pending | — |
 | 6 | 10.6.1 | M5 evidence and handoff | pending | — |
@@ -45,6 +45,14 @@ Plan: [EXECUTION_PLAN_10.md](EXECUTION_PLAN_10.md); worker prompt: [PROMPT_TEMPL
 - **Deviations:** none; accounting vector copies were changed to preallocated slices after review to avoid trial-time allocation.
 - **Gotcha:** 10.4/10.5 must define signs and update semantics for cumulative per-species boundary and reaction mass.
 
+## 10.3.1
+- **Status:** done; implicit finite-volume dissolved transport uses accepted water snapshots and preallocated tridiagonal buffers.
+- **Files:** `solute.rs`, `lib.rs`, new `tests/solute_transport.rs`, `tasks/10.3.1.todo.md`.
+- **Tests:** `cargo test -p hydrus-core --test solute_transport` — 5 passed, 0 failed; `cargo test --workspace` — 100 passed, 0 failed.
+- **Gates:** `cargo fmt --check`, `cargo clippy --workspace --all-targets -- -D warnings`, and `git diff --check` passed.
+- **Deviations:** none; one initial targeted run failed on a missing test config argument and was corrected; formatting was fixed within scope.
+- **Gotcha:** accepted water faces are `node_count + 1`, lower/internal/upper, signed toward +x; prescribed solute boundary flux is positive inward at either endpoint.
+
 ## Amendments and blockers
 
-- User approved the plan on 2026-09-24. Waves 1–2 passed verification; no active blockers.
+- User approved the plan on 2026-09-24. Waves 1–3 passed verification; no active blockers.

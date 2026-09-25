@@ -4,7 +4,10 @@
 //! supply mutually compatible units for concentrations, sorbed pools, rates,
 //! and fluxes; this contract does not impose a universal physical basis.
 
-use crate::{hydraulics::Mesh1D, SoluteConfigError};
+use crate::{
+    hydraulics::{solve_tridiagonal_in_place, Mesh1D, TridiagonalError},
+    SoluteConfigError,
+};
 
 /// Explicit labels used by a solute configuration; no unit conversion is implied.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -327,6 +330,10 @@ pub struct SoluteWorkspace {
     snapshot_kinetic_sorbed: Vec<f64>,
     snapshot_accounting: SoluteAccounting,
     trial_active: bool,
+    lower: Vec<f64>,
+    diagonal: Vec<f64>,
+    upper: Vec<f64>,
+    rhs: Vec<f64>,
 }
 
 impl SoluteWorkspace {
@@ -355,6 +362,10 @@ impl SoluteWorkspace {
             snapshot_kinetic_sorbed: vec![0.0; pool_len],
             snapshot_accounting: zero_accounting(species_count),
             trial_active: false,
+            lower: vec![0.0; node_count],
+            diagonal: vec![0.0; node_count],
+            upper: vec![0.0; node_count],
+            rhs: vec![0.0; node_count],
         })
     }
 
@@ -525,4 +536,259 @@ fn validate_accounting(
         "trial reaction accounting",
         &accounting.cumulative_reaction_mass,
     )
+}
+
+/// Borrowed accepted water values used to couple one solute step.
+#[derive(Clone, Copy, Debug)]
+pub struct AcceptedWaterSnapshot<'a> {
+    pub accepted_time: f64,
+    pub water_contents: &'a [f64],
+    /// `node_count + 1` fluxes: lower boundary, internal faces, upper boundary.
+    /// All entries are signed positive toward increasing mesh coordinates.
+    pub face_fluxes: &'a [f64],
+}
+
+/// Inputs held fixed while solving one dissolved transport step.
+#[derive(Clone, Copy, Debug)]
+pub struct SoluteTransportInput<'a> {
+    pub accepted_water: AcceptedWaterSnapshot<'a>,
+    /// Effective dispersion coefficient at each interior face, length `node_count - 1`.
+    pub face_dispersion: &'a [f64],
+    pub timestep: f64,
+    pub minimum_pivot: f64,
+}
+
+/// Errors returned by a dissolved-solute transport step.
+#[derive(Clone, Debug, PartialEq)]
+pub enum SoluteStepError {
+    Configuration(SoluteConfigError),
+    Linear(TridiagonalError),
+}
+
+impl core::fmt::Display for SoluteStepError {
+    fn fmt(&self, formatter: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            Self::Configuration(error) => error.fmt(formatter),
+            Self::Linear(error) => error.fmt(formatter),
+        }
+    }
+}
+
+impl std::error::Error for SoluteStepError {}
+
+impl From<SoluteConfigError> for SoluteStepError {
+    fn from(error: SoluteConfigError) -> Self {
+        Self::Configuration(error)
+    }
+}
+
+impl From<TridiagonalError> for SoluteStepError {
+    fn from(error: TridiagonalError) -> Self {
+        Self::Linear(error)
+    }
+}
+
+/// Advances dissolved concentrations by one implicit conservative transport step.
+/// Internal advection fluxes are upwinded, while dispersion uses adjacent-face
+/// concentration differences. No water quantity is reconstructed or mutated.
+pub fn advance_solute_step(
+    state: &mut SoluteState,
+    workspace: &mut SoluteWorkspace,
+    mesh: &Mesh1D,
+    config: &SoluteConfig,
+    input: SoluteTransportInput<'_>,
+) -> Result<(), SoluteStepError> {
+    let species_count = config.species.len();
+    validate_transport_input(state, workspace, mesh, config, input)?;
+
+    workspace.begin_trial(state)?;
+    let solve_result = (|| {
+        for species in 0..species_count {
+            assemble_and_solve_species(state, workspace, mesh, config, input, species)?;
+        }
+        validate_solute_values("trial concentrations", &workspace.trial_concentrations)?;
+        workspace.accept_trial(state, input.accepted_water.accepted_time)?;
+        Ok(())
+    })();
+    if solve_result.is_err() {
+        workspace.reject_trial();
+    }
+    solve_result
+}
+
+fn validate_transport_input(
+    state: &SoluteState,
+    workspace: &SoluteWorkspace,
+    mesh: &Mesh1D,
+    config: &SoluteConfig,
+    input: SoluteTransportInput<'_>,
+) -> Result<(), SoluteStepError> {
+    let node_count = mesh.coordinates().len();
+    let species_count = config.species.len();
+    if node_count < 2 {
+        return Err(invalid_transport("mesh", "at least two nodes are required"));
+    }
+    if state.node_count != node_count || state.species_count != species_count {
+        return Err(invalid_transport(
+            "state dimensions",
+            "do not match mesh/config",
+        ));
+    }
+    workspace.validate_state_dimensions(state)?;
+    if input.accepted_water.water_contents.len() != node_count {
+        return Err(invalid_transport(
+            "water contents",
+            "length must equal mesh node count",
+        ));
+    }
+    let expected_flux_count = node_count
+        .checked_add(1)
+        .ok_or_else(|| invalid_transport("face fluxes", "expected length overflows usize"))?;
+    if input.accepted_water.face_fluxes.len() != expected_flux_count {
+        return Err(invalid_transport(
+            "face fluxes",
+            "length must equal node_count + 1",
+        ));
+    }
+    if input.face_dispersion.len() != node_count - 1 {
+        return Err(invalid_transport(
+            "face dispersion",
+            "length must equal node_count - 1",
+        ));
+    }
+    if !input.accepted_water.accepted_time.is_finite()
+        || input.accepted_water.accepted_time <= state.time
+    {
+        return Err(invalid_transport(
+            "accepted water time",
+            "must be finite and after solute state time",
+        ));
+    }
+    if !input.timestep.is_finite() || input.timestep <= 0.0 {
+        return Err(invalid_transport("timestep", "must be finite and positive"));
+    }
+    if !input.minimum_pivot.is_finite() || input.minimum_pivot <= 0.0 {
+        return Err(invalid_transport(
+            "minimum pivot",
+            "must be finite and positive",
+        ));
+    }
+    validate_solute_values(
+        "accepted water contents",
+        input.accepted_water.water_contents,
+    )?;
+    if input
+        .accepted_water
+        .water_contents
+        .iter()
+        .any(|theta| *theta <= 0.0)
+    {
+        return Err(invalid_transport("water contents", "must be positive"));
+    }
+    validate_solute_values(
+        "accepted water face fluxes",
+        input.accepted_water.face_fluxes,
+    )?;
+    validate_solute_values("face dispersion", input.face_dispersion)?;
+    if input.face_dispersion.iter().any(|value| *value < 0.0) {
+        return Err(invalid_transport("face dispersion", "must be nonnegative"));
+    }
+    for boundary in [config.boundaries.upper, config.boundaries.lower] {
+        if let SoluteBoundaryMode::Concentration { value } = boundary {
+            if value < 0.0 {
+                return Err(invalid_transport(
+                    "boundary concentration",
+                    "must be nonnegative",
+                ));
+            }
+        }
+    }
+    Ok(())
+}
+
+fn assemble_and_solve_species(
+    state: &SoluteState,
+    workspace: &mut SoluteWorkspace,
+    mesh: &Mesh1D,
+    config: &SoluteConfig,
+    input: SoluteTransportInput<'_>,
+    species: usize,
+) -> Result<(), SoluteStepError> {
+    let count = workspace.node_count;
+    let offset = species * count;
+    workspace.lower.fill(0.0);
+    workspace.diagonal.fill(0.0);
+    workspace.upper.fill(0.0);
+    workspace.rhs.fill(0.0);
+
+    let coordinates = mesh.coordinates();
+    for node in 0..count {
+        let width = if node == 0 {
+            (coordinates[1] - coordinates[0]) / 2.0
+        } else if node + 1 == count {
+            (coordinates[count - 1] - coordinates[count - 2]) / 2.0
+        } else {
+            (coordinates[node + 1] - coordinates[node - 1]) / 2.0
+        };
+        let storage = input.accepted_water.water_contents[node] * width / input.timestep;
+        workspace.diagonal[node] = storage;
+        workspace.rhs[node] = storage * state.concentrations[offset + node];
+    }
+
+    // Face k joins nodes k-1 and k; its positive water-flux direction is +x.
+    for face in 1..count {
+        let left = face - 1;
+        let right = face;
+        let spacing = coordinates[right] - coordinates[left];
+        let theta_face = (input.accepted_water.water_contents[left]
+            + input.accepted_water.water_contents[right])
+            / 2.0;
+        let dispersive = theta_face * input.face_dispersion[left] / spacing;
+        let water_flux = input.accepted_water.face_fluxes[face];
+        let left_coefficient = water_flux.max(0.0) + dispersive;
+        let right_coefficient = water_flux.min(0.0) - dispersive;
+        workspace.diagonal[left] += left_coefficient;
+        workspace.upper[left] += right_coefficient;
+        workspace.lower[right] -= left_coefficient;
+        workspace.diagonal[right] -= right_coefficient;
+    }
+
+    match config.boundaries.lower {
+        SoluteBoundaryMode::Concentration { value } => {
+            workspace.diagonal[0] = 1.0;
+            workspace.upper[0] = 0.0;
+            workspace.rhs[0] = value;
+        }
+        SoluteBoundaryMode::TotalFlux { flux } => workspace.rhs[0] += flux,
+    }
+    let upper_node = count - 1;
+    match config.boundaries.upper {
+        SoluteBoundaryMode::Concentration { value } => {
+            workspace.lower[upper_node] = 0.0;
+            workspace.diagonal[upper_node] = 1.0;
+            workspace.rhs[upper_node] = value;
+        }
+        // The configured flux is positive into the domain. In +x coordinates
+        // this is a negative flux at the upper endpoint, hence +flux on RHS.
+        SoluteBoundaryMode::TotalFlux { flux } => workspace.rhs[upper_node] += flux,
+    }
+
+    validate_solute_values("assembled transport coefficients", &workspace.lower)?;
+    validate_solute_values("assembled transport coefficients", &workspace.diagonal)?;
+    validate_solute_values("assembled transport coefficients", &workspace.upper)?;
+    validate_solute_values("assembled transport rhs", &workspace.rhs)?;
+    solve_tridiagonal_in_place(
+        &workspace.lower,
+        &mut workspace.diagonal,
+        &workspace.upper,
+        &mut workspace.rhs,
+        input.minimum_pivot,
+    )?;
+    validate_solute_values("solved concentrations", &workspace.rhs)?;
+    workspace.trial_concentrations[offset..offset + count].copy_from_slice(&workspace.rhs);
+    Ok(())
+}
+
+fn invalid_transport(name: &'static str, reason: &'static str) -> SoluteStepError {
+    SoluteConfigError::Invalid { name, reason }.into()
 }
