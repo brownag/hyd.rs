@@ -133,6 +133,105 @@ fn assert_close(actual: f64, expected: f64) {
 }
 
 #[test]
+fn isolated_atmospheric_flux_row_accepts_demand_limited_flux() {
+    let mesh = Mesh1D::new(vec![0.0, 1.0, 2.0], vec![0; 3], None, 1, 0, 0.0).unwrap();
+    let model = LinearModel;
+    let materials: [&dyn HydraulicModel; 1] = [&model];
+    let sink = [0.0; 3];
+    let mut input = setup(&mesh, &materials, &sink);
+    no_flow_lower(&mut input, 0.0);
+    input.timestep = 1.0;
+    input.target_time = 1.0;
+    input.upper_condition = BoundaryCondition::Dirichlet { value: 0.1 };
+    let mut state = WaterState::new(0.0, vec![0.0; 3], vec![0.2; 3]).unwrap();
+    let mut workspace =
+        WaterWorkspace::with_transition_capacity(3, policy().max_iterations).unwrap();
+
+    let report = advance_atmospheric_step(
+        &mut state,
+        &mut workspace,
+        input,
+        policy(),
+        &constant_schedule(0.01, 0.0),
+    )
+    .unwrap();
+
+    assert_eq!(
+        state.atmospheric().upper_mode,
+        UpperBoundaryMode::AtmosphericFlux
+    );
+    assert!(state.heads()[2] <= 0.1);
+    assert_close(state.atmospheric().ponded_depth, 0.0);
+    assert_close(report.balance.soil_boundary_flux, 0.01);
+    assert_close(report.balance.atmospheric_exchange, 0.01);
+    assert_close(report.balance.boundary_flux, 0.01);
+    assert_close(report.balance.storage_change, report.balance.boundary_flux);
+    assert!(report.balance.absolute_residual < 1e-9, "{report:?}");
+}
+
+#[test]
+fn isolated_ponded_head_row_matches_discrete_top_flux_and_balance() {
+    let mesh = Mesh1D::new(vec![0.0, 1.0, 2.0], vec![0; 3], None, 1, 0, 0.0).unwrap();
+    let model = LinearModel;
+    let materials: [&dyn HydraulicModel; 1] = [&model];
+    let sink = [0.0; 3];
+    let mut input = setup(&mesh, &materials, &sink);
+    no_flow_lower(&mut input, 0.0);
+    input.timestep = 1.0;
+    input.target_time = 1.0;
+    input.upper_condition = BoundaryCondition::Dirichlet { value: 0.1 };
+    let mut state = WaterState::new(0.0, vec![0.0; 3], vec![0.2; 3]).unwrap();
+    let old_top_water = state.water_contents()[2];
+    let mut workspace =
+        WaterWorkspace::with_transition_capacity(3, policy().max_iterations).unwrap();
+
+    let report = advance_atmospheric_step(
+        &mut state,
+        &mut workspace,
+        input,
+        policy(),
+        &constant_schedule(1.0, 0.0),
+    )
+    .unwrap();
+
+    assert_eq!(
+        state.atmospheric().upper_mode,
+        UpperBoundaryMode::PondedHead
+    );
+    assert_close(state.heads()[2], 0.1);
+
+    // This is the discrete top-face flux expression used by the solver:
+    // K_face * (head gradient + gravity) plus half-cell storage and sink terms.
+    let top = state.heads().len() - 1;
+    let previous = top - 1;
+    let dx = mesh.coordinates()[top] - mesh.coordinates()[previous];
+    let conductivity = 0.5
+        * (model.conductivity(state.heads()[top]).unwrap()
+            + model.conductivity(state.heads()[previous]).unwrap());
+    let timestep = 1.0;
+    let storage_flux =
+        (model.theta(state.heads()[top]).unwrap() - old_top_water) * dx / (2.0 * timestep);
+    let sink_flux = sink[top] * dx / 2.0;
+    let discrete_top_flux = conductivity
+        * ((state.heads()[top] - state.heads()[previous]) / dx + mesh.inclination_cosine())
+        + storage_flux
+        + sink_flux;
+    assert_close(
+        report.balance.soil_boundary_flux,
+        discrete_top_flux * timestep,
+    );
+
+    assert_close(report.balance.atmospheric_exchange, 1.0);
+    assert_close(report.balance.boundary_flux, 1.0);
+    assert!(report.balance.surface_storage_change > 0.0);
+    assert_close(
+        report.balance.soil_storage_change + report.balance.surface_storage_change,
+        report.balance.boundary_flux,
+    );
+    assert!(report.balance.absolute_residual < 1e-9, "{report:?}");
+}
+
+#[test]
 fn accepted_rain_infiltrates_then_excess_builds_ponded_storage() {
     let mesh = Mesh1D::new(vec![0.0, 1.0, 2.0], vec![0; 3], None, 1, 0, 0.0).unwrap();
     let model = LinearModel;
