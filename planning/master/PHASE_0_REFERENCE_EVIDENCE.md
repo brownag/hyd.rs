@@ -38,6 +38,6 @@ Artifact notice/licensing and redistribution approval remain unreviewed. The sup
 
 ## Phase 1 handoff
 
-Phase 1 is still unplanned. Its plan may use this completed Phase 0 provenance process and the Phase 1 entry evidence named in the [sequential master plan](../HYDRUS1D_RUST_PORT_PLAN.md#sequential-phase-plan): Phase 0 provenance plus the curve source anchors. The next plan's scope is limited to the hydraulic foundation—`iModel=0` van Genuchten values, derivatives, domains, and table behavior—and its required exit evidence is pointwise/property evidence, invalid-selector behavior, and a decision on the next hydraulic family or table scope.
+At the time of this handoff, Phase 1 was unplanned. Its plan was to use this completed Phase 0 provenance process and the Phase 1 entry evidence named in the [sequential master plan](../HYDRUS1D_RUST_PORT_PLAN.md#sequential-phase-plan): Phase 0 provenance plus the curve source anchors. This historical note does not describe the current next step, which is recorded in the master plan.
 
 Before implementation, that future plan should consult the specified [feature matrix](FEATURE_MATRIX.md), [numerical design](NUMERICAL_DESIGN.md), and [validation strategy](VALIDATION_STRATEGY.md), recover or state the relevant source anchors, and establish its own acceptance checks. This handoff does not create a Phase 1 execution plan or promote the smoke outputs to a Phase 1 fixture.

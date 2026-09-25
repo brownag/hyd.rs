@@ -7,35 +7,33 @@ This roadmap organizes future implementation waves. It authorizes no Rust implem
 ```text
 M0 provenance + oracle bootstrap ──┐
                                   v
-M1 hydraulic curves/tables ──> M2 mesh + source stencil ──> M3 water solver
-                                  |                         |
-                                  └─────────────────────────v
-                         M4 atmosphere + roots + first water acceptance
+M1 hydraulics -> M2 mesh/stencil -> M3 water solver -> M4 water acceptance
                                   |
-          ┌───────────────────────┼───────────────────────┐
-          v                       v                       v
- M5 solute transport       M6 heat/vapor             M7 hysteresis
-          └──────────────┬────────┴──────────────┬────────┘
-                         v                       v
-                 M8 dual porosity         M9 optional branches/hosts
-                         \                       /
-                          v                     v
-                         M10 I/O, polish, benchmark and release gate
+                                  ├──> M5 solute -> M5-V scientific comparison -> M6 heat
+                                  ├──> M7 hysteresis
+                                  └──> M8 dual porosity
+                                               \       |       /
+                                                v      v      v
+                                         M9 optional branches/hosts
+                                                    |
+                                                    v
+                                         M10 integration/release gate
 ```
 
-M0 establishes a minimally patched, provenance-recorded oracle and fixture process; it is blocked by the known MSFLIB/integer-logical syntax issues until a separate portability task resolves them. M1 depends on source/feature audit and produces curve contracts. M2 depends on M1 and reconciles `Reset`'s observed stencil with manual terminology. M3 depends on M2 and provides Picard, tridiagonal solve, retry, and balance behavior. M4 depends on M3 plus minimal legacy forcing/input adapters and is the first accepted milestone. M5 and M6 require accepted water state and coupling contracts; M7 requires accepted water plus history rollback. M8 requires validated single-domain state and explicit mobile/immobile exchange. M9 is gated independently per optional capability. M10 depends on the selected supported set and validation evidence.
+Phase 0's pinned-source staging/build process and noncanonical smoke are complete; the initial syntax blockers are resolved in the isolated compatibility patch. That smoke proves runner/provenance mechanics only. No canonical scientific solute fixture, expected solute outputs, or calibrated tolerance has been reviewed. M1 depends on source/feature audit and produces curve contracts. M2 depends on M1 and reconciles `Reset`'s observed stencil with manual terminology. M3 depends on M2 and provides Picard, tridiagonal solve, retry, and balance behavior. M4 depends on M3 plus minimal legacy forcing/input adapters and is the first accepted milestone. M5 implementation and contract evidence exist, but its scientific-comparison gate (M5-V) remains open and is the next planning priority; plan it before Phase 6 heat/temperature work and before relying on M10 for scientific validation. M6 requires accepted water state and heat coupling contracts; M7 requires accepted water plus history rollback. M8 requires validated single-domain state and explicit mobile/immobile exchange. M9 is gated independently per optional capability. M10 depends on the selected supported set and reviewed validation evidence.
 
 ## Phase checklists
 
 | Milestone / original phase mapping | Entry evidence | Checklist and exit evidence |
 |---|---|---|
-| M0 / Phase 0 | Source hashes, audit, portability owner | Isolated oracle copy; patch/hash/toolchain manifest; canonical fixture provenance; outputs and failure markers; no claimed numerical pass until reviewed. |
+| M0 / Phase 0 | Source hashes, audit, portability owner | Isolated oracle copy; patch/hash/toolchain manifest; reviewed noncanonical smoke and run policy. Case-specific scientific fixture/output provenance is tracked at each physics gate, including M5-V; smoke is not a numerical pass. |
 | M1 / Phase 1 | `MATERIAL` and `GenMat` anchors | Implement candidate hydraulic families, derivatives, domains and tables; pointwise/unit checks; explicit unsupported selectors; curve evidence. |
 | M2 / Phase 2 | Mesh and stencil reconciliation decision | Mesh/layer/inclination metrics, one-to-zero index conversion, half-cell boundary algebra, layered/refinement fixtures; reviewed matrix coefficients. |
 | M3 / Phase 3 | M1/M2 contracts and solver diagnostics | Picard loop, reusable tridiagonal kernel, pivot policy, adaptive `dt`, rollback, water balances; dry infiltration/capillary checks and oracle comparison when available. |
 | M4 / Phase 4 | M3 accepted water behavior | Atmospheric event alignment; minimum hydraulic model `iModel=0` van Genuchten; upper atmospheric precipitation/evaporation with ponding and fixed-head/flux switching; lower fixed-head, prescribed-flux and free-drainage variants, with seepage/water-table combinations gated if fixture evidence is absent; Feddes/S-shaped root stress and compensation behavior. Required fixtures are dry-column infiltration, cyclic atmospheric forcing with ponding/switching, and a root-stress/compensation profile with mass balance. First acceptance sign-off requires these fixtures and explicit unsupported-combination errors. Excludes solute, heat, hysteresis, dual porosity and optional chemistry. |
 | M5 / Phase 5a | M4 water state and I/O contracts | Solute advection/dispersion, species/reaction, sorption, transfer and mass balance; nonequilibrium fixture; explicit combination validation. |
-| M6 / Phase 5b | M4 and thermal evidence | Heat, temperature dependence, vapor/energy only where separately accepted; coupled fixture and energy/balance evidence. |
+| M5-V / Phase 5a follow-up | O11 M5 implementation/contract evidence and [scientific-comparison research](SCIENTIFIC_COMPARISON_RESEARCH.md) | A source-matched, provenance-reviewed solute fixture and paired reference results for the selected M5 subset; independent analytical/balance checks where applicable; field-specific tolerances reviewed. This evidence gate remains open. |
+| M6 / Phase 5b | M4, reviewed M5-V comparison handoff, and thermal evidence | Heat, temperature dependence, vapor/energy only where separately accepted; coupled fixture and energy/balance evidence. |
 | M7 / later water | M4 rollback and history contract | Lenhard hysteresis paths, reversal state, drainage/imbibition fixtures; no implication that first acceptance includes it. |
 | M8 / later coupled physics | M3/M4 state plus exchange design | Mobile/immobile water and transfer, dual-porosity balance and rollback; keep distinct from Durner bimodal retention and rejected dual permeability. |
 | M9 / optional | Capability-specific schema and fixture | Drainage, density, snow/interception, colloid/bacteria, inverse and special chemistry each require a decision, independent fixture, and typed unsupported combinations. |
@@ -43,14 +41,14 @@ M0 establishes a minimally patched, provenance-recorded oracle and fixture proce
 
 ## Future wave-plan boundaries
 
-Each future wave should contain one vertical slice with immutable source inputs, a named producer for fixtures, and a reversible acceptance gate. M0 is a provenance/oracle wave; M1–M2 are hydraulic/spatial slices; M3 is the solver slice; M4 is the first water product slice; M5–M8 are separately reviewable transport/history slices; M9 is split by optional capability; M10 is integration and host packaging. No wave may silently expand M4 scope or treat a documented branch as supported behavior.
+Each future wave should contain one vertical slice with immutable source inputs, a named producer for fixtures, and a reversible acceptance gate. M0 is a provenance/oracle wave; M1–M2 are hydraulic/spatial slices; M3 is the solver slice; M4 is the first water product slice; M5 implementation is followed by M5-V scientific comparison before Phase 6 planning; M6–M8 are separately reviewable physics slices; M9 is split by optional capability; M10 is integration and host packaging. No wave may silently expand M4 scope or treat a documented branch as supported behavior.
 
 ## Risk registry
 
 | Risk | Evidence / consequence | Mitigation and owner | Gate |
 |---|---|---|---|
 | Unverified 4.08/derivative identity | Source header and manuals disagree on release identity | Pin hashes; use “4.08 or derivative”; provenance owner | Before parity claims |
-| No numerical baseline | Syntax check fails; no golden outputs | M0 isolated patch/harness and independent checks | Before tolerance acceptance |
+| No scientific solute baseline | Phase 0 smoke is noncanonical and water-only; no reviewed solute deck/output or calibrated tolerance | Dedicated M5-V fixture recovery, reference run, paired observations, and tolerance review; owner: next orchestration | Before Phase 6 planning and M10 scientific/release evidence |
 | MSFLIB/platform extensions | `use MSFLIB`, signals, date/time, arguments | Host/runtime portability owner; preserve patch manifest | M0 |
 | Integer/logical blocker | `TIME.FOR:551` semantics unclear | Verify semantics before patch | M0 |
 | FE/manual vs FD/source stencil | `Reset` labels finite differences | Algebraic reconciliation and stencil fixture | M2 |
@@ -85,7 +83,7 @@ Each future wave should contain one vertical slice with immutable source inputs,
 | R14 | Validation component/property tests; M1/M4/M5. |
 | R15 | Confirmed M4 first gate and M5/M6/M7/M8 later sequence. |
 | R16 | Feature matrix and M9 optional capability gates; no silent omission. |
-| R17 | This roadmap phase mapping and API/validation sections; M0/M4/M10. |
+| R17 | This roadmap phase mapping and API/validation sections; M0/M4/M5-V/M10. |
 | R18 | Master synthesis destination; supporting design documents provide inputs. |
 | R19 | This orchestration remains planning-only and seeds later waves. |
 | R20 | Decision register below and bounded worker policy in execution plan. |
@@ -106,7 +104,7 @@ Atomic prompt traceability:
 | Verification 3.1: dry infiltration, capillary rise, cyclic atmosphere, solute, and heat scenarios | `VALIDATION_STRATEGY.md` fixture matrix; M4–M6, with missing decks recorded. |
 | Verification 3.2: L-infinity/L2 metrics, tolerances, precision drift and mass balance | validation tolerance policy plus numerical precision section; M0/M3. |
 | Verification 3.3: curve derivatives, root uptake properties and conservation tests | validation component/property tests; M1/M4/M5. |
-| Roadmap Phase 0: harness and ground-truth baseline | M0, blocked until portability patch and provenance review. |
+| Roadmap Phase 0: harness and ground-truth baseline | M0 portability patch and provenance review are complete; scientific fixture/output provenance remains per-physics work, with M5 solute comparison assigned to M5-V. |
 | Roadmap Phase 1: soil physics and hydraulic curves | M1, minimum `iModel=0`, later families gated. |
 | Roadmap Phase 2: mesh/profile/spatial discretization | M2, source stencil reconciliation. |
 | Roadmap Phase 3: Richards/Picard/adaptive water solver and balance | M3, strict retry/rollback contract. |

@@ -69,6 +69,8 @@ M5 reaches its planned implementation and contract-evidence endpoint for the sel
 
 The largest evidence limits are absent manual decks/outputs and reference-executable results; caller-declared rather than universally fixed unit bases; and a concentration-boundary exchange inferred from the same closure equation. Interval accounting now takes caller-owned start-of-interval water contents and the accepted end snapshot explicitly; start-water values are dimension, finiteness, and positivity checked before trial mutation, and are contractually associated with the current solute-state time. Test tolerances are invariant-check thresholds, not calibrated physical tolerances. The nonlinear solver's caller-selected tolerance is not calibrated. The source snapshot's lineage and release compatibility remain unverified.
 
+The M5 scientific-comparison gate is still open. Per the [comparison research](SCIENTIFIC_COMPARISON_RESEARCH.md), Orchestration 12 is reserved for fixture selection/recovery, solute reference-run support, paired observables, and tolerance review. This is the next planning session before Phase 6 heat/temperature work; it does not upgrade the current M5 contract evidence. Phase 0's noncanonical smoke output is not a solute oracle.
+
 The next physics milestones remain distinct and are not authorized by this evidence:
 
 - **M6 heat/vapor:** requires a separate temperature/energy and, if approved, vapor coupling order, supported-feature contract, energy/water balance evidence, rollback, and fixture provenance.
