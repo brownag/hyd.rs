@@ -15,6 +15,7 @@ Paste the matching task specification from `EXECUTION_PLAN_12.md` verbatim.
 - If a test fails twice for the same reason, stop and report rather than retrying again.
 - Preserve the distinction between pinned-source parity, analytical/physical validation, text-layout compatibility, and release compatibility. Do not promote derived or noncanonical fixtures into manual reproduction claims.
 - Do not edit immutable `src_reference/` files or the committed compatibility patch.
+- For task 12.2.1 amendment C, preserve the prior failed-run audit trail and obey its one-run stop rule. Read `planning/master/TEXT_FIXTURE_FORMAT_RESEARCH.md` before writing the revised micro-plan.
 
 ## Analysis
 

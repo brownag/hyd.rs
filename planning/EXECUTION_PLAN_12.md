@@ -1,7 +1,7 @@
 # Orchestration 12 — M5 scientific-comparison catch-up
 
-Status: **draft; implementation has not started.**
-Authority: the updated sequential master plan and [scientific-comparison research](master/SCIENTIFIC_COMPARISON_RESEARCH.md).
+Status: **approved; Wave 2 accepted after amendment C; Wave 3 ready.**
+Authority: the updated sequential master plan, [scientific-comparison research](master/SCIENTIFIC_COMPARISON_RESEARCH.md), and [text-fixture format audit](master/TEXT_FIXTURE_FORMAT_RESEARCH.md).
 
 ## Goal and scope
 
@@ -20,7 +20,7 @@ This catch-up is placed after Orchestration 11 and before Phase 6 heat/temperatu
 ## Reconnaissance and baseline
 
 - Current root: `/home/andrew/AI/hyd.rs`; prior plan: Orchestration 11, all implementation waves complete.
-- `planning/master/PHASE_0_REFERENCE_EVIDENCE.md` records a working patched GNU Fortran/Linux build and a noncanonical water smoke only. `tools/run_fortran_reference.py` currently exposes `--smoke` only.
+- `planning/master/PHASE_0_REFERENCE_EVIDENCE.md` records a working patched GNU Fortran/Linux build and a noncanonical water smoke. Wave 2 added a fixture-specific `--case` runner mode and focused tests; amendment C resolved profile parsing and produced verified solute outputs. Scientific comparison remains the work of Waves 3–4.
 - `planning/master/PHASE_5_SOLUTE_EVIDENCE.md` records constructed contract fixtures, no manual solute deck or expected output, and no calibrated tolerance or parity evidence.
 - At plan drafting, the latest serial workspace gates are green: `cargo test --workspace` — 112 tests, 0 failures; `cargo fmt --check`, `cargo clippy --workspace --all-targets -- -D warnings`, and `git diff --check` passed. Re-run and record the baseline before Wave 1; stop on unrelated failures.
 - No `AGENTS.md` applies within this repository. Do not change the immutable `src_reference/` snapshot or the Fortran portability patch.
@@ -57,6 +57,28 @@ Waves are serial because each consumes the preceding fixture/output artifact. Wo
 - **Spec:** Extend the isolated runner with a fixture-specific solute mode, retaining immutable staging, fresh input/output directories, timeout, captured logs, output completeness checks, hashes, and the existing smoke command unchanged. Record required solute output files and semantic completion markers only after verifying actual outputs. Keep raw generated outputs under `.development/12.2.1/`; do not commit them or source-derived golden data unless the repo's artifact review supports retaining them.
 - **Do not touch:** `src_reference/`, compatibility patch, Rust solver, non-solute smoke behavior, dependencies, unrelated tools.
 - **Acceptance:** `python3 -m unittest tools.test_run_fortran_reference` passes; the fixture-specific command `python3 tools/run_fortran_reference.py --case reference/fortran_reference/solute/example3 --timeout-seconds 60` completes and records a manifest with source, patch, executable, compiler, platform, input/output hashes, status, markers and warnings. If the case does not execute solute outputs, stop and document the blocker without treating water output as a pass.
+
+#### 12.2.1 scope amendment A — selector record alignment
+
+- **Reason:** The first two fixture executions failed in `BasInf` while parsing `SELECTOR.IN`, before solute execution. Source inspection indicates the basic-information reader consumes two records before its heading and units; the derived selector may be missing one descriptive record.
+- **Allowed correction:** Edit only `reference/fortran_reference/solute/example3/SELECTOR.IN` record layout and the corresponding format/provenance description in that fixture's `CASE.json` and `README.md`. Keep all model values, flags, units, and scientific choices frozen. No runner or model changes are allowed under this amendment.
+- **Retry:** One mid-tier worker retry is allowed after its revised TODO is reviewed and approved. Rerun the selector parse check and focused runner tests, then the fixture command once. If it fails at a new or repeated blocker, stop and document; do not launch another correction attempt without a new orchestrator decision.
+
+#### 12.2.1 scope amendment B — profile record layout
+
+- **Reason:** Amendment A cleared `BasInf`; its single retry then failed in `NodInf` while reading `PROFILE.DAT`. Source inspection shows `NodInf` reads the file version, a record count, skips that many descriptive records, then reads the node header and immediately expects node records. The fixture has an extra column-label record after the node header, which is not consumed by this reader.
+- **Orchestrator decision:** Permit one orchestrator-owned format correction and one fixture execution. This does not reopen worker retries.
+- **Allowed correction:** Remove only the non-input column-label record after the node header. Do not change the record count, node values, material assignments, species concentrations, selector settings, runner, or scientific choices. Update format provenance in `CASE.json`/`README.md` and the run record.
+- **Stop rule:** Run JSON validation and focused runner tests, then execute the fixture command once. If it fails, stop and mark Wave 2 blocked; no further correction attempts under amendment B. Its one run failed at `INPUT.FOR:251` with end-of-file while reading `Profile.dat`. The later user-requested amendment C is a new decision based on a source audit.
+
+#### 12.2.1 scope amendment C — equilibrium initial-profile mode
+
+- **Authority and diagnosis:** The user's new amendment request follows the primary-source audit in `planning/master/TEXT_FIXTURE_FORMAT_RESEARCH.md`. `BasInf` reads `lEquil=f` from the current `SELECTOR.IN`; `NodInf` runs before `ChemIn` and therefore requests 16 values per node (including three initial sorbed values), while every current `PROFILE.DAT` row has 13. This explains the recorded EOF at `INPUT.FOR:251`. The fixture declares all-equilibrium sorption (`Fraction=1`, immobile water `0`) and zero initial dissolved/sorbed pools.
+- **Chosen correction:** Set the initial `lEquil` selector flag to `t` so `NodInf` reads the existing 13-value rows. This is the source-compatible derived-case choice; do not add sorbed columns or alter any node, material, concentration, hydraulic, reaction, boundary, time, or unit value. Update the `CASE.json`/fixture `README.md` format and mode provenance to state why the initial selector flag is true and that `ChemIn` later derives its own equilibrium mode. Keep the case labeled derived, not a recovered manual deck.
+- **Files in scope:** **Must edit:** `reference/fortran_reference/solute/example3/SELECTOR.IN`, `CASE.json`, `README.md`, `RUN.md`, `planning/tasks/12.2.1.todo.md`, and the task report in `planning/STATE_12.md`. **Can edit:** `tools/test_run_fortran_reference.py` only to add a focused fixture-layout check for the selected `lEquil` branch, node count, per-row width, and required conditional inputs. **Read only:** `PROFILE.DAT`, `LEVEL_01.DIR`, `tools/run_fortran_reference.py`, `src_reference/`, and the portability patch. Scratch remains `.development/12.2.1/`.
+- **Preflight:** Before execution, check the exact selector flag position, 1001 profile rows of 13 numeric fields, `NumNP=1001`, `NS=3`, `NObs=0`, and the source conditions that make `ATMOSPH.IN`, `Meteo.in`, and `Mater.in` unnecessary. Note that `LEVEL_01.DIR` is not consumed when the runner passes the data-path argument. Compare staged source/patch and record the known final `lFlux`/`lDualNEq` argument-order mismatch; both flags are false in this case, so it is a separate audit caveat.
+- **Execution gate:** Because earlier small-model and mid-tier retries are exhausted, assign this evidence-backed correction to one frontier-capable worker with a fresh micro-plan and orchestrator approval. The worker runs `python3 -m json.tool reference/fortran_reference/solute/example3/CASE.json`, `python3 -m unittest tools.test_run_fortran_reference`, and exactly one fresh `python3 tools/run_fortran_reference.py --case reference/fortran_reference/solute/example3 --timeout-seconds 60` after preflight. The orchestrator reviews the one-flag diff, source mapping, manifest, and actual solute files before accepting Wave 2.
+- **Stop and acceptance:** If the run fails or lacks per-species solute output/completion markers, record the exact blocker and stop; no further fixture retry is authorized by this amendment. Wave 3 remains blocked until the run manifest contains verified solute outputs and all provenance/hashes required by the original 12.2.1 acceptance.
 
 ### 12.3.1 — Parse and compare Rust/reference observables
 

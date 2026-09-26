@@ -1,12 +1,13 @@
 Pcp_File_Version=4
 *** BLOCK A: BASIC INFORMATION *****************************************
 Derived executable mapping of HYDRUS 1D 4.08 manual Example 3.
+Source-matched derived comparison fixture; not a recovered manual deck.
 LUnit TUnit MUnit
 cm
 hours
 mmol
 lWat lChem lTemp lSink lRoot lShort lWDep lScreen lVariabBC lEquil
-t t f f f f f f f f
+t t f f f f f f f t
 lSnow lHP1 lMeteo lVapor lActiveU lFluxes
 f f f f f f
 NMat NLay CosAlpha

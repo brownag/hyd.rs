@@ -2,7 +2,6 @@ Pcp_File_Version=4
 1
 Derived saturated steady-flow profile; see CASE.json and README.md
 1001 0 3
-n x h Mat Lay Beta Axz Bxz Dxz Temp NH4 NO2 NO3
 1 -0.00 0 1 1 0 1 1 1 20 0 0 0
 2 -0.25 0 1 1 0 1 1 1 20 0 0 0
 3 -0.50 0 1 1 0 1 1 1 20 0 0 0

@@ -13,6 +13,27 @@ input bundle. `PROFILE.DAT` lists the inlet/top first, then nodes toward the
 outlet; normalize its reversed native coordinate to flow distance as described
 in `CASE.json`.
 
+The second descriptive record after `Pcp_File_Version=4` in `SELECTOR.IN` is
+authored format text. The pinned `BasInf` reader skips two records after the
+version before reading a heading and the unit records; this record keeps those
+fields aligned. It changes no model setting or scientific value.
+
+`PROFILE.DAT` places node rows immediately after its `NumNP/ii/NS` header.
+The pinned `NodInf` reader consumes no column-label line between that header
+and the node records; the descriptive labels used while authoring this fixture
+are therefore omitted from the executable file. Node rows and values are
+unchanged.
+
+The initial `lEquil` flag is true (the tenth basic-information flag in
+`SELECTOR.IN`). `NodInf` runs before `ChemIn` and uses this initial flag to
+select 13 numeric fields per node: ten node/temperature fields and three
+dissolved concentrations, with no explicit sorbed columns. The initial pools
+remain zero. `ChemIn` later derives its own equilibrium mode from the material
+coefficients (`Fraction=1`, immobile water `0`). This is a source-compatible
+format choice for this derived fixture, not a recovered manual-deck setting.
+See `INPUT.FOR:31–32,248–252,1332–1339` and
+`HYDRUS.FOR:196–199,271–277` in the pinned source.
+
 The manual's retardation factors map to linear equilibrium sorption using
 `R = 1 + rho_b Kd / theta`. With derived `theta=0.43` and `rho_b=0.8 g/cm3`,
 `Kd=0.5375 cm3/g` gives `R=2` for NH4 and zero Kd gives `R=1` for NO2/NO3.

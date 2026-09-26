@@ -84,7 +84,10 @@
     "print_interval_hours": {"value": 50.0, "provenance": "derived to coincide with manual observation times"}
   },
   "fortran_input_settings": {
+    "initial_profile_equilibrium_mode": {"value": true, "provenance": "Derived source-compatible record-layout choice: BasInf reads the tenth basic-information flag as lEquil. NodInf runs before ChemIn and, with lChem=true and NS=3, lEquil=true selects 13 numeric fields per node (10 node/temperature fields plus 3 dissolved concentrations), omitting explicit sorbed columns. Zero initial equilibrium sorbed pools follow from zero dissolved concentrations. ChemIn later derives its own equilibrium mode from Fraction=1 and ImmobileWaterContent=0; this flag is not evidence of a recovered manual deck. Source: INPUT.FOR:31-32,248-252,1332-1339; HYDRUS.FOR:196-199,271-277."},
+    "profile_node_header_record_layout": {"value": "After the version and one counted descriptive record, NodInf reads the NumNP/ii/NS record, then reads node rows immediately; this fixture omits a non-input column-label line there.", "provenance": "src_reference/INPUT.FOR NodInf record reads and repository smoke PROFILE.DAT; format provenance only"},
     "selector_version": {"value": 4, "provenance": "derived file-format choice supported by pinned INPUT.FOR"},
+    "selector_basic_information_record_layout": {"value": "After the version record, the pinned BasInf reader skips two descriptive records, reads a heading record, skips the unit heading record, then reads length, time, and mass unit records. The second descriptive record is an authored format description.", "provenance": "src_reference/INPUT.FOR BasInf record reads and the repository smoke SELECTOR.IN layout; format provenance only"},
     "declared_mass_unit_label": {"value": "mmol", "provenance": "derived display label copied from repository smoke input; normalized concentrations remain dimensionless"},
     "vertical_cosine": {"value": 1.0, "provenance": "derived vertical-column orientation"},
     "water_solver_max_iterations": {"value": 20, "provenance": "derived numerical setting"},
