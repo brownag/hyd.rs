@@ -1,6 +1,6 @@
 # Orchestration 12 — M5 scientific-comparison catch-up
 
-Status: **Approved; Waves 1–3 accepted; Wave 4 ready for mapping review and comparison.**
+Status: **Approved; Waves 1–3 accepted; Wave 4 blocked by unsupported outlet equation; Wave 5 pending.**
 Authority: the updated sequential master plan, [scientific-comparison research](master/SCIENTIFIC_COMPARISON_RESEARCH.md), and [text-fixture format audit](master/TEXT_FIXTURE_FORMAT_RESEARCH.md).
 
 ## Goal and scope
@@ -121,6 +121,10 @@ Waves are serial because each consumes the preceding fixture/output artifact. Wo
 - **Spec:** Add strict parsing for only the verified fixture output records; normalize species, units, signs, coordinates, and times. Run the matching Rust fixture with the same initial pools and water history. Compare dissolved profiles, applicable supported pools, integrated inventories, boundary terms and independently recomputed species balances at common points/times. Preserve raw values and emit residual summaries; compare manual Example 3 with an independent analytical result only if the frozen fixture maps to that equation. Do not infer or hard-code a tolerance from Rust output itself.
 - **Do not touch:** public solver API, water solver, reference source/patch, dependencies, unrelated parsers or tests.
 - **Acceptance:** `cargo test -p hydrus-core --test solute_fixture_parity` and `python3 tools/compare_solute_reference.py reference/fortran_reference/solute/example3` pass schema/shape/unit/sign checks and produce a residual report. A numeric mismatch is evidence to report, not permission to weaken checks. If no independent/reference values are available, report the precise blocker and leave this task incomplete.
+
+#### 12.4.1 resumed mapping finding — 2026-09-26
+
+The per-species configuration repair is accepted, but the frozen outlet remains unsupported. For `kBotCh=-1` and outward native water flux, `SOLUTE.FOR:810–819` imposes `-C(1)+C(2)=0`; boundary accounting uses the solved endpoint concentration times water flux (`64–67,214–217`). Rust's existing concentration and prescribed-total-flux modes cannot express that zero-gradient equation with solution-dependent outflow. A zero scalar flux or reference-fed scalar would change the problem. The mapping gate therefore stops pairing; task 12.4.1 and dependent 12.5.1 remain incomplete. See the fixture README and current state report for observations and remaining mapping limits. A separately scoped outlet implementation and accounting amendment is required before resuming comparison; no fixture or solver edits are included in this diagnostic task.
 
 #### 12.4.1 historical finding — formerly 12.3.1, recorded in `e54e10f`
 

@@ -62,18 +62,41 @@ accepts a validated endpoint pair for each configured species, while
 `SoluteConfig::new` retains shared-pair broadcast behavior. The contract tests
 cover species-specific concentration values and coupled-chain accounting.
 
-That API repair does not implement the fixture's third-type top boundary
-(`kTopCh=-1`) or establish that either supported Rust boundary mode represents
-its outlet equation. The derived record's 0.43 cm/hour Darcy flux remains a
-setup target, not a verified species boundary-mass-flux observation. Task
-12.4.1 must still verify outlet equivalence, water history, species order,
-signs, units, realized transport coefficients, and spatial/time mapping. Do
-not substitute zero outgoing solute flux, use oracle-fed forcing, or describe
-the result as paired parity. No paired Rust run, residual report, or scientific
-parity claim is established here; any unresolved equation mapping remains an
-explicit blocker. Numeric reference extraction, if needed for diagnosis,
-belongs in `.development/12.4.1/`; do not commit source-derived golden arrays
-or infer tolerances from Rust output.
+That API repair does not implement the frozen third-type outflow law. In pinned
+`SOLUTE.FOR`, `MatSet` handles `kBotCh=-1` at the first endpoint (lines
+810–819): when `vN(1)<=0`, it writes `D(1)=-1`, `E(1)=1`, `F(1)=0`, the
+zero-gradient matrix row. Boundary accounting at lines 64–67 and 214–217
+computes advective solute flux from the solved endpoint concentration and water
+velocity when that boundary is outflow. These are parts of one direction-
+dependent outflow condition, not a prescribed zero solute flux. Rust's
+unchanged `SoluteBoundaryMode` in `solute.rs:60–68` and
+`apply_endpoint_boundary_rows` at `solute.rs:1268–1292` provide prescribed
+concentration or scalar total flux; neither expresses this zero-gradient row
+with concentration-dependent outflow accounting. Feeding a measured reference
+flux into `TotalFlux` would use the oracle as forcing, not establish
+independent boundary parity.
+
+Pinned `INPUT.FOR:253` reverses profile records into the solver arrays with
+`n=NumNP-n+1`; thus internal endpoint index 1 maps to native `x=-250`, the
+fixture's lower outlet, and index N maps to native `x=0`, its inlet. The
+endpoint orientation is consistent with `kBotCh` at the outlet and `kTopCh`
+at the inlet. Read-only `NOD_INF.OUT` records show water flux
+`-0.4300 cm/hour` at printed nodes 1 (`x=-0`) and 1001 (`x=-250`) at 0, 50,
+100, and 200 h. `solute3.out` reports final `cvBot=-0.24770E-09` at 200 h
+(its header defines solute flux positive into the region). These sparse
+observations do not independently establish the complete water history or
+provide a Rust boundary input. The 0.43 cm/hour value remains a setup target,
+not a verified species boundary-mass-flux input.
+
+Task 12.4.1 stops at this gate. Do not replace the outflow law with zero total
+solute flux, use oracle-fed forcing, change the fixture or public solver API,
+or describe the result as paired parity. No Rust fixture run, parser, paired
+residual report, numeric tolerance, or scientific parity claim is established.
+Wave 4 and dependent Wave 5 remain incomplete. Any future comparison requires
+a separately scoped representation of the outlet law.
+Diagnostic numeric extraction, if later authorized, belongs in
+`.development/12.4.1/`; do not commit source-derived golden arrays or infer
+tolerances from Rust output.
 
 The input deck was executed under task 12.2.1; its provenance and observed output
 schema are recorded in `RUN.md`, with raw files kept under `.development/12.2.1/`.

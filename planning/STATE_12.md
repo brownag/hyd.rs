@@ -1,6 +1,6 @@
 # State — Orchestration 12: M5 scientific-comparison catch-up
 
-Plan status: **Approved; Waves 1–3 accepted; Wave 4 ready for mapping review and comparison.**
+Plan status: **Approved; Waves 1–3 accepted; Wave 4 blocked by unsupported outlet equation; Wave 5 pending.**
 Plan: [EXECUTION_PLAN_12.md](EXECUTION_PLAN_12.md); worker prompt: [PROMPT_TEMPLATE_12.md](PROMPT_TEMPLATE_12.md).
 
 ## Baseline checklist
@@ -19,8 +19,8 @@ Plan: [EXECUTION_PLAN_12.md](EXECUTION_PLAN_12.md); worker prompt: [PROMPT_TEMPL
 |---|---|---|---|---|
 | 1 | 12.1.1 | Complete, provenance-labeled M5 comparison fixture | done | b8dd5f3 |
 | 2 | 12.2.1 | Isolated Fortran solute run and verified output manifest | done | 05bd911 |
-| 3 | 12.3.1 | Per-species Rust boundary configuration and accounting | done | this commit |
-| 4 | 12.4.1 | Normalized observables and paired Rust/reference comparison | ready | e54e10f (historical blocker only) |
+| 3 | 12.3.1 | Per-species Rust boundary configuration and accounting | done | b8f6b4d |
+| 4 | 12.4.1 | Normalized observables and paired Rust/reference comparison | blocked | this commit (outlet audit); e54e10f (historical blocker) |
 | 5 | 12.5.1 | Reviewed tolerance decision and M5 evidence handoff | planned | — |
 
 ## Amendment resume notes
@@ -79,3 +79,14 @@ Plan: [EXECUTION_PLAN_12.md](EXECUTION_PLAN_12.md); worker prompt: [PROMPT_TEMPL
 - **Coverage:** signed distinct endpoint fluxes and independent inventories in both stepping paths; distinct concentration values/mixed modes; NH4→NO2→NO3 with direct input only to NH4, zero total reaction change, independently summed inventory delta, and positive inventory in both daughters; broadcast/explicit solver-step equivalence; malformed config and later-species failure rollback.
 - **Verification retry:** strengthened chain conservation assertions and added broadcast-versus-explicit solver-step equivalence after review; targeted suite passes. Later documentation handoff marks the historical shared-pair blocker resolved while preserving outlet/water/parity gates.
 - **Deviations:** none. Dependent 12.4.1 must still audit the frozen outlet and water/source mapping; M5-V remains open.
+
+## 12.4.1 current execution
+
+- **Status:** blocked/incomplete at the required boundary-mapping gate; Wave 4 acceptance and dependent Wave 5 remain unmet.
+- **Files:** fixture `README.md` 65–99 documents the Fortran/Rust outlet mismatch and observed limits; `tasks/12.4.1.todo.md` 19–31 records the approved, completed blocker plan.
+- **Mapping:** `INPUT.FOR:253` reverses profile records, so internal endpoint 1 is native `x=-250` outlet. `SOLUTE.FOR:810–819` imposes the `kBotCh=-1`, `vN(1)<=0` zero-gradient row; lines 64–67 and 214–217 account concentration-dependent advective outflow.
+- **Rust contract:** `solute.rs:60–68,1268–1292` offers concentration or scalar total-flux rows, not the Fortran zero-gradient row plus outflow accounting. Oracle-fed flux would not be independent parity.
+- **Observations:** `NOD_INF.OUT` prints q=-0.4300 cm/hour at native endpoints at 0/50/100/200 h; `solute3.out` final `cvBot=-0.24770E-09` at 200 h. Sparse records do not verify the complete water history.
+- **Checks:** `git diff --check -- planning/STATE_12.md planning/tasks/12.4.1.todo.md reference/fortran_reference/solute/example3/README.md` — passed; scoped diff inspected. No acceptance parser/test or Fortran execution was run.
+- **Deviations:** none. No solver/API, fixture, parser, residual, golden array, or tolerance changes; no parity claim. Future comparison needs a separately scoped representation of the outlet law.
+- **Orchestrator verification:** source/API and recorded-output findings independently checked; `cargo test --workspace` — 121 passed, 0 failed; `cargo fmt --check`, `cargo clippy --workspace --all-targets -- -D warnings`, and `git diff --check` passed. Diagnostic outcome accepted; comparison acceptance remains unmet.
