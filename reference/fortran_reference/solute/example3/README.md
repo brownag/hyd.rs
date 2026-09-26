@@ -69,7 +69,7 @@ The derived record's 0.43 cm/hour Darcy flux is a setup target, not a verified
 species boundary-mass-flux observation. It does not resolve this boundary
 mapping mismatch. No paired Rust run, residual report, or scientific parity
 claim is available for this fixture. Numeric reference extraction, if needed
-for diagnosis, belongs in `.development/12.3.1/`; do not commit source-derived
+for diagnosis, belongs in `.development/12.4.1/`; do not commit source-derived
 golden arrays or infer tolerances from Rust output. A future scope decision
 must address per-species endpoint boundary values before this comparison can
 meet its acceptance criteria. The reference run remains evidence of successful

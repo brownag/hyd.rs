@@ -1,6 +1,6 @@
 # State — Orchestration 12: M5 scientific-comparison catch-up
 
-Plan status: **approved; Wave 2 accepted; Wave 3 blocked by the Rust boundary contract.**
+Plan status: **Approved; Waves 1–2 accepted; new Wave 3 ready.**
 Plan: [EXECUTION_PLAN_12.md](EXECUTION_PLAN_12.md); worker prompt: [PROMPT_TEMPLATE_12.md](PROMPT_TEMPLATE_12.md).
 
 ## Baseline checklist
@@ -17,14 +17,22 @@ Plan: [EXECUTION_PLAN_12.md](EXECUTION_PLAN_12.md); worker prompt: [PROMPT_TEMPL
 |---|---|---|---|---|
 | 1 | 12.1.1 | Complete, provenance-labeled M5 comparison fixture | done | b8dd5f3 |
 | 2 | 12.2.1 | Isolated Fortran solute run and verified output manifest | done | 05bd911 |
-| 3 | 12.3.1 | Normalized observables and paired Rust/reference comparison | blocked | blocker recorded in this commit |
-| 4 | 12.4.1 | Reviewed tolerance decision and M5 evidence handoff | planned | — |
+| 3 | 12.3.1 | Per-species Rust boundary configuration and accounting | planned | — |
+| 4 | 12.4.1 | Normalized observables and paired Rust/reference comparison | waiting on 12.3.1 | e54e10f (blocker only) |
+| 5 | 12.5.1 | Reviewed tolerance decision and M5 evidence handoff | planned | — |
+
+## Amendment resume notes
+
+- 2026-09-26: user requested a new boundary wave. Approved amendment adds 12.3.1; original comparison 12.3.1 becomes 12.4.1 and tolerance task 12.4.1 becomes 12.5.1. Completed reference work is preserved.
+- Amendment approved by the user on 2026-09-26; execute new Wave 3 first. Wave 4 waits for its contract tests and still must verify the outlet/water mapping; Wave 5 waits for actual comparison evidence.
+- `tasks/12.4.1.todo.md` retains the completed historical diagnostic TODO, not an approved comparison implementation plan. New boundary task 12.3.1 needs its own fresh micro-plan.
+- Shared constructor broadcast compatibility is the approved default; species-indexed storage/access and accounting are required. No solver implementation has been performed by this amendment.
 
 ## Task reports
 
 <!-- Append each accepted worker report here, at most 15 lines per task. -->
 
-## 12.3.1
+## 12.4.1 — historical blocked attempt (formerly 12.3.1)
 
 - **Status:** blocked; the frozen fixture cannot map to the current Rust M5 endpoint-boundary configuration, so paired acceptance is unmet.
 - **Files:** fixture `README.md` 54–80 documents the blocker; task TODO 1–14 and execution-plan finding record the scoped stop; no parser, Rust test, normalized oracle, or residual artifact was added.
@@ -32,11 +40,11 @@ Plan: [EXECUTION_PLAN_12.md](EXECUTION_PLAN_12.md); worker prompt: [PROMPT_TEMPL
 - **Consequence:** one shared concentration or total-flux scalar cannot express the frozen species-specific inlet; separate runs would remove chain coupling. The fixture's 0.43 cm/hour Darcy value is a target, not a verified species mass-flux observation.
 - **Checks:** `git diff --check` — passed. Fortran was not rerun; Rust parity test and comparator were not run because no matching Rust boundary input is representable.
 - **Orchestrator gates:** `cargo test --workspace` — 112 passed, 0 failed; `cargo fmt --check`, `cargo clippy --workspace --all-targets -- -D warnings`, and `git diff --check` passed.
-- **Deviations:** acceptance is blocked by the existing API and task scope forbids public solver API changes. No numeric tolerance or source-derived golden arrays were created; dependent 12.4.1 remains unmet.
+- **Deviations:** acceptance is blocked by the existing API and task scope forbids public solver API changes. No numeric tolerance or source-derived golden arrays were created; dependent 12.5.1 remains unmet.
 
 ## 12.2.1
 
-- **Status:** accepted by orchestrator after amendment C. Exactly one fresh run exited 0 and produced complete per-species outputs through 200 h; Wave 3 may proceed.
+- **Status:** accepted by orchestrator after amendment C. Exactly one fresh run exited 0 and produced complete per-species outputs through 200 h; the reference prerequisite for comparison (now Wave 4) is satisfied.
 - **Files:** amendment C changes `SELECTOR.IN` 10; `CASE.json` 88; fixture `README.md` 27–36; `RUN.md` 1–124; focused fixture-layout test 11–41; task TODO 46–77. Existing runner and earlier amendment edits are preserved.
 - **Preflight:** selector differs from amendment B by only tenth flag `lEquil=f` to `t`; profile/path bytes and all prior scientific JSON fields unchanged; 1001 numeric 13-field rows, NS=3, NObs=0; conditional inputs source-checked; staged source matches pinned snapshot plus unchanged patch.
 - **Targeted checks:** `python3 -m json.tool reference/fortran_reference/solute/example3/CASE.json` passed; `python3 -m unittest tools.test_run_fortran_reference` passed 7/7; `git diff --check` passed.
