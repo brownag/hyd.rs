@@ -107,14 +107,33 @@ impl DeferredSoluteFeature {
 pub struct SoluteConfig {
     units: SoluteUnits,
     species: Vec<SoluteSpecies>,
-    boundaries: SoluteBoundaries,
+    boundaries: Vec<SoluteBoundaries>,
 }
 
 impl SoluteConfig {
+    /// Construct a configuration with one shared endpoint pair broadcast to every species.
     pub fn new(
         units: SoluteUnits,
         species: Vec<SoluteSpecies>,
         boundaries: SoluteBoundaries,
+        water_domain_count: usize,
+        deferred: &[DeferredSoluteFeature],
+    ) -> Result<Self, SoluteConfigError> {
+        let species_boundaries = vec![boundaries; species.len()];
+        Self::new_with_species_boundaries(
+            units,
+            species,
+            species_boundaries,
+            water_domain_count,
+            deferred,
+        )
+    }
+
+    /// Construct a configuration with one independently selected endpoint pair per species.
+    pub fn new_with_species_boundaries(
+        units: SoluteUnits,
+        species: Vec<SoluteSpecies>,
+        boundaries: Vec<SoluteBoundaries>,
         water_domain_count: usize,
         deferred: &[DeferredSoluteFeature],
     ) -> Result<Self, SoluteConfigError> {
@@ -157,6 +176,12 @@ impl SoluteConfig {
                 });
             }
         }
+        if boundaries.len() != species.len() {
+            return Err(SoluteConfigError::Invalid {
+                name: "boundary pairs",
+                reason: "one endpoint pair is required for each species",
+            });
+        }
         for item in &species {
             if item.name.trim().is_empty() {
                 return Err(SoluteConfigError::Invalid {
@@ -189,16 +214,24 @@ impl SoluteConfig {
                 }
             }
         }
-        for mode in [boundaries.upper, boundaries.lower] {
-            let value = match mode {
-                SoluteBoundaryMode::Concentration { value } => value,
-                SoluteBoundaryMode::TotalFlux { flux } => flux,
-            };
-            if !value.is_finite() {
-                return Err(SoluteConfigError::Invalid {
-                    name: "boundary",
-                    reason: "value must be finite",
-                });
+        for pair in &boundaries {
+            for mode in [pair.upper, pair.lower] {
+                let value = match mode {
+                    SoluteBoundaryMode::Concentration { value } => value,
+                    SoluteBoundaryMode::TotalFlux { flux } => flux,
+                };
+                if !value.is_finite() {
+                    return Err(SoluteConfigError::Invalid {
+                        name: "boundary",
+                        reason: "value must be finite",
+                    });
+                }
+                if matches!(mode, SoluteBoundaryMode::Concentration { .. }) && value < 0.0 {
+                    return Err(SoluteConfigError::Invalid {
+                        name: "boundary concentration",
+                        reason: "must be nonnegative",
+                    });
+                }
             }
         }
         Ok(Self {
@@ -214,8 +247,9 @@ impl SoluteConfig {
     pub fn species(&self) -> &[SoluteSpecies] {
         &self.species
     }
-    pub fn boundaries(&self) -> SoluteBoundaries {
-        self.boundaries
+    /// Endpoint pairs in configured species order.
+    pub fn boundaries(&self) -> &[SoluteBoundaries] {
+        &self.boundaries
     }
     pub fn water_domain_count(&self) -> usize {
         1
@@ -873,13 +907,15 @@ fn validate_transport_input(
         }
         None => {}
     }
-    for boundary in [config.boundaries.upper, config.boundaries.lower] {
-        if let SoluteBoundaryMode::Concentration { value } = boundary {
-            if value < 0.0 {
-                return Err(invalid_transport(
-                    "boundary concentration",
-                    "must be nonnegative",
-                ));
+    for pair in &config.boundaries {
+        for boundary in [pair.upper, pair.lower] {
+            if let SoluteBoundaryMode::Concentration { value } = boundary {
+                if value < 0.0 {
+                    return Err(invalid_transport(
+                        "boundary concentration",
+                        "must be nonnegative",
+                    ));
+                }
             }
         }
     }
@@ -928,22 +964,18 @@ fn update_step_balances(
     input: SoluteTransportInput<'_>,
     process_input: Option<SoluteProcessInput<'_>>,
 ) -> Result<(), SoluteStepError> {
-    let has_concentration_boundary = matches!(
-        config.boundaries.lower,
-        SoluteBoundaryMode::Concentration { .. }
-    ) || matches!(
-        config.boundaries.upper,
-        SoluteBoundaryMode::Concentration { .. }
-    );
-    let prescribed_boundary = [config.boundaries.lower, config.boundaries.upper]
-        .iter()
-        .map(|boundary| match boundary {
-            SoluteBoundaryMode::TotalFlux { flux } => flux * input.timestep,
-            SoluteBoundaryMode::Concentration { .. } => 0.0,
-        })
-        .sum::<f64>();
-
     for species in 0..config.species.len() {
+        let boundaries = config.boundaries[species];
+        let has_concentration_boundary =
+            matches!(boundaries.lower, SoluteBoundaryMode::Concentration { .. })
+                || matches!(boundaries.upper, SoluteBoundaryMode::Concentration { .. });
+        let prescribed_boundary = [boundaries.lower, boundaries.upper]
+            .iter()
+            .map(|boundary| match boundary {
+                SoluteBoundaryMode::TotalFlux { flux } => flux * input.timestep,
+                SoluteBoundaryMode::Concentration { .. } => 0.0,
+            })
+            .sum::<f64>();
         let storage_after = species_storage(
             &workspace.trial_concentrations,
             &workspace.trial_kinetic_sorbed,
@@ -1032,7 +1064,7 @@ fn assemble_and_solve_species(
         workspace.rhs[node] = storage * state.concentrations[offset + node];
     }
 
-    apply_endpoint_boundary_rows(workspace, config, count);
+    apply_endpoint_boundary_rows(workspace, config.boundaries[species], count);
 
     validate_solute_values("assembled transport coefficients", &workspace.lower)?;
     validate_solute_values("assembled transport coefficients", &workspace.diagonal)?;
@@ -1120,7 +1152,7 @@ fn assemble_and_solve_species_with_processes(
                     width * (old_mass / input.timestep + source - gamma * intercept);
             }
         }
-        apply_endpoint_boundary_rows(workspace, config, count);
+        apply_endpoint_boundary_rows(workspace, config.boundaries[species], count);
         validate_solute_values("reaction/sorption coefficients", &workspace.lower)?;
         validate_solute_values("reaction/sorption coefficients", &workspace.diagonal)?;
         validate_solute_values("reaction/sorption coefficients", &workspace.upper)?;
@@ -1235,10 +1267,10 @@ fn assemble_flux_operator(
 
 fn apply_endpoint_boundary_rows(
     workspace: &mut SoluteWorkspace,
-    config: &SoluteConfig,
+    boundaries: SoluteBoundaries,
     node_count: usize,
 ) {
-    match config.boundaries.lower {
+    match boundaries.lower {
         SoluteBoundaryMode::Concentration { value } => {
             workspace.diagonal[0] = 1.0;
             workspace.upper[0] = 0.0;
@@ -1247,7 +1279,7 @@ fn apply_endpoint_boundary_rows(
         SoluteBoundaryMode::TotalFlux { flux } => workspace.rhs[0] += flux,
     }
     let upper = node_count - 1;
-    match config.boundaries.upper {
+    match boundaries.upper {
         SoluteBoundaryMode::Concentration { value } => {
             workspace.lower[upper] = 0.0;
             workspace.diagonal[upper] = 1.0;

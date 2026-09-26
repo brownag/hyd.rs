@@ -64,7 +64,10 @@ fn accepts_units_species_order_sorption_and_selected_boundaries() {
     );
     assert_eq!(config.species()[0].decay_rate, 0.1);
     assert_eq!(config.water_domain_count(), 1);
-    assert_eq!(config.boundaries().lower, Boundary::TotalFlux { flux: 0.2 });
+    assert_eq!(
+        config.boundaries()[0].lower,
+        Boundary::TotalFlux { flux: 0.2 }
+    );
 }
 
 #[test]
@@ -74,7 +77,13 @@ fn rejects_empty_units_species_and_malformed_or_nonfinite_parameters() {
         sorbed_mass: "mg/kg".into(),
     };
     assert!(matches!(
-        SoluteConfig::new(units, vec![species("A", 0.0)], valid().boundaries(), 1, &[]),
+        SoluteConfig::new(
+            units,
+            vec![species("A", 0.0)],
+            valid().boundaries()[0],
+            1,
+            &[]
+        ),
         Err(SoluteConfigError::Invalid {
             name: "concentration units",
             ..
@@ -87,7 +96,7 @@ fn rejects_empty_units_species_and_malformed_or_nonfinite_parameters() {
                 sorbed_mass: "".into()
             },
             vec![species("A", 0.0)],
-            valid().boundaries(),
+            valid().boundaries()[0],
             1,
             &[]
         ),
@@ -103,7 +112,7 @@ fn rejects_empty_units_species_and_malformed_or_nonfinite_parameters() {
                 sorbed_mass: "mg/kg".into()
             },
             vec![],
-            valid().boundaries(),
+            valid().boundaries()[0],
             1,
             &[]
         ),
@@ -119,7 +128,7 @@ fn rejects_empty_units_species_and_malformed_or_nonfinite_parameters() {
                 sorbed_mass: "mg/kg".into()
             },
             vec![species("A", 0.0), species("A", 0.1)],
-            valid().boundaries(),
+            valid().boundaries()[0],
             1,
             &[]
         ),
@@ -133,7 +142,7 @@ fn rejects_empty_units_species_and_malformed_or_nonfinite_parameters() {
         SoluteConfig::new(
             valid().units().clone(),
             vec![bad.clone()],
-            valid().boundaries(),
+            valid().boundaries()[0],
             1,
             &[]
         ),
@@ -153,7 +162,7 @@ fn rejects_empty_units_species_and_malformed_or_nonfinite_parameters() {
         SoluteConfig::new(
             valid().units().clone(),
             vec![bad.clone()],
-            valid().boundaries(),
+            valid().boundaries()[0],
             1,
             &[]
         ),
@@ -171,7 +180,7 @@ fn rejects_empty_units_species_and_malformed_or_nonfinite_parameters() {
         SoluteConfig::new(
             valid().units().clone(),
             vec![bad],
-            valid().boundaries(),
+            valid().boundaries()[0],
             1,
             &[]
         ),
@@ -224,7 +233,7 @@ fn rejects_multiple_water_domains_and_every_deferred_combination_with_typed_erro
         SoluteConfig::new(
             valid().units().clone(),
             vec![species("A", 0.0)],
-            valid().boundaries(),
+            valid().boundaries()[0],
             2,
             &[]
         ),
@@ -250,7 +259,7 @@ fn rejects_multiple_water_domains_and_every_deferred_combination_with_typed_erro
                 SoluteConfig::new(
                     valid().units().clone(),
                     vec![species("A", 0.0)],
-                    valid().boundaries(),
+                    valid().boundaries()[0],
                     1,
                     &[feature]
                 ),
@@ -258,5 +267,70 @@ fn rejects_multiple_water_domains_and_every_deferred_combination_with_typed_erro
             ),
             "feature {feature:?}"
         );
+    }
+}
+
+#[test]
+fn boundary_pairs_broadcast_and_explicit_configuration_is_species_indexed() {
+    let broadcast = valid();
+    let explicit = SoluteConfig::new_with_species_boundaries(
+        broadcast.units().clone(),
+        broadcast.species().to_vec(),
+        vec![broadcast.boundaries()[0]; broadcast.species().len()],
+        1,
+        &[],
+    )
+    .unwrap();
+    assert_eq!(broadcast, explicit);
+    assert_eq!(explicit.boundaries().len(), 2);
+    assert_eq!(
+        explicit.boundaries().get(1),
+        Some(&explicit.boundaries()[0])
+    );
+}
+
+#[test]
+fn rejects_bad_boundary_pair_count_and_invalid_nonfirst_pair() {
+    let species = vec![species("A", 0.0), species("B", 0.0)];
+    let units = valid().units().clone();
+    let good = SoluteBoundaries {
+        upper: Boundary::TotalFlux { flux: 0.0 },
+        lower: Boundary::TotalFlux { flux: 0.0 },
+    };
+    for boundaries in [vec![good], vec![good, good, good]] {
+        assert!(matches!(
+            SoluteConfig::new_with_species_boundaries(
+                units.clone(),
+                species.clone(),
+                boundaries,
+                1,
+                &[]
+            ),
+            Err(SoluteConfigError::Invalid {
+                name: "boundary pairs",
+                ..
+            })
+        ));
+    }
+    for invalid in [
+        SoluteBoundaries {
+            upper: Boundary::TotalFlux { flux: f64::NAN },
+            lower: Boundary::TotalFlux { flux: 0.0 },
+        },
+        SoluteBoundaries {
+            upper: Boundary::Concentration { value: -0.1 },
+            lower: Boundary::TotalFlux { flux: 0.0 },
+        },
+    ] {
+        assert!(matches!(
+            SoluteConfig::new_with_species_boundaries(
+                units.clone(),
+                species.clone(),
+                vec![good, invalid],
+                1,
+                &[]
+            ),
+            Err(SoluteConfigError::Invalid { .. })
+        ));
     }
 }

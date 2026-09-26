@@ -51,29 +51,29 @@ transport coefficients, successful solute output, and spatial mapping before
 this fixture is used for paired comparison. The finite domain and discretization
 are derived and differ from the infinite-domain analytical formulation.
 
-## Paired Rust comparison blocker
+## Historical shared-boundary blocker and remaining comparison gates
 
-The verified Fortran run is available for read-only extraction, but the frozen
-fixture cannot be paired faithfully through the current Rust M5 boundary API.
-The input prescribes a third-type top boundary (`kTopCh=-1`) with a separate
-concentration for each species: NH4=1, NO2=0, NO3=0 (`SELECTOR.IN`, records
-56–57; the per-species `cTop(jS)` use is in `src_reference/SOLUTE.FOR`,
-`MatSet`). Rust `SoluteBoundaries` contains only one upper and one lower mode;
-each `Concentration` or `TotalFlux` mode carries one scalar shared by every
-species (`crates/hydrus-core/src/solute.rs`, `SoluteConfig` and
-`apply_endpoint_boundary_rows`). A shared concentration would inject every
-species, while a shared flux cannot express the fixture's species vector.
-Separate Rust configurations would lose the coupled ordered-chain reaction.
+The historical 12.4.1 comparison diagnosis identified that the Rust M5 API then
+stored one endpoint pair shared by every species, while the frozen input
+specifies top concentrations NH4=1, NO2=0, NO3=0 (`SELECTOR.IN`, records 56–57;
+`src_reference/SOLUTE.FOR` uses per-species `cTop(jS)`). Task 12.3.1 resolved
+that representation blocker: `SoluteConfig::new_with_species_boundaries`
+accepts a validated endpoint pair for each configured species, while
+`SoluteConfig::new` retains shared-pair broadcast behavior. The contract tests
+cover species-specific concentration values and coupled-chain accounting.
 
-The derived record's 0.43 cm/hour Darcy flux is a setup target, not a verified
-species boundary-mass-flux observation. It does not resolve this boundary
-mapping mismatch. No paired Rust run, residual report, or scientific parity
-claim is available for this fixture. Numeric reference extraction, if needed
-for diagnosis, belongs in `.development/12.4.1/`; do not commit source-derived
-golden arrays or infer tolerances from Rust output. A future scope decision
-must address per-species endpoint boundary values before this comparison can
-meet its acceptance criteria. The reference run remains evidence of successful
-Fortran execution only.
+That API repair does not implement the fixture's third-type top boundary
+(`kTopCh=-1`) or establish that either supported Rust boundary mode represents
+its outlet equation. The derived record's 0.43 cm/hour Darcy flux remains a
+setup target, not a verified species boundary-mass-flux observation. Task
+12.4.1 must still verify outlet equivalence, water history, species order,
+signs, units, realized transport coefficients, and spatial/time mapping. Do
+not substitute zero outgoing solute flux, use oracle-fed forcing, or describe
+the result as paired parity. No paired Rust run, residual report, or scientific
+parity claim is established here; any unresolved equation mapping remains an
+explicit blocker. Numeric reference extraction, if needed for diagnosis,
+belongs in `.development/12.4.1/`; do not commit source-derived golden arrays
+or infer tolerances from Rust output.
 
 The input deck was executed under task 12.2.1; its provenance and observed output
 schema are recorded in `RUN.md`, with raw files kept under `.development/12.2.1/`.

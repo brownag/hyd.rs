@@ -1,6 +1,6 @@
 # State — Orchestration 12: M5 scientific-comparison catch-up
 
-Plan status: **Approved; Waves 1–2 accepted; new Wave 3 ready.**
+Plan status: **Approved; Waves 1–3 accepted; Wave 4 ready for mapping review and comparison.**
 Plan: [EXECUTION_PLAN_12.md](EXECUTION_PLAN_12.md); worker prompt: [PROMPT_TEMPLATE_12.md](PROMPT_TEMPLATE_12.md).
 
 ## Baseline checklist
@@ -11,22 +11,24 @@ Plan: [EXECUTION_PLAN_12.md](EXECUTION_PLAN_12.md); worker prompt: [PROMPT_TEMPL
 - [x] Before Wave 1, `cargo test --workspace` passed (112 tests, 0 failures); `cargo fmt --check`, `cargo clippy --workspace --all-targets -- -D warnings`, and `git diff --check` passed serially.
 - [x] Scientific evidence remains unavailable: no approved M5 fixture, paired solute oracle output, or calibrated per-field tolerance.
 
+- [x] Wave 3 observed baseline was **114 passed** (correcting the earlier recorded 112); post-change workspace result is **121 passed**, 0 failed. Seven new regression tests were added.
+
 ## Wave board
 
 | Wave | Task | Deliverable | Status | Commit |
 |---|---|---|---|---|
 | 1 | 12.1.1 | Complete, provenance-labeled M5 comparison fixture | done | b8dd5f3 |
 | 2 | 12.2.1 | Isolated Fortran solute run and verified output manifest | done | 05bd911 |
-| 3 | 12.3.1 | Per-species Rust boundary configuration and accounting | planned | — |
-| 4 | 12.4.1 | Normalized observables and paired Rust/reference comparison | waiting on 12.3.1 | e54e10f (blocker only) |
+| 3 | 12.3.1 | Per-species Rust boundary configuration and accounting | done | this commit |
+| 4 | 12.4.1 | Normalized observables and paired Rust/reference comparison | ready | e54e10f (historical blocker only) |
 | 5 | 12.5.1 | Reviewed tolerance decision and M5 evidence handoff | planned | — |
 
 ## Amendment resume notes
 
 - 2026-09-26: user requested a new boundary wave. Approved amendment adds 12.3.1; original comparison 12.3.1 becomes 12.4.1 and tolerance task 12.4.1 becomes 12.5.1. Completed reference work is preserved.
 - Amendment approved by the user on 2026-09-26; execute new Wave 3 first. Wave 4 waits for its contract tests and still must verify the outlet/water mapping; Wave 5 waits for actual comparison evidence.
-- `tasks/12.4.1.todo.md` retains the completed historical diagnostic TODO, not an approved comparison implementation plan. New boundary task 12.3.1 needs its own fresh micro-plan.
-- Shared constructor broadcast compatibility is the approved default; species-indexed storage/access and accounting are required. No solver implementation has been performed by this amendment.
+- `tasks/12.4.1.todo.md` retains the completed historical diagnostic TODO, not an approved comparison implementation plan. The approved boundary micro-plan is recorded in `tasks/12.3.1.todo.md`.
+- Shared constructor broadcast compatibility is the approved default; species-indexed storage/access and accounting are required. Implementation accepted in task 12.3.1; see its report below.
 
 ## Task reports
 
@@ -65,3 +67,15 @@ Plan: [EXECUTION_PLAN_12.md](EXECUTION_PLAN_12.md); worker prompt: [PROMPT_TEMPL
 - **Gates:** `cargo test --workspace` — 112 passed, 0 failed; `cargo fmt --check`, `cargo clippy --workspace --all-targets -- -D warnings`, and `git diff --check` passed.
 - **Deviations:** none; no Fortran execution run in this task.
 - **Gotchas:** No original manual deck or CHAIN arrays exist in the workspace. The authored finite-domain case is explicitly derived; task 12.2.1 must verify deck execution, realized water/dispersion, boundary signs, and solute outputs before comparison.
+
+
+## 12.3.1
+
+- **Status:** accepted by orchestrator; per-species boundary blocker resolved, with outlet/water/source mapping and scientific parity still open.
+- **Files:** `solute.rs` 107–253, 959–1002, 1067, 1155, 1268–1287; `solute_contract.rs` 67, 276–336; new `solute_species_boundaries.rs` 106–327; boundary-contract text in `PHASE_5_SOLUTE_EVIDENCE.md`; fixture README historical blocker handoff; task TODO.
+- **Contract:** shared `new` broadcasts; `new_with_species_boundaries` validates exactly one pair per species, finite values, and nonnegative concentrations; `boundaries()` returns a species-ordered slice. Both assembly paths and accounting use each species pair.
+- **Targeted command:** `cargo test -p hydrus-core --test solute_species_boundaries --test solute_contract --test solute_transport --test solute_reactions --test solute_transaction --test solute_acceptance` — 31 passed, 0 failed.
+- **Orchestrator verification:** targeted suite 31/31 and `cargo test --workspace` 121/121 passed; `cargo fmt --check`, `cargo clippy --workspace --all-targets -- -D warnings`, and `git diff --check` passed serially. No Fortran execution.
+- **Coverage:** signed distinct endpoint fluxes and independent inventories in both stepping paths; distinct concentration values/mixed modes; NH4→NO2→NO3 with direct input only to NH4, zero total reaction change, independently summed inventory delta, and positive inventory in both daughters; broadcast/explicit solver-step equivalence; malformed config and later-species failure rollback.
+- **Verification retry:** strengthened chain conservation assertions and added broadcast-versus-explicit solver-step equivalence after review; targeted suite passes. Later documentation handoff marks the historical shared-pair blocker resolved while preserving outlet/water/parity gates.
+- **Deviations:** none. Dependent 12.4.1 must still audit the frozen outlet and water/source mapping; M5-V remains open.
