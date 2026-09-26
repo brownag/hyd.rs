@@ -1,6 +1,6 @@
 # State — Orchestration 12: M5 scientific-comparison catch-up
 
-Plan status: **Waves 1–5 accepted; Wave 6 ready for comparison mapping review; tolerance remains Wave 7.**
+Plan status: **Waves 1–6 accepted; Wave 7 ready for repeatability/precision characterization and tolerance review. M5-V remains open.**
 Plan: [EXECUTION_PLAN_12.md](EXECUTION_PLAN_12.md); worker prompt: [PROMPT_TEMPLATE_12.md](PROMPT_TEMPLATE_12.md).
 
 ## Baseline checklist
@@ -21,19 +21,19 @@ Plan: [EXECUTION_PLAN_12.md](EXECUTION_PLAN_12.md); worker prompt: [PROMPT_TEMPL
 | 2 | 12.2.1 | Isolated Fortran solute run and verified output manifest | done | 05bd911 |
 | 3 | 12.3.1 | Per-species Rust boundary configuration and accounting | done | b8f6b4d |
 | 4 | 12.4.1 | Reviewed outlet numerical contract and examples | done | d71b47d |
-| 5 | 12.5.1 | Outlet implementation and independent accounting | done | this commit |
-| 6 | 12.6.1 | Normalized observables and paired Rust/reference comparison | ready for mapping review | 01293ff / e54e10f (diagnostics only) |
-| 7 | 12.7.1 | Reviewed tolerance decision and M5 evidence handoff | pending 12.6.1 | — |
+| 5 | 12.5.1 | Outlet implementation and independent accounting | done | 80f9d81 |
+| 6 | 12.6.1 | Normalized observables and paired Rust/reference comparison | done (diagnostic comparison) | this commit |
+| 7 | 12.7.1 | Reviewed tolerance decision and M5 evidence handoff | ready | — |
 
 ## Current outlet amendment resume notes
 
 - 2026-09-26: user requested two proposed outlet waves in Orchestration 12. Approved amendment adds 12.4.1 numerical contract and 12.5.1 implementation; comparison moves to 12.6.1, tolerance review to 12.7.1. Tasks 12.4.1 and 12.5.1 are accepted.
-- User approved the amendment on 2026-09-26, including outflow-only behavior with typed inward-flow rejection and zero-flow support. Wave 5 implements the accepted contract; run Wave 6 mapping review next.
+- User approved the amendment on 2026-09-26, including outflow-only behavior with typed inward-flow rejection and zero-flow support. Waves 5–6 implement and compare the accepted contract; run Wave 7 next.
 - `tasks/12.6.1.todo.md` preserves both diagnostic micro-plans; old IDs in those records and reports below are historical aliases. The old completed TODO is not the new 12.4.1 plan. New workers create new 12.4.1/12.5.1 TODOs and obey the plan gate.
 - Prior scratch `.development/12.3.1/` and `.development/12.4.1/` stays intact; design scratch is `.development/12.4.1/outlet-contract/`, implementation `.development/12.5.1/`, comparison `.development/12.6.1/`.
 - Current amendment baseline: 121 Rust tests and 7 runner tests passed; format, Clippy, and diff checks passed. No Fortran execution. Prior baseline entries and accepted reports below are retained as historical records.
 - Independent spec and standards reviews passed without substantive findings; structural/history and diff checks passed. User approval of the plan and outflow-only scope is recorded; Waves 4–5 have completed.
-- Outlet implementation is accepted; full water history, inlet/source coefficient mapping, spatial/temporal discretization differences, comparison, and tolerances remain later gates. The amendment does not mark M5-V complete.
+- Outlet implementation and diagnostic comparison are accepted. Source-reconstructed steady water, inlet forcing, and coefficient mapping are documented; spatial/temporal differences are measured. Repeatability, precision sensitivity, and defensible tolerances remain Wave 7 gates. The amendment does not mark M5-V complete.
 
 ## Historical boundary amendment resume notes
 
@@ -117,6 +117,20 @@ The following notes retain the numbering used by the earlier amendment; current 
 - **Coverage:** signed distinct endpoint fluxes and independent inventories in both stepping paths; distinct concentration values/mixed modes; NH4→NO2→NO3 with direct input only to NH4, zero total reaction change, independently summed inventory delta, and positive inventory in both daughters; broadcast/explicit solver-step equivalence; malformed config and later-species failure rollback.
 - **Verification retry:** strengthened chain conservation assertions and added broadcast-versus-explicit solver-step equivalence after review; targeted suite passes. Later documentation handoff marks the historical shared-pair blocker resolved while preserving outlet/water/parity gates.
 - **Deviations:** none. Dependent 12.4.1 must still audit the frozen outlet and water/source mapping; M5-V remains open.
+
+## 12.6.1 — approved mapping audit and diagnostic pairing
+
+- **Status:** mapping audit and scratch-only diagnostic paired comparison complete; no tolerance or scientific acceptance claim.
+- **Files:** fixture README mapping/pairing record; `tasks/12.6.1.todo.md`; new `crates/hydrus-core/tests/solute_fixture_parity.rs`; new `tools/compare_solute_reference.py`.
+- **Mapping:** stationary saturated theta `0.43`, q `-0.43`, inlet total flux `[0.43,0,0]`, D `0.18`, rho/Kd/rates map from CASE/source; intermediate interior water is source-reconstructed, not directly logged each step.
+- **Reference:** strict parser verifies current fixture input and consumed output hashes against RUN.md, 2000 RUN/T_LEVEL rows, four complete 1001-node profiles, solute records and balance blocks.
+- **Inventory:** printed Sorb is inactive nonequilibrium storage; equilibrium pool derived as `Kd*C`; profile total uses `theta*C + rho*Kd*C`. `cvCh0/cvCh1` are independently reported cumulative source integrals; no reaction inference from closure.
+- **Artifacts:** Rust observations, normalized reference, and residual report are scratch-only at `.development/12.6.1/{rust-observations,normalized-reference,residual-report}.json`.
+- **Residuals:** maximum absolute concentration residual ranges `0.00164`–`0.0432`; Rust-minus-reference total profile inventory ranges approximately `-0.00506`–`0.0117` over species/times. No threshold assigned.
+- **Checks:** targeted Rust integration test passed 1/1; exact-default comparator passed; parser negatives and per-species balance regression passed (12 checks total), including nonfinite Rust time and duplicate-time mutation of the complete reference profile; Python compilation and `git diff --check` passed. Orchestrator owns global workspace suites.
+- **Limits:** outlet rows/quadrature remain expected discrete differences; no Fortran run, solver/API change, committed oracle arrays, or commit. Numerical tolerance/artifact review remain open.
+
+- **Orchestrator acceptance:** source/input mapping and hashes independently reviewed; targeted integration 1/1, comparator, 12 self-checks, workspace Rust 130/130, Python 13/13, fmt, Clippy and diff checks passed. One verification retry fixed species balance reporting; refreshed comparator checks pass. No Fortran run.
 
 ## 12.6.1 — historical outlet audit (recorded as 12.4.1 in 01293ff)
 

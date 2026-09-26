@@ -109,3 +109,95 @@ amendment moves comparison to **12.6.1** and tolerance review to **12.7.1**,
 inserting **12.4.1** for outlet numerical design and **12.5.1** for implementation.
 The earlier audit remains historical evidence; no outlet repair or comparison
 has executed under this amendment. See [the current plan](../../../../planning/EXECUTION_PLAN_12.md).
+
+## Wave 6 mapping audit (2026-09-26)
+
+The accepted Rust outlet mode is physically mapped to the frozen lower outlet:
+with the source-reconstructed water flux `q=-0.43 cm/hour` and endpoint 1 at
+the bottom, it applies zero dispersive boundary flux and concentration-dependent
+advective export. The Fortran lower equality row and its `epsi=0.5` old/new
+boundary quadrature differ from Rust's finite-volume row and backward-Euler
+accounting. The accepted outlet contract deliberately retains these methods;
+record their effect in residuals and do not treat discrete identity as a gate.
+
+The water forcing is reconstructible as a steady state from the frozen inputs
+and pinned source. The 1001-node initial profile has `h=0` throughout, the
+homogeneous material has `theta_s=Ks=0.43`, gravity cosine is 1, both water
+boundaries are fixed at `h=0`, and sinks are disabled. In `WATFLOW.FOR`,
+`Reset` uses equal neighboring conductivities (zero interior gravity RHS) and
+zero storage change; `Veloc` then gives the same `q=-Ks=-0.43` at every node
+and face. This is an exact discrete stationary solution for every interval,
+not a claim that the interior state was printed at every step. Recorded output
+corroborates it: `RUN_INF.OUT` has 2000 steps at `dt=0.1` through 200 h;
+`T_LEVEL.OUT` has 2000 rows with both endpoint fluxes `-0.43` and constant
+volume 107.5; `NOD_INF.OUT` has all 1001 nodes at 0, 50, 100, and 200 h, with
+`h=0`, `theta=K=0.43`, and flux `-0.43`. The `RUN_INF.OUT`, `T_LEVEL.OUT`,
+`NOD_INF.OUT`, `BALANCE.OUT`, and three `soluteN.out` files match their hashes
+in `RUN.md`. Spatial output precision is limited to the printed fields; the
+intermediate interior history is established from the input/source invariant
+and checked by the full-profile snapshots, not directly logged per step.
+
+The species order and inlet forcing also map without oracle-fed values. The
+source input sets `cTop=[1,0,0]` for NH4/NO2/NO3 and applies `kTopCh=-1`.
+At the upper endpoint the source retains its transport row and adds the
+incoming advective term `-q*cTop`; with `q=-0.43`, the inward species fluxes
+are `[0.43,0,0]`. Configure Rust's per-species `TotalFlux` with those values,
+derived only from the water invariant and input concentrations. This is not a
+reference-measured solute flux. The source and Rust spatial endpoint equations
+remain different discrete forms and should be reported with the residuals.
+
+Reaction and dispersion coefficients map to the selected Rust M5 processes.
+With `Fraction=1`, `ImmobileWaterContent=0`, linear `Beta=1`, and no nonlinear
+or optional process switches, `R=1+rho*Kd/theta`: `rho=0.8`, `Kd=0.5375`,
+`theta=0.43` gives NH4 `R=2`, while zero Kd gives NO2/NO3 `R=1`. For each
+species, source `GamL1` and `GamS1` both equal its chain rate (`0.005`, `0.1`,
+`0` per hour), so the source term transfers the same rate of total dissolved
+plus equilibrium-sorbed mass to the next species, as Rust's ordered chain
+does. Source dispersion is `alpha*abs(q)/theta + Dw*TauW`; with alpha `0.18`,
+`abs(q)/theta=1`, `Dw=0`, tortuosity off, and upstream weighting on, it maps
+to effective `D=0.18 cm2/hour` without the disabled correction terms.
+
+The mapping audit established sufficient independent physical inputs for
+measurement; expected outlet/spatial/time-quadrature differences remain
+residual sources, not equivalence claims. Raw and normalized outputs remain in
+`.development/12.6.1/` unless artifact review authorizes committing them.
+
+## Wave 6 scratch paired comparison
+
+The approved diagnostic pairing is implemented by
+`crates/hydrus-core/tests/solute_fixture_parity.rs` and
+`tools/compare_solute_reference.py`. The ordinary targeted test emits Rust
+profiles and independently integrated accounting to
+`.development/12.6.1/rust-observations.json`; the comparator verifies the
+current fixture inputs and every consumed raw output hash against `RUN.md`,
+then writes `normalized-reference.json` and `residual-report.json` in the same
+scratch directory. The parser validates `RUN_INF.OUT` and `T_LEVEL.OUT` at all
+2000 steps and checks the four complete water/solute profiles.
+For each Rust species, the comparator re-integrates the concentration profile,
+checks the emitted inventory and cumulative balance residual within a bound
+derived only from floating-point summation and JSON serialization precision,
+and independently recomputes the cumulative balance from boundary and process
+terms.
+
+`OUTPUT.FOR` prints `Conc` and source `Sorb` separately. In this fixture the
+printed `Sorb` fields are inactive nonequilibrium pools, all zero; they are
+retained as such in normalized data. Equilibrium sorption is independently
+derived as `Kd*C`, and total profile inventory is integrated as
+`theta*C + rho*Kd*C`, matching the case's total-water-plus-sorbed storage.
+`soluteN.out` cumulative `cvCh0`/`cvCh1` columns are `CumCh(3/4)`, accumulated
+from the trapezoidal `q0/q1` source integrals in `SOLUTE.FOR`; the comparator
+reports them separately from profile-derived inventory and `BALANCE.OUT`.
+
+The exact commands passed are
+`cargo test -p hydrus-core --test solute_fixture_parity`,
+`python3 tools/compare_solute_reference.py reference/fortran_reference/solute/example3`,
+`python3 tools/compare_solute_reference.py --self-test` (11 parser negatives plus a per-species balance regression),
+`python3 -m py_compile tools/compare_solute_reference.py`, and `git diff --check`.
+The report assigns no tolerance. Across the 50/100/200 h samples, maximum
+absolute dissolved-profile residuals range from `0.00164` (NO2) to `0.0432`
+(NH4); endpoint and row/quadrature differences remain measurable. Rust-minus-
+reference profile-integrated total-inventory differences range from about
+`-0.00506` to `0.0117` across species and times. These are diagnostic residuals,
+not pass/fail limits or a claim of manual/analytical validation. Review of the
+scratch artifacts and selection of any numerical acceptance tolerance remain
+outside this task.

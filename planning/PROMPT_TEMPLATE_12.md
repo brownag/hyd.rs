@@ -19,7 +19,7 @@ Paste the matching task specification from `EXECUTION_PLAN_12.md` verbatim.
 
 ## Current outlet amendment: numbering and scope
 
-- The user approved the outlet amendment on 2026-09-26 in STATE/EXECUTION_PLAN. Waves 4–5 are accepted; Wave 6 is the next executable wave and its worker still requires micro-plan approval.
+- The user approved the outlet amendment on 2026-09-26 in STATE/EXECUTION_PLAN. Waves 4–6 are accepted; Wave 7 is the next executable wave and its worker still requires micro-plan approval. Wave 7 permits bounded isolated characterization runs under its explicit task spec.
 - Preserve accepted 12.1.1/12.2.1/12.3.1. New 12.4.1 derives the outlet numerical contract; new 12.5.1 implements it; 12.6.1 is comparison; 12.7.1 is tolerance/evidence review.
 - The historical comparison TODO is now `tasks/12.6.1.todo.md`. Old IDs and completed checkboxes in its preserved audit do not approve the new tasks or complete comparison. Create fresh 12.4.1 and 12.5.1 micro-plans; append a fresh 12.6.1 plan only after dependencies pass.
 - 12.4.1 may create only its design note, independent Python numerical checker, and TODO, plus own STATE report. No Rust changes. Its scratch is `.development/12.4.1/outlet-contract/`; preserve prior diagnostic scratch. Orchestrator reviews the derivation and exact examples before accepting its design.

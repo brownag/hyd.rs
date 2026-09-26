@@ -1,6 +1,6 @@
 # Orchestration 12 — M5 scientific-comparison catch-up
 
-Status: **Waves 1–5 accepted; Wave 6 ready for comparison mapping review; tolerance remains Wave 7.**
+Status: **Waves 1–6 accepted; Wave 7 ready for repeatability/precision characterization and tolerance review. M5-V remains open.**
 Authority: the updated sequential master plan, [scientific-comparison research](master/SCIENTIFIC_COMPARISON_RESEARCH.md), and [text-fixture format audit](master/TEXT_FIXTURE_FORMAT_RESEARCH.md).
 
 ## Goal and scope
@@ -205,6 +205,9 @@ The per-species configuration repair is accepted, but the frozen outlet remains 
 - **Depends on:** 12.6.1.
 - **Must edit:** `planning/master/SCIENTIFIC_COMPARISON_RESEARCH.md`, `planning/master/PHASE_5_SOLUTE_EVIDENCE.md`, `planning/master/VALIDATION_STRATEGY.md`; **can edit:** the fixture's normalized acceptance thresholds/metadata; **can create:** `planning/tasks/12.7.1.todo.md`.
 - **Anchors:** paired fixture residual report; reference manifests/repeatability records; tolerance policy in `planning/master/VALIDATION_STRATEGY.md`; M5 unmet rows in `planning/master/PHASE_5_SOLUTE_EVIDENCE.md`.
+- **Scratch/build:** `.development/12.7.1/` for isolated copied inputs, staged source/builds, scripts, logs, numeric observations and sensitivity manifests. Frozen 12.2.1 inputs/run/build and 12.6.1 observations remain read-only. No new committed numeric oracle arrays.
+- **Bounded reference characterization:** task 12.7.1 authorizes two isolated repeat runs of the verified baseline executable and one isolated precision-sensitivity build/run using the same staged source and portability shim with documented `-fdefault-real-8 -fdefault-double-8` flags added. Record commands, source/input/executable/output hashes, compiler, completion and warnings; cap each execution at 60 seconds. Do not invoke the default runner against its shared output paths or overwrite the accepted reference manifest. One retry is allowed only for a diagnosed harness/compile issue; no source-algorithm changes. A precision variant is sensitivity evidence, not a replacement oracle.
+- **Targeted checks:** `cargo test -p hydrus-core --test solute_fixture_parity`; `PYTHONDONTWRITEBYTECODE=1 python3 tools/compare_solute_reference.py reference/fortran_reference/solute/example3`; `PYTHONDONTWRITEBYTECODE=1 python3 tools/compare_solute_reference.py --self-test`; scratch characterization command defined in the approved micro-plan; `git diff --check`. Orchestrator owns workspace gates.
 - **Spec:** Characterize repeated reference runs and material compiler/precision sensitivity, summarize paired residuals by observable, and propose field-specific absolute/relative thresholds and balance zero-denominator policy with rationale. Review thresholds against analytical/invariant evidence and mesh/time sensitivity where available; freeze only justified values into the comparison regression. Update M5 evidence to state precisely which source-parity/analytical claims passed and which remain unavailable. Do not claim universal HYDRUS compatibility, physical validation from source parity alone, or release readiness.
 - **Do not touch:** source/solver equations, broadened feature support, dependencies, release claims, unrelated evidence.
 - **Acceptance:** the runner/parser commands from dependencies and `cargo test -p hydrus-core --test solute_fixture_parity` pass. The evidence table links exact fixture/run hashes and records reviewed tolerances or explicitly leaves the gate unmet with its blocker. The orchestrator owns workspace gates.
