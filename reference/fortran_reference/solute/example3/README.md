@@ -51,6 +51,30 @@ transport coefficients, successful solute output, and spatial mapping before
 this fixture is used for paired comparison. The finite domain and discretization
 are derived and differ from the infinite-domain analytical formulation.
 
-The input deck has not been executed as part of task 12.1.1. No output files,
-reference results, or tolerances are included here. Keep any generated run data
-in the scratch location assigned by Orchestration 12 task 12.2.1.
+## Paired Rust comparison blocker
+
+The verified Fortran run is available for read-only extraction, but the frozen
+fixture cannot be paired faithfully through the current Rust M5 boundary API.
+The input prescribes a third-type top boundary (`kTopCh=-1`) with a separate
+concentration for each species: NH4=1, NO2=0, NO3=0 (`SELECTOR.IN`, records
+56–57; the per-species `cTop(jS)` use is in `src_reference/SOLUTE.FOR`,
+`MatSet`). Rust `SoluteBoundaries` contains only one upper and one lower mode;
+each `Concentration` or `TotalFlux` mode carries one scalar shared by every
+species (`crates/hydrus-core/src/solute.rs`, `SoluteConfig` and
+`apply_endpoint_boundary_rows`). A shared concentration would inject every
+species, while a shared flux cannot express the fixture's species vector.
+Separate Rust configurations would lose the coupled ordered-chain reaction.
+
+The derived record's 0.43 cm/hour Darcy flux is a setup target, not a verified
+species boundary-mass-flux observation. It does not resolve this boundary
+mapping mismatch. No paired Rust run, residual report, or scientific parity
+claim is available for this fixture. Numeric reference extraction, if needed
+for diagnosis, belongs in `.development/12.3.1/`; do not commit source-derived
+golden arrays or infer tolerances from Rust output. A future scope decision
+must address per-species endpoint boundary values before this comparison can
+meet its acceptance criteria. The reference run remains evidence of successful
+Fortran execution only.
+
+The input deck was executed under task 12.2.1; its provenance and observed output
+schema are recorded in `RUN.md`, with raw files kept under `.development/12.2.1/`.
+No normalized paired result or comparison tolerances are established here.

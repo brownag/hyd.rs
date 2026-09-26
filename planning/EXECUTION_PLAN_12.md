@@ -1,6 +1,6 @@
 # Orchestration 12 — M5 scientific-comparison catch-up
 
-Status: **approved; Wave 2 accepted after amendment C; Wave 3 ready.**
+Status: **approved; Wave 2 accepted; Wave 3 blocked by the Rust boundary contract.**
 Authority: the updated sequential master plan, [scientific-comparison research](master/SCIENTIFIC_COMPARISON_RESEARCH.md), and [text-fixture format audit](master/TEXT_FIXTURE_FORMAT_RESEARCH.md).
 
 ## Goal and scope
@@ -89,6 +89,13 @@ Waves are serial because each consumes the preceding fixture/output artifact. Wo
 - **Spec:** Add strict parsing for only the verified fixture output records; normalize species, units, signs, coordinates, and times. Run the matching Rust fixture with the same initial pools and water history. Compare dissolved profiles, applicable supported pools, integrated inventories, boundary terms and independently recomputed species balances at common points/times. Preserve raw values and emit residual summaries; compare manual Example 3 with an independent analytical result only if the frozen fixture maps to that equation. Do not infer or hard-code a tolerance from Rust output itself.
 - **Do not touch:** public solver API, water solver, reference source/patch, dependencies, unrelated parsers or tests.
 - **Acceptance:** `cargo test -p hydrus-core --test solute_fixture_parity` and `python3 tools/compare_solute_reference.py reference/fortran_reference/solute/example3` pass schema/shape/unit/sign checks and produce a residual report. A numeric mismatch is evidence to report, not permission to weaken checks. If no independent/reference values are available, report the precise blocker and leave this task incomplete.
+
+#### 12.3.1 execution finding — boundary mapping blocked
+
+- The frozen selector prescribes species-specific inlet concentrations `[1, 0, 0]` for NH4/NO2/NO3. Fortran `MatSet` indexes `cTop(jS)` (`SOLUTE.FOR:880–915`), while Rust stores one scalar boundary pair in `SoluteConfig` and applies it to every species (`solute.rs:68–71,107–110,1236–1258`). The required coupled-chain run cannot be represented by this API.
+- The scope prohibition on public solver API changes prevents resolving this mismatch within task 12.3.1. Separate single-species runs would lose the configured chain coupling; shared injection would change the frozen case. Neither is an acceptable substitute.
+- The approved worker outcome is documentation of the blocker in the fixture README, task TODO, and state report. Parser/test implementation and paired residual generation remain unperformed; original acceptance is unmet. No new Fortran execution or fixture changes are authorized by this finding.
+- Resume requires a separately scoped boundary-contract change capable of representing the frozen species-specific inlet, followed by review of the third-type outlet, water history, and remaining equation mapping. Wave 4 and M5-V remain pending.
 
 ### 12.4.1 — Review tolerances and close the M5 evidence handoff
 
