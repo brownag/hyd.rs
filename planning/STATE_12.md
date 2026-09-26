@@ -1,6 +1,6 @@
 # State — Orchestration 12: M5 scientific-comparison catch-up
 
-Plan status: **Approved; Waves 1–3 accepted; Wave 4 blocked by unsupported outlet equation; Wave 5 pending.**
+Plan status: **Outlet amendment approved; Waves 1–3 accepted; Wave 4 ready; Wave 5 awaits the reviewed design; comparison/tolerance moved to Waves 6–7.**
 Plan: [EXECUTION_PLAN_12.md](EXECUTION_PLAN_12.md); worker prompt: [PROMPT_TEMPLATE_12.md](PROMPT_TEMPLATE_12.md).
 
 ## Baseline checklist
@@ -20,10 +20,24 @@ Plan: [EXECUTION_PLAN_12.md](EXECUTION_PLAN_12.md); worker prompt: [PROMPT_TEMPL
 | 1 | 12.1.1 | Complete, provenance-labeled M5 comparison fixture | done | b8dd5f3 |
 | 2 | 12.2.1 | Isolated Fortran solute run and verified output manifest | done | 05bd911 |
 | 3 | 12.3.1 | Per-species Rust boundary configuration and accounting | done | b8f6b4d |
-| 4 | 12.4.1 | Normalized observables and paired Rust/reference comparison | blocked | this commit (outlet audit); e54e10f (historical blocker) |
-| 5 | 12.5.1 | Reviewed tolerance decision and M5 evidence handoff | planned | — |
+| 4 | 12.4.1 | Reviewed outlet numerical contract and examples | ready | — |
+| 5 | 12.5.1 | Outlet implementation and independent accounting | pending 12.4.1 | — |
+| 6 | 12.6.1 | Normalized observables and paired Rust/reference comparison | blocked pending outlet waves | 01293ff / e54e10f (diagnostics only) |
+| 7 | 12.7.1 | Reviewed tolerance decision and M5 evidence handoff | pending 12.6.1 | — |
 
-## Amendment resume notes
+## Current outlet amendment resume notes
+
+- 2026-09-26: user requested two proposed outlet waves in Orchestration 12. Approved amendment adds 12.4.1 numerical contract and 12.5.1 implementation; comparison moves to 12.6.1, tolerance review to 12.7.1. No new task has executed.
+- User approved the amendment on 2026-09-26, including outflow-only behavior with typed inward-flow rejection and zero-flow support. Run new Wave 4 first; Wave 5 requires an accepted derivation, not just passing checker output.
+- `tasks/12.6.1.todo.md` preserves both diagnostic micro-plans; old IDs in those records and reports below are historical aliases. The old completed TODO is not the new 12.4.1 plan. New workers create new 12.4.1/12.5.1 TODOs and obey the plan gate.
+- Prior scratch `.development/12.3.1/` and `.development/12.4.1/` stays intact; design scratch is `.development/12.4.1/outlet-contract/`, implementation `.development/12.5.1/`, comparison `.development/12.6.1/`.
+- Current amendment baseline: 121 Rust tests and 7 runner tests passed; format, Clippy, and diff checks passed. No Fortran execution. Prior baseline entries and accepted reports below are retained as historical records.
+- Independent spec and standards reviews passed without substantive findings; structural/history and diff checks passed. User approval of the plan and outflow-only scope is recorded; execution has not started.
+- Known outlet blocker remains unresolved until 12.5.1 acceptance; full water history, inlet/source coefficient mapping, comparison, and tolerances remain later gates. The amendment does not mark M5-V complete.
+
+## Historical boundary amendment resume notes
+
+The following notes retain the numbering used by the earlier amendment; current numbering is above.
 
 - 2026-09-26: user requested a new boundary wave. Approved amendment adds 12.3.1; original comparison 12.3.1 becomes 12.4.1 and tolerance task 12.4.1 becomes 12.5.1. Completed reference work is preserved.
 - Amendment approved by the user on 2026-09-26; execute new Wave 3 first. Wave 4 waits for its contract tests and still must verify the outlet/water mapping; Wave 5 waits for actual comparison evidence.
@@ -34,7 +48,7 @@ Plan: [EXECUTION_PLAN_12.md](EXECUTION_PLAN_12.md); worker prompt: [PROMPT_TEMPL
 
 <!-- Append each accepted worker report here, at most 15 lines per task. -->
 
-## 12.4.1 — historical blocked attempt (formerly 12.3.1)
+## 12.6.1 — historical shared-pair blocker (recorded as 12.3.1; later 12.4.1)
 
 - **Status:** blocked; the frozen fixture cannot map to the current Rust M5 endpoint-boundary configuration, so paired acceptance is unmet.
 - **Files:** fixture `README.md` 54–80 documents the blocker; task TODO 1–14 and execution-plan finding record the scoped stop; no parser, Rust test, normalized oracle, or residual artifact was added.
@@ -80,7 +94,7 @@ Plan: [EXECUTION_PLAN_12.md](EXECUTION_PLAN_12.md); worker prompt: [PROMPT_TEMPL
 - **Verification retry:** strengthened chain conservation assertions and added broadcast-versus-explicit solver-step equivalence after review; targeted suite passes. Later documentation handoff marks the historical shared-pair blocker resolved while preserving outlet/water/parity gates.
 - **Deviations:** none. Dependent 12.4.1 must still audit the frozen outlet and water/source mapping; M5-V remains open.
 
-## 12.4.1 current execution
+## 12.6.1 — historical outlet audit (recorded as 12.4.1 in 01293ff)
 
 - **Status:** blocked/incomplete at the required boundary-mapping gate; Wave 4 acceptance and dependent Wave 5 remain unmet.
 - **Files:** fixture `README.md` 65–99 documents the Fortran/Rust outlet mismatch and observed limits; `tasks/12.4.1.todo.md` 19–31 records the approved, completed blocker plan.

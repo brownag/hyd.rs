@@ -101,3 +101,11 @@ tolerances from Rust output.
 The input deck was executed under task 12.2.1; its provenance and observed output
 schema are recorded in `RUN.md`, with raw files kept under `.development/12.2.1/`.
 No normalized paired result or comparison tolerances are established here.
+
+## Outlet plan amendment (approved, 2026-09-26)
+
+The audit above was recorded under comparison task 12.4.1. The approved
+amendment moves comparison to **12.6.1** and tolerance review to **12.7.1**,
+inserting **12.4.1** for outlet numerical design and **12.5.1** for implementation.
+The earlier audit remains historical evidence; no outlet repair or comparison
+has executed under this amendment. See [the current plan](../../../../planning/EXECUTION_PLAN_12.md).
