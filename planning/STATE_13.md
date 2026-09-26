@@ -1,6 +1,6 @@
 # State — Orchestration 13
 
-Plan status: **Draft; awaiting user approval. No task execution.**
+Plan status: **User approved on 2026-09-26; awaiting execution instruction. No task execution.**
 Scientific status: **M5-V open; convergence, independent full-case analytical evidence and justified tolerances remain unmet.**
 Plan: [EXECUTION_PLAN_13.md](EXECUTION_PLAN_13.md). Workers: [PROMPT_TEMPLATE_13.md](PROMPT_TEMPLATE_13.md).
 
@@ -16,7 +16,7 @@ Plan: [EXECUTION_PLAN_13.md](EXECUTION_PLAN_13.md). Workers: [PROMPT_TEMPLATE_13
 - [ ] Refresh baseline and record protected source/fixture/prior-artifact hashes before execution. Set `HYDRUS_SOLUTE_PARITY_OUT` to a fresh `.development/12.6.1/13-regression/<unique-id>.json` for this and every later full Cargo suite; preserve the accepted original.
 - [x] Independent spec review: passed; clarified reporting of measurement floors within user-selected build limits.
 - [x] Independent standards review: passed after correcting legacy parity-output preservation; reviewer rechecked the fix.
-- [ ] User approval of this plan.
+- [x] User approved the complete plan on 2026-09-26 (“approve”).
 
 ## Wave board
 
@@ -33,7 +33,7 @@ Plan: [EXECUTION_PLAN_13.md](EXECUTION_PLAN_13.md). Workers: [PROMPT_TEMPLATE_13
 
 ## Resume point
 
-Independent plan reviews are complete and findings resolved. Obtain user approval. Do not start Wave 1 from a draft. No numerical threshold or new build variant is approved. User chose: “Keep existing limits and report any measurement floor.” Retain the 1001-node capacity and current output formats; variants changing them are outside this plan. After plan approval, wait for a wave-orchestration execution instruction.
+Independent plan reviews are complete, findings resolved, and user approval recorded. Next task upon a wave-orchestration execution instruction: 13.1.1; refresh the baseline using the protected-output override first. No numerical threshold or new build variant is approved. User chose: “Keep existing limits and report any measurement floor.” Retain the 1001-node capacity and current output formats; variants changing them are outside this plan. Wait for a wave-orchestration execution instruction; plan approval alone has not started any task.
 
 ## Task reports
 

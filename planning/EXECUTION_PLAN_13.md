@@ -1,6 +1,6 @@
 # Orchestration 13 — Solute convergence and independent analytical evidence
 
-Status: **Draft for user approval; no execution authorized by this draft.**
+Status: **User approved on 2026-09-26; awaiting wave-orchestration execution instruction.**
 Companion files: [worker template](PROMPT_TEMPLATE_13.md), [state](STATE_13.md).
 
 ## Goal and scope
@@ -23,11 +23,11 @@ The referenced structure is: (1) benchmark equations/boundaries/error measures; 
 
 - **User direction:** create Orchestration 13 using the six phases above; preserve Orchestration 12's completed evidence and open M5-V gate.
 - **Inherited constraints:** preserve the selected boundary/process contract, source snapshot and portability patch; keep source parity, mathematical code verification and physical validation separate.
-- **Draft judgment:** exact cases supported by current APIs come first. A manufactured solution requiring a forcing hook is deferred, not silently approximated by existing reaction terms.
-- **Draft judgment:** begin the derived-case mesh study at 251/501/1,001 nodes and vary timestep independently. These are starting levels, not a promise that three levels reach the asymptotic regime.
+- **Approved planning choice:** exact cases supported by current APIs come first. A manufactured solution requiring a forcing hook is deferred, not silently approximated by existing reaction terms.
+- **Approved planning choice:** begin the derived-case mesh study at 251/501/1,001 nodes and vary timestep independently. These are starting levels, not a promise that three levels reach the asymptotic regime.
 - **User decision:** “Keep existing limits and report any measurement floor.” Retain the current Fortran array capacity and output formats. Identified baseline/promoted-real arithmetic modes remain available for sensitivity analysis; neither increases capacity or printed precision. Capacity/output-format variants are outside this plan. Report their measurement limits honestly; do not treat them as permission to alter the build.
-- **Draft judgment:** keep the core dependency-free and use Python standard-library validation tooling initially. Wave 1 must demonstrate that the selected independent evaluator can meet an explicit reference-error budget within this constraint or report the precise method/dependency gap.
-- **Draft judgment:** Wave 2's three adapters may run in isolated worktrees, at most three workers; other waves have one task. Shared Cargo/global suites run serially under the orchestrator. Choose the cheapest capable worker; use a stronger worker for derivation when needed, with independent orchestrator mathematical review.
+- **Approved planning choice:** keep the core dependency-free and use Python standard-library validation tooling initially. Wave 1 must demonstrate that the selected independent evaluator can meet an explicit reference-error budget within this constraint or report the precise method/dependency gap.
+- **Approved planning choice:** Wave 2's three adapters may run in isolated worktrees, at most three workers; other waves have one task. Shared Cargo/global suites run serially under the orchestrator. Choose the cheapest capable worker; use a stronger worker for derivation when needed, with independent orchestrator mathematical review.
 - **Scientific acceptance:** planning approval approves the protocol, not unknown numerical thresholds. The orchestrator reviews actual budgets before activating thresholds. Evidence may leave thresholds unassigned and M5-V open; this is a truthful review outcome, not scientific completion.
 
 ## Reconnaissance and baseline
@@ -207,4 +207,4 @@ Update the three evidence documents with exact commands, artifact hashes, achiev
 
 The scientific goal succeeds only with independently justified full-case accuracy and convergence evidence plus accepted error budgets/regressions. A complete evidence review may instead identify precisely what remains missing. STATE tracks task completion and scientific completion separately.
 
-Independent plan review completed on 2026-09-26: spec pass; standards pass after correction. Corrected the legacy parity-test overwrite hazard with an orchestrator-only fresh-output exception, and clarified that capacity/output-precision floors are reported within the user’s chosen limits. Both reviewers found no remaining blockers. Derivation feasibility and any scientifically unassigned thresholds remain execution judgments, not presumed successes. User approval: pending. No Orchestration 13 task has run.
+Independent plan review completed on 2026-09-26: spec pass; standards pass after correction. Corrected the legacy parity-test overwrite hazard with an orchestrator-only fresh-output exception, and clarified that capacity/output-precision floors are reported within the user’s chosen limits. Both reviewers found no remaining blockers. Derivation feasibility and any scientifically unassigned thresholds remain execution judgments, not presumed successes. User approved the complete plan on 2026-09-26 (“approve”), including the existing Fortran capacity/output limits. Execution has not started; all tasks remain pending.
