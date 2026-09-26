@@ -1,6 +1,6 @@
 # Orchestration 12 — M5 scientific-comparison catch-up
 
-Status: **Outlet amendment approved; Waves 1–3 accepted; Wave 4 ready; Wave 5 awaits the reviewed design; comparison/tolerance now Waves 6–7.**
+Status: **Outlet amendment approved; Waves 1–4 accepted; Wave 5 ready for outlet implementation; comparison/tolerance remain Waves 6–7.**
 Authority: the updated sequential master plan, [scientific-comparison research](master/SCIENTIFIC_COMPARISON_RESEARCH.md), and [text-fixture format audit](master/TEXT_FIXTURE_FORMAT_RESEARCH.md).
 
 ## Goal and scope
@@ -75,7 +75,7 @@ Independent spec and standards reviews found the insertion, scopes, test cases, 
 
 ### Outlet amendment review
 
-Independent spec and standards reviewers found no substantive gaps in scope coverage, file ownership, numbering/dependencies, numerical acceptance, historical preservation, or execution gates. Final consistency pass corrected active references to the renumbered comparison task. `git diff --check` and structural/history checks passed. User approved the amendment on 2026-09-26. No inserted task has executed; Wave 4 is ready for wave-orchestration.
+Independent spec and standards reviewers found no substantive gaps in scope coverage, file ownership, numbering/dependencies, numerical acceptance, historical preservation, or execution gates. Final consistency pass corrected active references to the renumbered comparison task. `git diff --check` and structural/history checks passed. User approved the amendment on 2026-09-26. Task 12.4.1 is now accepted after source/derivation review, 6 exact checks, and serial workspace gates; Wave 5 is ready for wave-orchestration. The selected contract is recorded in [SOLUTE_OUTLET_CONTRACT.md](master/SOLUTE_OUTLET_CONTRACT.md).
 
 ## Wave table
 
