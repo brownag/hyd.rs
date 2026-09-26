@@ -1,6 +1,6 @@
 # State — Orchestration 12: M5 scientific-comparison catch-up
 
-Plan status: **Waves 1–6 accepted; Wave 7 ready for repeatability/precision characterization and tolerance review. M5-V remains open.**
+Plan status: **Waves 1–7 executed and accepted as bounded evidence work; scientific exit criteria remain unmet. M5-V stays open; no Phase 6 readiness.**
 Plan: [EXECUTION_PLAN_12.md](EXECUTION_PLAN_12.md); worker prompt: [PROMPT_TEMPLATE_12.md](PROMPT_TEMPLATE_12.md).
 
 ## Baseline checklist
@@ -22,13 +22,17 @@ Plan: [EXECUTION_PLAN_12.md](EXECUTION_PLAN_12.md); worker prompt: [PROMPT_TEMPL
 | 3 | 12.3.1 | Per-species Rust boundary configuration and accounting | done | b8f6b4d |
 | 4 | 12.4.1 | Reviewed outlet numerical contract and examples | done | d71b47d |
 | 5 | 12.5.1 | Outlet implementation and independent accounting | done | 80f9d81 |
-| 6 | 12.6.1 | Normalized observables and paired Rust/reference comparison | done (diagnostic comparison) | this commit |
-| 7 | 12.7.1 | Reviewed tolerance decision and M5 evidence handoff | ready | — |
+| 6 | 12.6.1 | Normalized observables and paired Rust/reference comparison | done (diagnostic comparison) | 4867fdf |
+| 7 | 12.7.1 | Reviewed tolerance decision and M5 evidence handoff | done (thresholds unassigned; M5-V open) | this commit |
 
-## Current outlet amendment resume notes
+## Final resume point
+
+All tasks in this execution plan have reached their scoped outcomes. Wave 7 explicitly permits an unmet tolerance decision: the review is accepted, but the orchestration scientific exit is not achieved. Further work needs a plan for matched spatial/temporal refinement, an independent analytical or manufactured finite-domain benchmark, and field/balance error budgets including zero/near-zero cases. Do not infer acceptance thresholds from the present residuals or advance Phase 6 as though M5-V passed. Current evidence is in `master/SCIENTIFIC_COMPARISON_RESEARCH.md` and `.development/12.7.1/characterization.json`.
+
+## Historical outlet amendment resume notes
 
 - 2026-09-26: user requested two proposed outlet waves in Orchestration 12. Approved amendment adds 12.4.1 numerical contract and 12.5.1 implementation; comparison moves to 12.6.1, tolerance review to 12.7.1. Tasks 12.4.1 and 12.5.1 are accepted.
-- User approved the amendment on 2026-09-26, including outflow-only behavior with typed inward-flow rejection and zero-flow support. Waves 5–6 implement and compare the accepted contract; run Wave 7 next.
+- User approved the amendment on 2026-09-26, including outflow-only behavior with typed inward-flow rejection and zero-flow support. Waves 5–7 implemented, compared, and reviewed the accepted contract; see final resume point above.
 - `tasks/12.6.1.todo.md` preserves both diagnostic micro-plans; old IDs in those records and reports below are historical aliases. The old completed TODO is not the new 12.4.1 plan. New workers create new 12.4.1/12.5.1 TODOs and obey the plan gate.
 - Prior scratch `.development/12.3.1/` and `.development/12.4.1/` stays intact; design scratch is `.development/12.4.1/outlet-contract/`, implementation `.development/12.5.1/`, comparison `.development/12.6.1/`.
 - Current amendment baseline: 121 Rust tests and 7 runner tests passed; format, Clippy, and diff checks passed. No Fortran execution. Prior baseline entries and accepted reports below are retained as historical records.
@@ -142,3 +146,16 @@ The following notes retain the numbering used by the earlier amendment; current 
 - **Checks:** `git diff --check -- planning/STATE_12.md planning/tasks/12.4.1.todo.md reference/fortran_reference/solute/example3/README.md` — passed; scoped diff inspected. No acceptance parser/test or Fortran execution was run.
 - **Deviations:** none. No solver/API, fixture, parser, residual, golden array, or tolerance changes; no parity claim. Future comparison needs a separately scoped representation of the outlet law.
 - **Orchestrator verification:** source/API and recorded-output findings independently checked; `cargo test --workspace` — 121 passed, 0 failed; `cargo fmt --check`, `cargo clippy --workspace --all-targets -- -D warnings`, and `git diff --check` passed. Diagnostic outcome accepted; comparison acceptance remains unmet.
+
+## 12.7.1 — repeatability, precision and tolerance handoff
+
+- **Status:** bounded characterization and evidence review complete; M5-V remains open, no scientific threshold frozen.
+- **Files:** `master/SCIENTIFIC_COMPARISON_RESEARCH.md` repeatability/precision review and refreshed gaps; `master/PHASE_5_SOLUTE_EVIDENCE.md` derived-case handoff; `master/VALIDATION_STRATEGY.md` calibration/zero-denominator decision; `tasks/12.7.1.todo.md` preserved audit and revised completed plan.
+- **Characterization:** `PYTHONDONTWRITEBYTECODE=1 python3 .development/12.7.1/characterize.py --baseline-runs 2 --precision-run --timeout-seconds 60` passed: exactly 2 baseline + 1 precision executions, each capped at 60 seconds, all exit zero and complete; underflow/denormal warnings retained.
+- **Provenance:** independent patch/source/shim reconstruction and retained precision-build verification passed; source/executable/input/output/log hashes in `.development/12.7.1/characterization.json`, 3 starts/exits/completions in `execution-ledger.jsonl`; earlier failed attempts archived with reported zero successful starts.
+- **Measurements:** original and repeated baseline numeric observations identical (188,134 parsed values). Precision dissolved-profile maxima NH4/NO2/NO3 `1e-4/1e-5/1e-4`; 200 h inventory shifts `+0.00495196/+0.000247269/+0.00332002`; largest reported balance shift `0.00665`; parsed water/step diagnostics unchanged.
+- **Decision:** no justified field `atol`/`rtol`, absolute balance threshold or near-zero cutoff. Missing both-code mesh/time convergence, endpoint/quadrature error bounds, independent finite-domain analytical trajectory, and zero/near-zero storage/flux/reaction error budgets. Exact-zero relative balance remains undefined; report dimensional residual and normalization branch.
+- **Checks:** `cargo test -p hydrus-core --test solute_fixture_parity` passed 1/1; `PYTHONDONTWRITEBYTECODE=1 python3 tools/compare_solute_reference.py reference/fortran_reference/solute/example3` passed; `PYTHONDONTWRITEBYTECODE=1 python3 tools/compare_solute_reference.py --self-test` passed 12/12.
+- **Checks:** `PYTHONDONTWRITEBYTECODE=1 python3 .development/12.7.1/summarize.py` passed accepted-runner completion validation and inventory summaries; `PYTHONDONTWRITEBYTECODE=1 python3 .development/12.7.1/characterize.py --verify-only` passed with zero launches; `git diff --check` passed. Accepted 12.2.1 tree and all 3 accepted 12.6.1 JSON hashes unchanged.
+- **Deviations:** orchestrator-approved escalation repaired harness failures and reused verified successful precision build; no solver/parser changes, new oracle arrays, global suites or commit. Derived fixture is not manual reproduction, physical validation, release compatibility or Phase 6 readiness.
+- **Orchestrator acceptance:** characterization review and independent profile-sensitivity/three-launch checks passed; workspace Rust 130/130, Python 13/13, comparator 12/12, fmt, Clippy and diff checks passed. All 84 protected hashes unchanged. Review outcome accepted; scientific thresholds and M5-V remain unmet.
