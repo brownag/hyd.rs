@@ -212,6 +212,7 @@ fn accepts_each_supported_boundary_mode_and_rejects_nonfinite_boundary_values() 
     for mode in [
         Boundary::Concentration { value: 1.0 },
         Boundary::TotalFlux { flux: -1.0 },
+        Boundary::AdvectiveOutflow,
     ] {
         assert!(SoluteConfig::new(
             valid().units().clone(),

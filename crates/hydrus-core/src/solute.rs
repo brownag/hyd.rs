@@ -62,6 +62,16 @@ pub enum SoluteBoundaryMode {
     Concentration { value: f64 },
     /// Prescribed total solute flux; positive flux enters the domain.
     TotalFlux { flux: f64 },
+    /// Zero dispersive boundary flux with solution-dependent advective export.
+    /// Inward water flow is rejected; zero flow is allowed.
+    AdvectiveOutflow,
+}
+
+/// Geometric endpoint where an outlet flow reversal occurred.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum SoluteEndpoint {
+    Lower,
+    Upper,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -217,16 +227,19 @@ impl SoluteConfig {
         for pair in &boundaries {
             for mode in [pair.upper, pair.lower] {
                 let value = match mode {
-                    SoluteBoundaryMode::Concentration { value } => value,
-                    SoluteBoundaryMode::TotalFlux { flux } => flux,
+                    SoluteBoundaryMode::Concentration { value } => Some(value),
+                    SoluteBoundaryMode::TotalFlux { flux } => Some(flux),
+                    SoluteBoundaryMode::AdvectiveOutflow => None,
                 };
-                if !value.is_finite() {
+                if value.is_some_and(|value| !value.is_finite()) {
                     return Err(SoluteConfigError::Invalid {
                         name: "boundary",
                         reason: "value must be finite",
                     });
                 }
-                if matches!(mode, SoluteBoundaryMode::Concentration { .. }) && value < 0.0 {
+                if matches!(mode, SoluteBoundaryMode::Concentration { .. })
+                    && value.is_some_and(|value| value < 0.0)
+                {
                     return Err(SoluteConfigError::Invalid {
                         name: "boundary concentration",
                         reason: "must be nonnegative",
@@ -665,6 +678,11 @@ pub enum SoluteStepError {
         iterations: usize,
         residual: f64,
     },
+    InwardFlowAtOutlet {
+        species: usize,
+        endpoint: SoluteEndpoint,
+        flux: f64,
+    },
 }
 
 impl core::fmt::Display for SoluteStepError {
@@ -675,6 +693,10 @@ impl core::fmt::Display for SoluteStepError {
             Self::NonConverged { species, iterations, residual } => write!(
                 formatter,
                 "solute nonlinear solve for species {species} did not converge after {iterations} iterations (change={residual})"
+            ),
+            Self::InwardFlowAtOutlet { species, endpoint, flux } => write!(
+                formatter,
+                "inward water flux {flux} at {endpoint:?} advective outlet for species {species}"
             ),
         }
     }
@@ -919,6 +941,28 @@ fn validate_transport_input(
             }
         }
     }
+    for (species, pair) in config.boundaries.iter().enumerate() {
+        if matches!(pair.lower, SoluteBoundaryMode::AdvectiveOutflow) {
+            let flux = input.accepted_water.face_fluxes[0];
+            if flux > 0.0 {
+                return Err(SoluteStepError::InwardFlowAtOutlet {
+                    species,
+                    endpoint: SoluteEndpoint::Lower,
+                    flux,
+                });
+            }
+        }
+        if matches!(pair.upper, SoluteBoundaryMode::AdvectiveOutflow) {
+            let flux = input.accepted_water.face_fluxes[node_count];
+            if flux < 0.0 {
+                return Err(SoluteStepError::InwardFlowAtOutlet {
+                    species,
+                    endpoint: SoluteEndpoint::Upper,
+                    flux,
+                });
+            }
+        }
+    }
     Ok(())
 }
 
@@ -974,8 +1018,24 @@ fn update_step_balances(
             .map(|boundary| match boundary {
                 SoluteBoundaryMode::TotalFlux { flux } => flux * input.timestep,
                 SoluteBoundaryMode::Concentration { .. } => 0.0,
+                SoluteBoundaryMode::AdvectiveOutflow => 0.0,
             })
             .sum::<f64>();
+        let lower_outlet = if matches!(boundaries.lower, SoluteBoundaryMode::AdvectiveOutflow) {
+            input.timestep
+                * input.accepted_water.face_fluxes[0]
+                * workspace.trial_concentrations[species * workspace.node_count]
+        } else {
+            0.0
+        };
+        let upper_outlet = if matches!(boundaries.upper, SoluteBoundaryMode::AdvectiveOutflow) {
+            -input.timestep
+                * input.accepted_water.face_fluxes[workspace.node_count]
+                * workspace.trial_concentrations[(species + 1) * workspace.node_count - 1]
+        } else {
+            0.0
+        };
+        let known_boundary = prescribed_boundary + lower_outlet + upper_outlet;
         let storage_after = species_storage(
             &workspace.trial_concentrations,
             &workspace.trial_kinetic_sorbed,
@@ -994,11 +1054,11 @@ fn update_step_balances(
         // Concentration rows provide no measured solute flux; infer their net
         // exchange from the solved discrete balance after known fluxes.
         let concentration_exchange = if has_concentration_boundary {
-            storage_change - reaction_change - prescribed_boundary
+            storage_change - reaction_change - known_boundary
         } else {
             0.0
         };
-        let boundary_exchange = prescribed_boundary + concentration_exchange;
+        let boundary_exchange = known_boundary + concentration_exchange;
         let absolute_residual = (storage_change - boundary_exchange - reaction_change).abs();
         let denominator = storage_change.abs() + boundary_exchange.abs() + reaction_change.abs();
         let normalized_residual = if denominator == 0.0 {
@@ -1064,7 +1124,7 @@ fn assemble_and_solve_species(
         workspace.rhs[node] = storage * state.concentrations[offset + node];
     }
 
-    apply_endpoint_boundary_rows(workspace, config.boundaries[species], count);
+    apply_endpoint_boundary_rows(workspace, config.boundaries[species], input, count);
 
     validate_solute_values("assembled transport coefficients", &workspace.lower)?;
     validate_solute_values("assembled transport coefficients", &workspace.diagonal)?;
@@ -1152,7 +1212,7 @@ fn assemble_and_solve_species_with_processes(
                     width * (old_mass / input.timestep + source - gamma * intercept);
             }
         }
-        apply_endpoint_boundary_rows(workspace, config.boundaries[species], count);
+        apply_endpoint_boundary_rows(workspace, config.boundaries[species], input, count);
         validate_solute_values("reaction/sorption coefficients", &workspace.lower)?;
         validate_solute_values("reaction/sorption coefficients", &workspace.diagonal)?;
         validate_solute_values("reaction/sorption coefficients", &workspace.upper)?;
@@ -1268,6 +1328,7 @@ fn assemble_flux_operator(
 fn apply_endpoint_boundary_rows(
     workspace: &mut SoluteWorkspace,
     boundaries: SoluteBoundaries,
+    input: SoluteTransportInput<'_>,
     node_count: usize,
 ) {
     match boundaries.lower {
@@ -1277,6 +1338,9 @@ fn apply_endpoint_boundary_rows(
             workspace.rhs[0] = value;
         }
         SoluteBoundaryMode::TotalFlux { flux } => workspace.rhs[0] += flux,
+        SoluteBoundaryMode::AdvectiveOutflow => {
+            workspace.diagonal[0] -= input.accepted_water.face_fluxes[0];
+        }
     }
     let upper = node_count - 1;
     match boundaries.upper {
@@ -1288,6 +1352,9 @@ fn apply_endpoint_boundary_rows(
         // The configured flux is positive into the domain. In +x coordinates
         // this is a negative flux at the upper endpoint, hence +flux on RHS.
         SoluteBoundaryMode::TotalFlux { flux } => workspace.rhs[upper] += flux,
+        SoluteBoundaryMode::AdvectiveOutflow => {
+            workspace.diagonal[upper] += input.accepted_water.face_fluxes[node_count];
+        }
     }
 }
 

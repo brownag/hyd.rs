@@ -22,7 +22,7 @@ pub use root_uptake::{feddes_reduction, RootUptakeInput, RootUptakeModel};
 pub use solute::{
     advance_solute_step, AcceptedWaterSnapshot, DeferredSoluteFeature, EquilibriumSorption,
     KineticSorption, SoluteAccounting, SoluteBoundaries, SoluteBoundaryMode, SoluteConfig,
-    SoluteSpecies, SoluteState, SoluteStepError, SoluteTransportInput, SoluteUnits,
+    SoluteEndpoint, SoluteSpecies, SoluteState, SoluteStepError, SoluteTransportInput, SoluteUnits,
     SoluteWorkspace,
 };
 pub use water_solver::{

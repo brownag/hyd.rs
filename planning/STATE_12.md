@@ -1,6 +1,6 @@
 # State — Orchestration 12: M5 scientific-comparison catch-up
 
-Plan status: **Outlet amendment approved; Waves 1–4 accepted; Wave 5 ready for outlet implementation; comparison/tolerance remain Waves 6–7.**
+Plan status: **Waves 1–5 accepted; Wave 6 ready for comparison mapping review; tolerance remains Wave 7.**
 Plan: [EXECUTION_PLAN_12.md](EXECUTION_PLAN_12.md); worker prompt: [PROMPT_TEMPLATE_12.md](PROMPT_TEMPLATE_12.md).
 
 ## Baseline checklist
@@ -20,20 +20,20 @@ Plan: [EXECUTION_PLAN_12.md](EXECUTION_PLAN_12.md); worker prompt: [PROMPT_TEMPL
 | 1 | 12.1.1 | Complete, provenance-labeled M5 comparison fixture | done | b8dd5f3 |
 | 2 | 12.2.1 | Isolated Fortran solute run and verified output manifest | done | 05bd911 |
 | 3 | 12.3.1 | Per-species Rust boundary configuration and accounting | done | b8f6b4d |
-| 4 | 12.4.1 | Reviewed outlet numerical contract and examples | done | this commit |
-| 5 | 12.5.1 | Outlet implementation and independent accounting | ready | — |
-| 6 | 12.6.1 | Normalized observables and paired Rust/reference comparison | blocked pending outlet waves | 01293ff / e54e10f (diagnostics only) |
+| 4 | 12.4.1 | Reviewed outlet numerical contract and examples | done | d71b47d |
+| 5 | 12.5.1 | Outlet implementation and independent accounting | done | this commit |
+| 6 | 12.6.1 | Normalized observables and paired Rust/reference comparison | ready for mapping review | 01293ff / e54e10f (diagnostics only) |
 | 7 | 12.7.1 | Reviewed tolerance decision and M5 evidence handoff | pending 12.6.1 | — |
 
 ## Current outlet amendment resume notes
 
-- 2026-09-26: user requested two proposed outlet waves in Orchestration 12. Approved amendment adds 12.4.1 numerical contract and 12.5.1 implementation; comparison moves to 12.6.1, tolerance review to 12.7.1. New task 12.4.1 is now accepted; 12.5.1 has not executed.
-- User approved the amendment on 2026-09-26, including outflow-only behavior with typed inward-flow rejection and zero-flow support. Wave 4 derivation and independent examples are accepted; run Wave 5 next against `master/SOLUTE_OUTLET_CONTRACT.md`.
+- 2026-09-26: user requested two proposed outlet waves in Orchestration 12. Approved amendment adds 12.4.1 numerical contract and 12.5.1 implementation; comparison moves to 12.6.1, tolerance review to 12.7.1. Tasks 12.4.1 and 12.5.1 are accepted.
+- User approved the amendment on 2026-09-26, including outflow-only behavior with typed inward-flow rejection and zero-flow support. Wave 5 implements the accepted contract; run Wave 6 mapping review next.
 - `tasks/12.6.1.todo.md` preserves both diagnostic micro-plans; old IDs in those records and reports below are historical aliases. The old completed TODO is not the new 12.4.1 plan. New workers create new 12.4.1/12.5.1 TODOs and obey the plan gate.
 - Prior scratch `.development/12.3.1/` and `.development/12.4.1/` stays intact; design scratch is `.development/12.4.1/outlet-contract/`, implementation `.development/12.5.1/`, comparison `.development/12.6.1/`.
 - Current amendment baseline: 121 Rust tests and 7 runner tests passed; format, Clippy, and diff checks passed. No Fortran execution. Prior baseline entries and accepted reports below are retained as historical records.
-- Independent spec and standards reviews passed without substantive findings; structural/history and diff checks passed. User approval of the plan and outflow-only scope is recorded; Wave 4 has completed and implementation remains pending.
-- Known outlet blocker remains unresolved until 12.5.1 acceptance; full water history, inlet/source coefficient mapping, comparison, and tolerances remain later gates. The amendment does not mark M5-V complete.
+- Independent spec and standards reviews passed without substantive findings; structural/history and diff checks passed. User approval of the plan and outflow-only scope is recorded; Waves 4–5 have completed.
+- Outlet implementation is accepted; full water history, inlet/source coefficient mapping, spatial/temporal discretization differences, comparison, and tolerances remain later gates. The amendment does not mark M5-V complete.
 
 ## Historical boundary amendment resume notes
 
@@ -47,6 +47,18 @@ The following notes retain the numbering used by the earlier amendment; current 
 ## Task reports
 
 <!-- Append each accepted worker report here, at most 15 lines per task. -->
+
+## 12.5.1
+
+- **Status:** accepted by orchestrator after implementation/diff review and independent serial gates.
+- **Files:** `solute.rs` 65–75, 681–701, 944–965, 1012–1065, 1127, 1215, 1331–1359; `lib.rs` 25; new `tests/solute_outlet.rs` 1–607; `solute_contract.rs` 211–228; `PHASE_5_SOLUTE_EVIDENCE.md` 15, 34, 38; task TODO 1–24.
+- **Behavior:** added lower/upper outflow terms, typed pre-trial reversal rejection, and independently computed outlet exchange before concentration remainder inference; accepted zero flow.
+- **Coverage:** rational f64 lower/upper examples through both paths; independent weighted inventory/exchange checks; zero flow both paths; sorption/decay; NH4-only inlet and chain exports; mixed and broadcast cases through both paths; typed reversal; later-species nonlinear failure rolls back accepted state and workspace including nonzero kinetic/accounting data.
+- **Targeted Rust:** `cargo test -p hydrus-core --test solute_outlet --test solute_species_boundaries --test solute_contract --test solute_transport --test solute_reactions --test solute_transaction --test solute_acceptance` — 39 passed, 0 failed.
+- **Targeted Python:** `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest tools.test_solute_outlet_contract` — 6 passed, 0 failed.
+- **Formatting:** `cargo fmt --check` and `git diff --check` passed.
+- **Deviations:** none. No Fortran execution or parity/tolerance claim; water-history and source-row mapping remain comparison gates for 12.6.1.
+- **Orchestrator gates:** targeted Rust 39/39, workspace Rust 129/129, Python runner/checker 13/13, formatting, Clippy, and diff checks passed. One verification retry added missing in-trial later-species rollback and strengthened independent checks. No Fortran execution.
 
 ## 12.4.1 — outlet numerical contract
 

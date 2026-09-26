@@ -1,6 +1,6 @@
 # Orchestration 12 — M5 scientific-comparison catch-up
 
-Status: **Outlet amendment approved; Waves 1–4 accepted; Wave 5 ready for outlet implementation; comparison/tolerance remain Waves 6–7.**
+Status: **Waves 1–5 accepted; Wave 6 ready for comparison mapping review; tolerance remains Wave 7.**
 Authority: the updated sequential master plan, [scientific-comparison research](master/SCIENTIFIC_COMPARISON_RESEARCH.md), and [text-fixture format audit](master/TEXT_FIXTURE_FORMAT_RESEARCH.md).
 
 ## Goal and scope
