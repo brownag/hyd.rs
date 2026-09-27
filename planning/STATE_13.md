@@ -1,6 +1,6 @@
 # State — Orchestration 13
 
-Plan status: **Execution started on 2026-09-26 by user wave-orchestration instruction; Wave 1 accepted; Wave 2 accepted; Wave 3 split into serial tasks; component references accepted; finite-chain evaluator accepted; reference persistence accepted; solver lifecycle next.**
+Plan status: **Execution started on 2026-09-26 by user wave-orchestration instruction; Wave 1 accepted; Wave 2 accepted; Wave 3 split into serial tasks; component references accepted; finite-chain evaluator accepted; reference persistence and solver lifecycle accepted; bridge gate next.**
 Scientific status: **M5-V open; convergence, independent full-case analytical evidence and justified tolerances remain unmet.**
 Plan: [EXECUTION_PLAN_13.md](EXECUTION_PLAN_13.md). Workers: [PROMPT_TEMPLATE_13.md](PROMPT_TEMPLATE_13.md).
 
@@ -28,8 +28,8 @@ Plan: [EXECUTION_PLAN_13.md](EXECUTION_PLAN_13.md). Workers: [PROMPT_TEMPLATE_13
 | 2 | 13.2.3 | Strict metrics and normalization | done | 15b21b5 |
 | 3a | 13.3.2 | Component analytical references | done | 6285bca |
 | 3b | 13.3.3 | Finite-domain chain reference | done | 88b2656 |
-| 3c.1 | 13.3.5 | Checkpointed analytical reference work | done | pending commit |
-| 3c.2 | 13.3.6 | Shared bounded solver lifecycle | pending | — |
+| 3c.1 | 13.3.5 | Checkpointed analytical reference work | done | 4323adf |
+| 3c.2 | 13.3.6 | Shared bounded solver lifecycle | done | pending commit |
 | 3c.3 | 13.3.7 | Retained-evidence bridge gate | pending | — |
 | 3c.4 | 13.3.4 | Bounded benchmark integration | awaiting prerequisites | — |
 | 3d | 13.3.1 | Analytical executions and evidence | pending | — |
@@ -39,7 +39,7 @@ Plan: [EXECUTION_PLAN_13.md](EXECUTION_PLAN_13.md). Workers: [PROMPT_TEMPLATE_13
 
 ## Resume point
 
-Waves 1 and 2 accepted. Next tasks: serial 13.3.6 lifecycle, 13.3.7 bridge, then 13.3.4 integration and original 13.3.1 executions/evidence. Read frozen spec including approved Wave 2 interface appendix and dependency reports. All 77 conditional launch rows remain unconsumed; actual runs require explicit orchestrator activation. Preserve 207 hashes in `.development/13-baseline/protected-hashes.json`. Latest full-suite parity output: `.development/12.6.1/13-regression/wave3c1-20260927-01.json`. No solver threshold approved; M5-V remains open.
+Waves 1 and 2 accepted. Next tasks: serial 13.3.7 bridge, then 13.3.4 integration and original 13.3.1 executions/evidence. Read frozen spec including approved Wave 2 interface appendix and dependency reports. All 77 conditional launch rows remain unconsumed; actual runs require explicit orchestrator activation. Preserve 207 hashes in `.development/13-baseline/protected-hashes.json`. Latest full-suite parity output: `.development/12.6.1/13-regression/wave3c2-20260927-01.json`. No solver threshold approved; M5-V remains open.
 
 ## Task reports
 
@@ -146,3 +146,19 @@ Accepted planning-only split of 13.3.4 into serial prerequisites 13.3.5–13.3.7
 - Root fmt/Clippy/diff and 207 protected hashes passed; fresh Cargo output wave3c1-20260927-01.json.
 - No expensive analytical evaluations or solver launches; all 77 rows remain unconsumed.
 - Deviations: recorded producer decomposition only; mathematical coverage and M5-V remain open.
+
+## Rust retained-executable storage decision
+
+Task 13.3.6 planning measured the existing debug harness at 11,664,672 bytes, above the smallest 4,568,792-byte per-run cap. Approved omitting debug symbols with profile.test.debug=0 while preserving unoptimized test semantics and f64 mode; exact build provenance and prelaunch size checks required. No build or solver run activated and no cap changed.
+
+## 13.3.6
+- Status: accepted; reusable shared lifecycle and 17 mocked tests.
+- Exact phase/row activation, immutable requests/manifests, shared ledger/limits and no automatic retries.
+- Rust isolated build recipe omits debug metadata, keeps test semantics and records verbose compiler commands; actual build remains pending.
+- Reviewed prelaunch executable/output reservations, actual global storage, process-group cleanup and final metrics validation.
+- Fortran reuses accepted adapter with normalization-size checks; raw evidence remains immutable.
+- Independently authored Rust observations pass actual metrics validation; failures, corruption and read-only verification tested.
+- Root checks: 132 Python and 145 Rust passed; 12 comparator and 34 contract checks; fmt/Clippy/diff passed.
+- Fresh Cargo output wave3c2-20260927-01.json; 207 protected hashes unchanged.
+- API and build caveats: .development/13.3.6/HANDOFF.md. No real study build/launch; all 77 rows unconsumed.
+- Deviations: approved debug-metadata and verbose logging decisions only; no numerical mode or cap changes.
