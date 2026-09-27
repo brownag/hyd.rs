@@ -1,6 +1,6 @@
 # State — Orchestration 13
 
-Plan status: **Execution started on 2026-09-26 by user wave-orchestration instruction; Wave 1 accepted; Wave 2 Fortran/Rust accepted; metrics worker executing.**
+Plan status: **Execution started on 2026-09-26 by user wave-orchestration instruction; Wave 1 accepted; Wave 2 accepted; Wave 3 next.**
 Scientific status: **M5-V open; convergence, independent full-case analytical evidence and justified tolerances remain unmet.**
 Plan: [EXECUTION_PLAN_13.md](EXECUTION_PLAN_13.md). Workers: [PROMPT_TEMPLATE_13.md](PROMPT_TEMPLATE_13.md).
 
@@ -23,9 +23,9 @@ Plan: [EXECUTION_PLAN_13.md](EXECUTION_PLAN_13.md). Workers: [PROMPT_TEMPLATE_13
 | Wave | Task | Deliverable | Status | Commit |
 |---|---|---|---|---|
 | 1 | 13.1.1 | Mathematical benchmark/case/schema contract | done | 490a41b |
-| 2 | 13.2.1 | Isolated Fortran adapter | done | task commit |
+| 2 | 13.2.1 | Isolated Fortran adapter | done | 4a40220 |
 | 2 | 13.2.2 | Configurable Rust adapter | done | 0023eb4 |
-| 2 | 13.2.3 | Strict metrics and normalization | in progress | — |
+| 2 | 13.2.3 | Strict metrics and normalization | done | task commit |
 | 3 | 13.3.1 | Independent analytical evaluator and evidence | pending | — |
 | 4 | 13.4.1 | Separate spatial and temporal convergence | pending | — |
 | 5 | 13.5.1 | Discrepancy attribution/remediation specifications | pending | — |
@@ -33,7 +33,7 @@ Plan: [EXECUTION_PLAN_13.md](EXECUTION_PLAN_13.md). Workers: [PROMPT_TEMPLATE_13
 
 ## Resume point
 
-Wave 1 accepted after independent equation, boundary, equal-rate and feasibility review. All Wave 2 micro-plans approved; 13.2.1/13.2.2 accepted, 13.2.3 implementing in `.development/worktrees/<task-id>` on `solute-<task-id>` branches. Contract frozen; 77 conditional runs remain gated on adapters and evaluator. No solver threshold approved; M5-V remains open. Preserve 207 hashes in `.development/13-baseline/protected-hashes.json`. Latest full-suite parity output: `.development/12.6.1/13-regression/wave1-20260926-01.json`.
+Waves 1 and 2 accepted. Next task: 13.3.1 analytical evaluator and bounded bridge/benchmark integration. Read frozen spec including approved Wave 2 interface appendix and dependency reports. All 77 conditional launch rows remain unconsumed; actual runs require explicit orchestrator activation. Preserve 207 hashes in `.development/13-baseline/protected-hashes.json`. Latest full-suite parity output: `.development/12.6.1/13-regression/wave2-20260927-01.json`. No solver threshold approved; M5-V remains open.
 
 ## Task reports
 
@@ -74,3 +74,16 @@ Approved the metrics validated-dict context and exact reference wrapper in the s
 - Protected main 207 hashes unchanged; worker additionally checked 211 across its checkout/shared evidence.
 - Deviations: none; all 77 conditional launch slots remain unconsumed.
 - Downstream APIs: initial_arrays, request_bytes, generate_decks, validate_outputs; actual build/run bridge remains Wave 3.
+
+## 13.2.3
+- Status: accepted; strict metrics/normalization module, 22 tests and completed TODO integrated.
+- Independent per-species norms, phase/continuum/mesh inventories, signed endpoint/reaction integrals and balance implemented.
+- Executable/shim hashes bind retained artifacts; initial arrays match declared formulas; strict path and complete record validation.
+- Worker cross-adapter synthetic check: 33 profiles, 128 steps, 129 endpoints; retained raw bridge readers independently passed.
+- Fixed tiny norm error cancellation; explicit zero/near-zero scales retain uncertainties.
+- Profile-coordinate uncertainty remains explicitly unresolved without independent gradient bounds; quadrature sensitivities remain empirical.
+- Orchestrator wave checks: 145 Rust tests; 58 Python tests; 12 comparator self-checks; 34 contract self-checks; fmt/Clippy/diff passed.
+- Fixed Fortran tamper test to make only isolated copy writable; pinned main sources and all 207 protected hashes unchanged.
+- Full Cargo output used fresh `.development/12.6.1/13-regression/wave2-20260927-01.json`.
+- Deviations: none; clarified species independence applies without transfer, with separate legitimate chain-coupling coverage.
+- Study launches: zero; thresholds unassigned and M5-V remains open.
