@@ -1,0 +1,2849 @@
+{
+  "schema_version": "solute-verification-v1",
+  "units": {
+    "length": "cm",
+    "time": "hour",
+    "concentration": "C_ref",
+    "sorbed": "C_ref cm3/g",
+    "inventory": "C_ref cm",
+    "flux": "C_ref cm/hour",
+    "density": "g/cm3"
+  },
+  "limits": {
+    "nodes": 1001,
+    "print_times": 999,
+    "timeout_seconds": 60,
+    "automatic_retries": 0
+  },
+  "provenance": {
+    "authorship": "Independently authored verification cases; Example 3 parameters inherited from the derived fixture, not a recovered manual deck.",
+    "source_sha256": {
+      "src_reference/SOLUTE.FOR": "81fed6adbbd18aabe53385151166ab36d0df504a7939b54e10460c2254488910",
+      "src_reference/INPUT.FOR": "d29d073ac40611b9991f77416edcdbcf8d0affe01330675e5a08f66db1f52411",
+      "src_reference/OUTPUT.FOR": "66bed77a0375f2561c39e2d93d6e9765980dae8abdb48cd0a68c163e6a031f80",
+      "src_reference/HYDRUS.FOR": "fca01114a773b0ec9d614d17ed493a008bac82f23d22a187a10a4d4f48fbf3a9",
+      "reference/fortran_reference/solute/example3/CASE.json": "2af384afeead138cb0f1fec9b1e4b712caa4a947618d9816898d5e236aae04c0",
+      "reference/fortran_reference/solute/example3/SELECTOR.IN": "5295301f190125560c5574a0c1ca63c50f9818b13dd611ec99040b5e7e949d69",
+      "reference/fortran_reference/solute/example3/PROFILE.DAT": "81bc1fa627743fa2a6794d3b34a68e409aa00c190c871188b32596b61903a60e",
+      "reference/fortran_reference/0001-gfortran-portability.patch": "622d1ea68285257e98a169f94dec83f3df1c671a9366f651e845806cb8c00d7e",
+      "planning/master/SOURCE_MANIFEST.json": "841e6036f05707483b3b7c2e5a18ffa7a902737e103c78b0a513e1460cb0c65d"
+    }
+  },
+  "contracts": {
+    "request": "flat-ascii-v1",
+    "observation": "solute-observation-v1",
+    "manifest": "solute-manifest-v1",
+    "spec": "planning/master/SOLUTE_VERIFICATION_SPEC.md"
+  },
+  "metrics": {
+    "profile_linf": "max_i abs(C_i-Cref_i)",
+    "profile_l2": "sqrt(sum_i w_i*(C_i-Cref_i)^2/L)",
+    "profile_l1": "sum_i w_i*abs(C_i-Cref_i)/L",
+    "endpoint_linf": "max(abs(error_first),abs(error_last))",
+    "interior_linf": "max(abs(error_i), 0<i<N-1)",
+    "inventory": "theta*sum(w*C), rho*Kd*sum(w*C), and their sum; compare continuum and same-mesh truth separately",
+    "boundary": "signed inward: J(0), -J(L); instantaneous and integrated separately",
+    "reaction": "production=lambda_parent*M_parent; loss=lambda*M; independently integrate each",
+    "balance": "M(t)-M(0)-B_in(t)-B_out(t)-P(t)+Q(t)",
+    "temporal_l2": "trapezoidal time-weighted RMS on declared analysis_times",
+    "normalization": "zero scale => relative null; scale<=reference+rounding uncertainty => near_zero absolute only; otherwise relative=abs_error/scale",
+    "order": "log(E_coarse/E_fine)/log(h_coarse/h_fine); only positive resolved monotone errors with controlled other-axis contamination"
+  },
+  "cases": [
+    {
+      "id": "reaction_distinct",
+      "family": "reaction",
+      "status": "executable",
+      "blocked_reason": null,
+      "length": 2,
+      "theta": 0.43,
+      "rho": 0.8,
+      "q": 0,
+      "dispersion": 0,
+      "species": [
+        {
+          "name": "S1",
+          "kd": 0.5375,
+          "rate": 0.2
+        },
+        {
+          "name": "S2",
+          "kd": 0,
+          "rate": 0.4
+        },
+        {
+          "name": "S3",
+          "kd": 0.26875,
+          "rate": 0.1
+        }
+      ],
+      "initial": {
+        "kind": "uniform",
+        "values": [
+          1,
+          0,
+          0
+        ]
+      },
+      "boundary": {
+        "inlet": "total_flux",
+        "inlet_concentration": [
+          0,
+          0,
+          0
+        ],
+        "outlet": "zero_gradient"
+      },
+      "time_end": 4,
+      "analysis_times": [
+        1,
+        2,
+        4
+      ],
+      "hydraulics": {
+        "cos_alpha": 0,
+        "head": 0,
+        "ks": 0.43,
+        "theta_r": 0.08,
+        "alpha": 0.015,
+        "n": 1.875,
+        "pore_connectivity": 0.5
+      },
+      "chemistry": {
+        "dispersivity": 0,
+        "molecular_diffusion": 0,
+        "tortuosity": false,
+        "artificial_dispersion": false,
+        "upstream_weighting": false,
+        "epsi": 0.5,
+        "fraction": 1,
+        "immobile_water": 0
+      },
+      "analytical": {
+        "method": "reaction",
+        "status": "feasible_pending_wave3_validation",
+        "budget": {
+          "concentration_absolute": 1e-07,
+          "inventory_scaled": 1e-08,
+          "instantaneous_flux_scaled": 1e-07,
+          "cumulative_scaled": 1e-08
+        },
+        "budget_meaning": "reference evaluator admission only; no solver acceptance threshold"
+      },
+      "provenance": "Authored continuous benchmark; derivation and source mapping in SOLUTE_VERIFICATION_SPEC.md"
+    },
+    {
+      "id": "reaction_equal",
+      "family": "reaction",
+      "status": "executable",
+      "blocked_reason": null,
+      "length": 2,
+      "theta": 0.43,
+      "rho": 0.8,
+      "q": 0,
+      "dispersion": 0,
+      "species": [
+        {
+          "name": "S1",
+          "kd": 0.5375,
+          "rate": 0.2
+        },
+        {
+          "name": "S2",
+          "kd": 0,
+          "rate": 0.2
+        },
+        {
+          "name": "S3",
+          "kd": 0.26875,
+          "rate": 0
+        }
+      ],
+      "initial": {
+        "kind": "uniform",
+        "values": [
+          1,
+          0,
+          0
+        ]
+      },
+      "boundary": {
+        "inlet": "total_flux",
+        "inlet_concentration": [
+          0,
+          0,
+          0
+        ],
+        "outlet": "zero_gradient"
+      },
+      "time_end": 4,
+      "analysis_times": [
+        1,
+        2,
+        4
+      ],
+      "hydraulics": {
+        "cos_alpha": 0,
+        "head": 0,
+        "ks": 0.43,
+        "theta_r": 0.08,
+        "alpha": 0.015,
+        "n": 1.875,
+        "pore_connectivity": 0.5
+      },
+      "chemistry": {
+        "dispersivity": 0,
+        "molecular_diffusion": 0,
+        "tortuosity": false,
+        "artificial_dispersion": false,
+        "upstream_weighting": false,
+        "epsi": 0.5,
+        "fraction": 1,
+        "immobile_water": 0
+      },
+      "analytical": {
+        "method": "reaction",
+        "status": "feasible_pending_wave3_validation",
+        "budget": {
+          "concentration_absolute": 1e-07,
+          "inventory_scaled": 1e-08,
+          "instantaneous_flux_scaled": 1e-07,
+          "cumulative_scaled": 1e-08
+        },
+        "budget_meaning": "reference evaluator admission only; no solver acceptance threshold"
+      },
+      "provenance": "Authored continuous benchmark; derivation and source mapping in SOLUTE_VERIFICATION_SPEC.md"
+    },
+    {
+      "id": "reaction_zero",
+      "family": "reaction",
+      "status": "executable",
+      "blocked_reason": null,
+      "length": 2,
+      "theta": 0.43,
+      "rho": 0.8,
+      "q": 0,
+      "dispersion": 0,
+      "species": [
+        {
+          "name": "S1",
+          "kd": 0.5375,
+          "rate": 0
+        },
+        {
+          "name": "S2",
+          "kd": 0,
+          "rate": 0
+        },
+        {
+          "name": "S3",
+          "kd": 0.26875,
+          "rate": 0
+        }
+      ],
+      "initial": {
+        "kind": "uniform",
+        "values": [
+          1,
+          0.25,
+          0
+        ]
+      },
+      "boundary": {
+        "inlet": "total_flux",
+        "inlet_concentration": [
+          0,
+          0,
+          0
+        ],
+        "outlet": "zero_gradient"
+      },
+      "time_end": 4,
+      "analysis_times": [
+        1,
+        2,
+        4
+      ],
+      "hydraulics": {
+        "cos_alpha": 0,
+        "head": 0,
+        "ks": 0.43,
+        "theta_r": 0.08,
+        "alpha": 0.015,
+        "n": 1.875,
+        "pore_connectivity": 0.5
+      },
+      "chemistry": {
+        "dispersivity": 0,
+        "molecular_diffusion": 0,
+        "tortuosity": false,
+        "artificial_dispersion": false,
+        "upstream_weighting": false,
+        "epsi": 0.5,
+        "fraction": 1,
+        "immobile_water": 0
+      },
+      "analytical": {
+        "method": "reaction",
+        "status": "feasible_pending_wave3_validation",
+        "budget": {
+          "concentration_absolute": 1e-07,
+          "inventory_scaled": 1e-08,
+          "instantaneous_flux_scaled": 1e-07,
+          "cumulative_scaled": 1e-08
+        },
+        "budget_meaning": "reference evaluator admission only; no solver acceptance threshold"
+      },
+      "provenance": "Authored continuous benchmark; derivation and source mapping in SOLUTE_VERIFICATION_SPEC.md"
+    },
+    {
+      "id": "diffusion_cosine",
+      "family": "diffusion",
+      "status": "executable",
+      "blocked_reason": null,
+      "length": 2,
+      "theta": 0.43,
+      "rho": 0.8,
+      "q": 0,
+      "dispersion": 0.2,
+      "species": [
+        {
+          "name": "S1",
+          "kd": 0.5375,
+          "rate": 0
+        }
+      ],
+      "initial": {
+        "kind": "cosine",
+        "mean": 1,
+        "amplitude": 0.25,
+        "mode": 1
+      },
+      "boundary": {
+        "inlet": "total_flux",
+        "inlet_concentration": [
+          0
+        ],
+        "outlet": "zero_gradient"
+      },
+      "time_end": 1,
+      "analysis_times": [
+        0.25,
+        0.5,
+        1
+      ],
+      "hydraulics": {
+        "cos_alpha": 0,
+        "head": 0,
+        "ks": 0.43,
+        "theta_r": 0.08,
+        "alpha": 0.015,
+        "n": 1.875,
+        "pore_connectivity": 0.5
+      },
+      "chemistry": {
+        "dispersivity": 0,
+        "molecular_diffusion": 0.2,
+        "tortuosity": false,
+        "artificial_dispersion": false,
+        "upstream_weighting": false,
+        "epsi": 0.5,
+        "fraction": 1,
+        "immobile_water": 0
+      },
+      "analytical": {
+        "method": "diffusion",
+        "status": "feasible_pending_wave3_validation",
+        "budget": {
+          "concentration_absolute": 1e-07,
+          "inventory_scaled": 1e-08,
+          "instantaneous_flux_scaled": 1e-07,
+          "cumulative_scaled": 1e-08
+        },
+        "budget_meaning": "reference evaluator admission only; no solver acceptance threshold"
+      },
+      "provenance": "Authored continuous benchmark; derivation and source mapping in SOLUTE_VERIFICATION_SPEC.md"
+    },
+    {
+      "id": "scalar_robin",
+      "family": "scalar_robin",
+      "status": "executable",
+      "blocked_reason": null,
+      "length": 2,
+      "theta": 0.43,
+      "rho": 0.8,
+      "q": 0.43,
+      "dispersion": 1,
+      "species": [
+        {
+          "name": "S1",
+          "kd": 0.26875,
+          "rate": 0.2
+        }
+      ],
+      "initial": {
+        "kind": "steady_plus_mode",
+        "amplitude": 0.1,
+        "root": 0.6532711870944032,
+        "root_bracket": [
+          0.6532711870944031,
+          0.6532711870944032
+        ]
+      },
+      "boundary": {
+        "inlet": "total_flux",
+        "inlet_concentration": [
+          1
+        ],
+        "outlet": "zero_gradient"
+      },
+      "time_end": 1,
+      "analysis_times": [
+        0.25,
+        0.5,
+        1
+      ],
+      "hydraulics": {
+        "cos_alpha": 1,
+        "head": 0,
+        "ks": 0.43,
+        "theta_r": 0.08,
+        "alpha": 0.015,
+        "n": 1.875,
+        "pore_connectivity": 0.5
+      },
+      "chemistry": {
+        "dispersivity": 1.0,
+        "molecular_diffusion": 0,
+        "tortuosity": false,
+        "artificial_dispersion": false,
+        "upstream_weighting": true,
+        "epsi": 0.5,
+        "fraction": 1,
+        "immobile_water": 0
+      },
+      "analytical": {
+        "method": "scalar_robin",
+        "status": "feasible_pending_wave3_validation",
+        "budget": {
+          "concentration_absolute": 1e-07,
+          "inventory_scaled": 1e-08,
+          "instantaneous_flux_scaled": 1e-07,
+          "cumulative_scaled": 1e-08
+        },
+        "budget_meaning": "reference evaluator admission only; no solver acceptance threshold"
+      },
+      "provenance": "Authored continuous benchmark; derivation and source mapping in SOLUTE_VERIFICATION_SPEC.md"
+    },
+    {
+      "id": "example3",
+      "family": "finite_chain",
+      "status": "executable",
+      "blocked_reason": null,
+      "length": 250,
+      "theta": 0.43,
+      "rho": 0.8,
+      "q": 0.43,
+      "dispersion": 0.18,
+      "species": [
+        {
+          "name": "NH4",
+          "kd": 0.5375,
+          "rate": 0.005
+        },
+        {
+          "name": "NO2",
+          "kd": 0,
+          "rate": 0.1
+        },
+        {
+          "name": "NO3",
+          "kd": 0,
+          "rate": 0
+        }
+      ],
+      "initial": {
+        "kind": "uniform",
+        "values": [
+          0,
+          0,
+          0
+        ]
+      },
+      "boundary": {
+        "inlet": "total_flux",
+        "inlet_concentration": [
+          1,
+          0,
+          0
+        ],
+        "outlet": "zero_gradient"
+      },
+      "time_end": 200,
+      "analysis_times": [
+        50,
+        100,
+        200
+      ],
+      "hydraulics": {
+        "cos_alpha": 1,
+        "head": 0,
+        "ks": 0.43,
+        "theta_r": 0.08,
+        "alpha": 0.015,
+        "n": 1.875,
+        "pore_connectivity": 0.5
+      },
+      "chemistry": {
+        "dispersivity": 0.18,
+        "molecular_diffusion": 0,
+        "tortuosity": false,
+        "artificial_dispersion": false,
+        "upstream_weighting": true,
+        "epsi": 0.5,
+        "fraction": 1,
+        "immobile_water": 0
+      },
+      "analytical": {
+        "method": "finite_laplace_divided_differences_decimal",
+        "status": "feasible_pending_wave3_validation",
+        "budget": {
+          "concentration_absolute": 1e-07,
+          "inventory_scaled": 1e-08,
+          "instantaneous_flux_scaled": 1e-07,
+          "cumulative_scaled": 1e-08
+        },
+        "budget_meaning": "reference evaluator admission only; no solver acceptance threshold",
+        "settings": {
+          "orders": [
+            192,
+            256,
+            384
+          ],
+          "maximum_order": 512,
+          "decimal_digits": [
+            400,
+            650
+          ],
+          "uncertainty_safety_factor": 10,
+          "maximum_full_evaluations": 4
+        }
+      },
+      "provenance": "Inherited physical parameters from reference/fortran_reference/solute/example3/CASE.json; finite domain and boundary derivation is independent."
+    },
+    {
+      "id": "manufactured_forcing",
+      "family": "unsupported",
+      "status": "blocked",
+      "blocked_reason": "Arbitrary volumetric forcing requires a new public/core hook outside the approved scope.",
+      "length": 2,
+      "theta": 0.43,
+      "rho": 0.8,
+      "q": 0,
+      "dispersion": 1,
+      "species": [
+        {
+          "name": "S1",
+          "kd": 0,
+          "rate": 0
+        }
+      ],
+      "initial": {
+        "kind": "uniform",
+        "values": [
+          0
+        ]
+      },
+      "boundary": {
+        "inlet": "total_flux",
+        "inlet_concentration": [
+          0
+        ],
+        "outlet": "zero_gradient"
+      },
+      "time_end": 1,
+      "analysis_times": [
+        0.25,
+        0.5,
+        1
+      ],
+      "hydraulics": {
+        "cos_alpha": 0,
+        "head": 0,
+        "ks": 0.43,
+        "theta_r": 0.08,
+        "alpha": 0.015,
+        "n": 1.875,
+        "pore_connectivity": 0.5
+      },
+      "chemistry": {
+        "dispersivity": 0,
+        "molecular_diffusion": 1,
+        "tortuosity": false,
+        "artificial_dispersion": false,
+        "upstream_weighting": false,
+        "epsi": 0.5,
+        "fraction": 1,
+        "immobile_water": 0
+      },
+      "analytical": {
+        "method": "unsupported",
+        "status": "blocked",
+        "budget": {
+          "concentration_absolute": 1e-07,
+          "inventory_scaled": 1e-08,
+          "instantaneous_flux_scaled": 1e-07,
+          "cumulative_scaled": 1e-08
+        },
+        "budget_meaning": "reference evaluator admission only; no solver acceptance threshold"
+      },
+      "provenance": "Authored continuous benchmark; derivation and source mapping in SOLUTE_VERIFICATION_SPEC.md"
+    }
+  ],
+  "launches": [
+    {
+      "id": "benchmark-example3-bridge-fortran-baseline",
+      "phase": "benchmark",
+      "case_id": "example3",
+      "solver": "fortran",
+      "precision": "baseline",
+      "role": "bridge",
+      "axis": "bridge",
+      "nodes": 1001,
+      "dt": 0.1,
+      "sampling_interval": 50,
+      "analysis_times": [
+        50,
+        100,
+        200
+      ],
+      "timeout_seconds": 60,
+      "max_steps": 2000,
+      "estimated_output_bytes": 6541340,
+      "estimated_work_units": 6006000,
+      "status": "approved_pending_adapter_and_evaluator_gates",
+      "time_controls": {
+        "policy": "legacy_bridge",
+        "dt_min": 0.01,
+        "dt_max": 0.5,
+        "increase": 1.2,
+        "decrease": 0.5
+      }
+    },
+    {
+      "id": "benchmark-example3-bridge-rust-baseline",
+      "phase": "benchmark",
+      "case_id": "example3",
+      "solver": "rust",
+      "precision": "f64",
+      "role": "bridge",
+      "axis": "bridge",
+      "nodes": 1001,
+      "dt": 0.1,
+      "sampling_interval": 50,
+      "analysis_times": [
+        50,
+        100,
+        200
+      ],
+      "timeout_seconds": 60,
+      "max_steps": 2000,
+      "estimated_output_bytes": 6541340,
+      "estimated_work_units": 6006000,
+      "status": "approved_pending_adapter_and_evaluator_gates",
+      "time_controls": {
+        "policy": "legacy_bridge",
+        "dt_min": 0.01,
+        "dt_max": 0.5,
+        "increase": 1.2,
+        "decrease": 0.5
+      }
+    },
+    {
+      "id": "benchmark-reaction_distinct-component-fortran-baseline",
+      "phase": "benchmark",
+      "case_id": "reaction_distinct",
+      "solver": "fortran",
+      "precision": "baseline",
+      "role": "benchmark",
+      "axis": "component",
+      "nodes": 9,
+      "dt": 0.03125,
+      "sampling_interval": 0.125,
+      "analysis_times": [
+        1,
+        2,
+        4
+      ],
+      "timeout_seconds": 60,
+      "max_steps": 128,
+      "estimated_output_bytes": 2284396,
+      "estimated_work_units": 3456,
+      "status": "approved_pending_adapter_and_evaluator_gates",
+      "time_controls": {
+        "policy": "fixed",
+        "dt_min": 0.03125,
+        "dt_max": 0.03125,
+        "increase": 1,
+        "decrease": 1
+      }
+    },
+    {
+      "id": "benchmark-reaction_distinct-component-rust-baseline",
+      "phase": "benchmark",
+      "case_id": "reaction_distinct",
+      "solver": "rust",
+      "precision": "f64",
+      "role": "benchmark",
+      "axis": "component",
+      "nodes": 9,
+      "dt": 0.03125,
+      "sampling_interval": 0.125,
+      "analysis_times": [
+        1,
+        2,
+        4
+      ],
+      "timeout_seconds": 60,
+      "max_steps": 128,
+      "estimated_output_bytes": 2284396,
+      "estimated_work_units": 3456,
+      "status": "approved_pending_adapter_and_evaluator_gates",
+      "time_controls": {
+        "policy": "fixed",
+        "dt_min": 0.03125,
+        "dt_max": 0.03125,
+        "increase": 1,
+        "decrease": 1
+      }
+    },
+    {
+      "id": "benchmark-reaction_equal-component-fortran-baseline",
+      "phase": "benchmark",
+      "case_id": "reaction_equal",
+      "solver": "fortran",
+      "precision": "baseline",
+      "role": "benchmark",
+      "axis": "component",
+      "nodes": 9,
+      "dt": 0.03125,
+      "sampling_interval": 0.125,
+      "analysis_times": [
+        1,
+        2,
+        4
+      ],
+      "timeout_seconds": 60,
+      "max_steps": 128,
+      "estimated_output_bytes": 2284396,
+      "estimated_work_units": 3456,
+      "status": "approved_pending_adapter_and_evaluator_gates",
+      "time_controls": {
+        "policy": "fixed",
+        "dt_min": 0.03125,
+        "dt_max": 0.03125,
+        "increase": 1,
+        "decrease": 1
+      }
+    },
+    {
+      "id": "benchmark-reaction_equal-component-rust-baseline",
+      "phase": "benchmark",
+      "case_id": "reaction_equal",
+      "solver": "rust",
+      "precision": "f64",
+      "role": "benchmark",
+      "axis": "component",
+      "nodes": 9,
+      "dt": 0.03125,
+      "sampling_interval": 0.125,
+      "analysis_times": [
+        1,
+        2,
+        4
+      ],
+      "timeout_seconds": 60,
+      "max_steps": 128,
+      "estimated_output_bytes": 2284396,
+      "estimated_work_units": 3456,
+      "status": "approved_pending_adapter_and_evaluator_gates",
+      "time_controls": {
+        "policy": "fixed",
+        "dt_min": 0.03125,
+        "dt_max": 0.03125,
+        "increase": 1,
+        "decrease": 1
+      }
+    },
+    {
+      "id": "benchmark-reaction_zero-component-fortran-baseline",
+      "phase": "benchmark",
+      "case_id": "reaction_zero",
+      "solver": "fortran",
+      "precision": "baseline",
+      "role": "benchmark",
+      "axis": "component",
+      "nodes": 9,
+      "dt": 0.03125,
+      "sampling_interval": 0.125,
+      "analysis_times": [
+        1,
+        2,
+        4
+      ],
+      "timeout_seconds": 60,
+      "max_steps": 128,
+      "estimated_output_bytes": 2284396,
+      "estimated_work_units": 3456,
+      "status": "approved_pending_adapter_and_evaluator_gates",
+      "time_controls": {
+        "policy": "fixed",
+        "dt_min": 0.03125,
+        "dt_max": 0.03125,
+        "increase": 1,
+        "decrease": 1
+      }
+    },
+    {
+      "id": "benchmark-reaction_zero-component-rust-baseline",
+      "phase": "benchmark",
+      "case_id": "reaction_zero",
+      "solver": "rust",
+      "precision": "f64",
+      "role": "benchmark",
+      "axis": "component",
+      "nodes": 9,
+      "dt": 0.03125,
+      "sampling_interval": 0.125,
+      "analysis_times": [
+        1,
+        2,
+        4
+      ],
+      "timeout_seconds": 60,
+      "max_steps": 128,
+      "estimated_output_bytes": 2284396,
+      "estimated_work_units": 3456,
+      "status": "approved_pending_adapter_and_evaluator_gates",
+      "time_controls": {
+        "policy": "fixed",
+        "dt_min": 0.03125,
+        "dt_max": 0.03125,
+        "increase": 1,
+        "decrease": 1
+      }
+    },
+    {
+      "id": "benchmark-diffusion_cosine-component-fortran-baseline",
+      "phase": "benchmark",
+      "case_id": "diffusion_cosine",
+      "solver": "fortran",
+      "precision": "baseline",
+      "role": "benchmark",
+      "axis": "component",
+      "nodes": 65,
+      "dt": 0.000244140625,
+      "sampling_interval": 0.0625,
+      "analysis_times": [
+        0.25,
+        0.5,
+        1
+      ],
+      "timeout_seconds": 60,
+      "max_steps": 4096,
+      "estimated_output_bytes": 6312580,
+      "estimated_work_units": 266240,
+      "status": "approved_pending_adapter_and_evaluator_gates",
+      "time_controls": {
+        "policy": "fixed",
+        "dt_min": 0.000244140625,
+        "dt_max": 0.000244140625,
+        "increase": 1,
+        "decrease": 1
+      }
+    },
+    {
+      "id": "benchmark-diffusion_cosine-component-rust-baseline",
+      "phase": "benchmark",
+      "case_id": "diffusion_cosine",
+      "solver": "rust",
+      "precision": "f64",
+      "role": "benchmark",
+      "axis": "component",
+      "nodes": 65,
+      "dt": 0.000244140625,
+      "sampling_interval": 0.0625,
+      "analysis_times": [
+        0.25,
+        0.5,
+        1
+      ],
+      "timeout_seconds": 60,
+      "max_steps": 4096,
+      "estimated_output_bytes": 6312580,
+      "estimated_work_units": 266240,
+      "status": "approved_pending_adapter_and_evaluator_gates",
+      "time_controls": {
+        "policy": "fixed",
+        "dt_min": 0.000244140625,
+        "dt_max": 0.000244140625,
+        "increase": 1,
+        "decrease": 1
+      }
+    },
+    {
+      "id": "benchmark-scalar_robin-component-fortran-baseline",
+      "phase": "benchmark",
+      "case_id": "scalar_robin",
+      "solver": "fortran",
+      "precision": "baseline",
+      "role": "benchmark",
+      "axis": "component",
+      "nodes": 129,
+      "dt": 0.00390625,
+      "sampling_interval": 0.0625,
+      "analysis_times": [
+        0.25,
+        0.5,
+        1
+      ],
+      "timeout_seconds": 60,
+      "max_steps": 256,
+      "estimated_output_bytes": 2685828,
+      "estimated_work_units": 33024,
+      "status": "approved_pending_adapter_and_evaluator_gates",
+      "time_controls": {
+        "policy": "fixed",
+        "dt_min": 0.00390625,
+        "dt_max": 0.00390625,
+        "increase": 1,
+        "decrease": 1
+      }
+    },
+    {
+      "id": "benchmark-scalar_robin-component-rust-baseline",
+      "phase": "benchmark",
+      "case_id": "scalar_robin",
+      "solver": "rust",
+      "precision": "f64",
+      "role": "benchmark",
+      "axis": "component",
+      "nodes": 129,
+      "dt": 0.00390625,
+      "sampling_interval": 0.0625,
+      "analysis_times": [
+        0.25,
+        0.5,
+        1
+      ],
+      "timeout_seconds": 60,
+      "max_steps": 256,
+      "estimated_output_bytes": 2685828,
+      "estimated_work_units": 33024,
+      "status": "approved_pending_adapter_and_evaluator_gates",
+      "time_controls": {
+        "policy": "fixed",
+        "dt_min": 0.00390625,
+        "dt_max": 0.00390625,
+        "increase": 1,
+        "decrease": 1
+      }
+    },
+    {
+      "id": "benchmark-example3-component-fortran-baseline",
+      "phase": "benchmark",
+      "case_id": "example3",
+      "solver": "fortran",
+      "precision": "baseline",
+      "role": "benchmark",
+      "axis": "component",
+      "nodes": 1001,
+      "dt": 0.1,
+      "sampling_interval": 1,
+      "analysis_times": [
+        50,
+        100,
+        200
+      ],
+      "timeout_seconds": 60,
+      "max_steps": 2000,
+      "estimated_output_bytes": 59121868,
+      "estimated_work_units": 6006000,
+      "status": "approved_pending_adapter_and_evaluator_gates",
+      "time_controls": {
+        "policy": "fixed",
+        "dt_min": 0.1,
+        "dt_max": 0.1,
+        "increase": 1,
+        "decrease": 1
+      }
+    },
+    {
+      "id": "benchmark-example3-component-rust-baseline",
+      "phase": "benchmark",
+      "case_id": "example3",
+      "solver": "rust",
+      "precision": "f64",
+      "role": "benchmark",
+      "axis": "component",
+      "nodes": 1001,
+      "dt": 0.1,
+      "sampling_interval": 1,
+      "analysis_times": [
+        50,
+        100,
+        200
+      ],
+      "timeout_seconds": 60,
+      "max_steps": 2000,
+      "estimated_output_bytes": 59121868,
+      "estimated_work_units": 6006000,
+      "status": "approved_pending_adapter_and_evaluator_gates",
+      "time_controls": {
+        "policy": "fixed",
+        "dt_min": 0.1,
+        "dt_max": 0.1,
+        "increase": 1,
+        "decrease": 1
+      }
+    },
+    {
+      "id": "convergence-diffusion_cosine-space_17-fortran-baseline",
+      "phase": "convergence",
+      "case_id": "diffusion_cosine",
+      "solver": "fortran",
+      "precision": "baseline",
+      "role": "study",
+      "axis": "space",
+      "nodes": 17,
+      "dt": 0.000244140625,
+      "sampling_interval": 0.0625,
+      "analysis_times": [
+        0.25,
+        0.5,
+        1
+      ],
+      "timeout_seconds": 60,
+      "max_steps": 4096,
+      "estimated_output_bytes": 6152644,
+      "estimated_work_units": 69632,
+      "status": "approved_pending_adapter_and_evaluator_gates",
+      "time_controls": {
+        "policy": "fixed",
+        "dt_min": 0.000244140625,
+        "dt_max": 0.000244140625,
+        "increase": 1,
+        "decrease": 1
+      }
+    },
+    {
+      "id": "convergence-diffusion_cosine-space_17-rust-baseline",
+      "phase": "convergence",
+      "case_id": "diffusion_cosine",
+      "solver": "rust",
+      "precision": "f64",
+      "role": "study",
+      "axis": "space",
+      "nodes": 17,
+      "dt": 0.000244140625,
+      "sampling_interval": 0.0625,
+      "analysis_times": [
+        0.25,
+        0.5,
+        1
+      ],
+      "timeout_seconds": 60,
+      "max_steps": 4096,
+      "estimated_output_bytes": 6152644,
+      "estimated_work_units": 69632,
+      "status": "approved_pending_adapter_and_evaluator_gates",
+      "time_controls": {
+        "policy": "fixed",
+        "dt_min": 0.000244140625,
+        "dt_max": 0.000244140625,
+        "increase": 1,
+        "decrease": 1
+      }
+    },
+    {
+      "id": "convergence-diffusion_cosine-space_33-fortran-baseline",
+      "phase": "convergence",
+      "case_id": "diffusion_cosine",
+      "solver": "fortran",
+      "precision": "baseline",
+      "role": "study",
+      "axis": "space",
+      "nodes": 33,
+      "dt": 0.000244140625,
+      "sampling_interval": 0.0625,
+      "analysis_times": [
+        0.25,
+        0.5,
+        1
+      ],
+      "timeout_seconds": 60,
+      "max_steps": 4096,
+      "estimated_output_bytes": 6205956,
+      "estimated_work_units": 135168,
+      "status": "approved_pending_adapter_and_evaluator_gates",
+      "time_controls": {
+        "policy": "fixed",
+        "dt_min": 0.000244140625,
+        "dt_max": 0.000244140625,
+        "increase": 1,
+        "decrease": 1
+      }
+    },
+    {
+      "id": "convergence-diffusion_cosine-space_33-rust-baseline",
+      "phase": "convergence",
+      "case_id": "diffusion_cosine",
+      "solver": "rust",
+      "precision": "f64",
+      "role": "study",
+      "axis": "space",
+      "nodes": 33,
+      "dt": 0.000244140625,
+      "sampling_interval": 0.0625,
+      "analysis_times": [
+        0.25,
+        0.5,
+        1
+      ],
+      "timeout_seconds": 60,
+      "max_steps": 4096,
+      "estimated_output_bytes": 6205956,
+      "estimated_work_units": 135168,
+      "status": "approved_pending_adapter_and_evaluator_gates",
+      "time_controls": {
+        "policy": "fixed",
+        "dt_min": 0.000244140625,
+        "dt_max": 0.000244140625,
+        "increase": 1,
+        "decrease": 1
+      }
+    },
+    {
+      "id": "convergence-diffusion_cosine-space_65-fortran-baseline",
+      "phase": "convergence",
+      "case_id": "diffusion_cosine",
+      "solver": "fortran",
+      "precision": "baseline",
+      "role": "study",
+      "axis": "space",
+      "nodes": 65,
+      "dt": 0.000244140625,
+      "sampling_interval": 0.0625,
+      "analysis_times": [
+        0.25,
+        0.5,
+        1
+      ],
+      "timeout_seconds": 60,
+      "max_steps": 4096,
+      "estimated_output_bytes": 6312580,
+      "estimated_work_units": 266240,
+      "status": "approved_pending_adapter_and_evaluator_gates",
+      "time_controls": {
+        "policy": "fixed",
+        "dt_min": 0.000244140625,
+        "dt_max": 0.000244140625,
+        "increase": 1,
+        "decrease": 1
+      }
+    },
+    {
+      "id": "convergence-diffusion_cosine-space_65-rust-baseline",
+      "phase": "convergence",
+      "case_id": "diffusion_cosine",
+      "solver": "rust",
+      "precision": "f64",
+      "role": "study",
+      "axis": "space",
+      "nodes": 65,
+      "dt": 0.000244140625,
+      "sampling_interval": 0.0625,
+      "analysis_times": [
+        0.25,
+        0.5,
+        1
+      ],
+      "timeout_seconds": 60,
+      "max_steps": 4096,
+      "estimated_output_bytes": 6312580,
+      "estimated_work_units": 266240,
+      "status": "approved_pending_adapter_and_evaluator_gates",
+      "time_controls": {
+        "policy": "fixed",
+        "dt_min": 0.000244140625,
+        "dt_max": 0.000244140625,
+        "increase": 1,
+        "decrease": 1
+      }
+    },
+    {
+      "id": "convergence-diffusion_cosine-space_control-fortran-baseline",
+      "phase": "convergence",
+      "case_id": "diffusion_cosine",
+      "solver": "fortran",
+      "precision": "baseline",
+      "role": "control",
+      "axis": "space",
+      "nodes": 65,
+      "dt": 0.0001220703125,
+      "sampling_interval": 0.0625,
+      "analysis_times": [
+        0.25,
+        0.5,
+        1
+      ],
+      "timeout_seconds": 60,
+      "max_steps": 8192,
+      "estimated_output_bytes": 10408580,
+      "estimated_work_units": 532480,
+      "status": "approved_pending_adapter_and_evaluator_gates",
+      "time_controls": {
+        "policy": "fixed",
+        "dt_min": 0.0001220703125,
+        "dt_max": 0.0001220703125,
+        "increase": 1,
+        "decrease": 1
+      }
+    },
+    {
+      "id": "convergence-diffusion_cosine-space_control-rust-baseline",
+      "phase": "convergence",
+      "case_id": "diffusion_cosine",
+      "solver": "rust",
+      "precision": "f64",
+      "role": "control",
+      "axis": "space",
+      "nodes": 65,
+      "dt": 0.0001220703125,
+      "sampling_interval": 0.0625,
+      "analysis_times": [
+        0.25,
+        0.5,
+        1
+      ],
+      "timeout_seconds": 60,
+      "max_steps": 8192,
+      "estimated_output_bytes": 10408580,
+      "estimated_work_units": 532480,
+      "status": "approved_pending_adapter_and_evaluator_gates",
+      "time_controls": {
+        "policy": "fixed",
+        "dt_min": 0.0001220703125,
+        "dt_max": 0.0001220703125,
+        "increase": 1,
+        "decrease": 1
+      }
+    },
+    {
+      "id": "convergence-scalar_robin-space_33-fortran-baseline",
+      "phase": "convergence",
+      "case_id": "scalar_robin",
+      "solver": "fortran",
+      "precision": "baseline",
+      "role": "study",
+      "axis": "space",
+      "nodes": 33,
+      "dt": 0.00390625,
+      "sampling_interval": 0.0625,
+      "analysis_times": [
+        0.25,
+        0.5,
+        1
+      ],
+      "timeout_seconds": 60,
+      "max_steps": 256,
+      "estimated_output_bytes": 2365956,
+      "estimated_work_units": 8448,
+      "status": "approved_pending_adapter_and_evaluator_gates",
+      "time_controls": {
+        "policy": "fixed",
+        "dt_min": 0.00390625,
+        "dt_max": 0.00390625,
+        "increase": 1,
+        "decrease": 1
+      }
+    },
+    {
+      "id": "convergence-scalar_robin-space_33-rust-baseline",
+      "phase": "convergence",
+      "case_id": "scalar_robin",
+      "solver": "rust",
+      "precision": "f64",
+      "role": "study",
+      "axis": "space",
+      "nodes": 33,
+      "dt": 0.00390625,
+      "sampling_interval": 0.0625,
+      "analysis_times": [
+        0.25,
+        0.5,
+        1
+      ],
+      "timeout_seconds": 60,
+      "max_steps": 256,
+      "estimated_output_bytes": 2365956,
+      "estimated_work_units": 8448,
+      "status": "approved_pending_adapter_and_evaluator_gates",
+      "time_controls": {
+        "policy": "fixed",
+        "dt_min": 0.00390625,
+        "dt_max": 0.00390625,
+        "increase": 1,
+        "decrease": 1
+      }
+    },
+    {
+      "id": "convergence-scalar_robin-space_65-fortran-baseline",
+      "phase": "convergence",
+      "case_id": "scalar_robin",
+      "solver": "fortran",
+      "precision": "baseline",
+      "role": "study",
+      "axis": "space",
+      "nodes": 65,
+      "dt": 0.00390625,
+      "sampling_interval": 0.0625,
+      "analysis_times": [
+        0.25,
+        0.5,
+        1
+      ],
+      "timeout_seconds": 60,
+      "max_steps": 256,
+      "estimated_output_bytes": 2472580,
+      "estimated_work_units": 16640,
+      "status": "approved_pending_adapter_and_evaluator_gates",
+      "time_controls": {
+        "policy": "fixed",
+        "dt_min": 0.00390625,
+        "dt_max": 0.00390625,
+        "increase": 1,
+        "decrease": 1
+      }
+    },
+    {
+      "id": "convergence-scalar_robin-space_65-rust-baseline",
+      "phase": "convergence",
+      "case_id": "scalar_robin",
+      "solver": "rust",
+      "precision": "f64",
+      "role": "study",
+      "axis": "space",
+      "nodes": 65,
+      "dt": 0.00390625,
+      "sampling_interval": 0.0625,
+      "analysis_times": [
+        0.25,
+        0.5,
+        1
+      ],
+      "timeout_seconds": 60,
+      "max_steps": 256,
+      "estimated_output_bytes": 2472580,
+      "estimated_work_units": 16640,
+      "status": "approved_pending_adapter_and_evaluator_gates",
+      "time_controls": {
+        "policy": "fixed",
+        "dt_min": 0.00390625,
+        "dt_max": 0.00390625,
+        "increase": 1,
+        "decrease": 1
+      }
+    },
+    {
+      "id": "convergence-scalar_robin-space_129-fortran-baseline",
+      "phase": "convergence",
+      "case_id": "scalar_robin",
+      "solver": "fortran",
+      "precision": "baseline",
+      "role": "study",
+      "axis": "space",
+      "nodes": 129,
+      "dt": 0.00390625,
+      "sampling_interval": 0.0625,
+      "analysis_times": [
+        0.25,
+        0.5,
+        1
+      ],
+      "timeout_seconds": 60,
+      "max_steps": 256,
+      "estimated_output_bytes": 2685828,
+      "estimated_work_units": 33024,
+      "status": "approved_pending_adapter_and_evaluator_gates",
+      "time_controls": {
+        "policy": "fixed",
+        "dt_min": 0.00390625,
+        "dt_max": 0.00390625,
+        "increase": 1,
+        "decrease": 1
+      }
+    },
+    {
+      "id": "convergence-scalar_robin-space_129-rust-baseline",
+      "phase": "convergence",
+      "case_id": "scalar_robin",
+      "solver": "rust",
+      "precision": "f64",
+      "role": "study",
+      "axis": "space",
+      "nodes": 129,
+      "dt": 0.00390625,
+      "sampling_interval": 0.0625,
+      "analysis_times": [
+        0.25,
+        0.5,
+        1
+      ],
+      "timeout_seconds": 60,
+      "max_steps": 256,
+      "estimated_output_bytes": 2685828,
+      "estimated_work_units": 33024,
+      "status": "approved_pending_adapter_and_evaluator_gates",
+      "time_controls": {
+        "policy": "fixed",
+        "dt_min": 0.00390625,
+        "dt_max": 0.00390625,
+        "increase": 1,
+        "decrease": 1
+      }
+    },
+    {
+      "id": "convergence-scalar_robin-space_control-fortran-baseline",
+      "phase": "convergence",
+      "case_id": "scalar_robin",
+      "solver": "fortran",
+      "precision": "baseline",
+      "role": "control",
+      "axis": "space",
+      "nodes": 129,
+      "dt": 0.001953125,
+      "sampling_interval": 0.0625,
+      "analysis_times": [
+        0.25,
+        0.5,
+        1
+      ],
+      "timeout_seconds": 60,
+      "max_steps": 512,
+      "estimated_output_bytes": 2941828,
+      "estimated_work_units": 66048,
+      "status": "approved_pending_adapter_and_evaluator_gates",
+      "time_controls": {
+        "policy": "fixed",
+        "dt_min": 0.001953125,
+        "dt_max": 0.001953125,
+        "increase": 1,
+        "decrease": 1
+      }
+    },
+    {
+      "id": "convergence-scalar_robin-space_control-rust-baseline",
+      "phase": "convergence",
+      "case_id": "scalar_robin",
+      "solver": "rust",
+      "precision": "f64",
+      "role": "control",
+      "axis": "space",
+      "nodes": 129,
+      "dt": 0.001953125,
+      "sampling_interval": 0.0625,
+      "analysis_times": [
+        0.25,
+        0.5,
+        1
+      ],
+      "timeout_seconds": 60,
+      "max_steps": 512,
+      "estimated_output_bytes": 2941828,
+      "estimated_work_units": 66048,
+      "status": "approved_pending_adapter_and_evaluator_gates",
+      "time_controls": {
+        "policy": "fixed",
+        "dt_min": 0.001953125,
+        "dt_max": 0.001953125,
+        "increase": 1,
+        "decrease": 1
+      }
+    },
+    {
+      "id": "convergence-example3-space_251-fortran-baseline",
+      "phase": "convergence",
+      "case_id": "example3",
+      "solver": "fortran",
+      "precision": "baseline",
+      "role": "study",
+      "axis": "space",
+      "nodes": 251,
+      "dt": 0.025,
+      "sampling_interval": 1,
+      "analysis_times": [
+        50,
+        100,
+        200
+      ],
+      "timeout_seconds": 60,
+      "max_steps": 8000,
+      "estimated_output_bytes": 28320868,
+      "estimated_work_units": 6024000,
+      "status": "approved_pending_adapter_and_evaluator_gates",
+      "time_controls": {
+        "policy": "fixed",
+        "dt_min": 0.025,
+        "dt_max": 0.025,
+        "increase": 1,
+        "decrease": 1
+      }
+    },
+    {
+      "id": "convergence-example3-space_251-rust-baseline",
+      "phase": "convergence",
+      "case_id": "example3",
+      "solver": "rust",
+      "precision": "f64",
+      "role": "study",
+      "axis": "space",
+      "nodes": 251,
+      "dt": 0.025,
+      "sampling_interval": 1,
+      "analysis_times": [
+        50,
+        100,
+        200
+      ],
+      "timeout_seconds": 60,
+      "max_steps": 8000,
+      "estimated_output_bytes": 28320868,
+      "estimated_work_units": 6024000,
+      "status": "approved_pending_adapter_and_evaluator_gates",
+      "time_controls": {
+        "policy": "fixed",
+        "dt_min": 0.025,
+        "dt_max": 0.025,
+        "increase": 1,
+        "decrease": 1
+      }
+    },
+    {
+      "id": "convergence-example3-space_501-fortran-baseline",
+      "phase": "convergence",
+      "case_id": "example3",
+      "solver": "fortran",
+      "precision": "baseline",
+      "role": "study",
+      "axis": "space",
+      "nodes": 501,
+      "dt": 0.025,
+      "sampling_interval": 1,
+      "analysis_times": [
+        50,
+        100,
+        200
+      ],
+      "timeout_seconds": 60,
+      "max_steps": 8000,
+      "estimated_output_bytes": 41787868,
+      "estimated_work_units": 12024000,
+      "status": "approved_pending_adapter_and_evaluator_gates",
+      "time_controls": {
+        "policy": "fixed",
+        "dt_min": 0.025,
+        "dt_max": 0.025,
+        "increase": 1,
+        "decrease": 1
+      }
+    },
+    {
+      "id": "convergence-example3-space_501-rust-baseline",
+      "phase": "convergence",
+      "case_id": "example3",
+      "solver": "rust",
+      "precision": "f64",
+      "role": "study",
+      "axis": "space",
+      "nodes": 501,
+      "dt": 0.025,
+      "sampling_interval": 1,
+      "analysis_times": [
+        50,
+        100,
+        200
+      ],
+      "timeout_seconds": 60,
+      "max_steps": 8000,
+      "estimated_output_bytes": 41787868,
+      "estimated_work_units": 12024000,
+      "status": "approved_pending_adapter_and_evaluator_gates",
+      "time_controls": {
+        "policy": "fixed",
+        "dt_min": 0.025,
+        "dt_max": 0.025,
+        "increase": 1,
+        "decrease": 1
+      }
+    },
+    {
+      "id": "convergence-example3-space_1001-fortran-baseline",
+      "phase": "convergence",
+      "case_id": "example3",
+      "solver": "fortran",
+      "precision": "baseline",
+      "role": "study",
+      "axis": "space",
+      "nodes": 1001,
+      "dt": 0.025,
+      "sampling_interval": 1,
+      "analysis_times": [
+        50,
+        100,
+        200
+      ],
+      "timeout_seconds": 60,
+      "max_steps": 8000,
+      "estimated_output_bytes": 68721868,
+      "estimated_work_units": 24024000,
+      "status": "approved_pending_adapter_and_evaluator_gates",
+      "time_controls": {
+        "policy": "fixed",
+        "dt_min": 0.025,
+        "dt_max": 0.025,
+        "increase": 1,
+        "decrease": 1
+      }
+    },
+    {
+      "id": "convergence-example3-space_1001-rust-baseline",
+      "phase": "convergence",
+      "case_id": "example3",
+      "solver": "rust",
+      "precision": "f64",
+      "role": "study",
+      "axis": "space",
+      "nodes": 1001,
+      "dt": 0.025,
+      "sampling_interval": 1,
+      "analysis_times": [
+        50,
+        100,
+        200
+      ],
+      "timeout_seconds": 60,
+      "max_steps": 8000,
+      "estimated_output_bytes": 68721868,
+      "estimated_work_units": 24024000,
+      "status": "approved_pending_adapter_and_evaluator_gates",
+      "time_controls": {
+        "policy": "fixed",
+        "dt_min": 0.025,
+        "dt_max": 0.025,
+        "increase": 1,
+        "decrease": 1
+      }
+    },
+    {
+      "id": "convergence-example3-space_control-fortran-baseline",
+      "phase": "convergence",
+      "case_id": "example3",
+      "solver": "fortran",
+      "precision": "baseline",
+      "role": "control",
+      "axis": "space",
+      "nodes": 1001,
+      "dt": 0.0125,
+      "sampling_interval": 1,
+      "analysis_times": [
+        50,
+        100,
+        200
+      ],
+      "timeout_seconds": 60,
+      "max_steps": 16000,
+      "estimated_output_bytes": 81521868,
+      "estimated_work_units": 48048000,
+      "status": "approved_pending_adapter_and_evaluator_gates",
+      "time_controls": {
+        "policy": "fixed",
+        "dt_min": 0.0125,
+        "dt_max": 0.0125,
+        "increase": 1,
+        "decrease": 1
+      }
+    },
+    {
+      "id": "convergence-example3-space_control-rust-baseline",
+      "phase": "convergence",
+      "case_id": "example3",
+      "solver": "rust",
+      "precision": "f64",
+      "role": "control",
+      "axis": "space",
+      "nodes": 1001,
+      "dt": 0.0125,
+      "sampling_interval": 1,
+      "analysis_times": [
+        50,
+        100,
+        200
+      ],
+      "timeout_seconds": 60,
+      "max_steps": 16000,
+      "estimated_output_bytes": 81521868,
+      "estimated_work_units": 48048000,
+      "status": "approved_pending_adapter_and_evaluator_gates",
+      "time_controls": {
+        "policy": "fixed",
+        "dt_min": 0.0125,
+        "dt_max": 0.0125,
+        "increase": 1,
+        "decrease": 1
+      }
+    },
+    {
+      "id": "convergence-reaction_distinct-time_0.125-fortran-baseline",
+      "phase": "convergence",
+      "case_id": "reaction_distinct",
+      "solver": "fortran",
+      "precision": "baseline",
+      "role": "study",
+      "axis": "time",
+      "nodes": 9,
+      "dt": 0.125,
+      "sampling_interval": 0.125,
+      "analysis_times": [
+        1,
+        2,
+        4
+      ],
+      "timeout_seconds": 60,
+      "max_steps": 32,
+      "estimated_output_bytes": 2130796,
+      "estimated_work_units": 864,
+      "status": "approved_pending_adapter_and_evaluator_gates",
+      "time_controls": {
+        "policy": "fixed",
+        "dt_min": 0.125,
+        "dt_max": 0.125,
+        "increase": 1,
+        "decrease": 1
+      }
+    },
+    {
+      "id": "convergence-reaction_distinct-time_0.125-rust-baseline",
+      "phase": "convergence",
+      "case_id": "reaction_distinct",
+      "solver": "rust",
+      "precision": "f64",
+      "role": "study",
+      "axis": "time",
+      "nodes": 9,
+      "dt": 0.125,
+      "sampling_interval": 0.125,
+      "analysis_times": [
+        1,
+        2,
+        4
+      ],
+      "timeout_seconds": 60,
+      "max_steps": 32,
+      "estimated_output_bytes": 2130796,
+      "estimated_work_units": 864,
+      "status": "approved_pending_adapter_and_evaluator_gates",
+      "time_controls": {
+        "policy": "fixed",
+        "dt_min": 0.125,
+        "dt_max": 0.125,
+        "increase": 1,
+        "decrease": 1
+      }
+    },
+    {
+      "id": "convergence-reaction_distinct-time_0.0625-fortran-baseline",
+      "phase": "convergence",
+      "case_id": "reaction_distinct",
+      "solver": "fortran",
+      "precision": "baseline",
+      "role": "study",
+      "axis": "time",
+      "nodes": 9,
+      "dt": 0.0625,
+      "sampling_interval": 0.125,
+      "analysis_times": [
+        1,
+        2,
+        4
+      ],
+      "timeout_seconds": 60,
+      "max_steps": 64,
+      "estimated_output_bytes": 2181996,
+      "estimated_work_units": 1728,
+      "status": "approved_pending_adapter_and_evaluator_gates",
+      "time_controls": {
+        "policy": "fixed",
+        "dt_min": 0.0625,
+        "dt_max": 0.0625,
+        "increase": 1,
+        "decrease": 1
+      }
+    },
+    {
+      "id": "convergence-reaction_distinct-time_0.0625-rust-baseline",
+      "phase": "convergence",
+      "case_id": "reaction_distinct",
+      "solver": "rust",
+      "precision": "f64",
+      "role": "study",
+      "axis": "time",
+      "nodes": 9,
+      "dt": 0.0625,
+      "sampling_interval": 0.125,
+      "analysis_times": [
+        1,
+        2,
+        4
+      ],
+      "timeout_seconds": 60,
+      "max_steps": 64,
+      "estimated_output_bytes": 2181996,
+      "estimated_work_units": 1728,
+      "status": "approved_pending_adapter_and_evaluator_gates",
+      "time_controls": {
+        "policy": "fixed",
+        "dt_min": 0.0625,
+        "dt_max": 0.0625,
+        "increase": 1,
+        "decrease": 1
+      }
+    },
+    {
+      "id": "convergence-reaction_distinct-time_0.03125-fortran-baseline",
+      "phase": "convergence",
+      "case_id": "reaction_distinct",
+      "solver": "fortran",
+      "precision": "baseline",
+      "role": "study",
+      "axis": "time",
+      "nodes": 9,
+      "dt": 0.03125,
+      "sampling_interval": 0.125,
+      "analysis_times": [
+        1,
+        2,
+        4
+      ],
+      "timeout_seconds": 60,
+      "max_steps": 128,
+      "estimated_output_bytes": 2284396,
+      "estimated_work_units": 3456,
+      "status": "approved_pending_adapter_and_evaluator_gates",
+      "time_controls": {
+        "policy": "fixed",
+        "dt_min": 0.03125,
+        "dt_max": 0.03125,
+        "increase": 1,
+        "decrease": 1
+      }
+    },
+    {
+      "id": "convergence-reaction_distinct-time_0.03125-rust-baseline",
+      "phase": "convergence",
+      "case_id": "reaction_distinct",
+      "solver": "rust",
+      "precision": "f64",
+      "role": "study",
+      "axis": "time",
+      "nodes": 9,
+      "dt": 0.03125,
+      "sampling_interval": 0.125,
+      "analysis_times": [
+        1,
+        2,
+        4
+      ],
+      "timeout_seconds": 60,
+      "max_steps": 128,
+      "estimated_output_bytes": 2284396,
+      "estimated_work_units": 3456,
+      "status": "approved_pending_adapter_and_evaluator_gates",
+      "time_controls": {
+        "policy": "fixed",
+        "dt_min": 0.03125,
+        "dt_max": 0.03125,
+        "increase": 1,
+        "decrease": 1
+      }
+    },
+    {
+      "id": "convergence-reaction_distinct-time_control-fortran-baseline",
+      "phase": "convergence",
+      "case_id": "reaction_distinct",
+      "solver": "fortran",
+      "precision": "baseline",
+      "role": "control",
+      "axis": "time",
+      "nodes": 17,
+      "dt": 0.03125,
+      "sampling_interval": 0.125,
+      "analysis_times": [
+        1,
+        2,
+        4
+      ],
+      "timeout_seconds": 60,
+      "max_steps": 128,
+      "estimated_output_bytes": 2355148,
+      "estimated_work_units": 6528,
+      "status": "approved_pending_adapter_and_evaluator_gates",
+      "time_controls": {
+        "policy": "fixed",
+        "dt_min": 0.03125,
+        "dt_max": 0.03125,
+        "increase": 1,
+        "decrease": 1
+      }
+    },
+    {
+      "id": "convergence-reaction_distinct-time_control-rust-baseline",
+      "phase": "convergence",
+      "case_id": "reaction_distinct",
+      "solver": "rust",
+      "precision": "f64",
+      "role": "control",
+      "axis": "time",
+      "nodes": 17,
+      "dt": 0.03125,
+      "sampling_interval": 0.125,
+      "analysis_times": [
+        1,
+        2,
+        4
+      ],
+      "timeout_seconds": 60,
+      "max_steps": 128,
+      "estimated_output_bytes": 2355148,
+      "estimated_work_units": 6528,
+      "status": "approved_pending_adapter_and_evaluator_gates",
+      "time_controls": {
+        "policy": "fixed",
+        "dt_min": 0.03125,
+        "dt_max": 0.03125,
+        "increase": 1,
+        "decrease": 1
+      }
+    },
+    {
+      "id": "convergence-diffusion_cosine-time_0.0625-fortran-baseline",
+      "phase": "convergence",
+      "case_id": "diffusion_cosine",
+      "solver": "fortran",
+      "precision": "baseline",
+      "role": "study",
+      "axis": "time",
+      "nodes": 257,
+      "dt": 0.0625,
+      "sampling_interval": 0.0625,
+      "analysis_times": [
+        0.25,
+        0.5,
+        1
+      ],
+      "timeout_seconds": 60,
+      "max_steps": 16,
+      "estimated_output_bytes": 2872324,
+      "estimated_work_units": 4112,
+      "status": "approved_pending_adapter_and_evaluator_gates",
+      "time_controls": {
+        "policy": "fixed",
+        "dt_min": 0.0625,
+        "dt_max": 0.0625,
+        "increase": 1,
+        "decrease": 1
+      }
+    },
+    {
+      "id": "convergence-diffusion_cosine-time_0.0625-rust-baseline",
+      "phase": "convergence",
+      "case_id": "diffusion_cosine",
+      "solver": "rust",
+      "precision": "f64",
+      "role": "study",
+      "axis": "time",
+      "nodes": 257,
+      "dt": 0.0625,
+      "sampling_interval": 0.0625,
+      "analysis_times": [
+        0.25,
+        0.5,
+        1
+      ],
+      "timeout_seconds": 60,
+      "max_steps": 16,
+      "estimated_output_bytes": 2872324,
+      "estimated_work_units": 4112,
+      "status": "approved_pending_adapter_and_evaluator_gates",
+      "time_controls": {
+        "policy": "fixed",
+        "dt_min": 0.0625,
+        "dt_max": 0.0625,
+        "increase": 1,
+        "decrease": 1
+      }
+    },
+    {
+      "id": "convergence-diffusion_cosine-time_0.03125-fortran-baseline",
+      "phase": "convergence",
+      "case_id": "diffusion_cosine",
+      "solver": "fortran",
+      "precision": "baseline",
+      "role": "study",
+      "axis": "time",
+      "nodes": 257,
+      "dt": 0.03125,
+      "sampling_interval": 0.0625,
+      "analysis_times": [
+        0.25,
+        0.5,
+        1
+      ],
+      "timeout_seconds": 60,
+      "max_steps": 32,
+      "estimated_output_bytes": 2888324,
+      "estimated_work_units": 8224,
+      "status": "approved_pending_adapter_and_evaluator_gates",
+      "time_controls": {
+        "policy": "fixed",
+        "dt_min": 0.03125,
+        "dt_max": 0.03125,
+        "increase": 1,
+        "decrease": 1
+      }
+    },
+    {
+      "id": "convergence-diffusion_cosine-time_0.03125-rust-baseline",
+      "phase": "convergence",
+      "case_id": "diffusion_cosine",
+      "solver": "rust",
+      "precision": "f64",
+      "role": "study",
+      "axis": "time",
+      "nodes": 257,
+      "dt": 0.03125,
+      "sampling_interval": 0.0625,
+      "analysis_times": [
+        0.25,
+        0.5,
+        1
+      ],
+      "timeout_seconds": 60,
+      "max_steps": 32,
+      "estimated_output_bytes": 2888324,
+      "estimated_work_units": 8224,
+      "status": "approved_pending_adapter_and_evaluator_gates",
+      "time_controls": {
+        "policy": "fixed",
+        "dt_min": 0.03125,
+        "dt_max": 0.03125,
+        "increase": 1,
+        "decrease": 1
+      }
+    },
+    {
+      "id": "convergence-diffusion_cosine-time_0.015625-fortran-baseline",
+      "phase": "convergence",
+      "case_id": "diffusion_cosine",
+      "solver": "fortran",
+      "precision": "baseline",
+      "role": "study",
+      "axis": "time",
+      "nodes": 257,
+      "dt": 0.015625,
+      "sampling_interval": 0.0625,
+      "analysis_times": [
+        0.25,
+        0.5,
+        1
+      ],
+      "timeout_seconds": 60,
+      "max_steps": 64,
+      "estimated_output_bytes": 2920324,
+      "estimated_work_units": 16448,
+      "status": "approved_pending_adapter_and_evaluator_gates",
+      "time_controls": {
+        "policy": "fixed",
+        "dt_min": 0.015625,
+        "dt_max": 0.015625,
+        "increase": 1,
+        "decrease": 1
+      }
+    },
+    {
+      "id": "convergence-diffusion_cosine-time_0.015625-rust-baseline",
+      "phase": "convergence",
+      "case_id": "diffusion_cosine",
+      "solver": "rust",
+      "precision": "f64",
+      "role": "study",
+      "axis": "time",
+      "nodes": 257,
+      "dt": 0.015625,
+      "sampling_interval": 0.0625,
+      "analysis_times": [
+        0.25,
+        0.5,
+        1
+      ],
+      "timeout_seconds": 60,
+      "max_steps": 64,
+      "estimated_output_bytes": 2920324,
+      "estimated_work_units": 16448,
+      "status": "approved_pending_adapter_and_evaluator_gates",
+      "time_controls": {
+        "policy": "fixed",
+        "dt_min": 0.015625,
+        "dt_max": 0.015625,
+        "increase": 1,
+        "decrease": 1
+      }
+    },
+    {
+      "id": "convergence-diffusion_cosine-time_control-fortran-baseline",
+      "phase": "convergence",
+      "case_id": "diffusion_cosine",
+      "solver": "fortran",
+      "precision": "baseline",
+      "role": "control",
+      "axis": "time",
+      "nodes": 513,
+      "dt": 0.015625,
+      "sampling_interval": 0.0625,
+      "analysis_times": [
+        0.25,
+        0.5,
+        1
+      ],
+      "timeout_seconds": 60,
+      "max_steps": 64,
+      "estimated_output_bytes": 3773316,
+      "estimated_work_units": 32832,
+      "status": "approved_pending_adapter_and_evaluator_gates",
+      "time_controls": {
+        "policy": "fixed",
+        "dt_min": 0.015625,
+        "dt_max": 0.015625,
+        "increase": 1,
+        "decrease": 1
+      }
+    },
+    {
+      "id": "convergence-diffusion_cosine-time_control-rust-baseline",
+      "phase": "convergence",
+      "case_id": "diffusion_cosine",
+      "solver": "rust",
+      "precision": "f64",
+      "role": "control",
+      "axis": "time",
+      "nodes": 513,
+      "dt": 0.015625,
+      "sampling_interval": 0.0625,
+      "analysis_times": [
+        0.25,
+        0.5,
+        1
+      ],
+      "timeout_seconds": 60,
+      "max_steps": 64,
+      "estimated_output_bytes": 3773316,
+      "estimated_work_units": 32832,
+      "status": "approved_pending_adapter_and_evaluator_gates",
+      "time_controls": {
+        "policy": "fixed",
+        "dt_min": 0.015625,
+        "dt_max": 0.015625,
+        "increase": 1,
+        "decrease": 1
+      }
+    },
+    {
+      "id": "convergence-scalar_robin-time_0.0625-fortran-baseline",
+      "phase": "convergence",
+      "case_id": "scalar_robin",
+      "solver": "fortran",
+      "precision": "baseline",
+      "role": "study",
+      "axis": "time",
+      "nodes": 257,
+      "dt": 0.0625,
+      "sampling_interval": 0.0625,
+      "analysis_times": [
+        0.25,
+        0.5,
+        1
+      ],
+      "timeout_seconds": 60,
+      "max_steps": 16,
+      "estimated_output_bytes": 2872324,
+      "estimated_work_units": 4112,
+      "status": "approved_pending_adapter_and_evaluator_gates",
+      "time_controls": {
+        "policy": "fixed",
+        "dt_min": 0.0625,
+        "dt_max": 0.0625,
+        "increase": 1,
+        "decrease": 1
+      }
+    },
+    {
+      "id": "convergence-scalar_robin-time_0.0625-rust-baseline",
+      "phase": "convergence",
+      "case_id": "scalar_robin",
+      "solver": "rust",
+      "precision": "f64",
+      "role": "study",
+      "axis": "time",
+      "nodes": 257,
+      "dt": 0.0625,
+      "sampling_interval": 0.0625,
+      "analysis_times": [
+        0.25,
+        0.5,
+        1
+      ],
+      "timeout_seconds": 60,
+      "max_steps": 16,
+      "estimated_output_bytes": 2872324,
+      "estimated_work_units": 4112,
+      "status": "approved_pending_adapter_and_evaluator_gates",
+      "time_controls": {
+        "policy": "fixed",
+        "dt_min": 0.0625,
+        "dt_max": 0.0625,
+        "increase": 1,
+        "decrease": 1
+      }
+    },
+    {
+      "id": "convergence-scalar_robin-time_0.03125-fortran-baseline",
+      "phase": "convergence",
+      "case_id": "scalar_robin",
+      "solver": "fortran",
+      "precision": "baseline",
+      "role": "study",
+      "axis": "time",
+      "nodes": 257,
+      "dt": 0.03125,
+      "sampling_interval": 0.0625,
+      "analysis_times": [
+        0.25,
+        0.5,
+        1
+      ],
+      "timeout_seconds": 60,
+      "max_steps": 32,
+      "estimated_output_bytes": 2888324,
+      "estimated_work_units": 8224,
+      "status": "approved_pending_adapter_and_evaluator_gates",
+      "time_controls": {
+        "policy": "fixed",
+        "dt_min": 0.03125,
+        "dt_max": 0.03125,
+        "increase": 1,
+        "decrease": 1
+      }
+    },
+    {
+      "id": "convergence-scalar_robin-time_0.03125-rust-baseline",
+      "phase": "convergence",
+      "case_id": "scalar_robin",
+      "solver": "rust",
+      "precision": "f64",
+      "role": "study",
+      "axis": "time",
+      "nodes": 257,
+      "dt": 0.03125,
+      "sampling_interval": 0.0625,
+      "analysis_times": [
+        0.25,
+        0.5,
+        1
+      ],
+      "timeout_seconds": 60,
+      "max_steps": 32,
+      "estimated_output_bytes": 2888324,
+      "estimated_work_units": 8224,
+      "status": "approved_pending_adapter_and_evaluator_gates",
+      "time_controls": {
+        "policy": "fixed",
+        "dt_min": 0.03125,
+        "dt_max": 0.03125,
+        "increase": 1,
+        "decrease": 1
+      }
+    },
+    {
+      "id": "convergence-scalar_robin-time_0.015625-fortran-baseline",
+      "phase": "convergence",
+      "case_id": "scalar_robin",
+      "solver": "fortran",
+      "precision": "baseline",
+      "role": "study",
+      "axis": "time",
+      "nodes": 257,
+      "dt": 0.015625,
+      "sampling_interval": 0.0625,
+      "analysis_times": [
+        0.25,
+        0.5,
+        1
+      ],
+      "timeout_seconds": 60,
+      "max_steps": 64,
+      "estimated_output_bytes": 2920324,
+      "estimated_work_units": 16448,
+      "status": "approved_pending_adapter_and_evaluator_gates",
+      "time_controls": {
+        "policy": "fixed",
+        "dt_min": 0.015625,
+        "dt_max": 0.015625,
+        "increase": 1,
+        "decrease": 1
+      }
+    },
+    {
+      "id": "convergence-scalar_robin-time_0.015625-rust-baseline",
+      "phase": "convergence",
+      "case_id": "scalar_robin",
+      "solver": "rust",
+      "precision": "f64",
+      "role": "study",
+      "axis": "time",
+      "nodes": 257,
+      "dt": 0.015625,
+      "sampling_interval": 0.0625,
+      "analysis_times": [
+        0.25,
+        0.5,
+        1
+      ],
+      "timeout_seconds": 60,
+      "max_steps": 64,
+      "estimated_output_bytes": 2920324,
+      "estimated_work_units": 16448,
+      "status": "approved_pending_adapter_and_evaluator_gates",
+      "time_controls": {
+        "policy": "fixed",
+        "dt_min": 0.015625,
+        "dt_max": 0.015625,
+        "increase": 1,
+        "decrease": 1
+      }
+    },
+    {
+      "id": "convergence-scalar_robin-time_control-fortran-baseline",
+      "phase": "convergence",
+      "case_id": "scalar_robin",
+      "solver": "fortran",
+      "precision": "baseline",
+      "role": "control",
+      "axis": "time",
+      "nodes": 513,
+      "dt": 0.015625,
+      "sampling_interval": 0.0625,
+      "analysis_times": [
+        0.25,
+        0.5,
+        1
+      ],
+      "timeout_seconds": 60,
+      "max_steps": 64,
+      "estimated_output_bytes": 3773316,
+      "estimated_work_units": 32832,
+      "status": "approved_pending_adapter_and_evaluator_gates",
+      "time_controls": {
+        "policy": "fixed",
+        "dt_min": 0.015625,
+        "dt_max": 0.015625,
+        "increase": 1,
+        "decrease": 1
+      }
+    },
+    {
+      "id": "convergence-scalar_robin-time_control-rust-baseline",
+      "phase": "convergence",
+      "case_id": "scalar_robin",
+      "solver": "rust",
+      "precision": "f64",
+      "role": "control",
+      "axis": "time",
+      "nodes": 513,
+      "dt": 0.015625,
+      "sampling_interval": 0.0625,
+      "analysis_times": [
+        0.25,
+        0.5,
+        1
+      ],
+      "timeout_seconds": 60,
+      "max_steps": 64,
+      "estimated_output_bytes": 3773316,
+      "estimated_work_units": 32832,
+      "status": "approved_pending_adapter_and_evaluator_gates",
+      "time_controls": {
+        "policy": "fixed",
+        "dt_min": 0.015625,
+        "dt_max": 0.015625,
+        "increase": 1,
+        "decrease": 1
+      }
+    },
+    {
+      "id": "convergence-example3-time_0.2-fortran-baseline",
+      "phase": "convergence",
+      "case_id": "example3",
+      "solver": "fortran",
+      "precision": "baseline",
+      "role": "study",
+      "axis": "time",
+      "nodes": 1001,
+      "dt": 0.2,
+      "sampling_interval": 1,
+      "analysis_times": [
+        50,
+        100,
+        200
+      ],
+      "timeout_seconds": 60,
+      "max_steps": 1000,
+      "estimated_output_bytes": 57521868,
+      "estimated_work_units": 3003000,
+      "status": "approved_pending_adapter_and_evaluator_gates",
+      "time_controls": {
+        "policy": "fixed",
+        "dt_min": 0.2,
+        "dt_max": 0.2,
+        "increase": 1,
+        "decrease": 1
+      }
+    },
+    {
+      "id": "convergence-example3-time_0.2-rust-baseline",
+      "phase": "convergence",
+      "case_id": "example3",
+      "solver": "rust",
+      "precision": "f64",
+      "role": "study",
+      "axis": "time",
+      "nodes": 1001,
+      "dt": 0.2,
+      "sampling_interval": 1,
+      "analysis_times": [
+        50,
+        100,
+        200
+      ],
+      "timeout_seconds": 60,
+      "max_steps": 1000,
+      "estimated_output_bytes": 57521868,
+      "estimated_work_units": 3003000,
+      "status": "approved_pending_adapter_and_evaluator_gates",
+      "time_controls": {
+        "policy": "fixed",
+        "dt_min": 0.2,
+        "dt_max": 0.2,
+        "increase": 1,
+        "decrease": 1
+      }
+    },
+    {
+      "id": "convergence-example3-time_0.1-fortran-baseline",
+      "phase": "convergence",
+      "case_id": "example3",
+      "solver": "fortran",
+      "precision": "baseline",
+      "role": "study",
+      "axis": "time",
+      "nodes": 1001,
+      "dt": 0.1,
+      "sampling_interval": 1,
+      "analysis_times": [
+        50,
+        100,
+        200
+      ],
+      "timeout_seconds": 60,
+      "max_steps": 2000,
+      "estimated_output_bytes": 59121868,
+      "estimated_work_units": 6006000,
+      "status": "approved_pending_adapter_and_evaluator_gates",
+      "time_controls": {
+        "policy": "fixed",
+        "dt_min": 0.1,
+        "dt_max": 0.1,
+        "increase": 1,
+        "decrease": 1
+      }
+    },
+    {
+      "id": "convergence-example3-time_0.1-rust-baseline",
+      "phase": "convergence",
+      "case_id": "example3",
+      "solver": "rust",
+      "precision": "f64",
+      "role": "study",
+      "axis": "time",
+      "nodes": 1001,
+      "dt": 0.1,
+      "sampling_interval": 1,
+      "analysis_times": [
+        50,
+        100,
+        200
+      ],
+      "timeout_seconds": 60,
+      "max_steps": 2000,
+      "estimated_output_bytes": 59121868,
+      "estimated_work_units": 6006000,
+      "status": "approved_pending_adapter_and_evaluator_gates",
+      "time_controls": {
+        "policy": "fixed",
+        "dt_min": 0.1,
+        "dt_max": 0.1,
+        "increase": 1,
+        "decrease": 1
+      }
+    },
+    {
+      "id": "convergence-example3-time_0.05-fortran-baseline",
+      "phase": "convergence",
+      "case_id": "example3",
+      "solver": "fortran",
+      "precision": "baseline",
+      "role": "study",
+      "axis": "time",
+      "nodes": 1001,
+      "dt": 0.05,
+      "sampling_interval": 1,
+      "analysis_times": [
+        50,
+        100,
+        200
+      ],
+      "timeout_seconds": 60,
+      "max_steps": 4000,
+      "estimated_output_bytes": 62321868,
+      "estimated_work_units": 12012000,
+      "status": "approved_pending_adapter_and_evaluator_gates",
+      "time_controls": {
+        "policy": "fixed",
+        "dt_min": 0.05,
+        "dt_max": 0.05,
+        "increase": 1,
+        "decrease": 1
+      }
+    },
+    {
+      "id": "convergence-example3-time_0.05-rust-baseline",
+      "phase": "convergence",
+      "case_id": "example3",
+      "solver": "rust",
+      "precision": "f64",
+      "role": "study",
+      "axis": "time",
+      "nodes": 1001,
+      "dt": 0.05,
+      "sampling_interval": 1,
+      "analysis_times": [
+        50,
+        100,
+        200
+      ],
+      "timeout_seconds": 60,
+      "max_steps": 4000,
+      "estimated_output_bytes": 62321868,
+      "estimated_work_units": 12012000,
+      "status": "approved_pending_adapter_and_evaluator_gates",
+      "time_controls": {
+        "policy": "fixed",
+        "dt_min": 0.05,
+        "dt_max": 0.05,
+        "increase": 1,
+        "decrease": 1
+      }
+    },
+    {
+      "id": "convergence-example3-time_control-fortran-baseline",
+      "phase": "convergence",
+      "case_id": "example3",
+      "solver": "fortran",
+      "precision": "baseline",
+      "role": "control",
+      "axis": "time",
+      "nodes": 501,
+      "dt": 0.05,
+      "sampling_interval": 1,
+      "analysis_times": [
+        50,
+        100,
+        200
+      ],
+      "timeout_seconds": 60,
+      "max_steps": 4000,
+      "estimated_output_bytes": 35387868,
+      "estimated_work_units": 6012000,
+      "status": "approved_pending_adapter_and_evaluator_gates",
+      "time_controls": {
+        "policy": "fixed",
+        "dt_min": 0.05,
+        "dt_max": 0.05,
+        "increase": 1,
+        "decrease": 1
+      }
+    },
+    {
+      "id": "convergence-example3-time_control-rust-baseline",
+      "phase": "convergence",
+      "case_id": "example3",
+      "solver": "rust",
+      "precision": "f64",
+      "role": "control",
+      "axis": "time",
+      "nodes": 501,
+      "dt": 0.05,
+      "sampling_interval": 1,
+      "analysis_times": [
+        50,
+        100,
+        200
+      ],
+      "timeout_seconds": 60,
+      "max_steps": 4000,
+      "estimated_output_bytes": 35387868,
+      "estimated_work_units": 6012000,
+      "status": "approved_pending_adapter_and_evaluator_gates",
+      "time_controls": {
+        "policy": "fixed",
+        "dt_min": 0.05,
+        "dt_max": 0.05,
+        "increase": 1,
+        "decrease": 1
+      }
+    },
+    {
+      "id": "convergence-example3-precision-fortran-promoted-real",
+      "phase": "convergence",
+      "case_id": "example3",
+      "solver": "fortran",
+      "precision": "promoted-real",
+      "role": "sensitivity",
+      "axis": "precision",
+      "nodes": 1001,
+      "dt": 0.1,
+      "sampling_interval": 1,
+      "analysis_times": [
+        50,
+        100,
+        200
+      ],
+      "timeout_seconds": 60,
+      "max_steps": 2000,
+      "estimated_output_bytes": 59121868,
+      "estimated_work_units": 6006000,
+      "status": "approved_pending_adapter_and_evaluator_gates",
+      "time_controls": {
+        "policy": "fixed",
+        "dt_min": 0.1,
+        "dt_max": 0.1,
+        "increase": 1,
+        "decrease": 1
+      }
+    },
+    {
+      "id": "holdout-diffusion_cosine-holdout-fortran-baseline",
+      "phase": "holdout",
+      "case_id": "diffusion_cosine",
+      "solver": "fortran",
+      "precision": "baseline",
+      "role": "holdout",
+      "axis": "holdout",
+      "nodes": 97,
+      "dt": 0.0078125,
+      "sampling_interval": 0.0625,
+      "analysis_times": [
+        0.375,
+        0.75,
+        1
+      ],
+      "timeout_seconds": 60,
+      "max_steps": 128,
+      "estimated_output_bytes": 2451204,
+      "estimated_work_units": 12416,
+      "status": "approved_pending_adapter_and_evaluator_gates",
+      "time_controls": {
+        "policy": "fixed",
+        "dt_min": 0.0078125,
+        "dt_max": 0.0078125,
+        "increase": 1,
+        "decrease": 1
+      }
+    },
+    {
+      "id": "holdout-diffusion_cosine-holdout-rust-baseline",
+      "phase": "holdout",
+      "case_id": "diffusion_cosine",
+      "solver": "rust",
+      "precision": "f64",
+      "role": "holdout",
+      "axis": "holdout",
+      "nodes": 97,
+      "dt": 0.0078125,
+      "sampling_interval": 0.0625,
+      "analysis_times": [
+        0.375,
+        0.75,
+        1
+      ],
+      "timeout_seconds": 60,
+      "max_steps": 128,
+      "estimated_output_bytes": 2451204,
+      "estimated_work_units": 12416,
+      "status": "approved_pending_adapter_and_evaluator_gates",
+      "time_controls": {
+        "policy": "fixed",
+        "dt_min": 0.0078125,
+        "dt_max": 0.0078125,
+        "increase": 1,
+        "decrease": 1
+      }
+    },
+    {
+      "id": "holdout-scalar_robin-holdout-fortran-baseline",
+      "phase": "holdout",
+      "case_id": "scalar_robin",
+      "solver": "fortran",
+      "precision": "baseline",
+      "role": "holdout",
+      "axis": "holdout",
+      "nodes": 193,
+      "dt": 0.0078125,
+      "sampling_interval": 0.0625,
+      "analysis_times": [
+        0.375,
+        0.75,
+        1
+      ],
+      "timeout_seconds": 60,
+      "max_steps": 128,
+      "estimated_output_bytes": 2771076,
+      "estimated_work_units": 24704,
+      "status": "approved_pending_adapter_and_evaluator_gates",
+      "time_controls": {
+        "policy": "fixed",
+        "dt_min": 0.0078125,
+        "dt_max": 0.0078125,
+        "increase": 1,
+        "decrease": 1
+      }
+    },
+    {
+      "id": "holdout-scalar_robin-holdout-rust-baseline",
+      "phase": "holdout",
+      "case_id": "scalar_robin",
+      "solver": "rust",
+      "precision": "f64",
+      "role": "holdout",
+      "axis": "holdout",
+      "nodes": 193,
+      "dt": 0.0078125,
+      "sampling_interval": 0.0625,
+      "analysis_times": [
+        0.375,
+        0.75,
+        1
+      ],
+      "timeout_seconds": 60,
+      "max_steps": 128,
+      "estimated_output_bytes": 2771076,
+      "estimated_work_units": 24704,
+      "status": "approved_pending_adapter_and_evaluator_gates",
+      "time_controls": {
+        "policy": "fixed",
+        "dt_min": 0.0078125,
+        "dt_max": 0.0078125,
+        "increase": 1,
+        "decrease": 1
+      }
+    },
+    {
+      "id": "holdout-example3-holdout-fortran-baseline",
+      "phase": "holdout",
+      "case_id": "example3",
+      "solver": "fortran",
+      "precision": "baseline",
+      "role": "holdout",
+      "axis": "holdout",
+      "nodes": 751,
+      "dt": 0.04,
+      "sampling_interval": 1,
+      "analysis_times": [
+        75,
+        150,
+        200
+      ],
+      "timeout_seconds": 60,
+      "max_steps": 5000,
+      "estimated_output_bytes": 50454868,
+      "estimated_work_units": 11265000,
+      "status": "approved_pending_adapter_and_evaluator_gates",
+      "time_controls": {
+        "policy": "fixed",
+        "dt_min": 0.04,
+        "dt_max": 0.04,
+        "increase": 1,
+        "decrease": 1
+      }
+    },
+    {
+      "id": "holdout-example3-holdout-rust-baseline",
+      "phase": "holdout",
+      "case_id": "example3",
+      "solver": "rust",
+      "precision": "f64",
+      "role": "holdout",
+      "axis": "holdout",
+      "nodes": 751,
+      "dt": 0.04,
+      "sampling_interval": 1,
+      "analysis_times": [
+        75,
+        150,
+        200
+      ],
+      "timeout_seconds": 60,
+      "max_steps": 5000,
+      "estimated_output_bytes": 50454868,
+      "estimated_work_units": 11265000,
+      "status": "approved_pending_adapter_and_evaluator_gates",
+      "time_controls": {
+        "policy": "fixed",
+        "dt_min": 0.04,
+        "dt_max": 0.04,
+        "increase": 1,
+        "decrease": 1
+      }
+    }
+  ],
+  "budgets": {
+    "launch_cap": 77,
+    "failed_attempts_consume_cap": true,
+    "storage_bytes_cap": 2699462776,
+    "cost_estimate": "O(species*nodes*steps); output formula in spec; no measured runtime assumed. 60 second timeout remains binding. Estimates include 2x aggregate storage headroom, not additional launch slots.",
+    "phase_caps": {
+      "benchmark": 14,
+      "convergence": 57,
+      "holdout": 6
+    }
+  }
+}

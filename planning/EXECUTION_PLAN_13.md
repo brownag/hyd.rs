@@ -1,6 +1,6 @@
 # Orchestration 13 — Solute convergence and independent analytical evidence
 
-Status: **User approved on 2026-09-26; awaiting wave-orchestration execution instruction.**
+Status: **User approved and execution started on 2026-09-26; see STATE_13.md.**
 Companion files: [worker template](PROMPT_TEMPLATE_13.md), [state](STATE_13.md).
 
 ## Goal and scope
@@ -207,4 +207,4 @@ Update the three evidence documents with exact commands, artifact hashes, achiev
 
 The scientific goal succeeds only with independently justified full-case accuracy and convergence evidence plus accepted error budgets/regressions. A complete evidence review may instead identify precisely what remains missing. STATE tracks task completion and scientific completion separately.
 
-Independent plan review completed on 2026-09-26: spec pass; standards pass after correction. Corrected the legacy parity-test overwrite hazard with an orchestrator-only fresh-output exception, and clarified that capacity/output-precision floors are reported within the user’s chosen limits. Both reviewers found no remaining blockers. Derivation feasibility and any scientifically unassigned thresholds remain execution judgments, not presumed successes. User approved the complete plan on 2026-09-26 (“approve”), including the existing Fortran capacity/output limits. Execution has not started; all tasks remain pending.
+Independent plan review completed on 2026-09-26: spec pass; standards pass after correction. Corrected the legacy parity-test overwrite hazard with an orchestrator-only fresh-output exception, and clarified that capacity/output-precision floors are reported within the user’s chosen limits. Both reviewers found no remaining blockers. Derivation feasibility and any scientifically unassigned thresholds remain execution judgments, not presumed successes. User approved the complete plan on 2026-09-26 (“approve”), including the existing Fortran capacity/output limits. Execution was subsequently started by the user’s wave-orchestration invocation; progress is recorded in STATE_13.md.
