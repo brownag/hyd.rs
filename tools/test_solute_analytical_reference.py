@@ -467,5 +467,343 @@ class ContractTests(unittest.TestCase):
             analytical.component_reference(*configuration("example3"))
 
 
+class FiniteKernelTests(unittest.TestCase):
+    def test_jet_derivatives_and_zero_limit(self):
+        with localcontext() as context:
+            context.prec = 100
+            x = analytical._Jet(2, 1)
+            self.assertEqual((x * x).c, (D(4), D(4), D(1)))
+            self.assertEqual((1 / x).c, (D(".5"), D("-.25"), D(".125")))
+            self.assertEqual(x.exp().c, (D(2).exp(), D(2).exp(), D(2).exp() / 2))
+            self.assertLess(abs(x.sqrt().c[1] - 1 / (2 * D(2).sqrt())), D("1e-98"))
+            for s in (D(0), D(1), D(2)):
+                h, integral = analytical._finite_transfer(D(0), s, D(1), D(".5"), D(2), jets=True)
+                first = D(".5") * ((2 * (s - 2)).exp() - 1) - s
+                integrated_first = D(".25") * (1 - D(-4).exp()) - 2 - 1
+                self.assertLess(abs(h.c[0] - 1), D("1e-98"))
+                self.assertLess(abs(h.c[1] - first), D("1e-98"))
+                self.assertLess(abs(integral.c[0] - 2), D("1e-98"))
+                self.assertLess(abs(integral.c[1] - integrated_first), D("1e-98"))
+                self.assertNotEqual(h.c[2], 0)
+                self.assertNotEqual(integral.c[2], 0)
+
+    def test_transfer_derivatives_and_integral_identity(self):
+        with localcontext() as context:
+            context.prec = 100
+            z, s, v, d, length = map(D, (".3", ".7", "1", ".5", "2"))
+            h, integral = analytical._finite_transfer(z, s, v, d, length, jets=True)
+            eps = D("1e-20")
+            below = analytical._finite_transfer(z - eps, s, v, d, length)
+            above = analytical._finite_transfer(z + eps, s, v, d, length)
+            for jet, a, b in zip((h, integral), below, above):
+                self.assertLess(abs((b - a) / (2 * eps) - jet.c[1]), D("1e-37"))
+                self.assertLess(
+                    abs((a + b - 2 * jet.c[0]) / (2 * eps * eps) - jet.c[2]), D("1e-37")
+                )
+            outlet, total = analytical._finite_transfer(z, length, v, d, length)
+            self.assertLess(abs(z * total - v * (1 - outlet)), D("1e-97"))
+            # Differencing in space is independent of the differentiated z jets.
+            center = h.c[0]
+            left = analytical._finite_transfer(z, s - eps, v, d, length)[0]
+            right = analytical._finite_transfer(z, s + eps, v, d, length)[0]
+            residual = (
+                z * center
+                - d * (left + right - 2 * center) / eps**2
+                + v * (right - left) / (2 * eps)
+            )
+            self.assertLess(abs(residual), D("1e-37"))
+
+    def test_confluent_and_permuted_divided_differences(self):
+        import itertools
+
+        with localcontext() as context:
+            context.prec = 100
+
+            def derivative(z, order):
+                return (-1) ** order / (1 + z) ** (order + 1)
+
+            for nodes in ([D(0)] * 3, [D(0), D(0), D(2)], [D(1), D(1), D(1)], [D(1), D(2), D(3)]):
+                expected = 1 / math.prod(1 + z for z in nodes)
+                for permutation in itertools.permutations(nodes):
+                    actual, error, condition = analytical._divided_difference(
+                        permutation, [1 / (1 + z) for z in permutation], derivative
+                    )
+                    self.assertLessEqual(abs(actual - expected), error)
+                    self.assertGreater(error, 0)
+                    self.assertGreaterEqual(condition, 1)
+
+    def test_unequal_retardation_confluent_and_near_confluent(self):
+        case = CASES["example3"]
+        with localcontext() as context:
+            context.prec = 400
+            for p in (D(".09"), D(".09") + D("1e-80")):
+                values, errors, conditioning, guarded = analytical._transform_values(
+                    case, p, [D(10), D(250)]
+                )
+                self.assertEqual(guarded, p != D(".09"))
+                self.assertGreater(conditioning, 1)
+                self.assertTrue(all(e > 0 for row in errors for e in row))
+                # Integrate each transformed PDE, independently of closure construction.
+                theta, storage, _, rates, _, _, _ = analytical._chain_parameters(case)
+                masses = [a * c for a, c in zip(storage, values[-1])]
+                for j in range(3):
+                    inlet = D(".43") / p if j == 0 else D(0)
+                    production = rates[j - 1] * masses[j - 1] if j else D(0)
+                    residual = (
+                        (p + rates[j]) * masses[j] - production - inlet + D(".43") * values[1][j]
+                    )
+                    self.assertLess(abs(residual), D("1e-200"))
+
+    def test_zero_transfer_removes_daughters_exactly(self):
+        case = copy.deepcopy(CASES["example3"])
+        case["species"][0]["rate"] = 0
+        with localcontext() as context:
+            context.prec = 400
+            values, errors, _, _ = analytical._transform_values(case, D(".1"), [D(0), D(250)])
+        self.assertTrue(all(row[1:] == [0, 0] for row in values))
+        self.assertTrue(all(row[1:] == [0, 0] for row in errors))
+
+    def test_inversion_weights_known_transforms_and_limits(self):
+        self.assertEqual(analytical._stehfest_weights(2, 400), (D(2), D(-2)))
+        constant = analytical._invert_transform(lambda p: 1 / p, 2, 64, 400)
+        exponential = analytical._invert_transform(lambda p: 1 / (p + D(".2")), 2, 64, 400)
+        self.assertLess(abs(constant - 1), D("1e-300"))
+        self.assertLess(abs(exponential - D("-.4").exp()), D("1e-24"))
+        for order, digits in ((3, 400), (514, 650), (64, 800)):
+            with self.assertRaises(ValueError):
+                analytical._stehfest_weights(order, digits)
+
+
+def synthetic_chain_order(
+    case,
+    coordinates,
+    analysis_times,
+    diagnostic_times,
+    order,
+    digits,
+    profile_indices=None,
+    direct=False,
+):
+    values, errors = {}, {}
+    offset = {192: D("1e-4"), 256: D("1e-6"), 384: D("1e-10"), 512: D("1e-12")}[order]
+    for group, times, fields in (
+        ("profiles", [0, *analysis_times], ["concentration"]),
+        ("continuum", diagnostic_times, analytical.FIELDS),
+    ):
+        for time in times:
+            for field in fields:
+                if group == "profiles":
+                    indices = (
+                        range(len(coordinates))
+                        if profile_indices is None
+                        else profile_indices[time]
+                    )
+                else:
+                    indices = range(2) if field in analytical.PAIR_FIELDS else [-1]
+                for j in range(len(case["species"])):
+                    for index in indices:
+                        key = (group, time, field, j, index)
+                        if field in analytical.PAIR_FIELDS and index == 0:
+                            value = analytical._decimal(case["q"]) if j == 0 else D(0)
+                            if field == "boundary_cumulative":
+                                value *= analytical._decimal(time)
+                        elif analytical._known_exact(case, key):
+                            value = D(0)
+                        else:
+                            value = 1 + offset
+                            if field in analytical.PAIR_FIELDS:
+                                value = -value
+                        values[key], errors[key] = value, D(0)
+    return {
+        "values": values,
+        "arithmetic": errors,
+        "recurrence": errors,
+        "order": order,
+        "digits": digits,
+        "maximum_conditioning": "1",
+        "guarded_samples": 0,
+    }
+
+
+class FiniteEvaluationTests(unittest.TestCase):
+    def test_recurrence_and_independent_cumulative_channels(self):
+        case = CASES["example3"]
+        with localcontext() as context:
+            context.prec = 400
+            positions = [D(25) * i for i in range(11)]
+            recurrent, _, _, _ = analytical._transform_values(
+                case, D(".1"), positions, recurrence=True
+            )
+            direct, _, _, _ = analytical._transform_values(case, D(".1"), positions)
+            self.assertLess(
+                max(
+                    abs(a - b) for row, other in zip(recurrent, direct) for a, b in zip(row, other)
+                ),
+                D("1e-395"),
+            )
+        run = analytical._chain_order(case, [0, 125, 250], [50], [0, 50], 32, 400)
+        self.assertEqual(run["values"][("continuum", 50, "boundary_cumulative", 0, 0)], D("21.50"))
+        for j in range(3):
+
+            def value(field, side=-1):
+                return run["values"][("continuum", 50, field, j, side)]
+
+            residual = (
+                value("total")
+                - value("boundary_cumulative", 0)
+                - value("boundary_cumulative", 1)
+                - value("production_cumulative")
+                + value("loss_cumulative")
+            )
+            self.assertLess(abs(residual), D("1e-12"))
+
+    def test_transform_chain_pde_and_endpoint_derivatives(self):
+        with localcontext() as context:
+            context.prec = 100
+            case, p, x, eps = CASES["example3"], D(".2"), D(20), D("1e-15")
+            rows = analytical._transform_values(case, p, [x - eps, x, x + eps])[0]
+            theta, storage, _, rates, velocity, dispersion, length = analytical._chain_parameters(
+                case
+            )
+            for j in range(3):
+                first = (rows[2][j] - rows[0][j]) / (2 * eps)
+                second = (rows[2][j] + rows[0][j] - 2 * rows[1][j]) / eps**2
+                production = rates[j - 1] * storage[j - 1] * rows[1][j - 1] if j else 0
+                residual = (
+                    storage[j] * (p + rates[j]) * rows[1][j]
+                    - theta * dispersion * second
+                    + D(".43") * first
+                    - production
+                )
+                self.assertLess(abs(residual), D("1e-27"))
+            for position in (D(0), length):
+                rows = analytical._transform_values(
+                    case, p, [position - eps, position, position + eps]
+                )[0]
+                for j in range(3):
+                    derivative = (rows[2][j] - rows[0][j]) / (2 * eps)
+                    residual = (
+                        velocity * rows[1][j]
+                        - dispersion * derivative
+                        - (velocity / p if j == 0 else 0)
+                        if position == 0
+                        else derivative
+                    )
+                    self.assertLess(abs(residual), D("1e-26"))
+
+    def test_order_diagnostics_reject_plateau_and_nonmonotonicity(self):
+        for values in ([D(1), D(1), D(1)], [D(1), D(2), D(3)], [D(1), D(2), D(4)]):
+            self.assertFalse(analytical._difference_diagnostic(values)[2])
+        self.assertTrue(analytical._difference_diagnostic([D(1)] * 3, exact=True)[2])
+        self.assertTrue(analytical._difference_diagnostic([D("1e-3"), D("-1e-5"), D("-1e-7")])[2])
+
+    def test_full_coverage_and_bounded_escalation_with_synthetic_values(self):
+        from unittest.mock import patch
+
+        case, mesh, analysis, times = configuration("example3")
+        with patch.object(analytical, "_chain_order", side_effect=synthetic_chain_order) as calls:
+            reference, diagnostics = analytical.finite_chain_reference(
+                case, mesh, analysis, times, allow_escalation=True
+            )
+        self.assertEqual(diagnostics["orders"], [192, 256, 384, 512])
+        self.assertEqual(diagnostics["precision_comparison_digits"], [650, 400])
+        self.assertEqual(calls.call_count, 6)  # Four full orders; precision and input subsets.
+        self.assertEqual(len(reference["continuum"]), 201)
+        self.assertEqual(len(reference["profiles"]), 4)
+        self.assertEqual(len(reference["profiles"][0]["concentration"][0]), 1001)
+        self.assertEqual(
+            analytical.reference_admission(case, reference, diagnostics)["status"], "admitted"
+        )
+        for mutation in ("missing_observable", "missing_time", "precision", "hash"):
+            bad = copy.deepcopy(diagnostics)
+            if mutation == "missing_observable":
+                bad["observables"].pop()
+            elif mutation == "missing_time":
+                bad["diagnostic_times"].pop()
+            elif mutation == "precision":
+                bad["precision_comparison_digits"] = [650, 650]
+            else:
+                bad["reference_sha256"] = "0" * 64
+            with self.assertRaises(ValueError, msg=mutation):
+                analytical.reference_admission(case, reference, bad)
+        for mutation in (
+            "uncertainty",
+            "budget",
+            "exact_identity",
+            "decreasing",
+            "last_order_difference",
+            "arithmetic_estimate",
+            "status",
+            "summary",
+        ):
+            bad = copy.deepcopy(diagnostics)
+            row = next(
+                r for r in bad["observables"] if r["group"] == "profiles" and r["time"] == 50
+            )
+            if mutation in ("uncertainty", "budget"):
+                row[mutation] *= 2
+            elif mutation in ("exact_identity", "decreasing"):
+                row[mutation] = not row[mutation]
+            elif mutation == "last_order_difference":
+                row[mutation] = "1"
+            elif mutation == "arithmetic_estimate":
+                row[mutation] = "-1"
+            elif mutation == "status":
+                row[mutation] = "unmet"
+            else:
+                bad["status"] = "unmet"
+            with self.assertRaises(ValueError, msg=mutation):
+                analytical.reference_admission(case, reference, bad)
+
+    def test_no_implicit_escalation_and_unmet_budgets(self):
+        from unittest.mock import patch
+
+        case, mesh, analysis, times = configuration("example3")
+        mesh = [0, 125, 250]
+        with patch.object(analytical, "_chain_order", side_effect=synthetic_chain_order) as calls:
+            reference, diagnostics = analytical.finite_chain_reference(case, mesh, analysis, times)
+        self.assertEqual(diagnostics["orders"], [192, 256, 384])
+        self.assertEqual(calls.call_count, 5)
+        self.assertEqual(
+            analytical.reference_admission(case, reference, diagnostics)["status"], "unmet"
+        )
+        with self.assertRaises((ValueError, NotImplementedError)):
+            analytical.reference_admission(case, reference)
+        case["analytical"]["settings"]["maximum_order"] = 640
+        with self.assertRaisesRegex(ValueError, "settings"):
+            analytical.finite_chain_reference(case, mesh, analysis, times)
+
+    def test_mesh_validation_and_coordinate_deviation(self):
+        analytical._checked_uniform_mesh([0, 250 / 3, 500 / 3, 250], 250)
+        with self.assertRaisesRegex(ValueError, "uniform mesh"):
+            analytical._checked_uniform_mesh([0, 100, 250], 250)
+
+    def test_negative_near_zero_estimate_is_not_clipped(self):
+        from unittest.mock import patch
+
+        def small_negative(*args, **kwargs):
+            run = synthetic_chain_order(*args, **kwargs)
+            for key in run["values"]:
+                if key[0] == "profiles" and key[1] > 0:
+                    run["values"][key] = (
+                        D("-9e-10")
+                        + {192: D("1e-5"), 256: D("1e-7"), 384: D("1e-10"), 512: D("1e-12")}[
+                            run["order"]
+                        ]
+                    )
+            return run
+
+        case = copy.deepcopy(CASES["example3"])
+        with patch.object(analytical, "_chain_order", side_effect=small_negative):
+            reference, diagnostics = analytical.finite_chain_reference(
+                case, [0, 125, 250], [50, 100, 200], [0, 50, 100, 200], allow_escalation=True
+            )
+        self.assertLess(reference["profiles"][-1]["concentration"][0][0], 0)
+        self.assertGreater(
+            reference["uncertainty"]["profiles"][-1]["concentration"][0][0],
+            abs(reference["profiles"][-1]["concentration"][0][0]),
+        )
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -1,6 +1,6 @@
 # State — Orchestration 13
 
-Plan status: **Execution started on 2026-09-26 by user wave-orchestration instruction; Wave 1 accepted; Wave 2 accepted; Wave 3 split into serial tasks; component references accepted.**
+Plan status: **Execution started on 2026-09-26 by user wave-orchestration instruction; Wave 1 accepted; Wave 2 accepted; Wave 3 split into serial tasks; component references accepted; finite-chain evaluator accepted; benchmark integration next.**
 Scientific status: **M5-V open; convergence, independent full-case analytical evidence and justified tolerances remain unmet.**
 Plan: [EXECUTION_PLAN_13.md](EXECUTION_PLAN_13.md). Workers: [PROMPT_TEMPLATE_13.md](PROMPT_TEMPLATE_13.md).
 
@@ -26,8 +26,8 @@ Plan: [EXECUTION_PLAN_13.md](EXECUTION_PLAN_13.md). Workers: [PROMPT_TEMPLATE_13
 | 2 | 13.2.1 | Isolated Fortran adapter | done | 4a40220 |
 | 2 | 13.2.2 | Configurable Rust adapter | done | 0023eb4 |
 | 2 | 13.2.3 | Strict metrics and normalization | done | 15b21b5 |
-| 3a | 13.3.2 | Component analytical references | done | pending commit |
-| 3b | 13.3.3 | Finite-domain chain reference | pending | — |
+| 3a | 13.3.2 | Component analytical references | done | 6285bca |
+| 3b | 13.3.3 | Finite-domain chain reference | done | pending commit |
 | 3c | 13.3.4 | Bounded benchmark integration | pending | — |
 | 3d | 13.3.1 | Analytical executions and evidence | pending | — |
 | 4 | 13.4.1 | Separate spatial and temporal convergence | pending | — |
@@ -36,7 +36,7 @@ Plan: [EXECUTION_PLAN_13.md](EXECUTION_PLAN_13.md). Workers: [PROMPT_TEMPLATE_13
 
 ## Resume point
 
-Waves 1 and 2 accepted. Next task: 13.3.3 finite-chain evaluator, followed by 13.3.4 integration, and original 13.3.1 executions/evidence. Read frozen spec including approved Wave 2 interface appendix and dependency reports. All 77 conditional launch rows remain unconsumed; actual runs require explicit orchestrator activation. Preserve 207 hashes in `.development/13-baseline/protected-hashes.json`. Latest full-suite parity output: `.development/12.6.1/13-regression/wave3a-20260927-01.json`. No solver threshold approved; M5-V remains open.
+Waves 1 and 2 accepted. Next task: 13.3.4 integration, then original 13.3.1 executions/evidence. Read frozen spec including approved Wave 2 interface appendix and dependency reports. All 77 conditional launch rows remain unconsumed; actual runs require explicit orchestrator activation. Preserve 207 hashes in `.development/13-baseline/protected-hashes.json`. Latest full-suite parity output: `.development/12.6.1/13-regression/wave3b-20260927-01.json`. No solver threshold approved; M5-V remains open.
 
 ## Task reports
 
@@ -105,3 +105,25 @@ Worker identified four clusters exceeding twelve small steps. Approved serial su
 - Cargo used fresh .development/12.6.1/13-regression/wave3a-20260927-01.json; 207 protected hashes unchanged.
 - No study launches, core/source edits or solver thresholds; finite-chain remains explicitly unavailable pending next task.
 - Deviation: serial decomposition already recorded above; scientific M5-V remains open.
+
+## Finite-chain feasibility activation
+
+Approved task 13.3.3 micro-plan: reference-only 11-node mesh, analysis times 50/100/200 and ten listed continuum times, orders192/256/384 at400 digits, optional single512 at650 if needed. Precision subset and two fixed parent PDE residual stencils are declared in TODO. This is reduced evaluator feasibility, not full-case scientific admission. No solver launch activation or extra matrix rows.
+
+## Finite-chain interim verification
+
+Implementation review and orchestrator reruns passed:34 targeted tests,145 Rust tests,92 Python tests,12 comparator checks,34 contract checks,fmt/Clippy/diff. Cargo output:.development/12.6.1/13-regression/wave3b-20260927-01.json. Reduced numerical feasibility is still running at .development/13.3.3/feasibility/finite-chain-1d00b2c17a85; do not repeat its logged orders. Task13.3.3 is not yet accepted.
+
+## 13.3.3
+- Status: accepted; finite-domain chain evaluator, 34 targeted tests and completed TODO.
+- Reviewed stable H/I kernels, confluent divided differences, independent cumulative transforms and strict admission diagnostics.
+- Reduced exercise: 11 nodes, 3 profile times, 10 continuum times; all 402 scalar entries admitted empirically.
+- Orders 192/256/384; optional 512 unused; maximum uncertainty 2.948e-9; precision difference below 9.724e-144.
+- Parent PDE residual reduced 3.9967 times when stencil spacings halved; diagnostic only.
+- Runtime 825.87 seconds; rough full-time projection about 5 hours, not a measured cost or bound.
+- Artifacts and source snapshots: .development/13.3.3/feasibility/finite-chain-1d00b2c17a85; reuse rules in HANDOFF.md.
+- Orchestrator reproduced retained admission, matched current source hashes and verified all 207 protected hashes.
+- Orchestrator checks: 34 targeted, 145 Rust, 92 Python, 12 comparator and 34 contract checks; fmt/Clippy/diff passed.
+- API: finite_chain_reference returns reference/diagnostics; reference_admission requires bound diagnostics for chain.
+- No solver launches; full coverage pending; uncertainty empirical, scientific M5-V remains open.
+- Deviations: none beyond recorded decomposition; no core/source/dependency edits.
