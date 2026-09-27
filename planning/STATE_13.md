@@ -1,6 +1,6 @@
 # State — Orchestration 13
 
-Plan status: **Execution started on 2026-09-26 by user wave-orchestration instruction; Wave 1 accepted; Wave 2 accepted; Wave 3 next.**
+Plan status: **Execution started on 2026-09-26 by user wave-orchestration instruction; Wave 1 accepted; Wave 2 accepted; Wave 3 split into serial tasks; component references accepted.**
 Scientific status: **M5-V open; convergence, independent full-case analytical evidence and justified tolerances remain unmet.**
 Plan: [EXECUTION_PLAN_13.md](EXECUTION_PLAN_13.md). Workers: [PROMPT_TEMPLATE_13.md](PROMPT_TEMPLATE_13.md).
 
@@ -25,15 +25,18 @@ Plan: [EXECUTION_PLAN_13.md](EXECUTION_PLAN_13.md). Workers: [PROMPT_TEMPLATE_13
 | 1 | 13.1.1 | Mathematical benchmark/case/schema contract | done | 490a41b |
 | 2 | 13.2.1 | Isolated Fortran adapter | done | 4a40220 |
 | 2 | 13.2.2 | Configurable Rust adapter | done | 0023eb4 |
-| 2 | 13.2.3 | Strict metrics and normalization | done | task commit |
-| 3 | 13.3.1 | Independent analytical evaluator and evidence | pending | — |
+| 2 | 13.2.3 | Strict metrics and normalization | done | 15b21b5 |
+| 3a | 13.3.2 | Component analytical references | done | pending commit |
+| 3b | 13.3.3 | Finite-domain chain reference | pending | — |
+| 3c | 13.3.4 | Bounded benchmark integration | pending | — |
+| 3d | 13.3.1 | Analytical executions and evidence | pending | — |
 | 4 | 13.4.1 | Separate spatial and temporal convergence | pending | — |
 | 5 | 13.5.1 | Discrepancy attribution/remediation specifications | pending | — |
 | 6 | 13.6.1 | Budgets, regression gates and M5-V assessment | pending | — |
 
 ## Resume point
 
-Waves 1 and 2 accepted. Next task: 13.3.1 analytical evaluator and bounded bridge/benchmark integration. Read frozen spec including approved Wave 2 interface appendix and dependency reports. All 77 conditional launch rows remain unconsumed; actual runs require explicit orchestrator activation. Preserve 207 hashes in `.development/13-baseline/protected-hashes.json`. Latest full-suite parity output: `.development/12.6.1/13-regression/wave2-20260927-01.json`. No solver threshold approved; M5-V remains open.
+Waves 1 and 2 accepted. Next task: 13.3.3 finite-chain evaluator, followed by 13.3.4 integration, and original 13.3.1 executions/evidence. Read frozen spec including approved Wave 2 interface appendix and dependency reports. All 77 conditional launch rows remain unconsumed; actual runs require explicit orchestrator activation. Preserve 207 hashes in `.development/13-baseline/protected-hashes.json`. Latest full-suite parity output: `.development/12.6.1/13-regression/wave3a-20260927-01.json`. No solver threshold approved; M5-V remains open.
 
 ## Task reports
 
@@ -87,3 +90,18 @@ Approved the metrics validated-dict context and exact reference wrapper in the s
 - Full Cargo output used fresh `.development/12.6.1/13-regression/wave2-20260927-01.json`.
 - Deviations: none; clarified species independence applies without transfer, with separate legitimate chain-coupling coverage.
 - Study launches: zero; thresholds unassigned and M5-V remains open.
+
+## Wave 3 decomposition decision
+
+Worker identified four clusters exceeding twelve small steps. Approved serial subwaves3a–3d with separate task gates and commits; preserved original13.3.1 execution root and downstream IDs. Added producer test module `tools.test_solute_benchmarks` to future wave-end suites. Matrix, limits and scientific scope unchanged; no solver execution activated.
+
+## 13.3.2
+- Status: accepted; independent component evaluator, 21 tests and completed TODO.
+- Reaction uniformization, diffusion cosine and scalar Robin/Neumann formulas use independent integrals and outward Decimal enclosures.
+- Reviewed reaction tail indexing, integrated weights, transfer integral and inward signs; scalar frozen-root IC error uses a maximum-principle bound.
+- All five component reference budgets admitted; maximum concentration uncertainty 1.36e-16, inventory uncertainty 2.62e-16.
+- APIs: component_reference(case, coordinates, analysis_times, diagnostic_times), reference_admission(case, reference); wrapper unchanged.
+- Orchestrator checks: 21 targeted tests; 145 Rust tests; 79 Python tests; 12 comparator and 34 contract checks; fmt/Clippy/diff passed.
+- Cargo used fresh .development/12.6.1/13-regression/wave3a-20260927-01.json; 207 protected hashes unchanged.
+- No study launches, core/source edits or solver thresholds; finite-chain remains explicitly unavailable pending next task.
+- Deviation: serial decomposition already recorded above; scientific M5-V remains open.

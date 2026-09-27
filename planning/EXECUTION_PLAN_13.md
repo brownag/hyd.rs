@@ -66,7 +66,10 @@ All task IDs are new and initially pending. No task TODO is pre-completed.
 | 2 — Reusable study harness | 13.2.1 | Isolated Fortran case generation, builds and execution | 13.1.1 |
 | 2 — Reusable study harness | 13.2.2 | Configurable Rust observation adapter | 13.1.1 |
 | 2 — Reusable study harness | 13.2.3 | Strict parameterized normalization and independent metrics | 13.1.1 |
-| 3 — Independent analytical evidence | 13.3.1 | Independently checked evaluator and benchmark comparisons | 13.2.1, 13.2.2, 13.2.3 |
+| 3a — Component references | 13.3.2 | Reaction, diffusion and scalar evaluators | 13.2.1, 13.2.2, 13.2.3 |
+| 3b — Finite-chain reference | 13.3.3 | Decimal transforms, inversion and admission | 13.3.2 |
+| 3c — Benchmark tooling | 13.3.4 | Bounded launcher, bridge checks and mocked tests | 13.3.3 |
+| 3d — Analytical evidence | 13.3.1 | Activated bridge/benchmark comparisons and report | 13.3.4 |
 | 4 — Controlled convergence | 13.4.1 | Separate spatial/temporal studies for both implementations | 13.3.1 |
 | 5 — Discrepancy investigation | 13.5.1 | Attribution, counterexamples, and bounded remediation recommendations | 13.4.1 |
 | 6 — Error budgets and decision | 13.6.1 | Reviewed threshold policy, regressions and M5-V evidence assessment | 13.5.1; any accepted remediation |
@@ -141,20 +144,59 @@ Freeze a versioned JSON case/observation/manifest contract in the spec and CASES
 **Targeted commands:** `python3 -m unittest tools.test_solute_verification_metrics`; `git diff --check`.
 **Do not touch:** old comparator or other Wave 2 files; no solver launches.
 
-## 13.3.1 — Implement and independently check analytical evidence
+## Wave 3 decomposition amendment — 2026-09-27
 
-**Must edit:** none.
-**Can create:** `tools/solute_analytical_reference.py`; `tools/test_solute_analytical_reference.py`; `tools/check_solute_benchmarks.py`; `planning/master/SOLUTE_ANALYTICAL_EVIDENCE.md`.
-**Depends on:** all Wave 2 tasks.
-**Read-only references/anchors:** accepted derivation/spec and cases; new adapters/metrics; outlet contract exact-example style; accepted Orchestration 12 observations/manifests for bridge checks only.
+The reviewed worker micro-plan identified four independent implementation clusters that cannot fit twelve genuinely small steps. Execute serial subwaves 3a/3b/3c/3d below; no parallelism is allowed because evaluator/test files overlap. Preserve the original task 13.3.1 for numerical execution and evidence, so frozen execution roots, matrix phases and downstream task IDs remain unchanged. Added task IDs 13.3.2–13.3.4 are producer tasks, not added scientific scope. Each receives a separate micro-plan gate, verification and conventional commit. No new dependency, physics, build variant or solver launch is authorized by this decomposition.
+
+### Shared analytical objective
 
 **Spec:** Implement the reviewed analytic/semi-analytic evaluator independently of both transport solvers. Evaluate every accepted benchmark, including concentrations and independent mass/flux/reaction integrals. Quantify evaluator error through limiting exact identities, independent residual/BC/IC checks, tighter series/integration settings and alternate evaluations where conditioning demands them. Exact PDE formulas evaluated numerically still need an evaluator uncertainty estimate. Equal/near-equal decay rates, zero loss and disparate retardation must not cause cancellation to masquerade as solver error.
 
 Integrate the three adapters using a bounded, orchestrator-approved bridge/benchmark matrix. First reproduce the original Example 3 configuration in new scratch and compare against retained accepted outputs within documented printed/arithmetic precision; fail on unexplained adapter differences. Then run accepted component/full-case benchmarks through both solvers, check realized water/mapping, and compare with the independently evaluated truth. Analytic expectations must never be fitted to solver outputs. Record unsupported full-case mathematics explicitly; component passes cannot replace it.
 
-**Acceptance:** evaluator unit checks pass with documented precision bounds; at least one nontrivial case per accepted family runs through both adapters, with provenance and complete records. Deliberately perturbed species/order/boundary sign causes benchmark verification failure. Report verified cases, errors and unmet cases separately. Orchestrator reviews independence and reference error before admitting results into convergence analysis.
-**Targeted commands:** `python3 -m unittest tools.test_solute_analytical_reference`; `python3 tools/check_solute_benchmarks.py --cases reference/solute_verification/CASES.json --execute --output-root .development/13.3.1/benchmarks`; same command with `--verify-only` replacing `--execute`; `git diff --check`.
-**Do not touch:** solver code, frozen cases, old artifacts, thresholds or out-of-scope source/dependency variants. A deficient contract/tool requires a named amendment before edits.
+## 13.3.2 — Implement component analytical references
+
+**Must edit:** none.
+**Can create:** `tools/solute_analytical_reference.py`; `tools/test_solute_analytical_reference.py`.
+**Depends on:** 13.2.1, 13.2.2, 13.2.3.
+**Read-only references:** frozen verification spec/CASES and Wave 2 reference wrapper; metrics `_reference`; outlet exact-example style; Wave 1 mathematical scratch.
+**Spec:** Implement independently evaluated homogeneous stored-mass reaction chains (uniformization and integrated weights with tail bounds), finite cosine diffusion, and smooth scalar Robin/Neumann transport. Cover unequal storage, equal/near-equal/zero rates, initial daughters and terminal loss. Use independent spatial/time integrals for inventories, endpoint exchange and reactions. Recompute the scalar eigenvalue and bound formula/root/serialization errors. Return the frozen reference wrapper with explicit per-observable uncertainty/admission; unsupported finite-chain requests remain explicitly unavailable until the next task. Do not borrow either solver's matrix or fit outputs.
+**Acceptance:** exact and limiting identities, IC/BC/PDE residuals, dimensions, complete mesh/species/time coverage, independent integrals and uncertainty budget tests pass; altered species/boundary sign is detected.
+**Targeted commands:** `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest tools.test_solute_analytical_reference`; `git diff --check`.
+**Scratch:** `.development/13.3.2/`; own `planning/tasks/13.3.2.todo.md` only. No solver launches or existing adapter/core/case edits.
+
+## 13.3.3 — Implement the finite-domain chain evaluator
+
+**Must edit:** `tools/solute_analytical_reference.py`; `tools/test_solute_analytical_reference.py`.
+**Can create:** none beyond own TODO/scratch.
+**Depends on:** 13.3.2.
+**Read-only references:** frozen full-chain derivation, Wave 1 feasibility recipe/results, accepted component evaluator.
+**Spec:** Add stable Decimal H/I transforms, confluent and near-confluent divided differences, cached Gaver-Stehfest inversion and independently transformed mass/flux/reaction integrals. Preserve unequal retardation and zero limits. Implement the frozen bounded orders/precision, full profile and diagnostic-integral coverage, direct-versus-recurrence checks, decreasing-order-difference checks and honest per-observable admission. Report empirical uncertainty as empirical; inability to meet a budget remains unmet. No alternative method/dependency or expanded work cap without amendment.
+**Acceptance:** independent transform/PDE/BC identities, confluent/zero limits, tighter precision and documented finite-work feasibility checks pass. Orchestrator reviews evaluator independence and uncertainty before numerical reference admission. This task does not assert solver accuracy.
+**Targeted commands:** `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest tools.test_solute_analytical_reference`; `git diff --check`.
+**Scratch:** `.development/13.3.3/`; own `planning/tasks/13.3.3.todo.md` only. No solver launches or edits to prior artifacts/adapters/cases.
+
+## 13.3.4 — Implement bounded benchmark integration
+
+**Must edit:** none.
+**Can create:** `tools/check_solute_benchmarks.py`; `tools/test_solute_benchmarks.py`.
+**Depends on:** 13.3.3 and all Wave 2 tasks.
+**Read-only references:** accepted evaluator, adapters/metrics, frozen manifest/ledger/reference schemas, retained Example 3 provenance.
+**Spec:** Implement the benchmark CLI and safe Rust launcher/manifest wrapping, reuse the accepted Fortran runner, and connect independent references/metrics. Enforce unique roots, explicit --execute, no-launch verify-only, all-identity hashes, append-only shared phase ledger, failed-attempt budget consumption, 60-second solver timeouts and storage caps. Compile separately from counted solver runs. Bridge checks must reproduce retained original configurations and justify printed/arithmetic comparison; stop before dependent launches on unexplained differences. Preserve exact reference admission and scientific unmet results. Make mocked lifecycle and deliberately perturbed species/order/boundary checks independent of solver launches.
+**Acceptance:** mocked launch/timeout/failure/provenance/bridge tests pass; dry-run enumerates exactly the fourteen frozen benchmark rows and reserved caps; verify-only executes no solver. Orchestrator reviews concrete commands and activates runs separately.
+**Targeted commands:** `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest tools.test_solute_benchmarks`; `python3 tools/check_solute_benchmarks.py --cases reference/solute_verification/CASES.json --dry-run --output-root .development/13.3.1/benchmarks`; `git diff --check`.
+**Scratch:** `.development/13.3.4/` for mocked/unit work; dry-run recipe output under the reserved `.development/13.3.1/benchmarks` root is also permitted. Own `planning/tasks/13.3.4.todo.md`. No real solver launches or existing producer edits without amendment.
+
+## 13.3.1 — Execute and review analytical benchmark evidence
+
+**Must edit:** none.
+**Can create:** `planning/master/SOLUTE_ANALYTICAL_EVIDENCE.md`.
+**Depends on:** 13.3.4, with 13.3.2/13.3.3 reference review accepted.
+**Read-only references:** all accepted Wave 3 producers and original analytical objective above.
+**Spec:** After explicit orchestrator activation, execute the two bridge rows first in fresh scratch, review their retained-output comparisons, then the remaining twelve benchmark rows. Every failed attempt consumes its frozen slot; no retries or extra launches without a recorded bounded amendment. Independently admit analytical observables before claiming accuracy; compare complete concentration, inventory, flux, reaction and balance evidence. Report hashes, commands, budgets, achieved/unmet cases, reference limits and outstanding scientific gates. Fixes to producer tools require an explicit scoped amendment before edits.
+**Acceptance:** at least one nontrivial case per accepted family runs through both adapters with validated provenance and complete records; bridge identity and independent reference admission are reviewed. Unmet full-case mathematics/uncertainty remain explicit and cannot be replaced by component passes. Orchestrator independently verifies outputs and report before convergence.
+**Targeted commands:** `python3 tools/check_solute_benchmarks.py --cases reference/solute_verification/CASES.json --execute --output-root .development/13.3.1/benchmarks`; same command with `--verify-only`; `git diff --check`.
+**Scratch:** `.development/13.3.1/`; own `planning/tasks/13.3.1.todo.md`. No solver/core/source/case/dependency changes or threshold assignment.
 
 ## 13.4.1 — Measure spatial and temporal convergence separately
 
