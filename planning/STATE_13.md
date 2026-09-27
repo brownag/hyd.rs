@@ -1,6 +1,6 @@
 # State — Orchestration 13
 
-Plan status: **Execution started on 2026-09-26 by user wave-orchestration instruction; Wave 1 accepted; Wave 2 three approved workers executing.**
+Plan status: **Execution started on 2026-09-26 by user wave-orchestration instruction; Wave 1 accepted; Wave 2 Fortran/Rust accepted; metrics worker executing.**
 Scientific status: **M5-V open; convergence, independent full-case analytical evidence and justified tolerances remain unmet.**
 Plan: [EXECUTION_PLAN_13.md](EXECUTION_PLAN_13.md). Workers: [PROMPT_TEMPLATE_13.md](PROMPT_TEMPLATE_13.md).
 
@@ -23,8 +23,8 @@ Plan: [EXECUTION_PLAN_13.md](EXECUTION_PLAN_13.md). Workers: [PROMPT_TEMPLATE_13
 | Wave | Task | Deliverable | Status | Commit |
 |---|---|---|---|---|
 | 1 | 13.1.1 | Mathematical benchmark/case/schema contract | done | 490a41b |
-| 2 | 13.2.1 | Isolated Fortran adapter | in progress | — |
-| 2 | 13.2.2 | Configurable Rust adapter | done | task commit |
+| 2 | 13.2.1 | Isolated Fortran adapter | done | task commit |
+| 2 | 13.2.2 | Configurable Rust adapter | done | 0023eb4 |
 | 2 | 13.2.3 | Strict metrics and normalization | in progress | — |
 | 3 | 13.3.1 | Independent analytical evaluator and evidence | pending | — |
 | 4 | 13.4.1 | Separate spatial and temporal convergence | pending | — |
@@ -33,7 +33,7 @@ Plan: [EXECUTION_PLAN_13.md](EXECUTION_PLAN_13.md). Workers: [PROMPT_TEMPLATE_13
 
 ## Resume point
 
-Wave 1 accepted after independent equation, boundary, equal-rate and feasibility review. Isolated workers for 13.2.1/13.2.2/13.2.3 are preparing plans in `.development/worktrees/<task-id>` on `solute-<task-id>` branches. Contract frozen; 77 conditional runs remain gated on adapters and evaluator. No solver threshold approved; M5-V remains open. Preserve 207 hashes in `.development/13-baseline/protected-hashes.json`. Latest full-suite parity output: `.development/12.6.1/13-regression/wave1-20260926-01.json`.
+Wave 1 accepted after independent equation, boundary, equal-rate and feasibility review. All Wave 2 micro-plans approved; 13.2.1/13.2.2 accepted, 13.2.3 implementing in `.development/worktrees/<task-id>` on `solute-<task-id>` branches. Contract frozen; 77 conditional runs remain gated on adapters and evaluator. No solver threshold approved; M5-V remains open. Preserve 207 hashes in `.development/13-baseline/protected-hashes.json`. Latest full-suite parity output: `.development/12.6.1/13-regression/wave1-20260926-01.json`.
 
 ## Task reports
 
@@ -62,3 +62,15 @@ Approved the metrics validated-dict context and exact reference wrapper in the s
 - No core/Cargo/old-fixture edits; no study launches (77 conditional slots remain).
 - Wave-end global suite deferred until all Wave 2 producers are integrated.
 - Launcher owns casebook/launch authorization and mathematical IC validation; metrics owns independent integrals.
+
+## 13.2.1
+- Status: accepted; isolated Fortran adapter, 23 mocked tests and completed TODO integrated.
+- Orchestrator reran 23 tests, fresh dry-run and verify-only: all 39 planned Fortran manifests verified.
+- Fresh preview: worktree `.development/13.2.1/orchestrator-preview-20260927`; no builds/solver launches.
+- Read-only retained bridge validates 2000 steps, four profiles, exact terminals and water mapping.
+- Reviewed source/deck/hash preservation, process timeout/storage caps, ledger accounting, no-overwrite and symlink rejection.
+- Raw manifests stay verifiable after normalization; bridge unavailable endpoints use null.
+- Corrected file-specific solute header and complete mock source-authority fixture during review.
+- Protected main 207 hashes unchanged; worker additionally checked 211 across its checkout/shared evidence.
+- Deviations: none; all 77 conditional launch slots remain unconsumed.
+- Downstream APIs: initial_arrays, request_bytes, generate_decks, validate_outputs; actual build/run bridge remains Wave 3.
