@@ -10,14 +10,16 @@ Reaction truncation uses a Poisson-tail bound. Trigonometric Taylor remainders,
 Decimal arithmetic, the scalar root interval, decimal/binary input conversion,
 and final binary serialization are enclosed. These are component formula bounds,
 not solver thresholds. No solver matrices, outputs, quadrature closure, or third
-party numerical packages enter the calculation. Finite-chain requests are
-explicitly unavailable pending their separately reviewed implementation.
+party numerical packages enter the calculation. Finite-chain inversion uses
+empirical order/precision/input sensitivity estimates and separate admission;
+an optional stage executor supports durable checkpointing without changing the method.
 """
 
+import copy
 import hashlib
 import json
 import math
-from decimal import Decimal, ROUND_CEILING, ROUND_FLOOR, getcontext, localcontext
+from decimal import Decimal, InvalidOperation, ROUND_CEILING, ROUND_FLOOR, getcontext, localcontext
 from functools import lru_cache
 
 PRECISION = 70
@@ -1168,6 +1170,77 @@ def _make_chain_reference(case, coordinates, analysis_times, diagnostic_times, v
     return reference
 
 
+def validate_chain_stage(request: dict, result: dict) -> dict:
+    """Validate a completed stage without recalculating any transform values."""
+    require(
+        isinstance(result, dict)
+        and set(result)
+        == {
+            "values",
+            "arithmetic",
+            "recurrence",
+            "order",
+            "digits",
+            "maximum_conditioning",
+            "guarded_samples",
+        },
+        "invalid chain stage fields",
+    )
+    for name in ("order", "digits"):
+        require(
+            type(result[name]) is int and result[name] == request[name],
+            f"chain stage {name} mismatch",
+        )
+    require(
+        type(result["guarded_samples"]) is int and result["guarded_samples"] >= 0,
+        "invalid guarded sample count",
+    )
+    require(isinstance(result["maximum_conditioning"], str), "invalid stage conditioning")
+    try:
+        conditioning = Decimal(result["maximum_conditioning"])
+    except InvalidOperation as error:
+        raise ValueError("invalid stage conditioning") from error
+    require(conditioning.is_finite() and conditioning >= 1, "invalid stage conditioning")
+    expected = set()
+    for time in request["diagnostic_times"]:
+        for j in range(len(request["case"]["species"])):
+            for field in FIELDS:
+                for index in (range(2) if field in PAIR_FIELDS else [-1]):
+                    expected.add(("continuum", time, field, j, index))
+            if time in [0, *request["analysis_times"]]:
+                indices = (
+                    range(len(request["coordinates"]))
+                    if request["profile_indices"] is None
+                    else request["profile_indices"].get(time, [])
+                )
+                for index in indices:
+                    expected.add(("profiles", time, "concentration", j, index))
+    for name in ("values", "arithmetic", "recurrence"):
+        values = result[name]
+        require(
+            isinstance(values, dict) and set(values) == expected,
+            f"chain stage {name} coverage mismatch",
+        )
+        require(
+            all(
+                type(k) is tuple
+                and len(k) == 5
+                and type(k[1]) in (int, float)
+                and type(k[3]) is int
+                and type(k[4]) is int
+                for k in values
+            ),
+            "invalid chain stage scalar key types",
+        )
+        require(
+            all(isinstance(v, Decimal) and v.is_finite() for v in values.values()),
+            f"chain stage {name} must contain finite Decimals",
+        )
+        if name != "values":
+            require(all(v >= 0 for v in values.values()), f"negative stage {name}")
+    return result
+
+
 def finite_chain_reference(
     case: dict,
     coordinates: list,
@@ -1175,6 +1248,7 @@ def finite_chain_reference(
     diagnostic_times: list,
     *,
     allow_escalation=False,
+    stage_executor=None,
 ) -> tuple:
     """Return (frozen reference wrapper, empirical admission diagnostics).
 
@@ -1184,10 +1258,13 @@ def finite_chain_reference(
     and direct/recurrence coordinates. Every continuum field is checked at every
     diagnostic time; sparse profile differences are empirical estimates extended
     by their per-species/time maxima to unsampled nodes, not rigorous bounds.
+    Optional stage_executor(request, calculate) may persist/reuse completed
+    stages. Its returned metadata and complete scalar coverage are validated.
     """
     _validate_inputs(case, coordinates, analysis_times, diagnostic_times, allow_finite=True)
     require(case["family"] == "finite_chain", "finite-chain case required")
     require(type(allow_escalation) is bool, "explicit escalation flag required")
+    require(stage_executor is None or callable(stage_executor), "invalid stage executor")
     _checked_uniform_mesh(coordinates, case["length"])
     settings = case["analytical"].get("settings", {})
     require(
@@ -1201,10 +1278,37 @@ def finite_chain_reference(
         },
         "unreviewed finite-chain settings",
     )
-    runs = [
-        _chain_order(case, coordinates, analysis_times, diagnostic_times, n, 400)
-        for n in settings["orders"]
-    ]
+
+    def execute(variant, stage_case, mesh, order, digits, indices=None, direct=False):
+        def calculate():
+            return _chain_order(
+                stage_case,
+                mesh,
+                analysis_times,
+                diagnostic_times,
+                order,
+                digits,
+                indices,
+                direct=direct,
+            )
+
+        if stage_executor is None:
+            return calculate()
+        request = {
+            "variant": variant,
+            "case": stage_case,
+            "coordinates": mesh,
+            "analysis_times": analysis_times,
+            "diagnostic_times": diagnostic_times,
+            "order": order,
+            "digits": digits,
+            "profile_indices": indices,
+            "direct": direct,
+        }
+        result = stage_executor(copy.deepcopy(request), calculate)
+        return validate_chain_stage(request, result)
+
+    runs = [execute("full", case, coordinates, n, 400) for n in settings["orders"]]
     with localcontext() as context:
         context.prec = 650
         need_more = False
@@ -1217,29 +1321,27 @@ def finite_chain_reference(
             ):
                 need_more = True
         if need_more and allow_escalation:
-            runs.append(_chain_order(case, coordinates, analysis_times, diagnostic_times, 512, 650))
+            runs.append(execute("escalation", case, coordinates, 512, 650))
         final = runs[-1]
         subset = {
             t: _diagnostic_indices(case, coordinates, t, final["values"])
             for t in [0, *analysis_times]
         }
         opposite_digits = 650 if final["digits"] == 400 else 400
-        precision = _chain_order(
+        precision = execute(
+            "precision",
             case,
             coordinates,
-            analysis_times,
-            diagnostic_times,
             final["order"],
             opposite_digits,
             subset,
             direct=True,
         )
         # A same-650 repetition is never presented as independent precision evidence.
-        inputs = _chain_order(
+        inputs = execute(
+            "binary_inputs",
             _binary_case(case),
             [Decimal.from_float(x) if type(x) is float else x for x in coordinates],
-            analysis_times,
-            diagnostic_times,
             final["order"],
             final["digits"],
             subset,

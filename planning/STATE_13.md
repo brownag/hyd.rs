@@ -1,6 +1,6 @@
 # State — Orchestration 13
 
-Plan status: **Execution started on 2026-09-26 by user wave-orchestration instruction; Wave 1 accepted; Wave 2 accepted; Wave 3 split into serial tasks; component references accepted; finite-chain evaluator accepted; benchmark integration next.**
+Plan status: **Execution started on 2026-09-26 by user wave-orchestration instruction; Wave 1 accepted; Wave 2 accepted; Wave 3 split into serial tasks; component references accepted; finite-chain evaluator accepted; reference persistence accepted; solver lifecycle next.**
 Scientific status: **M5-V open; convergence, independent full-case analytical evidence and justified tolerances remain unmet.**
 Plan: [EXECUTION_PLAN_13.md](EXECUTION_PLAN_13.md). Workers: [PROMPT_TEMPLATE_13.md](PROMPT_TEMPLATE_13.md).
 
@@ -27,8 +27,11 @@ Plan: [EXECUTION_PLAN_13.md](EXECUTION_PLAN_13.md). Workers: [PROMPT_TEMPLATE_13
 | 2 | 13.2.2 | Configurable Rust adapter | done | 0023eb4 |
 | 2 | 13.2.3 | Strict metrics and normalization | done | 15b21b5 |
 | 3a | 13.3.2 | Component analytical references | done | 6285bca |
-| 3b | 13.3.3 | Finite-domain chain reference | done | pending commit |
-| 3c | 13.3.4 | Bounded benchmark integration | pending | — |
+| 3b | 13.3.3 | Finite-domain chain reference | done | 88b2656 |
+| 3c.1 | 13.3.5 | Checkpointed analytical reference work | done | pending commit |
+| 3c.2 | 13.3.6 | Shared bounded solver lifecycle | pending | — |
+| 3c.3 | 13.3.7 | Retained-evidence bridge gate | pending | — |
+| 3c.4 | 13.3.4 | Bounded benchmark integration | awaiting prerequisites | — |
 | 3d | 13.3.1 | Analytical executions and evidence | pending | — |
 | 4 | 13.4.1 | Separate spatial and temporal convergence | pending | — |
 | 5 | 13.5.1 | Discrepancy attribution/remediation specifications | pending | — |
@@ -36,7 +39,7 @@ Plan: [EXECUTION_PLAN_13.md](EXECUTION_PLAN_13.md). Workers: [PROMPT_TEMPLATE_13
 
 ## Resume point
 
-Waves 1 and 2 accepted. Next task: 13.3.4 integration, then original 13.3.1 executions/evidence. Read frozen spec including approved Wave 2 interface appendix and dependency reports. All 77 conditional launch rows remain unconsumed; actual runs require explicit orchestrator activation. Preserve 207 hashes in `.development/13-baseline/protected-hashes.json`. Latest full-suite parity output: `.development/12.6.1/13-regression/wave3b-20260927-01.json`. No solver threshold approved; M5-V remains open.
+Waves 1 and 2 accepted. Next tasks: serial 13.3.6 lifecycle, 13.3.7 bridge, then 13.3.4 integration and original 13.3.1 executions/evidence. Read frozen spec including approved Wave 2 interface appendix and dependency reports. All 77 conditional launch rows remain unconsumed; actual runs require explicit orchestrator activation. Preserve 207 hashes in `.development/13-baseline/protected-hashes.json`. Latest full-suite parity output: `.development/12.6.1/13-regression/wave3c1-20260927-01.json`. No solver threshold approved; M5-V remains open.
 
 ## Task reports
 
@@ -127,3 +130,19 @@ Implementation review and orchestrator reruns passed:34 targeted tests,145 Rust 
 - API: finite_chain_reference returns reference/diagnostics; reference_admission requires bound diagnostics for chain.
 - No solver launches; full coverage pending; uncertainty empirical, scientific M5-V remains open.
 - Deviations: none beyond recorded decomposition; no core/source/dependency edits.
+
+## Benchmark integration decomposition
+
+Accepted planning-only split of 13.3.4 into serial prerequisites 13.3.5–13.3.7 and final integration. Exact scopes/acceptance added to execution plan. A narrow stage interface permits durable reference checkpoints without monkeypatching private evaluator functions. Numerical method, coverage and all 77 solver rows unchanged; no numerical execution activated.
+
+## 13.3.5
+- Status: accepted; optional analytical stage executor and authenticated persistent reference cache.
+- Default evaluator method/arguments unchanged; exact Decimal checkpoints preserve diagnostic ordering.
+- Requests bind case, exact mesh/schedules, settings, runtime and source hashes; replay reproduces diagnostics/admission without inversion.
+- Durable start/completion ledger, exclusive files and locks; incomplete/failed/tampered stages block automatic repetition.
+- Reviewed coverage, metadata/result consistency, crash windows and preserved unmet outcomes.
+- API: ReferenceCache(root).reference(..., allow_work=False, allow_escalation=False) returns reference, diagnostics, admission.
+- Worker targeted 57 passed; root combined 115 Python and 145 Rust passed, plus 12 comparator and 34 contract checks.
+- Root fmt/Clippy/diff and 207 protected hashes passed; fresh Cargo output wave3c1-20260927-01.json.
+- No expensive analytical evaluations or solver launches; all 77 rows remain unconsumed.
+- Deviations: recorded producer decomposition only; mathematical coverage and M5-V remain open.

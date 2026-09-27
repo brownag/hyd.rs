@@ -68,7 +68,10 @@ All task IDs are new and initially pending. No task TODO is pre-completed.
 | 2 — Reusable study harness | 13.2.3 | Strict parameterized normalization and independent metrics | 13.1.1 |
 | 3a — Component references | 13.3.2 | Reaction, diffusion and scalar evaluators | 13.2.1, 13.2.2, 13.2.3 |
 | 3b — Finite-chain reference | 13.3.3 | Decimal transforms, inversion and admission | 13.3.2 |
-| 3c — Benchmark tooling | 13.3.4 | Bounded launcher, bridge checks and mocked tests | 13.3.3 |
+| 3c.1 — Reference persistence | 13.3.5 | Durable analytical checkpoints and cache | 13.3.3 |
+| 3c.2 — Solver lifecycle | 13.3.6 | Shared bounded launch and manifest handling | 13.3.5 |
+| 3c.3 — Bridge gate | 13.3.7 | Authenticated retained-output comparisons | 13.3.6 |
+| 3c.4 — Benchmark tooling | 13.3.4 | CLI integration and mocked tests | 13.3.7 |
 | 3d — Analytical evidence | 13.3.1 | Activated bridge/benchmark comparisons and report | 13.3.4 |
 | 4 — Controlled convergence | 13.4.1 | Separate spatial/temporal studies for both implementations | 13.3.1 |
 | 5 — Discrepancy investigation | 13.5.1 | Attribution, counterexamples, and bounded remediation recommendations | 13.4.1 |
@@ -176,11 +179,39 @@ Integrate the three adapters using a bounded, orchestrator-approved bridge/bench
 **Targeted commands:** `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest tools.test_solute_analytical_reference`; `git diff --check`.
 **Scratch:** `.development/13.3.3/`; own `planning/tasks/13.3.3.todo.md` only. No solver launches or edits to prior artifacts/adapters/cases.
 
+## Benchmark integration decomposition amendment
+
+Reviewed 13.3.4 planning exposed three substantial prerequisite clusters and a missing durable evaluator checkpoint interface. Execute 13.3.5–13.3.7 serially with separate micro-plan gates and commits, then original 13.3.4. The exact scopes below authorize only infrastructure needed for the already approved numerical protocol. Preserve all numerical methods, schedules, launch rows, limits and original execution roots. All prerequisite tests use mocked analytical work/processes; no expensive reference or solver execution is activated. A reference admission failure remains explicit evidence and stops accuracy claims; it must not be relabeled a tool failure or hidden. Bridge-only runs need no full analytical evaluation because they check retained configurations. Add the three new named test modules to subsequent wave-end regression suites.
+
+## 13.3.5 — Checkpointed analytical reference work
+
+Depends on accepted 13.3.3. Must edit only `tools/solute_analytical_reference.py` and `tools/test_solute_analytical_reference.py`; can create `tools/solute_reference_cache.py`, `tools/test_solute_reference_cache.py`, its own TODO, and `.development/13.3.5/`.
+
+Expose a narrow optional stage-execution interface around the existing finite-chain order calls, preserving default behavior, numerical arguments, diagnostics, and admission. Do not monkeypatch `_chain_order`. Implement durable, lossless Decimal stage checkpoints and complete reference caching keyed by canonical case hash, exact coordinate representations, both complete schedules, settings/escalation policy, Python/runtime provenance and evaluator/cache source hashes. Include sparse/direct/input-variant identity in individual stage keys. Verify shapes, scalar coverage, hashes and reference admission on every reuse; rejected admission remains rejected evidence. Persist each start before calculation and each completion/hash after exclusive durable artifact creation in an append-only analytical-work ledger. A complete valid checkpoint can resume; a started but missing/corrupt/incomplete checkpoint blocks instead of silently repeating work. An explicitly revised work authorization is required to repeat an interrupted stage. Source/settings/schedule changes never inherit partial coverage. No extra inversion orders, numerical methods, dependencies or real expensive evaluations.
+
+Acceptance: mocked stages prove cold evaluation, reuse across matching solver/dt rows, exact Decimal round trips, resume after a completed stage, refusal of interrupted/stale/tampered/incomplete stages, coverage rejection, final rejected admission preservation, and unchanged default evaluator results. Targeted commands: `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest tools.test_solute_analytical_reference tools.test_solute_reference_cache`; `git diff --check`. This task receives its own <=12-step micro-plan before edits.
+
+## 13.3.6 — Shared bounded solver lifecycle
+
+Depends on 13.3.5. Must edit none; can create `tools/solute_benchmark_lifecycle.py`, `tools/test_solute_benchmark_lifecycle.py`, its own TODO, and `.development/13.3.6/`. Existing Fortran adapter, metrics and Rust harness remain read-only.
+
+Implement reusable phase/root/row selection, explicit activation inputs, dry-run request/manifest creation and the Rust build/launch wrapper; reuse accepted Fortran preparation/execution/verification. Compile Rust separately with Cargo JSON executable discovery and retain its executable, source, compiler, flags and adapter identities. Run the selected harness test directly with the four frozen environment variables, bounded streams, 60-second timeout and storage cap. Use the existing task-root `launch.lock` and shared phase ledger for both solvers; check global 77-row, phase, no-retry and storage reservations immediately before start. Ensure future convergence/holdout callers use the same accounting; they receive no activation here. Finalize immutable complete/failed/timeout manifests with provenance and inventory validated through the accepted metrics loader. Preserve all protected baseline hashes. No solver execution or Rust build in this producer task.
+
+Acceptance: mocked build/launch tests cover exact command/environment, independent compile accounting, successful validation, spawn failure, nonzero exit, timeout, storage overflow, stale executable/input/source, duplicate starts, corrupt ledger, root escapes/symlinks, and shared Rust/Fortran consumption. Dry-run and verification perform no build or subprocess launch. Targeted commands: `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest tools.test_solute_benchmark_lifecycle`; `git diff --check`. This task receives its own <=12-step micro-plan before edits.
+
+## 13.3.7 — Retained-evidence bridge gate
+
+Depends on 13.3.6. Must edit none; can create `tools/solute_benchmark_bridge.py`, `tools/test_solute_benchmark_bridge.py`, its own TODO, and `.development/13.3.7/`. Retained Orchestration 12 artifacts and existing adapters/metrics remain read-only.
+
+Implement separate same-solver comparisons of the two bridge rows against authenticated retained original configurations. Pin the concrete retained manifests/artifacts in this task's micro-plan; never use cross-solver agreement as the bridge criterion. Check case/mesh/species ordering, native deck/request mapping, exact time/step coverage, and available concentrations, inventories, boundary/reaction quantities. Carry source-printed precision explicitly. For Rust f64 comparisons require a documented arithmetic comparison policy, reporting an unexplained mismatch instead of inventing scientific tolerances. Preserve legacy unavailable endpoint history as unavailable. Persist an authenticated bridge report that binds both new and retained artifacts plus comparator provenance. Both bridge reports must pass before dependent benchmark execution can be activated; tampering, missing records and unexplained differences stop the gate.
+
+Acceptance: synthetic and read-only retained-evidence tests independently reject changed species values/order, orientation/signs, boundary interpretation, schedule, record completeness and hashes; no subprocesses. Targeted commands: `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest tools.test_solute_benchmark_bridge`; `git diff --check`. This task receives its own <=12-step micro-plan before edits.
+
 ## 13.3.4 — Implement bounded benchmark integration
 
 **Must edit:** none.
 **Can create:** `tools/check_solute_benchmarks.py`; `tools/test_solute_benchmarks.py`.
-**Depends on:** 13.3.3 and all Wave 2 tasks.
+**Depends on:** 13.3.7 and all accepted producer tasks.
 **Read-only references:** accepted evaluator, adapters/metrics, frozen manifest/ledger/reference schemas, retained Example 3 provenance.
 **Spec:** Implement the benchmark CLI and safe Rust launcher/manifest wrapping, reuse the accepted Fortran runner, and connect independent references/metrics. Enforce unique roots, explicit --execute, no-launch verify-only, all-identity hashes, append-only shared phase ledger, failed-attempt budget consumption, 60-second solver timeouts and storage caps. Compile separately from counted solver runs. Bridge checks must reproduce retained original configurations and justify printed/arithmetic comparison; stop before dependent launches on unexplained differences. Preserve exact reference admission and scientific unmet results. Make mocked lifecycle and deliberately perturbed species/order/boundary checks independent of solver launches.
 **Acceptance:** mocked launch/timeout/failure/provenance/bridge tests pass; dry-run enumerates exactly the fourteen frozen benchmark rows and reserved caps; verify-only executes no solver. Orchestrator reviews concrete commands and activates runs separately.

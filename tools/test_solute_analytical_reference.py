@@ -805,5 +805,81 @@ class FiniteEvaluationTests(unittest.TestCase):
         )
 
 
+class StageExecutorTests(unittest.TestCase):
+    def test_hook_and_default_reproduce_all_arguments_and_results(self):
+        from unittest.mock import patch
+
+        case = copy.deepcopy(CASES["example3"])
+        arguments = (case, [0, 125, 250], [50], [0, 50, 200])
+        for escalation in (False, True):
+            with self.subTest(escalation=escalation):
+                with patch.object(
+                    analytical, "_chain_order", side_effect=synthetic_chain_order
+                ) as calls:
+                    expected = analytical.finite_chain_reference(
+                        *arguments, allow_escalation=escalation
+                    )
+                    expected_calls = copy.deepcopy(
+                        [(c.args, c.kwargs) for c in calls.call_args_list]
+                    )
+                variants = []
+
+                def execute(request, calculate):
+                    variants.append(request["variant"])
+                    # Request mutation cannot alter the callback's original arguments.
+                    request["case"]["theta"] = -1
+                    request["coordinates"].clear()
+                    return calculate()
+
+                with patch.object(
+                    analytical, "_chain_order", side_effect=synthetic_chain_order
+                ) as calls:
+                    actual = analytical.finite_chain_reference(
+                        *arguments, allow_escalation=escalation, stage_executor=execute
+                    )
+                    self.assertEqual(
+                        [(c.args, c.kwargs) for c in calls.call_args_list], expected_calls
+                    )
+                self.assertEqual(actual, expected)
+                self.assertEqual(
+                    variants,
+                    ["full"] * 3
+                    + (["escalation"] if escalation else [])
+                    + ["precision", "binary_inputs"],
+                )
+
+    def test_rejects_executor_metadata_coverage_and_value_corruption(self):
+        from unittest.mock import patch
+
+        mutations = {
+            "order": lambda r: r.update(order=512),
+            "digits": lambda r: r.update(digits=20),
+            "missing": lambda r: r["values"].pop(next(iter(r["values"]))),
+            "extra": lambda r: r["recurrence"].update({("bad", 0, "x", 0, 0): D(0)}),
+            "nonfinite": lambda r: r["values"].update({next(iter(r["values"])): D("NaN")}),
+            "float": lambda r: r["values"].update({next(iter(r["values"])): 0.0}),
+            "negative": lambda r: r["arithmetic"].update({next(iter(r["arithmetic"])): D(-1)}),
+            "conditioning": lambda r: r.update(maximum_conditioning="invalid"),
+            "guarded": lambda r: r.update(guarded_samples=-1),
+        }
+        for name, mutate in mutations.items():
+            with self.subTest(mutation=name):
+
+                def execute(request, calculate):
+                    result = copy.deepcopy(calculate())
+                    mutate(result)
+                    return result
+
+                with patch.object(analytical, "_chain_order", side_effect=synthetic_chain_order):
+                    with self.assertRaises(ValueError):
+                        analytical.finite_chain_reference(
+                            CASES["example3"],
+                            [0, 125, 250],
+                            [50],
+                            [0, 50, 200],
+                            stage_executor=execute,
+                        )
+
+
 if __name__ == "__main__":
     unittest.main()
