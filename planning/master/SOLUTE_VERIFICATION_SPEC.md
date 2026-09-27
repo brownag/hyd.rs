@@ -574,9 +574,10 @@ The metrics module's public entry points are
 `normalize_fortran(run_dir, cases_path) -> observation_dict`,
 `load_observations(path, manifest_path, cases_path) -> observation_dict`, and
 `compute_metrics(observations, reference) -> result_dict`. They validate
-hashes/mapping/shape before computing. `reference` uses the same coordinates,
-species and profile times plus independent continuum integrals and uncertainty;
-Wave 3 may add a typed wrapper without changing the frozen observation keys.
+hashes/mapping/shape before computing. `reference` uses the same coordinates and species, concentration profiles at
+initial plus analysis times, and independent continuum integrals/uncertainty
+at every diagnostic profile time. The exact wrapper is specified below;
+no observation JSON keys change.
 A metrics result must keep raw, derived and solver-reported namespaces separate.
 Schema changes return to the orchestrator for a contract amendment.
 
@@ -591,3 +592,57 @@ Unsupported manufactured forcing is explicitly blocked. Capacity, output
 rounding, insufficient quadrature resolution or failure to isolate dt error
 are outcomes to quantify within current limits. Component success does not
 replace the full transient finite-chain trajectory required for M5-V.
+
+## Wave 2 interface clarification — approved 2026-09-26
+
+`compute_metrics` accepts observations returned by either loader, using a dict
+subclass whose private attributes retain the validated case, launch, manifest,
+and raw rounding intervals. JSON observation keys stay frozen. Plain dicts and
+objects whose contents changed after loading are rejected as unvalidated.
+
+The reference object has exactly these keys:
+`schema_version`, `coordinates`, `species`, `profiles`, `continuum`, `uncertainty`.
+The version is `solute-metrics-reference-v1`; coordinates and ordered species
+match observations exactly. No implicit interpolation or dropped species.
+
+- `profiles`: list of `{time, concentration}`; concentration is S arrays of N
+  finite numbers. Coverage is initial time plus the launch's analysis
+  times, retaining all N nodes at those times.
+- `continuum`: list of `{time, dissolved, equilibrium_sorbed, total,
+  endpoint_flux, boundary_cumulative, production_cumulative, loss_cumulative}`.
+  Every observation profile time, including zero, is required. The inventory,
+  production and loss fields each contain S finite numbers. `endpoint_flux`
+  and `boundary_cumulative` each contain S pairs `[inlet, outlet]`, with both
+  signs inward. Production/loss are separate independently evaluated positive
+  integrals; no closure-derived term is accepted as independent evidence.
+- `uncertainty`: exactly `{profiles, continuum}`. Each list duplicates the
+  corresponding reference list's times, keys and dimensions, replacing every
+  value other than `time` by its finite nonnegative absolute uncertainty.
+  These include root/input, truncation, roundoff and evaluation uncertainty.
+
+A reference value whose uncertainty includes zero cannot supply a resolved
+relative denominator. Result namespaces are `raw`, `derived`, `solver_reported`;
+derived comparisons retain each named dimensional denominator and uncertainty.
+No solver acceptance threshold is assigned.
+
+
+## Shared artifact and format conventions
+
+Raw artifact logical keys use `NOD_INF.OUT`, `RUN_INF.OUT`, `T_LEVEL.OUT`,
+`BALANCE.OUT`, `OBS_NODE.OUT`, `PROFILE.OUT`, `I_CHECK.OUT`, and `solute1.out`
+through the configured species count. Artifact path values are authoritative,
+including literal `solute-input\\NAME` paths. `request.txt`, `stdout.txt`,
+`stderr.txt` have matching names. Input keys `SELECTOR.IN`, `PROFILE.DAT`,
+`LEVEL_01.DIR` point to `inputs/NAME`, with literal runtime aliases separate.
+Resolve contained path values rather than depending solely on logical keys.
+
+Source-checked `field_formats`: concentration/sorbed `e12.4`; coordinate
+`f10.4`; theta `f6.4`; head `f11.3`; nodal_flux `e12.4`; solute_flux `e13.5`;
+profile_time `f14.4`; run_time `e15.7`; run_dt `e13.5`; endpoint_time `f14.4`;
+endpoint_concentration `e12.4`. OBS_NODE additionally has per-node head `f12.2`,
+theta `f8.4`, then flux `e12.4` if lFlux or temperature `f9.3` otherwise.
+The selected cases use S<=3 and t<99999999; any other layout is rejected.
+
+Analytical concentration profiles cover initial plus analysis times; continuum
+observables cover every diagnostic profile time. This resolves the earlier API
+wording in favor of the explicit scientific-coverage and cost contract.

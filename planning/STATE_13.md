@@ -1,6 +1,6 @@
 # State — Orchestration 13
 
-Plan status: **Execution started on 2026-09-26 by user wave-orchestration instruction; Wave 1 accepted; Wave 2 next.**
+Plan status: **Execution started on 2026-09-26 by user wave-orchestration instruction; Wave 1 accepted; Wave 2 three approved workers executing.**
 Scientific status: **M5-V open; convergence, independent full-case analytical evidence and justified tolerances remain unmet.**
 Plan: [EXECUTION_PLAN_13.md](EXECUTION_PLAN_13.md). Workers: [PROMPT_TEMPLATE_13.md](PROMPT_TEMPLATE_13.md).
 
@@ -22,10 +22,10 @@ Plan: [EXECUTION_PLAN_13.md](EXECUTION_PLAN_13.md). Workers: [PROMPT_TEMPLATE_13
 
 | Wave | Task | Deliverable | Status | Commit |
 |---|---|---|---|---|
-| 1 | 13.1.1 | Mathematical benchmark/case/schema contract | done | task commit |
-| 2 | 13.2.1 | Isolated Fortran adapter | pending | — |
-| 2 | 13.2.2 | Configurable Rust adapter | pending | — |
-| 2 | 13.2.3 | Strict metrics and normalization | pending | — |
+| 1 | 13.1.1 | Mathematical benchmark/case/schema contract | done | 490a41b |
+| 2 | 13.2.1 | Isolated Fortran adapter | in progress | — |
+| 2 | 13.2.2 | Configurable Rust adapter | done | task commit |
+| 2 | 13.2.3 | Strict metrics and normalization | in progress | — |
 | 3 | 13.3.1 | Independent analytical evaluator and evidence | pending | — |
 | 4 | 13.4.1 | Separate spatial and temporal convergence | pending | — |
 | 5 | 13.5.1 | Discrepancy attribution/remediation specifications | pending | — |
@@ -33,7 +33,7 @@ Plan: [EXECUTION_PLAN_13.md](EXECUTION_PLAN_13.md). Workers: [PROMPT_TEMPLATE_13
 
 ## Resume point
 
-Wave 1 accepted after independent equation, boundary, equal-rate and feasibility review. Next: isolated workers for 13.2.1/13.2.2/13.2.3. Contract frozen; 77 conditional runs remain gated on adapters and evaluator. No solver threshold approved; M5-V remains open. Preserve 207 hashes in `.development/13-baseline/protected-hashes.json`. Latest full-suite parity output: `.development/12.6.1/13-regression/wave1-20260926-01.json`.
+Wave 1 accepted after independent equation, boundary, equal-rate and feasibility review. Isolated workers for 13.2.1/13.2.2/13.2.3 are preparing plans in `.development/worktrees/<task-id>` on `solute-<task-id>` branches. Contract frozen; 77 conditional runs remain gated on adapters and evaluator. No solver threshold approved; M5-V remains open. Preserve 207 hashes in `.development/13-baseline/protected-hashes.json`. Latest full-suite parity output: `.development/12.6.1/13-regression/wave1-20260926-01.json`.
 
 ## Task reports
 
@@ -49,3 +49,16 @@ Wave 1 accepted after independent equation, boundary, equal-rate and feasibility
 - Corrected printed concentration precision to four significant digits; original bridge controls retained.
 - Deviations: none. Worker recovered from transient service usage error; no incomplete output accepted.
 - Remaining: Wave 3 per-observable evaluator admission; capacity-limited temporal contamination and M5-V remain unresolved.
+
+## Wave 2 interface decision
+
+Approved the metrics validated-dict context and exact reference wrapper in the spec. Analytical concentration arrays cover initial/analysis times; continuum observables cover all diagnostic times. Shared artifact names and source formats frozen. Adapter task prose now explicitly leaves independent derived integrals to metrics. No added JSON observation keys, dependencies, or solver launches.
+
+## 13.2.2
+- Status: accepted after one review correction; Rust harness and completed TODO integrated from isolated worktree.
+- Strict flat request/hash/path validation, fixed-step observations, explicit frozen physics, and solver/derived separation implemented.
+- Corrected bridge profile schedule to 0/50/100/200 while retaining all step endpoints.
+- Orchestrator reran targeted harness: 15 passed; formatting, targeted Clippy and whitespace passed.
+- No core/Cargo/old-fixture edits; no study launches (77 conditional slots remain).
+- Wave-end global suite deferred until all Wave 2 producers are integrated.
+- Launcher owns casebook/launch authorization and mathematical IC validation; metrics owns independent integrals.
