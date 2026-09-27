@@ -1,6 +1,6 @@
 # State — Orchestration 13
 
-Plan status: **Execution started on 2026-09-26 by user wave-orchestration instruction; Wave 1 accepted; Wave 2 accepted; Wave 3 split into serial tasks; component references accepted; finite-chain evaluator accepted; reference persistence and solver lifecycle accepted; bridge gate next.**
+Plan status: **Execution started on 2026-09-26 by user wave-orchestration instruction; Wave 1 accepted; Wave 2 accepted; Wave 3 split into serial tasks; component references accepted; finite-chain evaluator accepted; all benchmark prerequisites accepted; final CLI integration next.**
 Scientific status: **M5-V open; convergence, independent full-case analytical evidence and justified tolerances remain unmet.**
 Plan: [EXECUTION_PLAN_13.md](EXECUTION_PLAN_13.md). Workers: [PROMPT_TEMPLATE_13.md](PROMPT_TEMPLATE_13.md).
 
@@ -29,8 +29,8 @@ Plan: [EXECUTION_PLAN_13.md](EXECUTION_PLAN_13.md). Workers: [PROMPT_TEMPLATE_13
 | 3a | 13.3.2 | Component analytical references | done | 6285bca |
 | 3b | 13.3.3 | Finite-domain chain reference | done | 88b2656 |
 | 3c.1 | 13.3.5 | Checkpointed analytical reference work | done | 4323adf |
-| 3c.2 | 13.3.6 | Shared bounded solver lifecycle | done | pending commit |
-| 3c.3 | 13.3.7 | Retained-evidence bridge gate | pending | — |
+| 3c.2 | 13.3.6 | Shared bounded solver lifecycle | done | a6edebe |
+| 3c.3 | 13.3.7 | Retained-evidence bridge gate | done | pending commit |
 | 3c.4 | 13.3.4 | Bounded benchmark integration | awaiting prerequisites | — |
 | 3d | 13.3.1 | Analytical executions and evidence | pending | — |
 | 4 | 13.4.1 | Separate spatial and temporal convergence | pending | — |
@@ -39,7 +39,7 @@ Plan: [EXECUTION_PLAN_13.md](EXECUTION_PLAN_13.md). Workers: [PROMPT_TEMPLATE_13
 
 ## Resume point
 
-Waves 1 and 2 accepted. Next tasks: serial 13.3.7 bridge, then 13.3.4 integration and original 13.3.1 executions/evidence. Read frozen spec including approved Wave 2 interface appendix and dependency reports. All 77 conditional launch rows remain unconsumed; actual runs require explicit orchestrator activation. Preserve 207 hashes in `.development/13-baseline/protected-hashes.json`. Latest full-suite parity output: `.development/12.6.1/13-regression/wave3c2-20260927-01.json`. No solver threshold approved; M5-V remains open.
+Waves 1 and 2 accepted. Next task: 13.3.4 integration and original 13.3.1 executions/evidence. Read frozen spec including approved Wave 2 interface appendix and dependency reports. All 77 conditional launch rows remain unconsumed; actual runs require explicit orchestrator activation. Preserve 207 hashes in `.development/13-baseline/protected-hashes.json`. Latest full-suite parity output: `.development/12.6.1/13-regression/wave3c3-20260927-01.json`. No solver threshold approved; M5-V remains open.
 
 ## Task reports
 
@@ -162,3 +162,20 @@ Task 13.3.6 planning measured the existing debug harness at 11,664,672 bytes, ab
 - Fresh Cargo output wave3c2-20260927-01.json; 207 protected hashes unchanged.
 - API and build caveats: .development/13.3.6/HANDOFF.md. No real study build/launch; all 77 rows unconsumed.
 - Deviations: approved debug-metadata and verbose logging decisions only; no numerical mode or cap changes.
+
+## Bridge comparison policy review
+
+Approved task 13.3.7 micro-plan with pinned retained artifacts and same-solver comparison. Rust orientation reversal changes elimination/reduction rounding; accepted source-derived M-matrix/operation-count arithmetic envelopes, including rounded linear intercept and cumulative sums, evaluated independently of new output. This is a bridge identity guard, not a continuum accuracy tolerance. Original Rust executable and per-step history remain unavailable. No solver runs activated.
+
+## 13.3.7
+- Status: accepted; authenticated same-solver bridge comparison/report gate and 23 tests.
+- Pinned retained inventory, original Fortran manifests/build and Rust observations; current core/harness policy hashes fixed.
+- Fortran compares all scientific raw fields with paired printed intervals; only date and calculation-time metadata excluded.
+- Rust maps reversed orientation and declared time recurrence; source-derived outward arithmetic bounds cover profiles and mass terms.
+- Root independently screened final concentration guards: approximately 2.411e-6, 2.543e-7, 7.040e-6; these are not accuracy tolerances.
+- Reports authenticate inputs and recompute comparisons; both distinct passing reports required before dependent activation.
+- Missing original Rust executable/all-step history and Fortran endpoint history remain explicitly unavailable.
+- Root checks: 155 Python, 145 Rust, 12 comparator and 34 contract checks; fmt/Clippy/diff passed.
+- Fresh Cargo output wave3c3-20260927-01.json; 207 protected hashes unchanged.
+- APIs: evaluate_bridge, write_report, verify_report, require_bridges; handoff under .development/13.3.7/.
+- No builds, reference evaluations or scientific launches; all 77 rows unconsumed; M5-V remains open.
