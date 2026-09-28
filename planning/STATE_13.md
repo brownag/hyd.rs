@@ -33,8 +33,9 @@ Plan: [EXECUTION_PLAN_13.md](EXECUTION_PLAN_13.md). Workers: [PROMPT_TEMPLATE_13
 | 3c.3 | 13.3.7 | Retained-evidence bridge gate | done | 431b7ad |
 | 3c.4 | 13.3.4 | Bounded benchmark integration | done | b9472e7 |
 | 3d | 13.3.1 | Analytical executions and evidence | in progress | — |
-| 4a | 13.4.2 | Pure convergence classifiers | done | pending commit |
-| 4b | 13.4.3 | Gated convergence CLI | pending | — |
+| 4a | 13.4.2 | Pure convergence classifiers | done | 69d60ad |
+| 4b.1 | 13.4.4 | Authenticated convergence evidence replay | done | pending commit |
+| 4b.2 | 13.4.3 | Gated convergence CLI | pending | — |
 | 4c | 13.4.1 | Separate spatial and temporal convergence evidence | pending | — |
 | 5 | 13.5.1 | Discrepancy attribution/remediation specifications | pending | — |
 | 6 | 13.6.1 | Budgets, regression gates and M5-V assessment | pending | — |
@@ -254,3 +255,35 @@ Root30targeted/202combinedPython/145Rust/12comparator/34contract/fmtClippy passe
 - Rate/floor/control/overall/informativesummary decisions distinct; allaccuracythresholds null and M5-Vopen.
 - Immutablehelper constraints for pending13.4.3 in .development/13.4.2/HANDOFF.md.
 - Deviations: approved producer decomposition and narrow reporting correction only.
+
+## Immutable convergence integration scope — 2026-09-27
+
+Finalize13.4.3 scope as separateCLI/tests using unchanged accepted public helpers. Dependency now accepted13.3.4/13.4.2; disjoint mocked producer may run during13.3.1 references. No actualdryrun/sharedlocks/builds/references/starts. Authenticated exact completepriorcache reads only, newworkcurrentroot only; corrupted/interrupted evidence must block rather than trigger repeat. Numerical13.4.1 remains dependent on completed13.3.1 and accepted13.4.3 with separateactivation.
+
+## Second full reference checkpoint — 2026-09-27
+
+N256/400 completed01:43:58.199347UTC,checkpointSHAce16a2f697ddf906cf74fa2db44d9cee5c0834ba08686d0aafc32ef28234e176, independently checked. N384/400 started01:43:58.230971UTC,stage4990ce01c6878958f3754dab9136ab9a17ec84c68efdf6d30ea3d632eb73df72. Fulladmission pending; no fullsolverstarts.
+
+## Convergence replay/CLI decomposition — 2026-09-27
+
+13.4.3 analysis identified13distinct units, exceeding12smallsteps. Insert13.4.4 authenticatedcache/run/metrics/classifier/summary helper;13.4.3 retainsbatch/activation/CLI and waitshelper acceptance. Bothmockedonly,immutableexistingproducers. No expandednumericalmatrix or workauthorization.
+
+## Evidence replay micro-plan approval — 2026-09-27
+
+Approved13.4.4 twelve-stepTODO. Replay selectedcompletecache receipt before trustingcallerreferencevalues; validate actualproduceridentities; source-boundreviewedbounds only. Priorinvalidpresent evidence failswithoutfallback/recomputation. Mockedtaskroot work only,noactive13.3.1access. Scientificexecution13.4.1 stillgatedafterbenchmark andproduceracceptance.
+
+## Conditional reference diagnostics clarification — 2026-09-27
+
+Originalpolicy shorthand final650precision/binary400 refers to baselinefinal384/400 branch. Frozenaccepted evaluator optional512/650 branch uses oppositeprecision512/400 and exactbinary-input512/650, one subsetstageeach. Explicitly authorize those existingconditional diagnostics ifsingleoptional escalationneeded; no neworders,variants orrepeats. Preserveoriginalpolicy/hash and attach example3-reference-policy-clarification.json before branchselection.
+
+## 13.4.4
+- Status: accepted authenticated convergence evidence helper;40mockedtests independently passed.
+- Exactprior/currentcache source bindings and stage safety, immutable receipts, complete-run and independent metrics replay.
+- Separately authenticated classifier bindings and reviewedbounds provenance; missingbounds inconclusive.
+- Invalidpresentprior evidence rejectsfallback; completedcurrentunmet retained and blocksderive.
+- Classification/summary replay authenticated; historicalcount shape only, actualsnapshotauthority delegated13.4.3.
+- Root244Python/145Rust/12comparator/34contract/fmtClippy/diff passed;207protected unchanged.
+- Fresh Cargo output wave4b1-20260927-01.json; acceptedproducers/core remain unchanged.
+- No numericalwork orstarts; active13.3.1 reference monitored separately.
+- API/helperSHA and trustboundary: .development/13.4.4/HANDOFF.md.
+- Deviations: approved evidence/CLI split only;thresholds null,scientificacceptancefalse,M5-Vopen.

@@ -74,12 +74,13 @@ All task IDs are new and initially pending. No task TODO is pre-completed.
 | 3c.4 — Benchmark tooling | 13.3.4 | CLI integration and mocked tests | 13.3.7 |
 | 3d — Analytical evidence | 13.3.1 | Activated bridge/benchmark comparisons and report | 13.3.4 |
 | 4a — Convergence classifiers | 13.4.2 | Pure independent rate/control classification | 13.2.3 |
-| 4b — Convergence CLI | 13.4.3 | Gated phase integration | 13.3.1, 13.4.2 |
+| 4b.1 — Convergence replay | 13.4.4 | Authenticated evidence/classifier replay | 13.3.4, 13.4.2 |
+| 4b.2 — Convergence CLI | 13.4.3 | Immutable-helper phase integration | 13.4.4 |
 | 4c — Controlled convergence | 13.4.1 | Activated separate spatial/temporal evidence for both implementations | 13.3.1, 13.4.3 |
 | 5 — Discrepancy investigation | 13.5.1 | Attribution, counterexamples, and bounded remediation recommendations | 13.4.1 |
 | 6 — Error budgets and decision | 13.6.1 | Reviewed threshold policy, regressions and M5-V evidence assessment | 13.5.1; any accepted remediation |
 
-Wave 2 files are pairwise disjoint. Its common schema is frozen in Wave 1; schema changes require returning to that contract before workers proceed. Use worktrees with task-local scratch and Cargo targets. Workers return reports; the orchestrator merges them into STATE serially to avoid a shared-file collision. Later evidence waves are serial. The explicitly split 13.4.2 pure classifier may run while 13.3.1 reference stages compute; its disjoint file scope and no-launch gate prevent shared evidence changes. Global checks and commits remain serial.
+Wave 2 files are pairwise disjoint. Its common schema is frozen in Wave 1; schema changes require returning to that contract before workers proceed. Use worktrees with task-local scratch and Cargo targets. Workers return reports; the orchestrator merges them into STATE serially to avoid a shared-file collision. Later evidence waves are serial. The explicitly split13.4.2 pure classifier and13.4.4/13.4.3 mocked producers may run while 13.3.1 reference stages compute; its disjoint file scope and no-launch gate prevent shared evidence changes. Global checks and commits remain serial.
 
 ## Common execution contract
 
@@ -244,11 +245,39 @@ Acceptance: synthetic and read-only retained-evidence tests independently reject
 **Targeted commands:** `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest tools.test_solute_convergence`; `git diff --check`.
 **Do not touch:** accepted helpers,core/source,CASES,thresholds,other task evidence. If scope exceeds12 small steps, propose further decomposition before implementation.
 
-## 13.4.3 — Integrate gated convergence CLI
+## 13.4.4 — Authenticate convergence evidence and classifier replay
 
-**Must edit/Can create:** precise helper amendment to be finalized after13.3.1 completes; prospective `tools/run_solute_convergence.py` and `tools/test_solute_convergence_cli.py`.
-**Depends on:** 13.3.1 and13.4.2.
-**Spec:** Integrate accepted lifecycle/cache/bridge/metrics and pure classifier for exact frozen convergence phase. BenchmarkBatch currently hard-codes benchmark; lifecycle convergence scratch is13.4.1. Finalize reviewed narrow phase/cache reuse changes after active benchmark provenance is frozen. No implementation authorized by this placeholder. Execution remains separately activated under13.4.1; shared77row/storage/60second/noautomaticrepeat rules unchanged.
+**Must edit:** none.
+**Can create:** `tools/solute_convergence_evidence.py`; `tools/test_solute_convergence_evidence.py`.
+**Depends on:** 13.3.4 and13.4.2.
+**Read-only references/anchors:** accepted BenchmarkBatch reference_request/reference/metrics replay and summary pattern; Lifecycle.verify_run; ReferenceCache reference/identity and persistence; bridge reports; pure classifier HANDOFF and APIs; frozen convergence rows.
+
+**Spec:** Implement ConvergenceEvidence helper owning only exact cache requests/source receipts, complete-run independent metrics replay, reviewed bound records, separately authenticated classifier bindings and classification/summary replay. No recipes,activation selection,builds,solver starts,launch ledger or batch-lock ownership. Context supplied by future13.4.3 has authenticated recipe/activation/source-bound bounds; helper still checks exact row/book/path/producer identities. All accepted helpers remain unchanged. Test every path with mocks/task scratch only; no actualsharedlocks/builds/references/runs.
+
+reference_request(row) derives frozen nodes/analysis/diagnostic schedules and exact cache identity. reference(row,allow_work=False,expected_receipt=None) replays selected source from immutable receipt, completeprior caches read-only, and currentcache only for separately authorizednewwork. Prior present corrupted/orphan/interrupted/unmet candidates fail honestly, never silently treated as missing to trigger repeats. Current interrupted/failed work cannot repeat automatically; only acceptedcache safety semantics apply. Newworkonly current13.4.1root; retain fullsource/artifact hashes and admissions; no interpolation/partialreuse. Different exact prior identities do not match. Preserve explicit escalation identity/workpolicy. Receipt verification reproduces complete request/admission/source bindings.
+
+derive(row,run,reference_values,receipt,write=False) authenticates Lifecycle complete run, independently loadsobservations/computesmetrics, verifies producer+run/reference receipts and compares existing immutable metrics result. Assemble exact reference wrapper and reviewed perchannel bounds; null/missing bounds remain missing, no numericalthresholds assigned. Separately derive expected classifier bindings from authenticated artifacts rather than rehashing untrusted expectations. classify/summary replay binds exact ordered row/result/reference identities and pureclassifier output; alteredrecords/sourcepath/producers/bounds/summary fail. Historicalbudgetcounts remain historical, independent currentledger accounting13.4.3. Verify-only performs no work or evidence mutation. Document trustboundary: boundassertions require rootreview/sourceauthentication, empiricaluncertainty remains empirical.
+
+**Acceptance:** focused mocked tests cover exact identities, readonlycache reuse, prior/currentinvalidpresent no-repeat, source/receipt forgery, wrongphase/path/producers, independently recomputed metrics perturbation, bounds/trustedbinding corruption, summary replay and no-work/no-I/O verification. Write exact API in `.development/13.4.4/HANDOFF.md`;zero starts. At most12 smallsteps; propose further split beforecode if needed.
+**Targeted commands:** `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest tools.test_solute_convergence_evidence`; `git diff --check`.
+**Do not touch:** acceptedhelpers,core/source,CASES,other task evidence,thresholds. No actualdryruns,sharedlockwrites,builds,references or launches.
+
+## 13.4.3 — Integrate gated convergence CLI with immutable helpers
+
+**Must edit:** none.
+**Can create:** `tools/run_solute_convergence.py`; `tools/test_solute_convergence_cli.py`.
+**Depends on:** 13.4.4 (accepted immutable public helpers,evidence replay and pure classifier).
+**Read-only references/anchors:** BenchmarkBatch create/load/reference_request/execute/verify/main as reviewed pattern; Lifecycle phase selection, exact activation and shared global limits; ReferenceCache reference/read-only replay and identity; bridge.require_bridges; classifier HANDOFF; frozen convergence matrix.
+
+**Spec:** Implement a separate convergence batch CLI using accepted13.4.4 evidence helper and unchanged public lifecycle/cache/bridge/metrics/classifier APIs and the reviewed benchmark orchestration pattern. Do not mutate or weaken accepted benchmark producers: their current hash equality authenticates retained evidence. Default dry-run and --verify-only perform no builds,analyticalwork or solver starts. Exact activation selects only frozen convergence rows under accepted13.4.1 lifecycle root. Require both authenticated passing bridge reports before dependent work and admitted exact reference coverage before starts. Explicit --allow-reference-work/--allow-reference-escalation flags are separately activated for real execution later; no code approval activates numerics. Real dry-run/execute writes are deferred to13.4.1; producer tests mock lifecycle and use only13.4.3 scratch.
+
+Allow explicitly configured read-only prior cache roots to reuse complete exact identities via ReferenceCache(...).reference(allow_work=False); never write to a prior task cache, copy partial coverage, interpolate or silently recompute. New authorized reference work belongs only to current13.4.1 cache. Detect prior candidate presence/complete status without treating malformed/orphan/interrupted entries as cache misses that trigger repeats; fail honestly. Record selected cache source and hashes in immutable recipe/receipts. Subsequent verify-only must replay the selected complete identity without analytical work.
+
+Retain immutable batch recipes, original activation bytes/subset authority, all producer identities including newCLI/classifier, shared77-row ledger/storage accounting, failed-start consumption,60second ceilings and no automatic repeat. Builds/failedanalyticalstages are likewise not auto-retried. Resume only authenticated completed artifacts and pending authorized rows. All derived metrics/results/reference bindings and summary need replay/hash verification; altered provenance, forged index/run paths, duplicate IDs, wrongphase, missingrecords, incomplete consumes and workpolicy changes rejected. Feed pure classifier separately authenticated trusted bindings and exact reference_values, with explicit reviewed optional channel bounds; absent bounds remain inconclusive. Do not assign accuracy thresholds. Precision row retained separately from refinement.
+
+**Acceptance:** mocked producer tests pass, cover default no-work, exact phase/activation, bridge/ref gating, cross-root completecache reuse vs incomplete/corrupt fail, failed/incomplete no-repeat,resume, receipt forgery and read-only classification. Exact prospective commands/API in `.development/13.4.3/HANDOFF.md`. Task consumes zero scientific starts. CLI tooling completion is distinct from convergence outcomes,thresholds andM5-V.
+**Targeted commands:** `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest tools.test_solute_convergence_cli`; `git diff --check`.
+**Do not touch:** acceptedhelpers,core/source,CASES,other task evidence,thresholds. No actualdryrun/sharedlocks,builds,references or launches. If12 genuinely small steps cannot cover integration, propose a further narrow batch/CLI split before implementation.
 
 ## 13.4.1 — Measure spatial and temporal convergence separately
 
