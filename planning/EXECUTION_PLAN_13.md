@@ -73,11 +73,13 @@ All task IDs are new and initially pending. No task TODO is pre-completed.
 | 3c.3 — Bridge gate | 13.3.7 | Authenticated retained-output comparisons | 13.3.6 |
 | 3c.4 — Benchmark tooling | 13.3.4 | CLI integration and mocked tests | 13.3.7 |
 | 3d — Analytical evidence | 13.3.1 | Activated bridge/benchmark comparisons and report | 13.3.4 |
-| 4 — Controlled convergence | 13.4.1 | Separate spatial/temporal studies for both implementations | 13.3.1 |
+| 4a — Convergence classifiers | 13.4.2 | Pure independent rate/control classification | 13.2.3 |
+| 4b — Convergence CLI | 13.4.3 | Gated phase integration | 13.3.1, 13.4.2 |
+| 4c — Controlled convergence | 13.4.1 | Activated separate spatial/temporal evidence for both implementations | 13.3.1, 13.4.3 |
 | 5 — Discrepancy investigation | 13.5.1 | Attribution, counterexamples, and bounded remediation recommendations | 13.4.1 |
 | 6 — Error budgets and decision | 13.6.1 | Reviewed threshold policy, regressions and M5-V evidence assessment | 13.5.1; any accepted remediation |
 
-Wave 2 files are pairwise disjoint. Its common schema is frozen in Wave 1; schema changes require returning to that contract before workers proceed. Use worktrees with task-local scratch and Cargo targets. Workers return reports; the orchestrator merges them into STATE serially to avoid a shared-file collision. All later waves are serial.
+Wave 2 files are pairwise disjoint. Its common schema is frozen in Wave 1; schema changes require returning to that contract before workers proceed. Use worktrees with task-local scratch and Cargo targets. Workers return reports; the orchestrator merges them into STATE serially to avoid a shared-file collision. Later evidence waves are serial. The explicitly split 13.4.2 pure classifier may run while 13.3.1 reference stages compute; its disjoint file scope and no-launch gate prevent shared evidence changes. Global checks and commits remain serial.
 
 ## Common execution contract
 
@@ -229,11 +231,30 @@ Acceptance: synthetic and read-only retained-evidence tests independently reject
 **Targeted commands:** `python3 tools/check_solute_benchmarks.py --cases reference/solute_verification/CASES.json --execute --output-root .development/13.3.1/benchmarks`; same command with `--verify-only`; `git diff --check`.
 **Scratch:** `.development/13.3.1/`; own `planning/tasks/13.3.1.todo.md`. No solver/core/source/case/dependency changes or threshold assignment.
 
+## 13.4.2 — Produce pure independent convergence classifiers
+
+**Must edit:** none.
+**Can create:** `tools/solute_convergence_analysis.py`; `tools/test_solute_convergence.py`.
+**Depends on:** 13.2.3 (accepted independent metrics) and frozen13.1.1 case contract.
+**Read-only references/anchors:** compute_metrics and metric result schemas in solute_verification_metrics.py; frozen convergence rows/spec; component review and current STATE. Read named anchors, not entire large sources.
+
+**Spec:** Implement a pure classifier consuming authenticated caller-provided metric records, declared case/row identities and run/reference hash bindings. No subprocess, reference calculation, filesystem mutation or lifecycle orchestration. Explicitly reject missing/inconsistent provenance and coverage; final receipt authentication belongs to later CLI13.4.3. Group independently measured errors by case/solver/axis/species/observable/time at common coverage. Derive actual dx/dt, accepted-step histories,Courant/Peclet diagnostics and contamination-control comparisons; report endpoint/interior concentration and inventory/flux/reaction/balance norms from independent metric evidence. Compute observed rates for smooth nonzero errors with reference uncertainty checks. Explicitly flag zero/nearzero, sign change, nonmonotonicity, plateau/output/arithmetic floors and control contamination; never force a fitted order or call an empirical three-grid rate proven convergence. Floor/control classification must derive from available uncertainty/control evidence rather than arbitrary undocumented tolerances. Missing floor or control bounds remain inconclusive. Achieved classification means observed supported decrease only, not solver accuracy acceptance or rigorous asymptotic proof. Numerical accuracy thresholds remain unassigned.
+
+**Acceptance:** synthetic power laws recover known orders; plateau,mixed-error,zero,nonmonotonic,sign-changing,missing/altered provenance and uncertainty-limited examples tested. No actual builds,references,dry-run sharedwrites or solver starts. Explain empirical/bounded status and achieved/inconclusive/failed reasons; M5-V remains open. Hand off exact API/schema in `.development/13.4.2/HANDOFF.md`.
+**Targeted commands:** `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest tools.test_solute_convergence`; `git diff --check`.
+**Do not touch:** accepted helpers,core/source,CASES,thresholds,other task evidence. If scope exceeds12 small steps, propose further decomposition before implementation.
+
+## 13.4.3 — Integrate gated convergence CLI
+
+**Must edit/Can create:** precise helper amendment to be finalized after13.3.1 completes; prospective `tools/run_solute_convergence.py` and `tools/test_solute_convergence_cli.py`.
+**Depends on:** 13.3.1 and13.4.2.
+**Spec:** Integrate accepted lifecycle/cache/bridge/metrics and pure classifier for exact frozen convergence phase. BenchmarkBatch currently hard-codes benchmark; lifecycle convergence scratch is13.4.1. Finalize reviewed narrow phase/cache reuse changes after active benchmark provenance is frozen. No implementation authorized by this placeholder. Execution remains separately activated under13.4.1; shared77row/storage/60second/noautomaticrepeat rules unchanged.
+
 ## 13.4.1 — Measure spatial and temporal convergence separately
 
 **Must edit:** none.
-**Can create:** `tools/run_solute_convergence.py`; `tools/test_solute_convergence.py`; `planning/master/SOLUTE_CONVERGENCE_EVIDENCE.md`.
-**Depends on:** 13.3.1.
+**Can create:** `planning/master/SOLUTE_CONVERGENCE_EVIDENCE.md`.
+**Depends on:** 13.3.1 and 13.4.3.
 **Read-only references/anchors:** accepted spec/matrix, evaluator and all study adapters; analytical evidence; prior precision review. Pattern-match the benchmark command's unique run IDs, ledger and verify-only behavior.
 
 **Spec:** Run the bounded matrix for both implementations. Vary dx with dt controlled, then dt with dx controlled, with at least three accepted levels per axis and contamination control. Report actual step histories, Courant/Peclet diagnostics, norms at common times, endpoint/interior errors, inventory, flux, reaction and balance errors per species. For smooth nonzero errors compute observed rates against independent truth; use self-convergence only as supplementary evidence. Flag nonmonotonic errors, sign changes, zero errors, output/arithmetic floors and failure to reach the asymptotic regime rather than forcing a fitted order.

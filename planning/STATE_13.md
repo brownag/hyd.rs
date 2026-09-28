@@ -31,15 +31,17 @@ Plan: [EXECUTION_PLAN_13.md](EXECUTION_PLAN_13.md). Workers: [PROMPT_TEMPLATE_13
 | 3c.1 | 13.3.5 | Checkpointed analytical reference work | done | 4323adf |
 | 3c.2 | 13.3.6 | Shared bounded solver lifecycle | done | a6edebe |
 | 3c.3 | 13.3.7 | Retained-evidence bridge gate | done | 431b7ad |
-| 3c.4 | 13.3.4 | Bounded benchmark integration | done | pending commit |
-| 3d | 13.3.1 | Analytical executions and evidence | pending | — |
-| 4 | 13.4.1 | Separate spatial and temporal convergence | pending | — |
+| 3c.4 | 13.3.4 | Bounded benchmark integration | done | b9472e7 |
+| 3d | 13.3.1 | Analytical executions and evidence | in progress | — |
+| 4a | 13.4.2 | Pure convergence classifiers | done | pending commit |
+| 4b | 13.4.3 | Gated convergence CLI | pending | — |
+| 4c | 13.4.1 | Separate spatial and temporal convergence evidence | pending | — |
 | 5 | 13.5.1 | Discrepancy attribution/remediation specifications | pending | — |
 | 6 | 13.6.1 | Budgets, regression gates and M5-V assessment | pending | — |
 
 ## Resume point
 
-Waves 1 and 2 accepted. Next task: original 13.3.1 executions/evidence, bridge-first with separate component/full-chain activation. Read frozen spec including approved Wave 2 interface appendix and dependency reports. All 77 conditional launch rows remain unconsumed; actual runs require explicit orchestrator activation. Preserve 207 hashes in `.development/13-baseline/protected-hashes.json`. Latest full-suite parity output: `.development/12.6.1/13-regression/wave3c4-20260927-01.json`. No solver threshold approved; M5-V remains open.
+Waves1/2 and all benchmark producers accepted. Task13.3.1 running: both bridge rows and ten component rows complete, root independently verified;12/77slots consumed,65remain. Full Example3 reference active once in batch-252f19ab8f56442a808e16e3bbad714b, cache22a684a825245213ea48b0afab6ac34524dce0dedd1ae05d4c0b228ac0789916; worker process session44969. Initial192/400stage started2026-09-28T01:06:21.635470UTC. Do not repeat interrupted stages or starts. Exact activation/reference policy retained under13.3.1; optional512/650authorized only if needed. Full solver rows await admission. Pure13.4.2 classifier microplanning permitted concurrently in disjoint scope;13.4.3 integration waits for13.3.1 and exact helper scope amendment. Partial analytical report remains pending. Preserve207protectedhashes. Latest full-suite parity output wave3c4-20260927-01.json. No thresholds;M5-Vopen.
 
 ## Task reports
 
@@ -199,3 +201,56 @@ Initial 13.3.4 dry-run batch66b1247c5dea4e97b6aaefcebf28d7bf planned14 rows and 
 - Actual builds, full references and solver launches remain unactivated; all77 launch rows unconsumed.
 - Concrete commands/API: .development/13.3.4/HANDOFF.md; exact subsets permit10 component rows and2 full-chain rows separately.
 - Deviations: narrow dry-run phase-lock scratch exception and planned-only archival correction; no scientific scope changes.
+
+## Bridge launch activation — 2026-09-27
+
+Approved 13.3.1 eleven-step micro-plan. Separately activate only the two frozen bridge rows in .development/13.3.1/bridge-activation.json, CASES SHA d3b06531c06545ca89956b95c487bb1616ace1470ba1a8c02a3f1209ff4e8acf. Exact command is the TODO bridge recipe with PYTHONDONTWRITEBYTECODE=1. Baseline modes, 60 seconds each, 26,165,360-byte aggregate row reservation within 2,699,462,776-byte global cap. Compilation remains separately accounted with accepted debug-metadata-only Rust profile. No analytical reference work or dependent rows activated. Failed starts consume slots; no retries. Root reviews both reports before further activation.
+
+## Bridge review — 2026-09-27
+
+Root independently reproduced both bridge reports in batch-c96c2d089400481a913a4accb6f1650f. Fortran259142 fields identical; Rust maximumC difference1.266e-14, maximumall-field1.108e-12; retained underflow/denormal warning. Both2000steps/fourprofiles; executable sizes490736/2172336bytes. Two slots consumed,75 remain; protected207 unchanged.
+
+## Component launch and reference activation — 2026-09-27
+
+Separately activate the exact ten component rows in component-activation.json and five complete shared reference requests in component-reference-policy.json. Use accepted component interval formulas, all frozen nodes/analysis/diagnostic times, cache authentication and --allow-reference-work; no escalation or full-chain inversion. Use both reviewed bridge report paths and the exact TODO component command once. Each60seconds, failedstarts consume; no retries. Root reviews admissions/results before fullExample3 activation.
+
+## Component review — 2026-09-27
+
+Root independent ten-row verification passed; five references admitted, maximum profile uncertainty1.353e-16. Both solvers complete without warnings/failures. Numerical errors recorded in component-review-20260927.json; no accuracy thresholds assigned. Twelve starts consumed,65 remain; protected207 unchanged.
+
+## Full Example 3 activation — 2026-09-27
+
+Separately activate only two frozen Example3 component rows in example3-activation.json and exact complete shared request in example3-reference-policy.json:1001nodes,initial0 plus50/100/200 profiles,201 diagnostic times. Permit frozen192/256/384 orders at400digits, final650 precision and exactbinary-input subset checks; single optional512/650 stage only if admission requires it. No added orders or retries. Use both reviewed bridge reports, --allow-reference-work --allow-reference-escalation, accepted cache and unchanged60second solver limits. Reference admission precedes starts; preserve unmet/failed evidence. Runtime projection is not a bound. Convergence/holdout remain unactivated.
+
+## Convergence task decomposition — 2026-09-27
+
+Split original13.4.1 tooling into13.4.2 with dependency on accepted13.3.4 helpers. Its disjoint mocked producer may proceed during long13.3.1 analytical work; no builds,new references,solver starts or shared evidence writes. Original13.4.1 retains scientific execution/report and depends on both accepted tasks. No row,threshold,capacity,timeout or scientific objective changed. Global checks/commits remain serialized.
+
+## Convergence producer scope correction — 2026-09-27
+
+Anchor review found BenchmarkBatch hard-coded phase benchmark and lifecycle convergence root13.4.1, incompatible with producer scratch13.4.2. Avoid changing producers used by active reference:13.4.2 now pure classifier/tests only. Insert pending13.4.3 CLI integration after13.3.1 with precise helper amendment still to be reviewed. Numerical execution13.4.1 waits for13.4.3. No extra launches or mathematical scope changes.
+
+## Pure classifier micro-plan approval — 2026-09-27
+
+Approved13.4.2 twelve-step microplan, in-memory independently trusted bindings, uncertainty-aware rates/controls and synthetic/no-I/O tests. Worker cannot perform builds,references,solver launches or shared evidence writes. Achieved means observed supported decrease, not assigned accuracy acceptance. Root reviews targetedtests/diff before serializedchecks/commit.
+
+## Full reference checkpoint — 2026-09-27
+
+N192/400 complete01:22:25.900143UTC,elapsed964.265seconds;stage37be5852d54b35843e2826b1a73692a028b6eb6f4870e2d2232cf21fbc206a09,19616469bytes,SHAf2980a9144bb9cc0a2b32c18bf569c4cdce2265b8696c0d7d0f0d58af3fae74d independently checked. N256/400 started01:22:25.931526UTC,stage1d9dd69a4205742a30e08ca4757507e5db8685fdb3f6cd6b6977db73399e7825. Admission pending;12starts consumed,65remain.
+
+## Classifier review correction — 2026-09-27
+
+Root30targeted/202combinedPython/145Rust/12comparator/34contract/fmtClippy passed;207protected unchanged. Reviewed pureclassifiers trustedbindings/intervals/commonmesh controls. Approved narrow within-scope reporting correction: retain conservative overallstatus and perchannel findings, add informative postinitialsummary with boundedexactzero vs unresolvedzeros explicitly counted. Focusedtests and targetedrecheck required; no new mathematicalthreshold or numericalwork.
+
+## 13.4.2
+- Status: accepted pure independent classifier, source frozen after reporting correction.
+- Added in-memory trustedbinding/schema checks, perobservable rate intervals, floor/control diagnostics and informative summary.
+- Exactzero/initialtime findings explicit; unresolvedzeros remain informative-inconclusive.
+- Root targeted32tests passed; combined202Python before two focused newtests;145Rust,12comparator,34contract passed.
+- Black/Ruff/fmt/Clippy/diff passed;207protectedhashes unchanged.
+- Fresh Cargo output wave4a-20260927-01.json; no source/core/helper changes.
+- No builds,newanalytical stages or launches in classifier; active13.3.1 references independently monitored.
+- API: analyze_convergence(book,records,trusted_bindings); conditional on separately authenticated callerexpectations and explicitboundevidence.
+- Rate/floor/control/overall/informativesummary decisions distinct; allaccuracythresholds null and M5-Vopen.
+- Immutablehelper constraints for pending13.4.3 in .development/13.4.2/HANDOFF.md.
+- Deviations: approved producer decomposition and narrow reporting correction only.
