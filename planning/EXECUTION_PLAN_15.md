@@ -1,6 +1,6 @@
 # Orchestration 15 — Investigate solute concentration parity failures
 
-Status: **User approved on 2026-09-29. Planning only; no diagnostic runs or solver changes performed.**
+Status: **User approved on 2026-09-29. Diagnostic execution is in progress; Waves 1 and 2 have produced bounded reports. No production solver changes are authorized or made.**
 Companion files: [worker prompt](PROMPT_TEMPLATE_15.md), [state](STATE_15.md).
 
 ## Goal and scope

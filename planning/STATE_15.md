@@ -1,7 +1,7 @@
 # State — Orchestration 15
 
 Plan status: **Approved by user on 2026-09-29.**
-Execution status: **User authorized correction of the agent-authored harness path/scratch-root issue that failed before solver entry. Six diagnostic solver simulations remain authorized; correction and run gate are in progress.**
+Execution status: **Waves 1 and 2 have run within task bounds. Reaction and scalar Robin reports are complete; diffusion has a Rust trace and a documented pre-assembly Fortran input-path failure. User chose no diffusion retry. No production solver changes are authorized or made.**
 Plan: [EXECUTION_PLAN_15.md](EXECUTION_PLAN_15.md). Worker template: [PROMPT_TEMPLATE_15.md](PROMPT_TEMPLATE_15.md).
 
 ## Baseline and guardrails
@@ -18,8 +18,8 @@ Plan: [EXECUTION_PLAN_15.md](EXECUTION_PLAN_15.md). Worker template: [PROMPT_TEM
 | Wave | Task | Deliverable | Status |
 |---|---|---|---|
 | 1 | 15.1.1 | Reaction first-step trace and cause classification | completed_with_launch_overrun |
-| 2 | 15.2.1 | Pure-diffusion diagnosis | pending |
-| 2 | 15.2.2 | Scalar Robin diagnosis | pending |
+| 2 | 15.2.1 | Pure-diffusion diagnosis | completed_with_fortran_preassembly_blocker |
+| 2 | 15.2.2 | Scalar Robin diagnosis | done |
 | 3 | 15.3.1 | Example 3 mapping/checkpoint diagnosis | pending |
 | 4 | 15.4.1 | Evidence synthesis and targeted-fix pathways | pending |
 
@@ -47,3 +47,20 @@ Plan: [EXECUTION_PLAN_15.md](EXECUTION_PLAN_15.md). Worker template: [PROMPT_TEM
 - Final task artifacts: 59,477,395 bytes / 104,857,600 cap. Corrected harness config now writes Rust observations inside the copied task-local workspace under its allowlisted `.development/15.1.1` subtree.
 - Diagnosis: `planning/master/SOLUTE_REACTION_FAILURE_DIAGNOSIS.md`. Inactive `reaction_zero` traces agree nodewise; reaction-enabled cases first diverge in the S1 assembled equation, with larger S2/S3 discrepancies. The report records formulation and print-precision limits; no production fix is made.
 - `git diff --check` passes. No broad tests were run.
+
+## 15.2.1 — Pure-diffusion trace
+- Status: bounded task complete with an unresolved Fortran pre-assembly input-path failure; user chose the no-retry limit.
+- Report: `planning/master/SOLUTE_DIFFUSION_FAILURE_DIAGNOSIS.md`; task-local validation passed, 58 retained hashes unchanged.
+- Prep/build passed; Rust produced the 0.0625 h profile and first-step trace. Fortran exited 2 before assembly because `.`/`Selector.in` runtime alias was missing; no operator comparison is claimed.
+- Exactly two process attempts are retained (Rust exit 0; Fortran exit 2). The Rust ledger finalization issue and atomic-writer correction are recorded; Rust was not rerun.
+- Final task artifacts: 27,692,887 bytes / 104,857,600 cap. No production or retained source changed.
+- Next discriminator documented in the report: a separately authorized Fortran-only bounded reproduction with the exact legacy path alias.
+
+## 15.2.2 — Scalar Robin trace
+- Status: complete; task-local provenance, source-backed boundary mapping, aligned trace, and diagnosis report accepted.
+- Report: `planning/master/SOLUTE_ROBIN_FAILURE_DIAGNOSIS.md`; Rust and Fortran builds passed, exactly two serial solver attempts exited 0.
+- First aligned interval is 0.00390625 h; effective D, flux magnitude, storage, and decay agree. The first solve differs in interior stencil and endpoint rows.
+- Reverse Fortran node order for comparison: its inlet is i=129 and outlet i=1; Rust inlet is node 0 and outlet node 128.
+- Evidence does not isolate upstream weighting from finite-element weighting and boundary assembly; the report gives a common-form discriminator.
+- Task-local trace verifier and `git diff --check` passed; 13 authenticated retained inputs remained unchanged.
+- Final task artifacts: 48,659,350 bytes / 104,857,600 cap. No production source changed.
