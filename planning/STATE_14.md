@@ -1,7 +1,7 @@
 # State — Orchestration 14
 
 Plan status: **Approved by user command `run plan 14`; execution in progress.**
-Evidence status: **No new parity comparisons yet. Existing artifacts are retained read-only; no solver starts or analytical reference calculations authorized.**
+Evidence status: **Six canonical pairs compared read-only; field-level coverage report accepted. No solver starts or analytical reference calculations authorized.**
 Plan: [EXECUTION_PLAN_14.md](EXECUTION_PLAN_14.md). Worker template: [PROMPT_TEMPLATE_14.md](PROMPT_TEMPLATE_14.md).
 
 ## Baseline and guardrails
@@ -21,8 +21,8 @@ Plan: [EXECUTION_PLAN_14.md](EXECUTION_PLAN_14.md). Worker template: [PROMPT_TEM
 | 1 | 14.1.1 | Authenticated canonical/supplemental artifact inventory and validation-failure classification | done |
 | 2 | 14.2.1 | Field-aware, print-interval cross-language comparator and tests | done |
 | 2b | 14.2.2 | Correct coordinate interval matching and direct CLI invocation | done |
-| 3 | 14.3.1 | Read-only six-example comparison and per-field coverage report | pending |
-| 4* | 14.4.1 | Case-specific run proposal only, or `skipped_no_remediable_gap`; zero starts | conditional |
+| 3 | 14.3.1 | Read-only six-example comparison and per-field coverage report | done |
+| 4* | 14.4.1 | Case-specific run proposal only, or `skipped_no_remediable_gap`; zero starts | skipped_no_remediable_gap |
 
 *Wave 4 starts only if Wave 3 records a remediable gap that retained artifacts cannot resolve. Proposal preparation confers no run authority.
 
@@ -58,3 +58,16 @@ Plan: [EXECUTION_PLAN_14.md](EXECUTION_PLAN_14.md). Worker template: [PROMPT_TEM
 - Checks: `env -u PYTHONPATH PYTHONDONTWRITEBYTECODE=1 python3 tools/solute_printed_parity.py --help` — exit 0; `git diff --check` — pass.
 - Deviations: none.
 - Dependency gotchas: Wave 3 may now rerun the canonical retained-pair comparison.
+
+## 14.3.1 — Compare canonical pairs and publish coverage
+- Status: accepted; all six authenticated canonical pairs compared, with per-record pass/fail/unavailable results.
+- Changed files: `planning/master/SOLUTE_PRINTED_PARITY_EVIDENCE.md`; `.development/14.3.1/printed_parity.json` (immutable output; SHA-256 `d3a2f97e45536e14b3323305c032ca67e51acd5479882fcb232a20960add29ad`); `planning/tasks/14.3.1.todo.md`.
+- Checks: `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest tools.test_solute_printed_parity` — pass — 10 tests; exact canonical CLI completed for six cases; `git diff --check` — pass.
+- Findings: theta passes for all records; concentrations have both passes and failures (9,092 failed records across four cases); other candidate fields are unavailable with reasons. Example 3 has 4 profiles, 1,001 nodes, 3 species, and zero common endpoints.
+- Deviations: initial attempt stopped before report due to coordinate-boundary/import defects; fixed by 14.2.2, then comparison completed.
+- Dependency gotchas: none; the comparison has no remediable retained-data coverage gap.
+
+## 14.4.1 — Conditional run proposal
+- Status: skipped_no_remediable_gap; no proposal or solver run created.
+- Basis: authenticated canonical pairs cover all six cases and their matched profile schedules; concentration failures are measured parity discrepancies, while unavailable fields have semantic/output mapping limits a new retained pair cannot resolve.
+- No solver/build/reference process was started.
