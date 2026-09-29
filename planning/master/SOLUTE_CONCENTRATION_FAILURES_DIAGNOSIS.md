@@ -1,0 +1,70 @@
+# Solute concentration parity diagnosis and bounded fix pathways
+
+## Scope and evidence standard
+
+This report synthesizes the authenticated printed-output parity comparison and the four bounded diagnostics from Orchestration 15. It identifies what the records establish and defines evidence needed before a later implementation plan chooses a fix. It does not change a solver, select which implementation is physically correct, or propose a tolerance change.
+
+The canonical printed comparison contains **9,092 concentration interval failures across five cases** and zero failures for the `reaction_zero` concentration control. These counts describe agreement with retained Fortran output print intervals. They do not establish continuum accuracy or physical validity. Detailed values and source-format intervals are in `.development/14.3.1/printed_parity.json`; case totals are summarized below from `SOLUTE_PRINTED_PARITY_EVIDENCE.md`.
+
+The source-level numerical forms also differ: Rust reaction assembly and sequential source handling are in `crates/hydrus-core/src/solute.rs:1162–1235,1283–1290`; Rust transport and boundaries are at `:1299–1358`. Fortran calls `Coeff` and `MatSet` at `src_reference/SOLUTE.FOR:112–128`, adds sequential species coupling at `:657–685`, assembles endpoint/interior rows at `:755–925`, computes upstream weights at `:965–1014`, and computes dispersion at `:1023–1062`. These locations identify candidate mechanisms, not causes by themselves.
+
+## Evidence matrix
+
+| Family | Printed parity signature | Earliest demonstrated difference | Confidence and unresolved cause |
+|---|---|---|---|
+| `reaction_equal` (9 nodes, 3 species) | 288/297 fails for each species; 864 total. Failures span positive-time profiles, not just boundaries. | In the 15.1.1 one-step trace, `reaction_zero` agrees nodewise, while active `reaction_equal` first differs in S1 assembly/state; S2 and S3 discrepancies grow. Rust and Fortran use differently weighted matrix forms, so raw coefficients are not a normalized row comparison. | High confidence that active-reaction setup is where this trace first separates; cause among mass weighting, effective sink conversion, parameter mapping, and chain coupling is not isolated. Fortran printed precision limits exact comparison. |
+| `reaction_distinct` (9 nodes, 3 species) | 855/891 fail (288 S1, 288 S2, 279 S3). S1 residuals match `reaction_equal`, consistent with identical S1 setup. | Intended 15.1.1 runs traced Rust and Fortran; the active chain shows disagreement. The seventh `reaction_distinct/Fortran` launch was unintended and is corroboration only, excluded from the approved six-run comparison. | Moderate. Distinct rates confirm disagreement with active chain behavior, but the extra launch and non-normalized matrix forms constrain comparison; no chain-specific cause is established. |
+| `reaction_zero` control (9 nodes, 3 species) | 0/891 fails. | 15.1.1 one-step concentrations agree at all nine nodes for S1=1, S2=0.25, S3=0; retained profile comparison also passes. | High confidence for this inactive-reaction configuration only. It does not prove active reaction assembly parity or rule out case-specific adaptation. |
+| `diffusion_cosine` (65 nodes, 1 species) | 440/1,105 fail; the first failing retained profile is 0.0625 h, with 10/65 failures, all negative. | Rust first-step assembly is recorded (`D=0.2 cm²/h`, `theta=0.43`, `q=0`); Fortran exited before assembly while opening `Selector.in`. | High confidence in the Rust trace and residual signature; no cross-solver operator/state comparison. Spatial stencil, boundary row, storage weighting, and solve hypotheses remain open. User selected no retry. |
+| `scalar_robin` (129 nodes, 1 species) | 1,386/2,193 fail; all nodes fail across positive-time profiles and aggregate residual is negative. | At the aligned first solve (`dt=0.00390625 h`), initial state and effective D/flux/storage/decay map consistently, while interior and endpoint assembled rows differ. | High confidence that divergence is already present in first assembly/solve and that pure effective-D translation/later stepping alone do not explain it. Upstream weighting, FE/FV row form, and boundary contributions were not separated. |
+| `example3` (1001 nodes, 3 species) | 5,547/12,012 fail at positive printed profiles (50/100/200 h), with mixed signs and large local differences. | Authenticated initial arrays agree; source-to-field map and 50 h profile are aligned. No common internal endpoints exist in the retained pair. Rust emitted representative rows; Fortran emitted zero first-step operator/solved rows. | High confidence in mapped fields and profile-level disagreement; earliest operator divergence is unknown. The time-guard miss is a likely instrumentation explanation, not measured proof. Two attempts were consumed; no retry. |
+
+Count arithmetic: reaction equal `288×3 = 864`; reaction distinct `288+288+279 = 855`; diffusion 440; scalar Robin 1,386; Example 3 `1,383+2,071+2,093 = 5,547`; total 9,092. `reaction_zero` has 297 passes per species, 891 total.
+
+## Family findings and follow-up pathways
+
+### Active reaction chain
+
+The inactive control agrees, while both active reaction cases fail in the retained comparison. In `reaction_equal`, the first material difference appears at S1, before S2/S3 source accumulation; later species amplify it. `reaction_distinct` has the same S1 settings and same S1 residual pattern as `reaction_equal`. Fortran's S2 source at the traced step is close to, but not identical with, Rust's; however, neither source nor solved-state differences can be assigned independently of the already different first-species equation. Rust builds next-species source from preceding species mass and decay (`solute.rs:1162–1170,1203–1212`); Fortran's `Coeff` adds prior-species terms (`SOLUTE.FOR:657–685`). The available traces have not normalized their mass formulations. See [reaction diagnosis](SOLUTE_REACTION_FAILURE_DIAGNOSIS.md), especially “Trace comparison” and “Findings and limits.”
+
+**Bounded pathway:** first derive and document both S1 equations in common units and a common weak-form/control-volume basis, including storage and sink terms, node/element mass weighting, and boundary contribution. Predict the normalized row coefficients before evaluating them against the retained first-step traces. If the S1 sink/storage terms still differ, isolate effective coefficient mapping in the later implementation plan. If S1 reconciles, compare only one chain source at a time (S1→S2, then S2→S3) using `reaction_equal` and `reaction_distinct`, with `reaction_zero` as the inactive control. A coefficient-only derivation can falsify mapping hypotheses without solver launches; any new Fortran/Rust counterfactual run needs a separate amendment. Exclude the unintended seventh Fortran launch from the approved run matrix.
+
+**Regression evidence for a later fix:** authenticate input/source hashes; compare first-step S1/S2/S3 normalized rows and RHS, solved concentrations, and chain source; run retained profile parity for equal/distinct plus the zero control; retain Fortran print intervals and report each family/species separately. Do not treat `Sorb` as equivalent storage across implementations (printed evidence marks it unavailable), or alter tolerance.
+
+### Pure diffusion
+
+The retained residual tail is negative and begins at profile 0.0625 h. The bounded Rust reproduction logged all 65 first-step rows for uniform D and zero flow. The Fortran launch failed before assembly at the exact Linux path `'.\\Selector.in'`, leaving no Fortran timestep, coefficient, boundary, RHS, or solved values. Thus this evidence neither confirms nor falsifies a spatial-stencil, endpoint, storage, or solve discrepancy. With `q=0`, upstream weighting is inactive in the case; it is not a supported explanation for this family. See [diffusion diagnosis](SOLUTE_DIFFUSION_FAILURE_DIAGNOSIS.md), “Rust trace and retained profile evidence” and “Finding, limits, and next discriminator.” The user selected the no-retry limit for this task.
+
+**Bounded pathway:** if separately authorized, prepare only the same 65-node/0.0625 h task-local Fortran case with the literal Linux path alias and verify every runtime alias before launch. One Fortran-only run should record its accepted first timestep and endpoint/interior rows, RHS, and solved state; compare against the preserved Rust trace. If setup again fails, stop. Do not retry within the consumed attempt limit.
+
+**Regression evidence for a later fix:** same authenticated case and first accepted interval; compare all face/cell dispersion and storage inputs, representative endpoint/interior rows and RHS, and 0.0625 h profile residuals. Confirm zero flow and inactive weighting. Preserve the negative-tail records and report per-node print intervals.
+
+### Scalar Robin transport
+
+The trace maps inlet/outlet orientation after reversing Fortran node order. Both use D=1 cm²/h, `theta=0.43`, flux magnitude 0.43 cm/h, spacing 0.015625 cm, and decay 0.2 h⁻¹; first-step state representation differs by about `2.9911e-8` from Fortran single precision. First assembled rows differ in the interior and at endpoints. Fortran has a small nonzero upstream weight and finite-element/time weighting; Rust uses face fluxes and conservative finite-volume rows. The Fortran outlet row is `(0,-1,1,0)`, while Rust retains a half-cell balance. The trace demonstrates an early operator difference but does not allocate the residual direction among weighting, FE/FV formulation, and endpoint assembly. See [scalar Robin diagnosis](SOLUTE_ROBIN_FAILURE_DIAGNOSIS.md), “Aligned first-step evidence” and “Finding and limits.”
+
+**Bounded pathway:** derive corresponding inlet, representative interior, and outlet equations in a common basis, including coordinate reversal, weighting, and time-level conventions. State predicted coefficients for two separately testable factors. Only then, under an amended launch budget, run at most one single-factor coefficient-only or counterfactual case per authorization; do not combine weighting and boundary changes. Existing runs do not authorize a retry or counterfactual.
+
+**Regression evidence for a later fix:** verify effective D, flux, Peclet/weight values, first-step inlet/interior/outlet rows, RHS and solved state in normalized orientation; recheck the 0.0625 h profile and node-level printed intervals. Keep a zero-flow or inactive-advection check if the selected change touches weighting.
+
+### Example 3
+
+The case mapping covers the authored 1001-node, 250 cm grid, three species, physical parameters, reaction rates and boundary orientation. Initial dissolved arrays match exactly, and the bounded derived fixtures reach a common 50 h printed profile. The retained canonical pair has profiles at 0/50/100/200 h but **zero common internal endpoints**; no step-index pairing is valid. At 50 h the differences are large and mixed-sign. Rust logged nine representative assembly and solved rows; Fortran logged none because the guard was set to `t <= 1e-12`, while `Solute` receives its time at `HYDRUS.FOR:506`. A guard mismatch is plausible, but entry time was not measured. See [Example 3 diagnosis](SOLUTE_EXAMPLE3_FAILURE_DIAGNOSIS.md), “Source-to-field mapping,” “Aligned checkpoint result,” and “Finding and evidence gap.”
+
+**Bounded pathway:** only after a separate amendment, instrument one first interval with the task-local Fortran guard triggered by a measured `Solute` entry time. Limit output to inlet, midpoint, outlet for each species; capture effective D, weighting, reaction/storage terms, rows/RHS, and solved values. Compare only corresponding physical coordinates and normalized orientation. Both authorized attempts were consumed; do not retry under the existing plan.
+
+**Regression evidence for a later fix:** source-to-field mapping and authenticated initial arrays; aligned first-interval rows for three representative locations and species; matched printed profiles at 0 and 50 h (then retained 100/200 h profiles); no internal endpoint parity claim. Report species-wise print-interval results and mixed-sign residual ranges.
+
+## Cross-family conclusions and guardrails
+
+Only the active reaction cases form a justified shared diagnostic family: same nine-node no-transport setup, same first-species settings, inactive `reaction_zero` control passes, and the two active cases first differ in reaction behavior. This grouping identifies where to investigate, not a shared proven defect. Diffusion, scalar Robin, and Example 3 remain separate: their residual signatures and source-level numerical differences do not establish a common cause.
+
+Before a later targeted implementation plan chooses a numerical change, it should name the falsifiable coefficient/state prediction, exact source boundary, and case-level regression matrix above. Preserve authenticated inputs and source hashes; declare units, species order, indexing/orientation, step/checkpoint alignment, and print representation. Keep printed-parity acceptance separate from physical or continuum validation. Do not change case definitions, printed tolerances, or the established failure count as part of a solver fix.
+
+## Open questions
+
+- After normalizing equations, do active-reaction S1 storage/sink terms agree? If so, at which chain source does the first discrepancy remain?
+- For pure diffusion, what Fortran operator rows and accepted timestep result from the exact bounded case once its legacy path alias is resolved?
+- Can scalar Robin's first-step difference be attributed to upstream weighting, endpoint treatment, or the broader FE/FV row form by a single-factor discriminator?
+- What are Example 3's Fortran first-interval coefficients and solved concentrations when instrumentation is keyed to the actual `Solute` entry time?
+- Which of the later targeted changes, if any, improves parity without degrading the independent physical/continuum checks? No such validation is included in Orchestration 15.

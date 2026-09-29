@@ -1,6 +1,6 @@
 # Orchestration 15 — Investigate solute concentration parity failures
 
-Status: **User approved on 2026-09-29. Waves 1–3 have produced bounded reports with documented trace gaps; Wave 4 synthesis is pending. No production solver changes are authorized or made.**
+Status: **Completed 2026-09-29. All four bounded diagnostic tasks and the evidence synthesis are recorded. Trace gaps and required separate authorizations are explicit; no production solver changes were made.**
 Companion files: [worker prompt](PROMPT_TEMPLATE_15.md), [state](STATE_15.md).
 
 ## Goal and scope

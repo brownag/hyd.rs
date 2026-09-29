@@ -1,7 +1,7 @@
 # State — Orchestration 15
 
 Plan status: **Approved by user on 2026-09-29.**
-Execution status: **Waves 1–3 have run within task bounds. Reaction and scalar Robin reports are complete. Diffusion and Example 3 reports record missing Fortran operator traces; no retries were made. Wave 4 synthesis is pending. No production solver changes are authorized or made.**
+Execution status: **Complete. All bounded diagnostic tasks and the synthesis report are recorded; open evidence gaps are listed for later, separately authorized work. No production solver changes were made.**
 Plan: [EXECUTION_PLAN_15.md](EXECUTION_PLAN_15.md). Worker template: [PROMPT_TEMPLATE_15.md](PROMPT_TEMPLATE_15.md).
 
 ## Baseline and guardrails
@@ -17,11 +17,11 @@ Plan: [EXECUTION_PLAN_15.md](EXECUTION_PLAN_15.md). Worker template: [PROMPT_TEM
 
 | Wave | Task | Deliverable | Status |
 |---|---|---|---|
-| 1 | 15.1.1 | Reaction first-step trace and cause classification | completed_with_launch_overrun |
-| 2 | 15.2.1 | Pure-diffusion diagnosis | completed_with_fortran_preassembly_blocker |
-| 2 | 15.2.2 | Scalar Robin diagnosis | done |
-| 3 | 15.3.1 | Example 3 mapping/checkpoint diagnosis | completed_with_missing_fortran_operator_trace |
-| 4 | 15.4.1 | Evidence synthesis and targeted-fix pathways | pending |
+| 1 | 15.1.1 | Reaction first-step trace and cause classification | done_with_documented_launch_overrun |
+| 2 | 15.2.1 | Pure-diffusion diagnosis | done_with_fortran_preassembly_gap_no_retry |
+| 2 | 15.2.2 | Scalar Robin diagnosis | done_with_unresolved_discriminator |
+| 3 | 15.3.1 | Example 3 mapping/checkpoint diagnosis | done_with_missing_fortran_operator_trace |
+| 4 | 15.4.1 | Evidence synthesis and targeted-fix pathways | done |
 
 ## Task reports
 
@@ -73,3 +73,12 @@ Plan: [EXECUTION_PLAN_15.md](EXECUTION_PLAN_15.md). Worker template: [PROMPT_TEM
 - Rust logged nine representative assembly and nine solved rows. Fortran logged no operator rows because the task-local time guard missed the `Solute` call time; first-step operator divergence remains unproven.
 - Verification status: `verified_incomplete_fortran_first_step_trace`; no retry or extra run. The separate 15.2.1 pre-assembly blocker also remains unresolved.
 - Final task artifacts: 45,878,333 bytes / 104,857,600 cap. No production source changed.
+
+## 15.4.1 — Evidence synthesis and targeted-fix pathways
+- Status: complete; report-only synthesis covers all five failing cases and the passing `reaction_zero` control.
+- Report: `planning/master/SOLUTE_CONCENTRATION_FAILURES_DIAGNOSIS.md`; it preserves the 9,092 interval-failure count as printed-parity evidence, not physical-accuracy evidence.
+- Active reaction is the only grouped diagnostic family; diffusion, scalar Robin, and Example 3 remain separate.
+- Each family has a bounded falsifiable next pathway, named regression evidence, and explicit confidence/uncertainty.
+- The synthesis carries forward the 15.1.1 launch overrun, 15.2.1 pre-assembly failure/no-retry choice, 15.2.2 unresolved FE/FV/weighting/boundary discriminator, and 15.3.1 missing Fortran operator trace/no-retry limit.
+- `git diff --check` passed. No builds, solver runs, tests, or production changes were made for this synthesis.
+- Orchestration 15 is complete as an investigation; any additional diagnostic runs or implementation work require a later separately scoped plan.
