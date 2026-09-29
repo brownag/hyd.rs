@@ -6,15 +6,18 @@ mappings here. Other fields remain unavailable until their mapping is proven.
 
 import argparse
 import json
-import math
 import re
+import sys
 from decimal import Decimal, InvalidOperation, localcontext
 from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+if __package__ in (None, ""):
+    sys.path.insert(0, str(ROOT))
 
 from tools import solute_printed_parity_inventory as inventory
 from tools import solute_verification_metrics as metrics
 
-ROOT = Path(__file__).resolve().parents[1]
 CONCENTRATION_FORMAT = "e12.4"
 COORDINATE_FORMAT = "f10.4"
 TIME_FORMAT = "f14.4"
@@ -157,8 +160,13 @@ def _validate_node_mapping(fields, expected_node, rust_coordinate):
     if int(fields[0]) != expected_node:
         raise ValueError(f"node order mismatch: expected {expected_node}, found {fields[0]}")
     token = fields[1]
-    coordinate = -float(_decimal(token))
-    if not math.isclose(coordinate, rust_coordinate, abs_tol=5e-5, rel_tol=0.0):
+    with localcontext() as context:
+        context.prec = 1200
+        coordinate = -_decimal(token)
+        half_width = _half_width(token, COORDINATE_FORMAT)
+        lower, upper = coordinate - half_width, coordinate + half_width
+        matched = lower <= Decimal.from_float(float(rust_coordinate)) <= upper
+    if not matched:
         raise ValueError(f"coordinate mapping mismatch at node {expected_node}")
     return token
 

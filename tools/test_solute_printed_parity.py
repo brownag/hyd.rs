@@ -1,5 +1,9 @@
 """Focused tests for field-aware retained printed-output comparison."""
 
+import math
+import os
+import subprocess
+import sys
 import unittest
 from decimal import Decimal
 
@@ -45,6 +49,29 @@ class PrintedParityTests(unittest.TestCase):
             parity._validate_node_mapping(["2", "-0.0000"], 1, 0.0)
         with self.assertRaisesRegex(ValueError, "coordinate mapping mismatch"):
             parity._validate_node_mapping(["1", "-1.0000"], 1, 0.0)
+
+    def test_coordinate_interval_includes_exact_edges_and_interior(self):
+        for token, coordinate in (("-0.0312", 0.03125), ("-0.0313", 0.03125),
+                                  ("-0.0312", 0.0312)):
+            with self.subTest(token=token, coordinate=coordinate):
+                self.assertEqual(parity._validate_node_mapping(["2", token], 2, coordinate), token)
+
+    def test_coordinate_interval_rejects_values_just_outside_edges(self):
+        for token, direction in (("-0.0312", math.inf), ("-0.0313", -math.inf)):
+            with self.subTest(token=token):
+                with self.assertRaisesRegex(ValueError, "coordinate mapping mismatch"):
+                    parity._validate_node_mapping(["2", token], 2, math.nextafter(0.03125, direction))
+
+    def test_direct_script_help_without_pythonpath(self):
+        environment = dict(os.environ)
+        environment.pop("PYTHONPATH", None)
+        environment["PYTHONDONTWRITEBYTECODE"] = "1"
+        result = subprocess.run(
+            [sys.executable, "tools/solute_printed_parity.py", "--help"],
+            cwd=parity.ROOT, env=environment, capture_output=True, text=True, check=False,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("--output-root", result.stdout)
 
     def test_missing_counterpart_and_candidate_field_coverage_are_unavailable(self):
         missing = parity._unavailable_record(

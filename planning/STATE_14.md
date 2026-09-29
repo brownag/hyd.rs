@@ -20,8 +20,8 @@ Plan: [EXECUTION_PLAN_14.md](EXECUTION_PLAN_14.md). Worker template: [PROMPT_TEM
 |---|---|---|---|
 | 1 | 14.1.1 | Authenticated canonical/supplemental artifact inventory and validation-failure classification | done |
 | 2 | 14.2.1 | Field-aware, print-interval cross-language comparator and tests | done |
-| 2b | 14.2.2 | Correct coordinate interval matching and direct CLI invocation | pending |
-| 3 | 14.3.1 | Read-only six-example comparison and per-field coverage report | blocked_pending_comparator_fix |
+| 2b | 14.2.2 | Correct coordinate interval matching and direct CLI invocation | done |
+| 3 | 14.3.1 | Read-only six-example comparison and per-field coverage report | pending |
 | 4* | 14.4.1 | Case-specific run proposal only, or `skipped_no_remediable_gap`; zero starts | conditional |
 
 *Wave 4 starts only if Wave 3 records a remediable gap that retained artifacts cannot resolve. Proposal preparation confers no run authority.
@@ -50,3 +50,11 @@ Plan: [EXECUTION_PLAN_14.md](EXECUTION_PLAN_14.md). Worker template: [PROMPT_TEM
 - Evidence: Fortran `-0.0312` (`f10.4`) implies an inclusive orientation-correct interval containing Rust `0.03125`; float tolerance rejected the exact upper edge.
 - Deviations: none; task stayed read-only and stopped as required.
 - Dependency gotchas: Wave 3 resumes after 14.2.2 fixes coordinate interval comparison and direct CLI import bootstrap.
+
+## 14.2.2 — Correct coordinate interval matching and CLI invocation
+- Status: accepted; sign-inverted coordinates are matched against exact inclusive `f10.4` intervals; direct script bootstraps repository imports.
+- Changed files: `tools/solute_printed_parity.py`; `tools/test_solute_printed_parity.py`; `planning/tasks/14.2.2.todo.md`.
+- Checks: `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest tools.test_solute_printed_parity` — pass — 10 tests; orchestrator rerun also passed.
+- Checks: `env -u PYTHONPATH PYTHONDONTWRITEBYTECODE=1 python3 tools/solute_printed_parity.py --help` — exit 0; `git diff --check` — pass.
+- Deviations: none.
+- Dependency gotchas: Wave 3 may now rerun the canonical retained-pair comparison.
