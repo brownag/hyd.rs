@@ -1,0 +1,49 @@
+# State — Orchestration 15
+
+Plan status: **Approved by user on 2026-09-29.**
+Execution status: **User authorized correction of the agent-authored harness path/scratch-root issue that failed before solver entry. Six diagnostic solver simulations remain authorized; correction and run gate are in progress.**
+Plan: [EXECUTION_PLAN_15.md](EXECUTION_PLAN_15.md). Worker template: [PROMPT_TEMPLATE_15.md](PROMPT_TEMPLATE_15.md).
+
+## Baseline and guardrails
+
+- [x] Read-only planning reconnaissance completed 2026-09-29.
+- [x] Last recorded baseline from Orchestration 14: 145 Rust tests; 13 runner/outlet Python tests; 17 benchmark tests; 86 convergence tests; fmt, Clippy with warnings denied, and diff checks passed. Not rerun for this plan.
+- [x] Authenticated parity evidence reports 9,092 concentration failures in five cases and zero in `reaction_zero`.
+- [x] Production solver/reference sources, casebook, retained `.development/13.*` and `.development/14.*` artifacts, and prior orchestration records are immutable under this plan.
+- [x] User approved the bounded diagnostic run protocol on 2026-09-29.
+- [ ] Exact per-task run commands, counts, timeouts, and storage bounds reviewed before execution.
+
+## Wave board
+
+| Wave | Task | Deliverable | Status |
+|---|---|---|---|
+| 1 | 15.1.1 | Reaction first-step trace and cause classification | completed_with_launch_overrun |
+| 2 | 15.2.1 | Pure-diffusion diagnosis | pending |
+| 2 | 15.2.2 | Scalar Robin diagnosis | pending |
+| 3 | 15.3.1 | Example 3 mapping/checkpoint diagnosis | pending |
+| 4 | 15.4.1 | Evidence synthesis and targeted-fix pathways | pending |
+
+## Task reports
+
+## 15.1.1 — Reaction-only first-step trace
+- Status: preflight passed after one user-approved correction; the first attempt assumed all three reaction cases shared the same S2 initial profile, but `reaction_zero` uses S2 = 0.25.
+- First command failed before builds/runs: `python3 .development/15.1.1/trace_runner.py --prepare --cases reference/solute_verification/CASES.json --inventory planning/master/SOLUTE_PRINTED_PARITY_INVENTORY.json --task-root .development/15.1.1 --max-artifact-bytes 104857600`.
+- Amendment: user approved correcting and rerunning the non-launching preflight once; no build or solver retries are authorized.
+- Corrected preflight: same command — exit 0; six one-step task-local inputs prepared at `dt=0.03125 h`.
+- Hashes: `provenance.json` `66a765cfa1848a06e3976ddac386527d383e97fe92aa0273ad0adde94fa6d75c`; `prepared_runs.json` `4a4d7709f79bd88a247b24c0b231f491f5f772cf0d31f5583da1ae36ab685f13`.
+- Pre-build artifacts: 686,973 bytes / 104,857,600 cap. All 23 retained manifest/request/source/deck/profile hashes rechecked unchanged; no diagnosis report yet.
+- Instrumentation diffs: Rust `rust-solute-instrumentation.patch` SHA-256 `dfdc21f5c7b854242c5ce509eb7abec661a6c52b90c07a756a850bc01f254a34`; Fortran `fortran-SOLUTE-instrumentation.patch` SHA-256 `5cc9d338677e89acd6fe2654a7884238842e02912fb2e83e1b80057133a23b06`.
+- Build command: `python3 .development/15.1.1/trace_runner.py --build --task-root .development/15.1.1 --max-artifact-bytes 104857600` — pass; Rust and Fortran builds both exit 0.
+- Build binaries: Rust SHA-256 `2a23d12ea4c76c14150211fffdf11cf0388dc9ded0547afd9e50cd6d0a9b7fd5`; Fortran SHA-256 `b1b35df616ffd57d2493f98a8425c47c3e073b03db2a45c8959b83f4d82613b8`.
+- Build peak: 43,991,479 bytes / 104,857,600 cap; both compiler commands exited 0.
+- First run attempt: the Rust harness process exited 101 before simulation because `HYDRUS_SOLUTE_VERIFICATION_OUT=observations.json` was relative; the harness requires an absolute destination.
+- Failed command: `timeout --signal=TERM 60s /home/andrew/AI/hyd.rs/.development/15.1.1/rust-target/debug/deps/solute_verification_harness-9a32a5c4b9de6ece --exact requested_study --nocapture`; elapsed 0.003784 s; request hash `56735a9829814ca4a3c0b3a339c57112bef1bd7c3106619dba0ff4399e4a4b3d`.
+- Outcome: one harness attempt failed before solver simulation; no other launch ran and no trace was produced. User then authorized correction of this self-authored configuration issue and one rerun of `reaction_equal/rust`; the original six successful solver simulations remain the cap, and any later failure stops without retry.
+- Current task artifacts: 43,994,419 bytes / 104,857,600 cap. All 23 retained hashes rechecked unchanged; `git diff --check` — pass.
+- Further launches require a user-approved amendment; the prior amendment authorized only one preflight correction/rerun.
+- Corrected harness record: `rust-harness-output-correction.patch` SHA-256 `6452064001a9581ebe53d87bf19c3babc031d0fe56b3093d955d4430188a77ee`; runner SHA-256 `76efa4e2562ecbc5d8586750ae2cc10ad8202ef53addecf0172b9c37abe4b1f0`; provenance SHA-256 `934a27a4071d684e0ab858e5d8f2924cd1d0e278c8d95e5a6a4e0da1dafdf8a0`.
+- Rust-only rebuild passed with binary SHA-256 `7c3145a7bbcc2e7c941881acb771d3bbc92cc65e35c3a20aea269bbfee4f39e1`; peak task artifacts during rebuild were 67,529,382 bytes.
+- After the one authorized pre-solver retry, six simulations succeeded. Runner accounting defect: it launched a seventh process (distinct/Fortran); no more launches were run. All six intended case/solver combinations completed, plus this unapproved extra run. Preserve all seven rows in `launch-results.json`; do not treat the extra result as part of the approved six.
+- Final task artifacts: 59,477,395 bytes / 104,857,600 cap. Corrected harness config now writes Rust observations inside the copied task-local workspace under its allowlisted `.development/15.1.1` subtree.
+- Diagnosis: `planning/master/SOLUTE_REACTION_FAILURE_DIAGNOSIS.md`. Inactive `reaction_zero` traces agree nodewise; reaction-enabled cases first diverge in the S1 assembled equation, with larger S2/S3 discrepancies. The report records formulation and print-precision limits; no production fix is made.
+- `git diff --check` passes. No broad tests were run.
