@@ -32,17 +32,17 @@ Plan: [EXECUTION_PLAN_13.md](EXECUTION_PLAN_13.md). Workers: [PROMPT_TEMPLATE_13
 | 3c.2 | 13.3.6 | Shared bounded solver lifecycle | done | a6edebe |
 | 3c.3 | 13.3.7 | Retained-evidence bridge gate | done | 431b7ad |
 | 3c.4 | 13.3.4 | Bounded benchmark integration | done | b9472e7 |
-| 3d | 13.3.1 | Analytical executions and evidence | in progress | — |
+| 3d | 13.3.1 | Analytical executions and evidence | done | 3567162 |
 | 4a | 13.4.2 | Pure convergence classifiers | done | 69d60ad |
-| 4b.1 | 13.4.4 | Authenticated convergence evidence replay | done | pending commit |
-| 4b.2 | 13.4.3 | Gated convergence CLI | pending | — |
-| 4c | 13.4.1 | Separate spatial and temporal convergence evidence | pending | — |
+| 4b.1 | 13.4.4 | Authenticated convergence evidence replay | done | a5db0f6 |
+| 4b.2 | 13.4.3 | Gated convergence CLI | done | 88ad99a |
+| 4c | 13.4.1 | Separate spatial and temporal convergence evidence | blocked: amended evidence storage ceiling exceeded; partial matrix retained | — |
 | 5 | 13.5.1 | Discrepancy attribution/remediation specifications | pending | — |
 | 6 | 13.6.1 | Budgets, regression gates and M5-V assessment | pending | — |
 
 ## Resume point
 
-Waves1/2 and all benchmark producers accepted. Task13.3.1 running: both bridge rows and ten component rows complete, root independently verified;12/77slots consumed,65remain. Full Example3 reference active once in batch-252f19ab8f56442a808e16e3bbad714b, cache22a684a825245213ea48b0afab6ac34524dce0dedd1ae05d4c0b228ac0789916; worker process session44969. Initial192/400stage started2026-09-28T01:06:21.635470UTC. Do not repeat interrupted stages or starts. Exact activation/reference policy retained under13.3.1; optional512/650authorized only if needed. Full solver rows await admission. Pure13.4.2 classifier microplanning permitted concurrently in disjoint scope;13.4.3 integration waits for13.3.1 and exact helper scope amendment. Partial analytical report remains pending. Preserve207protectedhashes. Latest full-suite parity output wave3c4-20260927-01.json. No thresholds;M5-Vopen.
+Waves1/2 and producer tasks accepted. Tasks13.3.1 and13.4.3 complete (`3567162`, `88ad99a`). In13.4.1, root reviewed57 frozen rows and15 activations. Thirty-two starts were consumed across the first10 batch groups; seven batches were classified and passed verify-only. Other groups retain validation failures or incomplete starts; no launch ID was retried. Current lifecycle storage is914,651,636bytes, or699,801,422bytes above the amended214,850,214byte baseline, exceeding the450,000,000byte growth ceiling by249,801,422bytes. No further numerical/reference work is authorized under this ceiling. Shared ledger is49/77 global starts and36/57 convergence starts (13.3.1 plus13.4.1);28 global slots and21 convergence rows remain unstarted, with6 holdouts reserved. Full partial results are in `planning/master/SOLUTE_CONVERGENCE_EVIDENCE.md`; task TODO records remaining work. No thresholds; M5-V remains open. Any continuation needs fresh root review of storage/reservations and a bounded amendment.
 
 ## Task reports
 
@@ -287,3 +287,39 @@ Originalpolicy shorthand final650precision/binary400 refers to baselinefinal384/
 - No numericalwork orstarts; active13.3.1 reference monitored separately.
 - API/helperSHA and trustboundary: .development/13.4.4/HANDOFF.md.
 - Deviations: approved evidence/CLI split only;thresholds null,scientificacceptancefalse,M5-Vopen.
+
+## Remaining CLI micro-planning — 2026-09-27
+
+Evidencehelper accepted a5db0f6, classifier69d60ad.13.4.3 worker remicroplansrecipe/activation/dryindex/reconcile/CLI usingacceptedhelper. Exactsharedledger-prefix/eventreceipt historicalcount authentication added to acceptance; nohelperchanges or actualnumericalwork authorized. Full13.3.1 order384active,firsttwoorders retained.
+
+## 13.4.3
+- Status: accepted separate convergence CLI and mocked tests; zero scientific starts, builds, references, or actual dry-runs.
+- Commit: `88ad99a feat(solute): integrate convergence batch CLI`.
+- Historical count receipts bind retained complete ledger prefixes, validate events, count failed starts, and must match summary counts.
+- CLI preserves activation, bridge, exact-reference, cache, resume, budget, and immutable evidence gates through accepted helpers.
+- Targeted CLI tests: 14 passed after adding missing/unmet-reference pre-start coverage; `git diff --check` passed.
+- Wave-end: 145 Rust tests; 13 baseline Python tests; 12 comparator self-checks; 85 classifier/evidence/CLI tests passed.
+- `cargo fmt --check`, Clippy with warnings denied, and diff checks passed.
+- Fresh parity output: `.development/12.6.1/13-regression/wave4b2-20260928-01.json`.
+- No accuracy thresholds assigned; scientific acceptance and M5-V remain false/open.
+- Deviations: none; exact mocked producer scope maintained.
+
+## 13.3.1
+- Status: evidence/report task complete; accepted component suite and full analytical reference retained, full solver comparison remains unmet.
+- Commit: `3567162 docs(solute): record analytical benchmark evidence`.
+- Full Example 3 reference admitted for 4,233 records; final `reference.json` SHA-256 `a816584a…`.
+- Single Fortran run exited 0 but failed endpoint-observation ID/order validation; no metrics accepted; Rust row never started.
+- Read-only verify-only exited 2 overall on the failed batch; the separate ten-row component batch reported `evidence_verified`.
+- Budget 13/77 starts consumed, 64 remain; failed slot was not retried. Protected hashes 207/207 unchanged.
+- Bridges and ten component rows verified; existing component metrics and reference uncertainties are in the committed evidence report.
+- Wave-end regression outputs and test results are recorded under 13.4.3; no thresholds assigned; M5-V open.
+- Remaining: convergence studies, full-case solver data, discrepancy attribution, error budgets and holdouts.
+
+## 13.4.1 bounded partial wave — 2026-09-28
+
+- Status: blocked at amended storage ceiling; partial evidence and outcomes at `planning/master/SOLUTE_CONVERGENCE_EVIDENCE.md`.
+- Exact frozen activation review SHA `41a7c3c3ed56fc2591bdacf3c0e164b42dc03dad1928fb6af8b2cd7db3ad4d03`; 57 rows across15 authorized groups.
+- 32 starts in this wave; seven batch classifications and verify-only checks passed. Validation failures are preserved; no retries.
+- Lifecycle storage914,651,636bytes; growth over amended baseline699,801,422bytes, above450,000,000byte ceiling by249,801,422bytes. Stop all numerical/reference stages.
+- Global49/77 starts, convergence36/57 including prior13.3.1 starts;28 global and21 convergence rows remain unstarted; six holdouts untouched.
+- Bounds/thresholds remain null, scientific acceptance false, M5-V open. Continuation requires fresh storage/reservation review and bounded amendment.
