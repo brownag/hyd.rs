@@ -1,0 +1,36 @@
+# State — Orchestration 14
+
+Plan status: **Approved by user command `run plan 14`; execution in progress.**
+Evidence status: **No new parity comparisons yet. Existing artifacts are retained read-only; no solver starts or analytical reference calculations authorized.**
+Plan: [EXECUTION_PLAN_14.md](EXECUTION_PLAN_14.md). Worker template: [PROMPT_TEMPLATE_14.md](PROMPT_TEMPLATE_14.md).
+
+## Baseline and guardrails
+
+- [x] Read-only reconnaissance completed on 2026-09-28; no tests, builds, solver runs, or reference calculations run for this plan.
+- [x] Last recorded baseline: 145 Rust tests; 13 runner/outlet Python tests; 12 comparator self-checks; 85 convergence classifier/evidence/CLI tests; fmt, Clippy with warnings denied, and diff checks passed (Orchestration 13 wave-end record).
+- [x] Six executable examples have retained canonical Fortran/Rust pairs: five component pairs and Example 3 bridge pair.
+- [x] Preserve Orchestration 13 and blocked 13.4.1 as history. 13.5.1/13.6.1 are superseded only for this parity goal.
+- [x] No solver/analytical run is authorized. Any future gap run needs a case-specific user-approved amendment. User-set new artifact/build/scratch ceiling: 1,000,000,000 bytes.
+- [x] Maximum worker concurrency: 3. Canonical comparison scope: one retained pair per example; use supplemental pairs only for a named gap.
+- [x] User approved Orchestration 14 by explicit command `run plan 14` (read-only parity scope only).
+
+## Wave board
+
+| Wave | Task | Deliverable | Status |
+|---|---|---|---|
+| 1 | 14.1.1 | Authenticated canonical/supplemental artifact inventory and validation-failure classification | done |
+| 2 | 14.2.1 | Field-aware, print-interval cross-language comparator and tests | pending |
+| 3 | 14.3.1 | Read-only six-example comparison and per-field coverage report | pending |
+| 4* | 14.4.1 | Case-specific run proposal only, or `skipped_no_remediable_gap`; zero starts | conditional |
+
+*Wave 4 starts only if Wave 3 records a remediable gap that retained artifacts cannot resolve. Proposal preparation confers no run authority.
+
+## Task reports
+
+## 14.1.1 — Inventory canonical pairs and validation failures
+- Status: accepted; six canonical pairs authenticated, 36 supplemental records indexed, four failed manifests excluded across three failure classes.
+- Changed files: `tools/solute_printed_parity_inventory.py`; `tools/test_solute_printed_parity_inventory.py`; `planning/master/SOLUTE_PRINTED_PARITY_INVENTORY.{json,md}`; `planning/tasks/14.1.1.todo.md`.
+- Checks: `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest tools.test_solute_printed_parity_inventory` — pass — 6 tests; orchestrator rerun also passed.
+- Checks: `git diff --check` — pass.
+- Deviations: Plan's component batch spelling `...278c4` corrected by evidence to authenticated `...278cba`.
+- Dependency gotchas: none; no solver/build/reference process started.
