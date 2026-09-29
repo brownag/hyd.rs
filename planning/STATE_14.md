@@ -19,7 +19,7 @@ Plan: [EXECUTION_PLAN_14.md](EXECUTION_PLAN_14.md). Worker template: [PROMPT_TEM
 | Wave | Task | Deliverable | Status |
 |---|---|---|---|
 | 1 | 14.1.1 | Authenticated canonical/supplemental artifact inventory and validation-failure classification | done |
-| 2 | 14.2.1 | Field-aware, print-interval cross-language comparator and tests | pending |
+| 2 | 14.2.1 | Field-aware, print-interval cross-language comparator and tests | done |
 | 3 | 14.3.1 | Read-only six-example comparison and per-field coverage report | pending |
 | 4* | 14.4.1 | Case-specific run proposal only, or `skipped_no_remediable_gap`; zero starts | conditional |
 
@@ -34,3 +34,11 @@ Plan: [EXECUTION_PLAN_14.md](EXECUTION_PLAN_14.md). Worker template: [PROMPT_TEM
 - Checks: `git diff --check` — pass.
 - Deviations: Plan's component batch spelling `...278c4` corrected by evidence to authenticated `...278cba`.
 - Dependency gotchas: none; no solver/build/reference process started.
+
+## 14.2.1 — Add field-aware printed-parity comparison
+- Status: accepted; compares concentration and theta against source-backed Fortran print intervals, with unmapped raw fields explicitly unavailable.
+- Changed files: `tools/solute_printed_parity.py`; `tools/test_solute_printed_parity.py`; `planning/tasks/14.2.1.todo.md`.
+- Checks: `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest tools.test_solute_printed_parity` — pass — 7 tests; orchestrator rerun also passed.
+- Checks: `git diff --check` — pass.
+- Deviations: one small-model acceptance retry followed by mid-tier correction set unverified capacity/sink formats to unknown.
+- Dependency gotchas: per-field coverage is concentration/theta comparable; other candidate nodal fields remain unavailable with reasons.
