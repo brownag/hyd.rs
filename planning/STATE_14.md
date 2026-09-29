@@ -1,6 +1,6 @@
 # State — Orchestration 14
 
-Plan status: **Approved by user command `run plan 14`; execution in progress.**
+Plan status: **Complete.**
 Evidence status: **Six canonical pairs compared read-only; field-level coverage report accepted. No solver starts or analytical reference calculations authorized.**
 Plan: [EXECUTION_PLAN_14.md](EXECUTION_PLAN_14.md). Worker template: [PROMPT_TEMPLATE_14.md](PROMPT_TEMPLATE_14.md).
 
@@ -71,3 +71,10 @@ Plan: [EXECUTION_PLAN_14.md](EXECUTION_PLAN_14.md). Worker template: [PROMPT_TEM
 - Status: skipped_no_remediable_gap; no proposal or solver run created.
 - Basis: authenticated canonical pairs cover all six cases and their matched profile schedules; concentration failures are measured parity discrepancies, while unavailable fields have semantic/output mapping limits a new retained pair cannot resolve.
 - No solver/build/reference process was started.
+
+## Wave-end regression checks
+- `cargo test --workspace --quiet` — pass — 145 Rust tests.
+- `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest tools.test_run_fortran_reference tools.test_solute_outlet_contract` — pass — 13 tests.
+- `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest tools.test_solute_benchmarks` — pass — 17 tests.
+- `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest tools.test_solute_convergence tools.test_solute_convergence_evidence tools.test_solute_convergence_cli` — pass — 86 tests.
+- `cargo fmt --check`; `cargo clippy --workspace --all-targets -- -D warnings`; `git diff --check` — all passed.
