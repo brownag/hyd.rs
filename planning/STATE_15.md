@@ -1,7 +1,7 @@
 # State — Orchestration 15
 
 Plan status: **Approved by user on 2026-09-29.**
-Execution status: **Waves 1 and 2 have run within task bounds. Reaction and scalar Robin reports are complete; diffusion has a Rust trace and a documented pre-assembly Fortran input-path failure. User chose no diffusion retry. No production solver changes are authorized or made.**
+Execution status: **Waves 1–3 have run within task bounds. Reaction and scalar Robin reports are complete. Diffusion and Example 3 reports record missing Fortran operator traces; no retries were made. Wave 4 synthesis is pending. No production solver changes are authorized or made.**
 Plan: [EXECUTION_PLAN_15.md](EXECUTION_PLAN_15.md). Worker template: [PROMPT_TEMPLATE_15.md](PROMPT_TEMPLATE_15.md).
 
 ## Baseline and guardrails
@@ -11,7 +11,7 @@ Plan: [EXECUTION_PLAN_15.md](EXECUTION_PLAN_15.md). Worker template: [PROMPT_TEM
 - [x] Authenticated parity evidence reports 9,092 concentration failures in five cases and zero in `reaction_zero`.
 - [x] Production solver/reference sources, casebook, retained `.development/13.*` and `.development/14.*` artifacts, and prior orchestration records are immutable under this plan.
 - [x] User approved the bounded diagnostic run protocol on 2026-09-29.
-- [ ] Exact per-task run commands, counts, timeouts, and storage bounds reviewed before execution.
+- [x] Exact per-task run commands, counts, timeouts, and storage bounds reviewed before each execution wave.
 
 ## Wave board
 
@@ -20,7 +20,7 @@ Plan: [EXECUTION_PLAN_15.md](EXECUTION_PLAN_15.md). Worker template: [PROMPT_TEM
 | 1 | 15.1.1 | Reaction first-step trace and cause classification | completed_with_launch_overrun |
 | 2 | 15.2.1 | Pure-diffusion diagnosis | completed_with_fortran_preassembly_blocker |
 | 2 | 15.2.2 | Scalar Robin diagnosis | done |
-| 3 | 15.3.1 | Example 3 mapping/checkpoint diagnosis | pending |
+| 3 | 15.3.1 | Example 3 mapping/checkpoint diagnosis | completed_with_missing_fortran_operator_trace |
 | 4 | 15.4.1 | Evidence synthesis and targeted-fix pathways | pending |
 
 ## Task reports
@@ -64,3 +64,12 @@ Plan: [EXECUTION_PLAN_15.md](EXECUTION_PLAN_15.md). Worker template: [PROMPT_TEM
 - Evidence does not isolate upstream weighting from finite-element weighting and boundary assembly; the report gives a common-form discriminator.
 - Task-local trace verifier and `git diff --check` passed; 13 authenticated retained inputs remained unchanged.
 - Final task artifacts: 48,659,350 bytes / 104,857,600 cap. No production source changed.
+
+## 15.3.1 — Example 3 mapping and checkpoint diagnosis
+- Status: bounded run/report complete with a missing Fortran first-step operator trace; no retry under the approved two-attempt limit.
+- Report: `planning/master/SOLUTE_EXAMPLE3_FAILURE_DIAGNOSIS.md`; 60 retained files rehashed with zero mismatches.
+- Task-local Rust and Fortran builds passed; exactly two serial solver attempts reached the shared 50 h profile and exited 0.
+- The 0/50 h profile check reproduces large mixed-sign differences; source-to-field mapping and Fortran/Rust coordinate reversal are documented.
+- Rust logged nine representative assembly and nine solved rows. Fortran logged no operator rows because the task-local time guard missed the `Solute` call time; first-step operator divergence remains unproven.
+- Verification status: `verified_incomplete_fortran_first_step_trace`; no retry or extra run. The separate 15.2.1 pre-assembly blocker also remains unresolved.
+- Final task artifacts: 45,878,333 bytes / 104,857,600 cap. No production source changed.
