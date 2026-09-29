@@ -20,7 +20,8 @@ Plan: [EXECUTION_PLAN_14.md](EXECUTION_PLAN_14.md). Worker template: [PROMPT_TEM
 |---|---|---|---|
 | 1 | 14.1.1 | Authenticated canonical/supplemental artifact inventory and validation-failure classification | done |
 | 2 | 14.2.1 | Field-aware, print-interval cross-language comparator and tests | done |
-| 3 | 14.3.1 | Read-only six-example comparison and per-field coverage report | pending |
+| 2b | 14.2.2 | Correct coordinate interval matching and direct CLI invocation | pending |
+| 3 | 14.3.1 | Read-only six-example comparison and per-field coverage report | blocked_pending_comparator_fix |
 | 4* | 14.4.1 | Case-specific run proposal only, or `skipped_no_remediable_gap`; zero starts | conditional |
 
 *Wave 4 starts only if Wave 3 records a remediable gap that retained artifacts cannot resolve. Proposal preparation confers no run authority.
@@ -42,3 +43,10 @@ Plan: [EXECUTION_PLAN_14.md](EXECUTION_PLAN_14.md). Worker template: [PROMPT_TEM
 - Checks: `git diff --check` — pass.
 - Deviations: one small-model acceptance retry followed by mid-tier correction set unverified capacity/sink formats to unknown.
 - Dependency gotchas: per-field coverage is concentration/theta comparable; other candidate nodal fields remain unavailable with reasons.
+
+## 14.3.1 — Compare canonical pairs and publish coverage (attempt 1)
+- Status: stopped before report generation; no partial evidence emitted.
+- Checks: named comparator unit test — pass — 7 tests; prescribed CLI — failed — import `tools` unavailable; `PYTHONPATH=.` retry — failed — coordinate boundary comparison at diffusion_cosine node 2.
+- Evidence: Fortran `-0.0312` (`f10.4`) implies an inclusive orientation-correct interval containing Rust `0.03125`; float tolerance rejected the exact upper edge.
+- Deviations: none; task stayed read-only and stopped as required.
+- Dependency gotchas: Wave 3 resumes after 14.2.2 fixes coordinate interval comparison and direct CLI import bootstrap.
