@@ -53,6 +53,13 @@ class ParityTests(unittest.TestCase):
         run_root.mkdir(parents=True)
         output_path.parent.mkdir(parents=True)
         output_path.write_bytes(output_data)
+        source_manifest = json.loads(
+            (parity.ROOT / "planning/master/SOURCE_MANIFEST.json").read_text(encoding="utf-8")
+        )
+        staged_sources = {
+            name: digest for name, digest in source_manifest.items()
+            if name == "planning/H1D_Src.zip" or (name.startswith("src_reference/") and name.endswith(".FOR"))
+        }
         result = {
             "complete": True,
             "task_root": str(task_root),
@@ -60,9 +67,7 @@ class ParityTests(unittest.TestCase):
             "input_sha256": self.fixture["input_files"],
             "output_paths": {"solute-output": "outputs/solute1.out"},
             "output_sha256": {"solute-output": digest(output_data)},
-            "source_and_archive_sha256": json.loads(
-                (parity.ROOT / "planning/master/SOURCE_MANIFEST.json").read_text(encoding="utf-8")
-            ),
+            "source_and_archive_sha256": staged_sources,
             "patch_sha256": parity.PINNED_PATCH_SHA256,
             "executable_sha256": "a" * 64,
         }
@@ -228,6 +233,31 @@ class ParityTests(unittest.TestCase):
         invalid["source_and_archive_sha256"]["src_reference/SOLUTE.FOR"] = "0" * 64
         with self.assertRaisesRegex(ValueError, "source/archive hashes"):
             parity._validate_raw_result(invalid, task_root, self.fixture)
+
+        invalid = json.loads(json.dumps(good))
+        del invalid["source_and_archive_sha256"]["src_reference/SOLUTE.FOR"]
+        with self.assertRaisesRegex(ValueError, "source/archive hashes"):
+            parity._validate_raw_result(invalid, task_root, self.fixture)
+
+        invalid = json.loads(json.dumps(good))
+        invalid["source_and_archive_sha256"]["planning/H1D_Src.zip"] = "0" * 64
+        with self.assertRaisesRegex(ValueError, "source/archive hashes"):
+            parity._validate_raw_result(invalid, task_root, self.fixture)
+
+        invalid = json.loads(json.dumps(good))
+        del invalid["source_and_archive_sha256"]["planning/H1D_Src.zip"]
+        with self.assertRaisesRegex(ValueError, "source/archive hashes"):
+            parity._validate_raw_result(invalid, task_root, self.fixture)
+
+    def test_runner_source_hashes_exclude_pdf_manifest_entries(self):
+        task_root = self.root / "pdf-exclusion-run"
+        good = self.runner_result(task_root)
+        manifest = json.loads(
+            (parity.ROOT / "planning/master/SOURCE_MANIFEST.json").read_text(encoding="utf-8")
+        )
+        self.assertTrue(any(name.endswith(".pdf") for name in manifest))
+        self.assertFalse(any(name.endswith(".pdf") for name in good["source_and_archive_sha256"]))
+        self.assertIs(parity._validate_raw_result(good, task_root, self.fixture), good)
 
         invalid = json.loads(json.dumps(good))
         invalid["patch_sha256"] = "0" * 64

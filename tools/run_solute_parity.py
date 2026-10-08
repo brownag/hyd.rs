@@ -120,8 +120,12 @@ def _validate_raw_result(result: dict, task_root: Path, fixture: dict) -> dict:
     _require(inputs == fixture["input_files"], "reference run input identity/hash mismatch")
 
     pinned_sources = load_json(ROOT / "planning/master/SOURCE_MANIFEST.json")
+    staged_sources = {
+        name: digest for name, digest in pinned_sources.items()
+        if name == "planning/H1D_Src.zip" or (name.startswith("src_reference/") and name.endswith(".FOR"))
+    }
     sources = result.get("source_and_archive_sha256")
-    _require(sources == pinned_sources, "reference source/archive hashes differ from pinned manifest")
+    _require(sources == staged_sources, "reference source/archive hashes differ from pinned manifest")
     _require(result.get("patch_sha256") == PINNED_PATCH_SHA256, "reference patch hash differs from pinned patch")
     _hash_string(result.get("executable_sha256"), "executable")
 
