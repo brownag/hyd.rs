@@ -44,7 +44,7 @@ After approval, follow the micro-TODO in order; mark completed items `[x]`. Run 
 
 ## Reporting
 
-Append a concise report under `## {{id}}` in `planning/STATE_18.md` (no more than 15 lines): status, changed files, exact commands/results, deviations, parity/coverage facts, and gotchas for dependents. The orchestrator owns state integration, full-suite checks, task commits, and wave completion.
+Report a concise completion summary to the orchestrator (no more than 15 lines): status, changed files, exact commands/results, deviations, parity/coverage facts, and gotchas for dependents. Do not edit `planning/STATE_18.md`; the orchestrator alone integrates task reports into state and owns full-suite checks, task commits, and wave completion.
 
 ## Verification and commit discipline
 
