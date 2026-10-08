@@ -12,10 +12,13 @@ Paste the complete task specification from `planning/EXECUTION_PLAN_16.md` here.
 - Never touch files outside the task's `Must edit` / `Can create` lists. Stop and report if more scope is required.
 - Never treat a printed-parity pass as evidence of physical or continuum accuracy.
 - Preserve all authenticated inputs, manifests, print intervals, case definitions, tolerances, and Fortran reference sources.
-- Do not retry a failed solver launch. A solver task needs its own explicitly approved pre-launch ledger; this plan does not grant launch authority.
+- Diagnostic retries and follow-up runs are allowed within the task's named case-family scope. Record every attempt and preserve prior outputs; do not ask the user to reauthorize routine in-scope retries.
+- No fixed timeout or artifact-size ceiling may block a useful diagnostic run. Monitor process/resource use, report elapsed time and output sizes, and adjust or stop a problematic attempt with the orchestrator before continuing.
+- A diagnostic task requires the orchestrator to review the worker micro-plan, prepared inputs, instrumentation, and run procedure before its first launch. This is the normal task plan gate, not a separate user approval.
 - If a task is conditional and its dependency did not establish a specific Rust defect, write the no-fix disposition and do not edit numerical source.
 - For implementation, run only the targeted Rust test and printed-parity checks named in the approved task micro-plan. Keep solver and full-suite work serial.
-- If a test fails twice for the same reason, stop and report; do not thrash.
+- For diagnostic runs, use the task-local runner from 16.2.1; authenticate canonical inputs and preserve a complete append-safe attempt ledger.
+- For diagnostics, investigate failures and continue with corrected task-local setup/instrumentation or a focused follow-up run; there is no fixed retry count. For implementation tests, use the normal escalation ladder unless the user steers otherwise.
 - Discovered work goes in the report and waits for a plan amendment.
 
 ## Analysis
