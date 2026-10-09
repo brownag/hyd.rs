@@ -1,6 +1,6 @@
 # Orchestration 18 — Source-faithful Fortran solute compatibility backend
 
-Status: **Approved by user on 2026-10-08, with task 18.3.4 amended on 2026-10-09.** Waves 1–2 are complete; Wave 3 is in progress. Companion files: [worker prompt](PROMPT_TEMPLATE_18.md), [state](STATE_18.md).
+Status: **Approved by user on 2026-10-08, with tasks 18.3.4 and 18.4.1 amended on 2026-10-09.** Waves 1–4 are complete; Wave 5 is next. Companion files: [worker prompt](PROMPT_TEMPLATE_18.md), [state](STATE_18.md).
 
 ## Goal & scope
 
@@ -33,6 +33,7 @@ Status: **Approved by user on 2026-10-08, with task 18.3.4 amended on 2026-10-09
 | 2026-10-08 | Task 18.1.1 source audit distinguishes the active `HYDRUS` → `ChemIn` → `Solute` behavior from helper code whose call sites are commented or whose switches cannot be enabled by the active reader. All active/callable solute behavior is parity scope; dormant helper algorithms are recorded as inactive, not implemented or claimed as parity modes. |
 | 2026-10-08 | Wave 2 integration review established that the runner authenticates raw Fortran outputs but does not normalize them. Add a manifest-driven normalizer and paired Rust/Fortran CLI stages before full parity acceptance; fixture manifests must carry observation maps. |
 | 2026-10-09 | For task 18.3.4, exercise dual-domain behavior through a full pinned HYDRUS run using independently authored water-model 6/7 deck inputs; let active `InitDualPor` initialize the dual-water state naturally. Do not add a Solute call-boundary injection harness or represent independently derived histories as active-path inputs. `WATFLOW`'s `DualPor` exchange-update call is commented out, so do not claim dynamic exchange or nonzero `SinkIm` parity. |
+| 2026-10-09 | Task 18.4.1 may add the minimal `serde_json` and SHA-256 dependencies to `hydrus-core` (and update `Cargo.lock`) because the crate has no existing JSON/hash support, while the accepted adapter contract requires parsing serialized fixture requests and verifying canonical request hashes. Keep all dependency edits confined to this task. |
 
 ## Reconnaissance and baseline
 
@@ -173,11 +174,11 @@ Tasks within each wave own disjoint files. Waves are sequential because the norm
 ### 18.4.1 — Add compatibility types, mode state, and precision model
 
 - **Repo:** `/home/andrew/AI/hyd.rs`.
-- **Must edit:** `crates/hydrus-core/src/lib.rs` (register a private module only).
+- **Must edit:** `crates/hydrus-core/src/lib.rs` (register a private module only); `crates/hydrus-core/Cargo.toml` and workspace `Cargo.lock` only to add the minimal JSON and SHA-256 dependencies required for the serialized adapter contract.
 - **Can create:** `planning/tasks/18.4.1.todo.md`; `crates/hydrus-core/src/solute_fortran_compat/mod.rs`; `crates/hydrus-core/src/solute_fortran_compat/types.rs`; `crates/hydrus-core/src/solute_fortran_compat/adapter.rs`; placeholder module files `transport.rs`, `assembly.rs`, `boundary.rs`, `accounting.rs`, `processes.rs`, `nonequilibrium.rs`, `dual_domain.rs`, `biology.rs`, `deposition.rs`, `driver.rs`, and `iteration.rs`; unit tests in `types.rs` and `adapter.rs`.
 - **Depends on:** Wave 3.
-- **Spec:** Define source-mapped compatibility inputs, state/workspace, per-species and per-node process arrays, source switch enums/validated combinations, boundary forms, intermediate precision conversions matching the recorded Fortran build semantics, and trace observations. In the same module, implement strict mapping from the versioned normalized fixture request, preserving units, orientation, source indexing, switches, external state histories and hashes. Reject missing, duplicate, unmapped, nonfinite or inconsistent fields before mutation. Add/register private module skeletons so later kernels can be tested incrementally. This is the new separate backend foundation; do not alter or route the existing FV/BE API yet.
-- **Do not touch:** `solute.rs` dispatch, `lib.rs` public exports beyond the private module registration, Fortran source, fixtures, or numerical implementations in kernel-module files assigned to later tasks.
+- **Spec (amended 2026-10-09):** Define source-mapped compatibility inputs, state/workspace, per-species and per-node process arrays, source switch enums/validated combinations, boundary forms, intermediate precision conversions matching the recorded Fortran build semantics, and trace observations. Implement parsing/mapping for serialized Wave 3 `CASE.json` requests in both accepted request schemas, preserving units, orientation, source indexing, switches, external state histories, explicit unavailable reasons and hashes. Verify canonical request SHA-256 using the same canonical JSON rules as `tools/run_solute_parity.py`; reject missing, duplicate, unmapped, nonfinite or inconsistent fields before mutation. Add/register private module skeletons so later kernels can be tested incrementally. This is the new separate backend foundation; do not alter or route the existing FV/BE API yet.
+- **Do not touch:** `solute.rs` dispatch, `lib.rs` public exports beyond the private module registration, Fortran source, fixtures, or numerical implementations in kernel-module files assigned to later tasks. Do not introduce dependencies beyond the minimal JSON/SHA-256 support approved above.
 - **Anchors:** compatibility contract and fixtures; `SOLUTE.FOR` declarations at `Solute`/`Coeff`; `INPUT.FOR`/`HYDRUS.FOR` mapping; current `SoluteConfig`, `SoluteState`, `SoluteWorkspace` as API patterns only (not formulas).
 - **Acceptance:** `cargo test -p hydrus-core solute_fortran_compat::types::tests` and `cargo test -p hydrus-core solute_fortran_compat::adapter::tests`; every contract input/mode maps to explicit typed fields; invalid flags/hash/schema reject before mutation; precision conversions are tested. No solver parity claim yet.
 

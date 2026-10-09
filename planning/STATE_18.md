@@ -1,7 +1,7 @@
 # State — Orchestration 18
 
 Plan status: **Approved by user on 2026-10-08 (“yes”).**
-Execution status: **Waves 1–3 complete; Wave 4 is next.** Wave 3 fixture runs authenticate raw outputs only; normalized parity remains pending. Compatibility backend must not become default until the full in-scope parity gate passes.
+Execution status: **Waves 1–4 complete; Wave 5 is next.** Wave 3 fixture runs authenticate raw outputs only; normalized parity remains pending. Compatibility backend must not become default until the full in-scope parity gate passes.
 Plan: [EXECUTION_PLAN_18.md](EXECUTION_PLAN_18.md). Worker template: [PROMPT_TEMPLATE_18.md](PROMPT_TEMPLATE_18.md).
 
 ## Baseline and guardrails
@@ -32,7 +32,7 @@ Plan: [EXECUTION_PLAN_18.md](EXECUTION_PLAN_18.md). Worker template: [PROMPT_TEM
 | 3 | 18.3.3 | Optional transport-property fixtures | done |
 | 3 | 18.3.4 | Nonequilibrium/dual-domain fixtures | done |
 | 3 | 18.3.5 | Biology/filtration/deposition fixtures | done |
-| 4 | 18.4.1 | Compatibility types/state/precision model | pending |
+| 4 | 18.4.1 | Compatibility types/state/precision model | done |
 | 5 | 18.5.1 | Transport and matrix assembly kernel | pending |
 | 5 | 18.5.2 | Endpoint rows and flux closure | pending |
 | 5 | 18.5.3 | Source accounting and observations | pending |
@@ -104,6 +104,20 @@ Plan: [EXECUTION_PLAN_18.md](EXECUTION_PLAN_18.md). Worker template: [PROMPT_TEM
 - `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tools -p 'test_*.py'` — 291 passed; one expected guarded “solver execution forbidden” diagnostic was emitted inside a passing test.
 - `cargo fmt --check`, `cargo clippy --workspace --all-targets -- -D warnings`, `git diff --check` — passed.
 - The five 18.3.4 retained raw-run manifests, declared output hashes, pinned source/archive/patch/executable provenance, and fixture input hashes were independently revalidated. No normalized parity claim.
+
+### 18.4.1 — Compatibility types, strict adapter, and precision model
+
+- **Status:** done; implementation and task report committed in `bce44da`.
+- Added private `solute_fortran_compat` types for source precision, units/availability, switches, boundaries, species/process fields, trace data, and source-index mappings. Added compileable placeholder modules for later kernels; the existing FV/BE API and dispatch remain unchanged.
+- Added `serde_json` and `sha2` for serialized fixture request parsing and canonical hash verification. Adapter maps both accepted schemas across all 38 Wave 3 manifests, rejects duplicate/unknown keys and invalid units/shapes/modes, and keeps unavailable values explicit.
+- Coordinates in current fixtures provide range metadata, not numeric arrays; the adapter preserves that metadata and explicit source permutation but does not claim physical coordinate values. No solver parity claim.
+- Targeted tests: `cargo test -p hydrus-core solute_fortran_compat::types::tests` — 4 passed; `cargo test -p hydrus-core solute_fortran_compat::adapter::tests` — 4 passed, including 38-fixture mapping/hash sweep.
+
+### Wave 4 verification
+
+- `cargo test --workspace` — 8 unit and 137 integration tests passed; zero doc tests.
+- `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tools -p 'test_*.py'` — 291 passed; one expected guarded solver-execution diagnostic was emitted inside a passing test.
+- `cargo fmt --check`, `cargo clippy --workspace --all-targets -- -D warnings`, and `git diff --check` — passed.
 
 ### Wave 2 verification
 
