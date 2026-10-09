@@ -7,6 +7,7 @@ pub mod hydraulics;
 pub mod lower_boundary;
 pub mod root_uptake;
 pub mod solute;
+mod solute_fortran_compat;
 mod water_solver;
 mod water_state;
 

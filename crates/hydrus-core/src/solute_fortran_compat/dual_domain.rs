@@ -1,0 +1,1 @@
+//! Dual-domain kernel placeholder; implementation belongs to task 18.6.3.
