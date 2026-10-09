@@ -1,0 +1,1570 @@
+{
+  "schema_version": "solute-observation-map-v1",
+  "observations": [
+    {
+      "field": "time",
+      "units": "hour",
+      "location": {
+        "species": 1,
+        "time": "each printed solute record"
+      },
+      "raw_output_file": "solute1.out",
+      "row_selector": {
+        "kind": "all data rows",
+        "identity_column": 1
+      },
+      "source_columns": [
+        1
+      ],
+      "native_to_canonical": {
+        "species_index": "native 1-based species identity",
+        "time_column": 1,
+        "coordinate": "not applicable"
+      },
+      "source_numeric_format": "f14.4 (OUTPUT.FOR format 190 before 0.99999999 h); e15.8 (format 191 thereafter)",
+      "source_precision_interval": "half one unit in the last printed digit of the applicable time format"
+    },
+    {
+      "field": "cvTop",
+      "units": "mass/area/time",
+      "location": {
+        "species": 1,
+        "time": "each printed solute record"
+      },
+      "raw_output_file": "solute1.out",
+      "row_selector": {
+        "kind": "all data rows",
+        "identity_column": 1
+      },
+      "source_columns": [
+        2
+      ],
+      "native_to_canonical": {
+        "species_index": "native 1-based species identity",
+        "time_column": 1,
+        "coordinate": "not applicable"
+      },
+      "source_numeric_format": "e13.5",
+      "source_precision_interval": "half one unit in the last printed digit"
+    },
+    {
+      "field": "cvBot",
+      "units": "mass/area/time",
+      "location": {
+        "species": 1,
+        "time": "each printed solute record"
+      },
+      "raw_output_file": "solute1.out",
+      "row_selector": {
+        "kind": "all data rows",
+        "identity_column": 1
+      },
+      "source_columns": [
+        3
+      ],
+      "native_to_canonical": {
+        "species_index": "native 1-based species identity",
+        "time_column": 1,
+        "coordinate": "not applicable"
+      },
+      "source_numeric_format": "e13.5",
+      "source_precision_interval": "half one unit in the last printed digit"
+    },
+    {
+      "field": "sum_cvTop",
+      "units": "mass/area",
+      "location": {
+        "species": 1,
+        "time": "each printed solute record"
+      },
+      "raw_output_file": "solute1.out",
+      "row_selector": {
+        "kind": "all data rows",
+        "identity_column": 1
+      },
+      "source_columns": [
+        4
+      ],
+      "native_to_canonical": {
+        "species_index": "native 1-based species identity",
+        "time_column": 1,
+        "coordinate": "not applicable"
+      },
+      "source_numeric_format": "e13.5",
+      "source_precision_interval": "half one unit in the last printed digit"
+    },
+    {
+      "field": "sum_cvBot",
+      "units": "mass/area",
+      "location": {
+        "species": 1,
+        "time": "each printed solute record"
+      },
+      "raw_output_file": "solute1.out",
+      "row_selector": {
+        "kind": "all data rows",
+        "identity_column": 1
+      },
+      "source_columns": [
+        5
+      ],
+      "native_to_canonical": {
+        "species_index": "native 1-based species identity",
+        "time_column": 1,
+        "coordinate": "not applicable"
+      },
+      "source_numeric_format": "e13.5",
+      "source_precision_interval": "half one unit in the last printed digit"
+    },
+    {
+      "field": "cvCh0",
+      "units": "mass/area",
+      "location": {
+        "species": 1,
+        "time": "each printed solute record"
+      },
+      "raw_output_file": "solute1.out",
+      "row_selector": {
+        "kind": "all data rows",
+        "identity_column": 1
+      },
+      "source_columns": [
+        6
+      ],
+      "native_to_canonical": {
+        "species_index": "native 1-based species identity",
+        "time_column": 1,
+        "coordinate": "not applicable"
+      },
+      "source_numeric_format": "e13.5",
+      "source_precision_interval": "half one unit in the last printed digit"
+    },
+    {
+      "field": "cvCh1",
+      "units": "mass/area",
+      "location": {
+        "species": 1,
+        "time": "each printed solute record"
+      },
+      "raw_output_file": "solute1.out",
+      "row_selector": {
+        "kind": "all data rows",
+        "identity_column": 1
+      },
+      "source_columns": [
+        7
+      ],
+      "native_to_canonical": {
+        "species_index": "native 1-based species identity",
+        "time_column": 1,
+        "coordinate": "not applicable"
+      },
+      "source_numeric_format": "e13.5",
+      "source_precision_interval": "half one unit in the last printed digit"
+    },
+    {
+      "field": "cTop",
+      "units": "mass/volume",
+      "location": {
+        "species": 1,
+        "time": "each printed solute record"
+      },
+      "raw_output_file": "solute1.out",
+      "row_selector": {
+        "kind": "all data rows",
+        "identity_column": 1
+      },
+      "source_columns": [
+        8
+      ],
+      "native_to_canonical": {
+        "species_index": "native 1-based species identity",
+        "time_column": 1,
+        "coordinate": "not applicable"
+      },
+      "source_numeric_format": "e13.5",
+      "source_precision_interval": "half one unit in the last printed digit"
+    },
+    {
+      "field": "cRoot",
+      "units": "mass/volume",
+      "location": {
+        "species": 1,
+        "time": "each printed solute record"
+      },
+      "raw_output_file": "solute1.out",
+      "row_selector": {
+        "kind": "all data rows",
+        "identity_column": 1
+      },
+      "source_columns": [
+        9
+      ],
+      "native_to_canonical": {
+        "species_index": "native 1-based species identity",
+        "time_column": 1,
+        "coordinate": "not applicable"
+      },
+      "source_numeric_format": "e13.5",
+      "source_precision_interval": "half one unit in the last printed digit"
+    },
+    {
+      "field": "cBot",
+      "units": "mass/volume",
+      "location": {
+        "species": 1,
+        "time": "each printed solute record"
+      },
+      "raw_output_file": "solute1.out",
+      "row_selector": {
+        "kind": "all data rows",
+        "identity_column": 1
+      },
+      "source_columns": [
+        10
+      ],
+      "native_to_canonical": {
+        "species_index": "native 1-based species identity",
+        "time_column": 1,
+        "coordinate": "not applicable"
+      },
+      "source_numeric_format": "e13.5",
+      "source_precision_interval": "half one unit in the last printed digit"
+    },
+    {
+      "field": "cvRoot",
+      "units": "mass/area/time",
+      "location": {
+        "species": 1,
+        "time": "each printed solute record"
+      },
+      "raw_output_file": "solute1.out",
+      "row_selector": {
+        "kind": "all data rows",
+        "identity_column": 1
+      },
+      "source_columns": [
+        11
+      ],
+      "native_to_canonical": {
+        "species_index": "native 1-based species identity",
+        "time_column": 1,
+        "coordinate": "not applicable"
+      },
+      "source_numeric_format": "e13.5",
+      "source_precision_interval": "half one unit in the last printed digit"
+    },
+    {
+      "field": "sum_cvRoot",
+      "units": "mass/area",
+      "location": {
+        "species": 1,
+        "time": "each printed solute record"
+      },
+      "raw_output_file": "solute1.out",
+      "row_selector": {
+        "kind": "all data rows",
+        "identity_column": 1
+      },
+      "source_columns": [
+        12
+      ],
+      "native_to_canonical": {
+        "species_index": "native 1-based species identity",
+        "time_column": 1,
+        "coordinate": "not applicable"
+      },
+      "source_numeric_format": "e13.5",
+      "source_precision_interval": "half one unit in the last printed digit"
+    },
+    {
+      "field": "sum_cvNEql",
+      "units": "mass/area",
+      "location": {
+        "species": 1,
+        "time": "each printed solute record"
+      },
+      "raw_output_file": "solute1.out",
+      "row_selector": {
+        "kind": "all data rows",
+        "identity_column": 1
+      },
+      "source_columns": [
+        13
+      ],
+      "native_to_canonical": {
+        "species_index": "native 1-based species identity",
+        "time_column": 1,
+        "coordinate": "not applicable"
+      },
+      "source_numeric_format": "e13.5",
+      "source_precision_interval": "half one unit in the last printed digit"
+    },
+    {
+      "field": "TLevel",
+      "units": "count",
+      "location": {
+        "species": 1,
+        "time": "each printed solute record"
+      },
+      "raw_output_file": "solute1.out",
+      "row_selector": {
+        "kind": "all data rows",
+        "identity_column": 1
+      },
+      "source_columns": [
+        14
+      ],
+      "native_to_canonical": {
+        "species_index": "native 1-based species identity",
+        "time_column": 1,
+        "coordinate": "not applicable"
+      },
+      "source_numeric_format": "i8",
+      "source_precision_interval": "half one unit in the last printed digit"
+    },
+    {
+      "field": "cGWL",
+      "units": "mass/area/time",
+      "location": {
+        "species": 1,
+        "time": "each printed solute record"
+      },
+      "raw_output_file": "solute1.out",
+      "row_selector": {
+        "kind": "all data rows",
+        "identity_column": 1
+      },
+      "source_columns": [
+        15
+      ],
+      "native_to_canonical": {
+        "species_index": "native 1-based species identity",
+        "time_column": 1,
+        "coordinate": "not applicable"
+      },
+      "source_numeric_format": "e13.5",
+      "source_precision_interval": "half one unit in the last printed digit"
+    },
+    {
+      "field": "cRunOff",
+      "units": "mass/area/time",
+      "location": {
+        "species": 1,
+        "time": "each printed solute record"
+      },
+      "raw_output_file": "solute1.out",
+      "row_selector": {
+        "kind": "all data rows",
+        "identity_column": 1
+      },
+      "source_columns": [
+        16
+      ],
+      "native_to_canonical": {
+        "species_index": "native 1-based species identity",
+        "time_column": 1,
+        "coordinate": "not applicable"
+      },
+      "source_numeric_format": "e13.5",
+      "source_precision_interval": "half one unit in the last printed digit"
+    },
+    {
+      "field": "sum_cRunOff",
+      "units": "mass/area",
+      "location": {
+        "species": 1,
+        "time": "each printed solute record"
+      },
+      "raw_output_file": "solute1.out",
+      "row_selector": {
+        "kind": "all data rows",
+        "identity_column": 1
+      },
+      "source_columns": [
+        17
+      ],
+      "native_to_canonical": {
+        "species_index": "native 1-based species identity",
+        "time_column": 1,
+        "coordinate": "not applicable"
+      },
+      "source_numeric_format": "e13.5",
+      "source_precision_interval": "half one unit in the last printed digit"
+    },
+    {
+      "field": "time",
+      "units": "hour",
+      "location": {
+        "species": 2,
+        "time": "each printed solute record"
+      },
+      "raw_output_file": "solute2.out",
+      "row_selector": {
+        "kind": "all data rows",
+        "identity_column": 1
+      },
+      "source_columns": [
+        1
+      ],
+      "native_to_canonical": {
+        "species_index": "native 1-based species identity",
+        "time_column": 1,
+        "coordinate": "not applicable"
+      },
+      "source_numeric_format": "f14.4 (OUTPUT.FOR format 190 before 0.99999999 h); e15.8 (format 191 thereafter)",
+      "source_precision_interval": "half one unit in the last printed digit of the applicable time format"
+    },
+    {
+      "field": "cvTop",
+      "units": "mass/area/time",
+      "location": {
+        "species": 2,
+        "time": "each printed solute record"
+      },
+      "raw_output_file": "solute2.out",
+      "row_selector": {
+        "kind": "all data rows",
+        "identity_column": 1
+      },
+      "source_columns": [
+        2
+      ],
+      "native_to_canonical": {
+        "species_index": "native 1-based species identity",
+        "time_column": 1,
+        "coordinate": "not applicable"
+      },
+      "source_numeric_format": "e13.5",
+      "source_precision_interval": "half one unit in the last printed digit"
+    },
+    {
+      "field": "cvBot",
+      "units": "mass/area/time",
+      "location": {
+        "species": 2,
+        "time": "each printed solute record"
+      },
+      "raw_output_file": "solute2.out",
+      "row_selector": {
+        "kind": "all data rows",
+        "identity_column": 1
+      },
+      "source_columns": [
+        3
+      ],
+      "native_to_canonical": {
+        "species_index": "native 1-based species identity",
+        "time_column": 1,
+        "coordinate": "not applicable"
+      },
+      "source_numeric_format": "e13.5",
+      "source_precision_interval": "half one unit in the last printed digit"
+    },
+    {
+      "field": "sum_cvTop",
+      "units": "mass/area",
+      "location": {
+        "species": 2,
+        "time": "each printed solute record"
+      },
+      "raw_output_file": "solute2.out",
+      "row_selector": {
+        "kind": "all data rows",
+        "identity_column": 1
+      },
+      "source_columns": [
+        4
+      ],
+      "native_to_canonical": {
+        "species_index": "native 1-based species identity",
+        "time_column": 1,
+        "coordinate": "not applicable"
+      },
+      "source_numeric_format": "e13.5",
+      "source_precision_interval": "half one unit in the last printed digit"
+    },
+    {
+      "field": "sum_cvBot",
+      "units": "mass/area",
+      "location": {
+        "species": 2,
+        "time": "each printed solute record"
+      },
+      "raw_output_file": "solute2.out",
+      "row_selector": {
+        "kind": "all data rows",
+        "identity_column": 1
+      },
+      "source_columns": [
+        5
+      ],
+      "native_to_canonical": {
+        "species_index": "native 1-based species identity",
+        "time_column": 1,
+        "coordinate": "not applicable"
+      },
+      "source_numeric_format": "e13.5",
+      "source_precision_interval": "half one unit in the last printed digit"
+    },
+    {
+      "field": "cvCh0",
+      "units": "mass/area",
+      "location": {
+        "species": 2,
+        "time": "each printed solute record"
+      },
+      "raw_output_file": "solute2.out",
+      "row_selector": {
+        "kind": "all data rows",
+        "identity_column": 1
+      },
+      "source_columns": [
+        6
+      ],
+      "native_to_canonical": {
+        "species_index": "native 1-based species identity",
+        "time_column": 1,
+        "coordinate": "not applicable"
+      },
+      "source_numeric_format": "e13.5",
+      "source_precision_interval": "half one unit in the last printed digit"
+    },
+    {
+      "field": "cvCh1",
+      "units": "mass/area",
+      "location": {
+        "species": 2,
+        "time": "each printed solute record"
+      },
+      "raw_output_file": "solute2.out",
+      "row_selector": {
+        "kind": "all data rows",
+        "identity_column": 1
+      },
+      "source_columns": [
+        7
+      ],
+      "native_to_canonical": {
+        "species_index": "native 1-based species identity",
+        "time_column": 1,
+        "coordinate": "not applicable"
+      },
+      "source_numeric_format": "e13.5",
+      "source_precision_interval": "half one unit in the last printed digit"
+    },
+    {
+      "field": "cTop",
+      "units": "mass/volume",
+      "location": {
+        "species": 2,
+        "time": "each printed solute record"
+      },
+      "raw_output_file": "solute2.out",
+      "row_selector": {
+        "kind": "all data rows",
+        "identity_column": 1
+      },
+      "source_columns": [
+        8
+      ],
+      "native_to_canonical": {
+        "species_index": "native 1-based species identity",
+        "time_column": 1,
+        "coordinate": "not applicable"
+      },
+      "source_numeric_format": "e13.5",
+      "source_precision_interval": "half one unit in the last printed digit"
+    },
+    {
+      "field": "cRoot",
+      "units": "mass/volume",
+      "location": {
+        "species": 2,
+        "time": "each printed solute record"
+      },
+      "raw_output_file": "solute2.out",
+      "row_selector": {
+        "kind": "all data rows",
+        "identity_column": 1
+      },
+      "source_columns": [
+        9
+      ],
+      "native_to_canonical": {
+        "species_index": "native 1-based species identity",
+        "time_column": 1,
+        "coordinate": "not applicable"
+      },
+      "source_numeric_format": "e13.5",
+      "source_precision_interval": "half one unit in the last printed digit"
+    },
+    {
+      "field": "cBot",
+      "units": "mass/volume",
+      "location": {
+        "species": 2,
+        "time": "each printed solute record"
+      },
+      "raw_output_file": "solute2.out",
+      "row_selector": {
+        "kind": "all data rows",
+        "identity_column": 1
+      },
+      "source_columns": [
+        10
+      ],
+      "native_to_canonical": {
+        "species_index": "native 1-based species identity",
+        "time_column": 1,
+        "coordinate": "not applicable"
+      },
+      "source_numeric_format": "e13.5",
+      "source_precision_interval": "half one unit in the last printed digit"
+    },
+    {
+      "field": "cvRoot",
+      "units": "mass/area/time",
+      "location": {
+        "species": 2,
+        "time": "each printed solute record"
+      },
+      "raw_output_file": "solute2.out",
+      "row_selector": {
+        "kind": "all data rows",
+        "identity_column": 1
+      },
+      "source_columns": [
+        11
+      ],
+      "native_to_canonical": {
+        "species_index": "native 1-based species identity",
+        "time_column": 1,
+        "coordinate": "not applicable"
+      },
+      "source_numeric_format": "e13.5",
+      "source_precision_interval": "half one unit in the last printed digit"
+    },
+    {
+      "field": "sum_cvRoot",
+      "units": "mass/area",
+      "location": {
+        "species": 2,
+        "time": "each printed solute record"
+      },
+      "raw_output_file": "solute2.out",
+      "row_selector": {
+        "kind": "all data rows",
+        "identity_column": 1
+      },
+      "source_columns": [
+        12
+      ],
+      "native_to_canonical": {
+        "species_index": "native 1-based species identity",
+        "time_column": 1,
+        "coordinate": "not applicable"
+      },
+      "source_numeric_format": "e13.5",
+      "source_precision_interval": "half one unit in the last printed digit"
+    },
+    {
+      "field": "sum_cvNEql",
+      "units": "mass/area",
+      "location": {
+        "species": 2,
+        "time": "each printed solute record"
+      },
+      "raw_output_file": "solute2.out",
+      "row_selector": {
+        "kind": "all data rows",
+        "identity_column": 1
+      },
+      "source_columns": [
+        13
+      ],
+      "native_to_canonical": {
+        "species_index": "native 1-based species identity",
+        "time_column": 1,
+        "coordinate": "not applicable"
+      },
+      "source_numeric_format": "e13.5",
+      "source_precision_interval": "half one unit in the last printed digit"
+    },
+    {
+      "field": "TLevel",
+      "units": "count",
+      "location": {
+        "species": 2,
+        "time": "each printed solute record"
+      },
+      "raw_output_file": "solute2.out",
+      "row_selector": {
+        "kind": "all data rows",
+        "identity_column": 1
+      },
+      "source_columns": [
+        14
+      ],
+      "native_to_canonical": {
+        "species_index": "native 1-based species identity",
+        "time_column": 1,
+        "coordinate": "not applicable"
+      },
+      "source_numeric_format": "i8",
+      "source_precision_interval": "half one unit in the last printed digit"
+    },
+    {
+      "field": "cGWL",
+      "units": "mass/area/time",
+      "location": {
+        "species": 2,
+        "time": "each printed solute record"
+      },
+      "raw_output_file": "solute2.out",
+      "row_selector": {
+        "kind": "all data rows",
+        "identity_column": 1
+      },
+      "source_columns": [
+        15
+      ],
+      "native_to_canonical": {
+        "species_index": "native 1-based species identity",
+        "time_column": 1,
+        "coordinate": "not applicable"
+      },
+      "source_numeric_format": "e13.5",
+      "source_precision_interval": "half one unit in the last printed digit"
+    },
+    {
+      "field": "cRunOff",
+      "units": "mass/area/time",
+      "location": {
+        "species": 2,
+        "time": "each printed solute record"
+      },
+      "raw_output_file": "solute2.out",
+      "row_selector": {
+        "kind": "all data rows",
+        "identity_column": 1
+      },
+      "source_columns": [
+        16
+      ],
+      "native_to_canonical": {
+        "species_index": "native 1-based species identity",
+        "time_column": 1,
+        "coordinate": "not applicable"
+      },
+      "source_numeric_format": "e13.5",
+      "source_precision_interval": "half one unit in the last printed digit"
+    },
+    {
+      "field": "sum_cRunOff",
+      "units": "mass/area",
+      "location": {
+        "species": 2,
+        "time": "each printed solute record"
+      },
+      "raw_output_file": "solute2.out",
+      "row_selector": {
+        "kind": "all data rows",
+        "identity_column": 1
+      },
+      "source_columns": [
+        17
+      ],
+      "native_to_canonical": {
+        "species_index": "native 1-based species identity",
+        "time_column": 1,
+        "coordinate": "not applicable"
+      },
+      "source_numeric_format": "e13.5",
+      "source_precision_interval": "half one unit in the last printed digit"
+    },
+    {
+      "field": "time",
+      "units": "hour",
+      "location": {
+        "species": 3,
+        "time": "each printed solute record"
+      },
+      "raw_output_file": "solute3.out",
+      "row_selector": {
+        "kind": "all data rows",
+        "identity_column": 1
+      },
+      "source_columns": [
+        1
+      ],
+      "native_to_canonical": {
+        "species_index": "native 1-based species identity",
+        "time_column": 1,
+        "coordinate": "not applicable"
+      },
+      "source_numeric_format": "f14.4 (OUTPUT.FOR format 190 before 0.99999999 h); e15.8 (format 191 thereafter)",
+      "source_precision_interval": "half one unit in the last printed digit of the applicable time format"
+    },
+    {
+      "field": "cvTop",
+      "units": "mass/area/time",
+      "location": {
+        "species": 3,
+        "time": "each printed solute record"
+      },
+      "raw_output_file": "solute3.out",
+      "row_selector": {
+        "kind": "all data rows",
+        "identity_column": 1
+      },
+      "source_columns": [
+        2
+      ],
+      "native_to_canonical": {
+        "species_index": "native 1-based species identity",
+        "time_column": 1,
+        "coordinate": "not applicable"
+      },
+      "source_numeric_format": "e13.5",
+      "source_precision_interval": "half one unit in the last printed digit"
+    },
+    {
+      "field": "cvBot",
+      "units": "mass/area/time",
+      "location": {
+        "species": 3,
+        "time": "each printed solute record"
+      },
+      "raw_output_file": "solute3.out",
+      "row_selector": {
+        "kind": "all data rows",
+        "identity_column": 1
+      },
+      "source_columns": [
+        3
+      ],
+      "native_to_canonical": {
+        "species_index": "native 1-based species identity",
+        "time_column": 1,
+        "coordinate": "not applicable"
+      },
+      "source_numeric_format": "e13.5",
+      "source_precision_interval": "half one unit in the last printed digit"
+    },
+    {
+      "field": "sum_cvTop",
+      "units": "mass/area",
+      "location": {
+        "species": 3,
+        "time": "each printed solute record"
+      },
+      "raw_output_file": "solute3.out",
+      "row_selector": {
+        "kind": "all data rows",
+        "identity_column": 1
+      },
+      "source_columns": [
+        4
+      ],
+      "native_to_canonical": {
+        "species_index": "native 1-based species identity",
+        "time_column": 1,
+        "coordinate": "not applicable"
+      },
+      "source_numeric_format": "e13.5",
+      "source_precision_interval": "half one unit in the last printed digit"
+    },
+    {
+      "field": "sum_cvBot",
+      "units": "mass/area",
+      "location": {
+        "species": 3,
+        "time": "each printed solute record"
+      },
+      "raw_output_file": "solute3.out",
+      "row_selector": {
+        "kind": "all data rows",
+        "identity_column": 1
+      },
+      "source_columns": [
+        5
+      ],
+      "native_to_canonical": {
+        "species_index": "native 1-based species identity",
+        "time_column": 1,
+        "coordinate": "not applicable"
+      },
+      "source_numeric_format": "e13.5",
+      "source_precision_interval": "half one unit in the last printed digit"
+    },
+    {
+      "field": "cvCh0",
+      "units": "mass/area",
+      "location": {
+        "species": 3,
+        "time": "each printed solute record"
+      },
+      "raw_output_file": "solute3.out",
+      "row_selector": {
+        "kind": "all data rows",
+        "identity_column": 1
+      },
+      "source_columns": [
+        6
+      ],
+      "native_to_canonical": {
+        "species_index": "native 1-based species identity",
+        "time_column": 1,
+        "coordinate": "not applicable"
+      },
+      "source_numeric_format": "e13.5",
+      "source_precision_interval": "half one unit in the last printed digit"
+    },
+    {
+      "field": "cvCh1",
+      "units": "mass/area",
+      "location": {
+        "species": 3,
+        "time": "each printed solute record"
+      },
+      "raw_output_file": "solute3.out",
+      "row_selector": {
+        "kind": "all data rows",
+        "identity_column": 1
+      },
+      "source_columns": [
+        7
+      ],
+      "native_to_canonical": {
+        "species_index": "native 1-based species identity",
+        "time_column": 1,
+        "coordinate": "not applicable"
+      },
+      "source_numeric_format": "e13.5",
+      "source_precision_interval": "half one unit in the last printed digit"
+    },
+    {
+      "field": "cTop",
+      "units": "mass/volume",
+      "location": {
+        "species": 3,
+        "time": "each printed solute record"
+      },
+      "raw_output_file": "solute3.out",
+      "row_selector": {
+        "kind": "all data rows",
+        "identity_column": 1
+      },
+      "source_columns": [
+        8
+      ],
+      "native_to_canonical": {
+        "species_index": "native 1-based species identity",
+        "time_column": 1,
+        "coordinate": "not applicable"
+      },
+      "source_numeric_format": "e13.5",
+      "source_precision_interval": "half one unit in the last printed digit"
+    },
+    {
+      "field": "cRoot",
+      "units": "mass/volume",
+      "location": {
+        "species": 3,
+        "time": "each printed solute record"
+      },
+      "raw_output_file": "solute3.out",
+      "row_selector": {
+        "kind": "all data rows",
+        "identity_column": 1
+      },
+      "source_columns": [
+        9
+      ],
+      "native_to_canonical": {
+        "species_index": "native 1-based species identity",
+        "time_column": 1,
+        "coordinate": "not applicable"
+      },
+      "source_numeric_format": "e13.5",
+      "source_precision_interval": "half one unit in the last printed digit"
+    },
+    {
+      "field": "cBot",
+      "units": "mass/volume",
+      "location": {
+        "species": 3,
+        "time": "each printed solute record"
+      },
+      "raw_output_file": "solute3.out",
+      "row_selector": {
+        "kind": "all data rows",
+        "identity_column": 1
+      },
+      "source_columns": [
+        10
+      ],
+      "native_to_canonical": {
+        "species_index": "native 1-based species identity",
+        "time_column": 1,
+        "coordinate": "not applicable"
+      },
+      "source_numeric_format": "e13.5",
+      "source_precision_interval": "half one unit in the last printed digit"
+    },
+    {
+      "field": "cvRoot",
+      "units": "mass/area/time",
+      "location": {
+        "species": 3,
+        "time": "each printed solute record"
+      },
+      "raw_output_file": "solute3.out",
+      "row_selector": {
+        "kind": "all data rows",
+        "identity_column": 1
+      },
+      "source_columns": [
+        11
+      ],
+      "native_to_canonical": {
+        "species_index": "native 1-based species identity",
+        "time_column": 1,
+        "coordinate": "not applicable"
+      },
+      "source_numeric_format": "e13.5",
+      "source_precision_interval": "half one unit in the last printed digit"
+    },
+    {
+      "field": "sum_cvRoot",
+      "units": "mass/area",
+      "location": {
+        "species": 3,
+        "time": "each printed solute record"
+      },
+      "raw_output_file": "solute3.out",
+      "row_selector": {
+        "kind": "all data rows",
+        "identity_column": 1
+      },
+      "source_columns": [
+        12
+      ],
+      "native_to_canonical": {
+        "species_index": "native 1-based species identity",
+        "time_column": 1,
+        "coordinate": "not applicable"
+      },
+      "source_numeric_format": "e13.5",
+      "source_precision_interval": "half one unit in the last printed digit"
+    },
+    {
+      "field": "sum_cvNEql",
+      "units": "mass/area",
+      "location": {
+        "species": 3,
+        "time": "each printed solute record"
+      },
+      "raw_output_file": "solute3.out",
+      "row_selector": {
+        "kind": "all data rows",
+        "identity_column": 1
+      },
+      "source_columns": [
+        13
+      ],
+      "native_to_canonical": {
+        "species_index": "native 1-based species identity",
+        "time_column": 1,
+        "coordinate": "not applicable"
+      },
+      "source_numeric_format": "e13.5",
+      "source_precision_interval": "half one unit in the last printed digit"
+    },
+    {
+      "field": "TLevel",
+      "units": "count",
+      "location": {
+        "species": 3,
+        "time": "each printed solute record"
+      },
+      "raw_output_file": "solute3.out",
+      "row_selector": {
+        "kind": "all data rows",
+        "identity_column": 1
+      },
+      "source_columns": [
+        14
+      ],
+      "native_to_canonical": {
+        "species_index": "native 1-based species identity",
+        "time_column": 1,
+        "coordinate": "not applicable"
+      },
+      "source_numeric_format": "i8",
+      "source_precision_interval": "half one unit in the last printed digit"
+    },
+    {
+      "field": "cGWL",
+      "units": "mass/area/time",
+      "location": {
+        "species": 3,
+        "time": "each printed solute record"
+      },
+      "raw_output_file": "solute3.out",
+      "row_selector": {
+        "kind": "all data rows",
+        "identity_column": 1
+      },
+      "source_columns": [
+        15
+      ],
+      "native_to_canonical": {
+        "species_index": "native 1-based species identity",
+        "time_column": 1,
+        "coordinate": "not applicable"
+      },
+      "source_numeric_format": "e13.5",
+      "source_precision_interval": "half one unit in the last printed digit"
+    },
+    {
+      "field": "cRunOff",
+      "units": "mass/area/time",
+      "location": {
+        "species": 3,
+        "time": "each printed solute record"
+      },
+      "raw_output_file": "solute3.out",
+      "row_selector": {
+        "kind": "all data rows",
+        "identity_column": 1
+      },
+      "source_columns": [
+        16
+      ],
+      "native_to_canonical": {
+        "species_index": "native 1-based species identity",
+        "time_column": 1,
+        "coordinate": "not applicable"
+      },
+      "source_numeric_format": "e13.5",
+      "source_precision_interval": "half one unit in the last printed digit"
+    },
+    {
+      "field": "sum_cRunOff",
+      "units": "mass/area",
+      "location": {
+        "species": 3,
+        "time": "each printed solute record"
+      },
+      "raw_output_file": "solute3.out",
+      "row_selector": {
+        "kind": "all data rows",
+        "identity_column": 1
+      },
+      "source_columns": [
+        17
+      ],
+      "native_to_canonical": {
+        "species_index": "native 1-based species identity",
+        "time_column": 1,
+        "coordinate": "not applicable"
+      },
+      "source_numeric_format": "e13.5",
+      "source_precision_interval": "half one unit in the last printed digit"
+    },
+    {
+      "field": "Conc",
+      "units": "dimensionless normalized concentration",
+      "location": {
+        "species": 1,
+        "time": "each PROFILE.OUT time section",
+        "node": "native 1-based row; canonical distance=-source coordinate"
+      },
+      "raw_output_file": "PROFILE.OUT",
+      "row_selector": {
+        "kind": "node records in every time section",
+        "time_header": "Time:",
+        "node_identity_column": 1,
+        "coordinate_column": 2
+      },
+      "source_columns": [
+        12
+      ],
+      "native_to_canonical": {
+        "species_index": "native 1-based species identity",
+        "node_index": "native row index; reverse rows/coordinates to increasing flow distance",
+        "coordinate": "canonical flow distance equals negative native depth"
+      },
+      "source_numeric_format": "e12.4",
+      "source_precision_interval": "half one unit in the last printed digit"
+    },
+    {
+      "field": "Conc",
+      "units": "dimensionless normalized concentration",
+      "location": {
+        "species": 2,
+        "time": "each PROFILE.OUT time section",
+        "node": "native 1-based row; canonical distance=-source coordinate"
+      },
+      "raw_output_file": "PROFILE.OUT",
+      "row_selector": {
+        "kind": "node records in every time section",
+        "time_header": "Time:",
+        "node_identity_column": 1,
+        "coordinate_column": 2
+      },
+      "source_columns": [
+        13
+      ],
+      "native_to_canonical": {
+        "species_index": "native 1-based species identity",
+        "node_index": "native row index; reverse rows/coordinates to increasing flow distance",
+        "coordinate": "canonical flow distance equals negative native depth"
+      },
+      "source_numeric_format": "e12.4",
+      "source_precision_interval": "half one unit in the last printed digit"
+    },
+    {
+      "field": "Conc",
+      "units": "dimensionless normalized concentration",
+      "location": {
+        "species": 3,
+        "time": "each PROFILE.OUT time section",
+        "node": "native 1-based row; canonical distance=-source coordinate"
+      },
+      "raw_output_file": "PROFILE.OUT",
+      "row_selector": {
+        "kind": "node records in every time section",
+        "time_header": "Time:",
+        "node_identity_column": 1,
+        "coordinate_column": 2
+      },
+      "source_columns": [
+        14
+      ],
+      "native_to_canonical": {
+        "species_index": "native 1-based species identity",
+        "node_index": "native row index; reverse rows/coordinates to increasing flow distance",
+        "coordinate": "canonical flow distance equals negative native depth"
+      },
+      "source_numeric_format": "e12.4",
+      "source_precision_interval": "half one unit in the last printed digit"
+    },
+    {
+      "field": "theta",
+      "units": "dimensionless",
+      "location": {
+        "node": "native 1-based row",
+        "time": "each PROFILE.OUT time section"
+      },
+      "raw_output_file": "PROFILE.OUT",
+      "row_selector": {
+        "kind": "node records in every time section",
+        "time_header": "Time:",
+        "node_identity_column": 1
+      },
+      "source_columns": [
+        4
+      ],
+      "native_to_canonical": {
+        "node_index": "native row index"
+      },
+      "source_numeric_format": "f6.4",
+      "source_precision_interval": "half one unit in the last printed digit"
+    },
+    {
+      "field": "temperature",
+      "units": "degC",
+      "location": {
+        "node": "native 1-based row",
+        "time": "each PROFILE.OUT time section"
+      },
+      "raw_output_file": "PROFILE.OUT",
+      "row_selector": {
+        "kind": "node records in every time section",
+        "time_header": "Time:",
+        "node_identity_column": 1
+      },
+      "source_columns": [
+        11
+      ],
+      "native_to_canonical": {
+        "node_index": "native row index"
+      },
+      "source_numeric_format": "f8.2",
+      "source_precision_interval": "half one unit in the last printed digit"
+    },
+    {
+      "field": "Disp",
+      "units": "unavailable",
+      "location": {
+        "scope": "fixture"
+      },
+      "availability": "unavailable",
+      "reason": "internal coefficient not printed in unmodified source output"
+    },
+    {
+      "field": "Retard",
+      "units": "unavailable",
+      "location": {
+        "scope": "fixture"
+      },
+      "availability": "unavailable",
+      "reason": "internal coefficient not printed in unmodified source output"
+    },
+    {
+      "field": "TauW/TauG",
+      "units": "unavailable",
+      "location": {
+        "scope": "fixture"
+      },
+      "availability": "unavailable",
+      "reason": "internal tortuosity factors not printed in unmodified source output"
+    },
+    {
+      "field": "Con",
+      "units": "L/T",
+      "location": {
+        "time": "each NOD_INF_V.OUT time section",
+        "node": "native 1-based row; canonical distance=-source depth"
+      },
+      "raw_output_file": "NOD_INF_V.OUT",
+      "row_selector": {
+        "kind": "node records in every time section",
+        "time_header": "Time:",
+        "node_identity_column": 1,
+        "coordinate_column": 2
+      },
+      "source_columns": [
+        3
+      ],
+      "native_to_canonical": {
+        "node_index": "native row index; reverse rows/coordinates to increasing flow distance",
+        "coordinate": "canonical flow distance equals negative native depth"
+      },
+      "source_numeric_format": "e13.5 (OUTPUT.FOR:926; node i4 and depth f10.4 precede nine values)",
+      "source_precision_interval": "half one unit in the last printed digit"
+    },
+    {
+      "field": "ConLT",
+      "units": "L2/K/T",
+      "location": {
+        "time": "each NOD_INF_V.OUT time section",
+        "node": "native 1-based row; canonical distance=-source depth"
+      },
+      "raw_output_file": "NOD_INF_V.OUT",
+      "row_selector": {
+        "kind": "node records in every time section",
+        "time_header": "Time:",
+        "node_identity_column": 1,
+        "coordinate_column": 2
+      },
+      "source_columns": [
+        4
+      ],
+      "native_to_canonical": {
+        "node_index": "native row index; reverse rows/coordinates to increasing flow distance",
+        "coordinate": "canonical flow distance equals negative native depth"
+      },
+      "source_numeric_format": "e13.5 (OUTPUT.FOR:926; node i4 and depth f10.4 precede nine values)",
+      "source_precision_interval": "half one unit in the last printed digit"
+    },
+    {
+      "field": "ConVh",
+      "units": "L/T",
+      "location": {
+        "time": "each NOD_INF_V.OUT time section",
+        "node": "native 1-based row; canonical distance=-source depth"
+      },
+      "raw_output_file": "NOD_INF_V.OUT",
+      "row_selector": {
+        "kind": "node records in every time section",
+        "time_header": "Time:",
+        "node_identity_column": 1,
+        "coordinate_column": 2
+      },
+      "source_columns": [
+        5
+      ],
+      "native_to_canonical": {
+        "node_index": "native row index; reverse rows/coordinates to increasing flow distance",
+        "coordinate": "canonical flow distance equals negative native depth"
+      },
+      "source_numeric_format": "e13.5 (OUTPUT.FOR:926; node i4 and depth f10.4 precede nine values)",
+      "source_precision_interval": "half one unit in the last printed digit"
+    },
+    {
+      "field": "ConVT",
+      "units": "L2/K/T",
+      "location": {
+        "time": "each NOD_INF_V.OUT time section",
+        "node": "native 1-based row; canonical distance=-source depth"
+      },
+      "raw_output_file": "NOD_INF_V.OUT",
+      "row_selector": {
+        "kind": "node records in every time section",
+        "time_header": "Time:",
+        "node_identity_column": 1,
+        "coordinate_column": 2
+      },
+      "source_columns": [
+        6
+      ],
+      "native_to_canonical": {
+        "node_index": "native row index; reverse rows/coordinates to increasing flow distance",
+        "coordinate": "canonical flow distance equals negative native depth"
+      },
+      "source_numeric_format": "e13.5 (OUTPUT.FOR:926; node i4 and depth f10.4 precede nine values)",
+      "source_precision_interval": "half one unit in the last printed digit"
+    },
+    {
+      "field": "vLiquid",
+      "units": "L/T",
+      "location": {
+        "time": "each NOD_INF_V.OUT time section",
+        "node": "native 1-based row; canonical distance=-source depth"
+      },
+      "raw_output_file": "NOD_INF_V.OUT",
+      "row_selector": {
+        "kind": "node records in every time section",
+        "time_header": "Time:",
+        "node_identity_column": 1,
+        "coordinate_column": 2
+      },
+      "source_columns": [
+        7
+      ],
+      "native_to_canonical": {
+        "node_index": "native row index; reverse rows/coordinates to increasing flow distance",
+        "coordinate": "canonical flow distance equals negative native depth"
+      },
+      "source_numeric_format": "e13.5 (OUTPUT.FOR:926; node i4 and depth f10.4 precede nine values)",
+      "source_precision_interval": "half one unit in the last printed digit"
+    },
+    {
+      "field": "vVapor",
+      "units": "L/T",
+      "location": {
+        "time": "each NOD_INF_V.OUT time section",
+        "node": "native 1-based row; canonical distance=-source depth"
+      },
+      "raw_output_file": "NOD_INF_V.OUT",
+      "row_selector": {
+        "kind": "node records in every time section",
+        "time_header": "Time:",
+        "node_identity_column": 1,
+        "coordinate_column": 2
+      },
+      "source_columns": [
+        8
+      ],
+      "native_to_canonical": {
+        "node_index": "native row index; reverse rows/coordinates to increasing flow distance",
+        "coordinate": "canonical flow distance equals negative native depth"
+      },
+      "source_numeric_format": "e13.5 (OUTPUT.FOR:926; node i4 and depth f10.4 precede nine values)",
+      "source_precision_interval": "half one unit in the last printed digit"
+    },
+    {
+      "field": "vTotal",
+      "units": "L/T",
+      "location": {
+        "time": "each NOD_INF_V.OUT time section",
+        "node": "native 1-based row; canonical distance=-source depth"
+      },
+      "raw_output_file": "NOD_INF_V.OUT",
+      "row_selector": {
+        "kind": "node records in every time section",
+        "time_header": "Time:",
+        "node_identity_column": 1,
+        "coordinate_column": 2
+      },
+      "source_columns": [
+        9
+      ],
+      "native_to_canonical": {
+        "node_index": "native row index; reverse rows/coordinates to increasing flow distance",
+        "coordinate": "canonical flow distance equals negative native depth"
+      },
+      "source_numeric_format": "e13.5 (OUTPUT.FOR:926; node i4 and depth f10.4 precede nine values)",
+      "source_precision_interval": "half one unit in the last printed digit"
+    },
+    {
+      "field": "vVapIso",
+      "units": "L/T",
+      "location": {
+        "time": "each NOD_INF_V.OUT time section",
+        "node": "native 1-based row; canonical distance=-source depth"
+      },
+      "raw_output_file": "NOD_INF_V.OUT",
+      "row_selector": {
+        "kind": "node records in every time section",
+        "time_header": "Time:",
+        "node_identity_column": 1,
+        "coordinate_column": 2
+      },
+      "source_columns": [
+        10
+      ],
+      "native_to_canonical": {
+        "node_index": "native row index; reverse rows/coordinates to increasing flow distance",
+        "coordinate": "canonical flow distance equals negative native depth"
+      },
+      "source_numeric_format": "e13.5 (OUTPUT.FOR:926; node i4 and depth f10.4 precede nine values)",
+      "source_precision_interval": "half one unit in the last printed digit"
+    },
+    {
+      "field": "vVapTerm",
+      "units": "L/T",
+      "location": {
+        "time": "each NOD_INF_V.OUT time section",
+        "node": "native 1-based row; canonical distance=-source depth"
+      },
+      "raw_output_file": "NOD_INF_V.OUT",
+      "row_selector": {
+        "kind": "node records in every time section",
+        "time_header": "Time:",
+        "node_identity_column": 1,
+        "coordinate_column": 2
+      },
+      "source_columns": [
+        11
+      ],
+      "native_to_canonical": {
+        "node_index": "native row index; reverse rows/coordinates to increasing flow distance",
+        "coordinate": "canonical flow distance equals negative native depth"
+      },
+      "source_numeric_format": "e13.5 (OUTPUT.FOR:926; node i4 and depth f10.4 precede nine values)",
+      "source_precision_interval": "half one unit in the last printed digit"
+    },
+    {
+      "field": "lDensity_effect",
+      "units": "unavailable",
+      "location": {
+        "scope": "fixture"
+      },
+      "availability": "unavailable",
+      "reason": "Inactive: INPUT.FOR initializes lDensity false at line 1713 and provides no active enabling assignment on the caller/input path; no density fixture or density-enabled claim is made."
+    },
+    {
+      "field": "time",
+      "units": "hour",
+      "location": {
+        "time": "each NOD_INF_V.OUT time section"
+      },
+      "raw_output_file": "NOD_INF_V.OUT",
+      "row_selector": {
+        "kind": "Time header records",
+        "identity_token": "Time:"
+      },
+      "source_columns": [],
+      "native_to_canonical": {
+        "time": "value following the Time: header"
+      },
+      "source_numeric_format": "f14.4 before 0.99999999 h; e15.8 thereafter (OUTPUT.FOR formats 110/111)",
+      "source_precision_interval": "half one unit in the last printed digit of the applicable time format"
+    }
+  ]
+}
