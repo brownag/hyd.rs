@@ -1,7 +1,7 @@
 # State — Orchestration 18
 
 Plan status: **Approved by user on 2026-10-08 (“yes”).**
-Execution status: **Waves 1–4 complete; Wave 5 is next.** Wave 3 fixture runs authenticate raw outputs only; normalized parity remains pending. Compatibility backend must not become default until the full in-scope parity gate passes.
+Execution status: **Waves 1–4 complete; Wave 5 is in progress.** Wave 3 fixture runs authenticate raw outputs only; normalized parity remains pending. Compatibility backend must not become default until the full in-scope parity gate passes.
 Plan: [EXECUTION_PLAN_18.md](EXECUTION_PLAN_18.md). Worker template: [PROMPT_TEMPLATE_18.md](PROMPT_TEMPLATE_18.md).
 
 ## Baseline and guardrails
@@ -33,9 +33,9 @@ Plan: [EXECUTION_PLAN_18.md](EXECUTION_PLAN_18.md). Worker template: [PROMPT_TEM
 | 3 | 18.3.4 | Nonequilibrium/dual-domain fixtures | done |
 | 3 | 18.3.5 | Biology/filtration/deposition fixtures | done |
 | 4 | 18.4.1 | Compatibility types/state/precision model | done |
-| 5 | 18.5.1 | Transport and matrix assembly kernel | pending |
-| 5 | 18.5.2 | Endpoint rows and flux closure | pending |
-| 5 | 18.5.3 | Source accounting and observations | pending |
+| 5 | 18.5.1 | Transport and matrix assembly kernel | in progress |
+| 5 | 18.5.2 | Endpoint rows and flux closure | in progress |
+| 5 | 18.5.3 | Source accounting and observations | in progress |
 | 6 | 18.6.1 | Reaction chains and equilibrium sorption | pending |
 | 6 | 18.6.2 | Active mobile/immobile coefficients | pending |
 | 6 | 18.6.3 | Active dual-domain coefficients | pending |
