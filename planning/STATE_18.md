@@ -1,7 +1,7 @@
 # State — Orchestration 18
 
 Plan status: **Approved by user on 2026-10-08 (“yes”).**
-Execution status: **Waves 1–2 complete; Wave 3 is next.** Wave 2 was verified without solver launches. Compatibility backend must not become default until the full in-scope parity gate passes.
+Execution status: **Waves 1–3 complete; Wave 4 is next.** Wave 2 tooling and Wave 3 fixtures are committed; Wave 3 runs authenticated raw outputs only. Compatibility backend must not become default until the full in-scope parity gate passes.
 Plan: [EXECUTION_PLAN_18.md](EXECUTION_PLAN_18.md). Worker template: [PROMPT_TEMPLATE_18.md](PROMPT_TEMPLATE_18.md).
 
 ## Baseline and guardrails
@@ -26,9 +26,9 @@ Plan: [EXECUTION_PLAN_18.md](EXECUTION_PLAN_18.md). Worker template: [PROMPT_TEM
 | 1 | 18.1.1 | Source mode matrix and compatibility contract | done |
 | 2 | 18.2.1 | Manifest-driven isolated Fortran runner | done |
 | 2 | 18.2.2 | Source-only parity orchestration/comparator | done |
-| 3 | 18.3.1 | Transport/weighting/boundary fixtures | pending |
-| 3 | 18.3.2 | Reaction/sorption fixtures | pending |
-| 3 | 18.3.3 | Optional transport-property fixtures | pending |
+| 3 | 18.3.1 | Transport/weighting/boundary fixtures | done |
+| 3 | 18.3.2 | Reaction/sorption fixtures | done |
+| 3 | 18.3.3 | Optional transport-property fixtures | done |
 | 3 | 18.3.4 | Nonequilibrium/dual-domain fixtures | pending |
 | 3 | 18.3.5 | Biology/filtration/deposition fixtures | pending |
 | 4 | 18.4.1 | Compatibility types/state/precision model | pending |
@@ -72,6 +72,15 @@ Plan: [EXECUTION_PLAN_18.md](EXECUTION_PLAN_18.md). Worker template: [PROMPT_TEM
 - Targeted parity tests — 10 passed; `tools.test_solute_printed_parity` — 10 passed; `tools/compare_solute_reference.py --self-test` — 12 passed.
 - Mocked end-to-end runner/group integration verified the shared result contract, nested roots, output paths and hashes; no real Fortran/Rust solver was launched. `git diff --check` passed.
 - Provenance comparison uses the runner's exact staged inventory (archive plus `.FOR` source files); unrelated PDF hashes in `SOURCE_MANIFEST.json` are excluded, with regression tests for missing/changed staged entries.
+
+### 18.3.1–18.3.3 — Reference fixture groups
+
+- **Status:** done; fixture files and task reports committed in `85f8bd6`, `292a70c`, and `3210f5d`.
+- 18.3.1: 18 transport fixtures cover all 14 active endpoint-code × native-flow combinations; `kTopCh=-2` positive/negative cases are included. Raw outputs authenticated; no normalized parity claim.
+- 18.3.2: four reaction/sorption fixtures authenticated; all maps converted to flat `solute-observation-map-v1`. Per-map counts: 60 observations for each chain fixture, 22 for the single-species case; retained inputs and outputs unchanged.
+- 18.3.3: five property fixtures authenticated, including vapor-enabled diagnostics. Density and moisture-dependent paths are documented inactive from the active caller/input path.
+- Three workers ran in separate worktrees; all run attempts remain in `.development/18-worktrees/18.3.{1,2,3}/.development/`. Each task's exact hashes and output inventory are in its TODO and retained manifests. Reaction maps use the versioned flat observation schema; their input/output provenance was rechecked after conversion without rerunning.
+- Orchestrator check across imported fixtures: all 27 `CASE.json` inputs and observation maps validate. Acceptance is raw output authentication only; normalization and paired parity remain pending.
 
 ### Wave 2 verification
 
