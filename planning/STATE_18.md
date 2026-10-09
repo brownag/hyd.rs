@@ -1,7 +1,7 @@
 # State — Orchestration 18
 
 Plan status: **Approved by user on 2026-10-08 (“yes”).**
-Execution status: **Wave 3 is blocked on task 18.3.4; Wave 4 has not started.** Task 18.3.5 is complete. Compatibility backend must not become default until the full in-scope parity gate passes.
+Execution status: **Waves 1–3 complete; Wave 4 is next.** Wave 3 fixture runs authenticate raw outputs only; normalized parity remains pending. Compatibility backend must not become default until the full in-scope parity gate passes.
 Plan: [EXECUTION_PLAN_18.md](EXECUTION_PLAN_18.md). Worker template: [PROMPT_TEMPLATE_18.md](PROMPT_TEMPLATE_18.md).
 
 ## Baseline and guardrails
@@ -16,6 +16,7 @@ Plan: [EXECUTION_PLAN_18.md](EXECUTION_PLAN_18.md). Worker template: [PROMPT_TEM
 - [x] Independent spec and standards reviews completed; plan corrected for verification-before-default ordering, task scopes, and escalation rules.
 - [x] Wave 2 integration review found the Fortran runner authenticates raw files only; plan amended to add fixture observation maps, a strict output normalizer, and paired Rust/Fortran CLI stages before all-mode acceptance.
 - [x] Wave 2 raw-output authentication is not labeled normalized parity; output normalization and candidate comparison are separate gates before all-mode acceptance.
+- [x] User selected full pinned HYDRUS runs for dual-domain fixtures: use models 6/7 with independently authored decks and active `InitDualPor` state initialization; no call-boundary injection harness. Source audit found the `WATFLOW` `DualPor` exchange-update call commented out, so dynamic transfer/nonzero `SinkIm` is not claimed.
 - [x] User approves this execution plan.
 - [ ] Full audited solute compatibility/parity gate passes before the default changes.
 
@@ -29,7 +30,7 @@ Plan: [EXECUTION_PLAN_18.md](EXECUTION_PLAN_18.md). Worker template: [PROMPT_TEM
 | 3 | 18.3.1 | Transport/weighting/boundary fixtures | done |
 | 3 | 18.3.2 | Reaction/sorption fixtures | done |
 | 3 | 18.3.3 | Optional transport-property fixtures | done |
-| 3 | 18.3.4 | Nonequilibrium/dual-domain fixtures | blocked — fixture input contract lacks caller-produced dual-domain history injection |
+| 3 | 18.3.4 | Nonequilibrium/dual-domain fixtures | done |
 | 3 | 18.3.5 | Biology/filtration/deposition fixtures | done |
 | 4 | 18.4.1 | Compatibility types/state/precision model | pending |
 | 5 | 18.5.1 | Transport and matrix assembly kernel | pending |
@@ -84,17 +85,25 @@ Plan: [EXECUTION_PLAN_18.md](EXECUTION_PLAN_18.md). Worker template: [PROMPT_TEM
 
 ### 18.3.4 — Nonequilibrium/dual-domain fixtures
 
-- **Status:** blocked before fixture creation or solver execution. The approved fixture contract has no input mapping for `ThOldIm`, `ThNewIm`, `SinkIm`, and related dual-flow histories consumed by `Solute`.
-- `INPUT.FOR` selects `iDualPor` from water models 6/7, but `HYDRUS` initializes dual state and `WATFLOW` evolves the histories. The current manifest/request maps deck inputs only and cannot inject those arrays at the active call boundary. Independent derivation would not test the pinned active `HYDRUS`→`Solute` path.
-- `planning/tasks/18.3.4.todo.md` records the evidence and requests an amendment defining a reproducible supported injection/mapping or driver harness. Dormant `NEquil`, `SorbConc`, and `NonEqInit` updates remain explicitly inactive.
-- Wave 4 is gated on all Wave 3 deliverables; do not begin 18.4.1 until this contract blocker is resolved or the plan is formally amended.
+- **Status:** done under the 2026-10-09 user-approved full-run amendment; fixtures/task report committed in `b5ef3ee`.
+- Added five fixtures: mobile-immobile and matched control, dual models 6 and 7, and single-domain control. Both water models are accepted through the pinned active reader and maps include printed `VolumeIm` evidence.
+- Full pinned reference-only run authenticated all five cases under `.development/18.3.4/attempt-20261009-unsaturated/`; orchestrator revalidated all five run manifests, declared output hashes, pinned source/archive/patch/executable provenance, fixture inputs, and observation maps.
+- Discriminators: dual model 6 `VolumeIm=0.33455E+00 cm`; model 7 `0.15740E+00 cm`; single-domain control omits the `W-volumeI[L]` row. Mobile-immobile `cvCh1` at 0.1 h differs from its zero-immobile control (`-0.30400E-01` vs `-0.34400E-01`). These are raw printed outputs, not normalized parity.
+- Active `InitDualPor` initializes `ThNewIm`/`ThOldIm` and `Solute` consumes dual storage. `WATFLOW.FOR:42–46` comments out `call DualPor`; `SinkIm=0`, so dynamic exchange/nonzero-`SinkIm` behavior is explicitly not claimed. `NEquil`, `SorbConc`, and `NonEqInit` remain inactive.
 
 ### 18.3.5 — Biology/filtration/deposition fixtures
 
-- **Status:** done; six fixtures and task report are staged for integration.
+- **Status:** done; committed in `cf651ff`.
 - Cases discriminate blocking codes 1–5 (including source no-op code 3) and filtration/deposition with valid positive particle/grain diameters. Reader mappings for bacteria/filtration and `ChPar` values are present; `Exclusion` remains inactive.
 - Reference-only run authenticated all six raw output inventories and source/archive, patch, executable, request, and input hashes under `.development/18.3.5/attempt-20261009T000000Z/`; no normalized parity claim.
-- Orchestrator contract validation: all 33 manifests and observation maps validate; maps use `solute-observation-map-v1` with nonempty observations.
+- Orchestrator contract validation after 18.3.4: all 38 manifests and versioned observation maps validate; all five new maps have unique field/location identities. New attempts remain raw authentication only, not normalized parity.
+
+### Wave 3 verification
+
+- `cargo test --workspace` — passed (137 integration tests; zero unit/doc tests).
+- `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tools -p 'test_*.py'` — 291 passed; one expected guarded “solver execution forbidden” diagnostic was emitted inside a passing test.
+- `cargo fmt --check`, `cargo clippy --workspace --all-targets -- -D warnings`, `git diff --check` — passed.
+- The five 18.3.4 retained raw-run manifests, declared output hashes, pinned source/archive/patch/executable provenance, and fixture input hashes were independently revalidated. No normalized parity claim.
 
 ### Wave 2 verification
 

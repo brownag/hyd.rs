@@ -1,6 +1,6 @@
 # Orchestration 18 — Source-faithful Fortran solute compatibility backend
 
-Status: **Approved by user on 2026-10-08.** Waves 1–2 are complete; Wave 3 is next. Companion files: [worker prompt](PROMPT_TEMPLATE_18.md), [state](STATE_18.md).
+Status: **Approved by user on 2026-10-08, with task 18.3.4 amended on 2026-10-09.** Waves 1–2 are complete; Wave 3 is in progress. Companion files: [worker prompt](PROMPT_TEMPLATE_18.md), [state](STATE_18.md).
 
 ## Goal & scope
 
@@ -32,6 +32,7 @@ Status: **Approved by user on 2026-10-08.** Waves 1–2 are complete; Wave 3 is 
 | 2026-10-08 | Use up to three concurrent workers, consistent with `INITIAL_PROMPT.md`. Permit retries/follow-ups without a fixed attempt count or arbitrary timeout/artifact ceiling; log attempts and keep per-task scratch isolated. |
 | 2026-10-08 | Task 18.1.1 source audit distinguishes the active `HYDRUS` → `ChemIn` → `Solute` behavior from helper code whose call sites are commented or whose switches cannot be enabled by the active reader. All active/callable solute behavior is parity scope; dormant helper algorithms are recorded as inactive, not implemented or claimed as parity modes. |
 | 2026-10-08 | Wave 2 integration review established that the runner authenticates raw Fortran outputs but does not normalize them. Add a manifest-driven normalizer and paired Rust/Fortran CLI stages before full parity acceptance; fixture manifests must carry observation maps. |
+| 2026-10-09 | For task 18.3.4, exercise dual-domain behavior through a full pinned HYDRUS run using independently authored water-model 6/7 deck inputs; let active `InitDualPor` initialize the dual-water state naturally. Do not add a Solute call-boundary injection harness or represent independently derived histories as active-path inputs. `WATFLOW`'s `DualPor` exchange-update call is commented out, so do not claim dynamic exchange or nonzero `SinkIm` parity. |
 
 ## Reconnaissance and baseline
 
@@ -153,10 +154,10 @@ Tasks within each wave own disjoint files. Waves are sequential because the norm
 - **Must edit:** none.
 - **Can create:** `planning/tasks/18.3.4.todo.md`; disjoint fixtures under `reference/fortran_reference/solute/parity/processes/nonequilibrium/` (including `CASE.json` and `OBSERVATION_MAP.json`) and `.development/18.3.4/`.
 - **Depends on:** 18.2.1–18.2.2.
-- **Spec:** Exercise active mobile-immobile and dual-domain coefficient/row behavior where selected by source-supported inputs, with explicit external histories. The `NEquil`, `SorbConc`, and `NonEqInit` updates are inactive. Add an observation map for active printed output fields and explicit unavailability reasons; do not claim helper-state parity. Biology/deposition fixtures are in 18.3.5.
-- **Do not touch:** solver implementation, pinned source, existing fixtures, tolerances, or other fixture-group paths.
+- **Spec (amended 2026-10-09):** Exercise active mobile-immobile and dual-domain coefficient/row behavior. For mobile-immobile mode, author a source-supported chemistry deck. For dual-domain mode, run the full pinned HYDRUS executable with independently authored water-model 6/7 deck inputs; active `InitDualPor` initializes `ThOldIm`/`ThNewIm` before the `Solute` call and the active solute path consumes dual-storage state. Record model selection, parameters, and available water/output evidence. Do not inject arrays at the call boundary or use independently derived values as though they were consumed by the active path. `WATFLOW`'s `DualPor` exchange-update call is commented out (`WATFLOW.FOR:42–46`), so `SinkIm` is initialized to zero and dynamic transfer/nonzero-exchange behavior is not part of this fixture claim. Include a matched control where practical to demonstrate a discriminating storage/coefficient effect. The `NEquil`, `SorbConc`, and `NonEqInit` updates are inactive. Add an observation map for active printed output fields and explicit unavailability reasons; do not claim helper-state parity. Biology/deposition fixtures are in 18.3.5.
+- **Do not touch:** solver implementation, pinned source, existing fixtures, tolerances, other fixture-group paths, or runner/harness code unless the existing full-run interface demonstrably cannot launch the required deck; if so, stop and request a further amendment rather than silently adding a harness.
 - **Anchors:** `SOLUTE.FOR` `NEquil`, `SorbConc`, `MassTran`, `NonEqInit`; `FEATURE_MATRIX.md` solute rows.
-- **Acceptance:** each active assigned mobile-immobile/dual-domain row behavior has a Fortran discriminator; observation maps cover active outputs and mark dormant helper updates unavailable. Inputs, outputs and provenance validate. `PYTHONDONTWRITEBYTECODE=1 python3 tools/run_solute_parity.py --fixture-group nonequilibrium --reference-only --task-root <fresh unique .development/18.3.4 attempt root>`.
+- **Acceptance:** provide an authenticated mobile-immobile fixture and full-run dual-domain fixtures for each supported/configurable water model (6/7); demonstrate the active reader's `iDualPor` selection, `InitDualPor` initialization and `Solute` consumption from source path plus discriminating output/control. Explicitly mark dynamic `DualPor` exchange and nonzero `SinkIm` untested/inactive due to the commented call. Observation maps cover active outputs and mark dormant helper updates unavailable. Input, completion, output and provenance hashes validate. Run `PYTHONDONTWRITEBYTECODE=1 python3 tools/run_solute_parity.py --fixture-group nonequilibrium --reference-only --task-root <fresh unique .development/18.3.4 attempt root>`.
 
 ### 18.3.5 — Create biology, filtration, and deposition fixtures
 
