@@ -1,0 +1,131 @@
+{
+  "schema_version": "solute-parity-fixture-v1",
+  "fixture_id": "endpoint-upper--2-atmospheric-derived",
+  "case_origin": "Independently derived source-branch probe based on the retained Example 3 executable input layout; not a recovered manual deck. Atmospheric inputs are synthetic branch-probe values, not output data.",
+  "request": {
+    "schema_version": "solute-normalized-request-v1",
+    "fixture_id": "endpoint-upper--2-atmospheric-derived",
+    "fields": {
+      "temporal_weighting.epsi": {
+        "value": 0.5,
+        "units": "1",
+        "provenance": "Source branch probe value; 0.5 is retained from the existing Example 3 input, 0 and 1 are explicit temporal-weighting boundary probes."
+      },
+      "transport.upstream_weighting": {
+        "value": true,
+        "units": "boolean",
+        "provenance": "Selector value explicitly selects the active PeCour branch; both true and false source branches are probed."
+      },
+      "transport.dispersivity": {
+        "value": 0.18,
+        "units": "cm",
+        "provenance": "0.18 cm retained from the Example 3 source fixture's derived alpha; no measurement or analytical output is authored."
+      },
+      "transport.molecular_diffusion": {
+        "value": 0.0,
+        "units": "cm2/hour",
+        "provenance": "Copied from the Example 3 legacy input; no molecular diffusion."
+      },
+      "boundary.upper.code": {
+        "value": -2,
+        "units": "source integer code",
+        "provenance": "SOLUTE.FOR MatSet kTopCh=-2 atmospheric-exchange branch; this source endpoint code is explicitly selected for the derived probe."
+      },
+      "boundary.lower.code": {
+        "value": -1,
+        "units": "source integer code",
+        "provenance": "Source-branch values from SOLUTE.FOR MatSet: lower -1/0/1; upper -2/-1/0/positive. -2 retains the Example 3 zero gas/Henry coefficients and probes the source endpoint branch only."
+      },
+      "boundary.flow_orientation": {
+        "value": "positive-native",
+        "units": "orientation",
+        "provenance": "Pinned source water-flux equation at the retained saturated state gives q=-K*CosAlpha; the first completed run confirmed +0.43 cm/hour for CosAlpha=-1."
+      },
+      "time.interval": {
+        "value": 0.1,
+        "units": "hour",
+        "provenance": "Copied legacy record layout and non-branch hydraulic/species settings from solute/example3; one 0.1 h interval is selected for this branch probe. Reaction rates are zeroed to isolate transport."
+      },
+      "boundary.upper.atmospheric_surface_distance": {
+        "value": 0.25,
+        "units": "cm",
+        "provenance": "Independently derived synthetic input: one 0.25 cm interval on the retained 250 cm / 1001-node profile, chosen as a positive boundary-layer length; not transcribed from a manual and not an output."
+      },
+      "boundary.upper.atmospheric_concentration": {
+        "value": 0.25,
+        "units": "normalized concentration",
+        "provenance": "Independently selected synthetic atmospheric concentration for the branch probe, distinct from the zero concentration at the initial state; not transcribed from a manual and not an output."
+      },
+      "species.1.gas_diffusion": {
+        "value": 0.01,
+        "units": "cm2/hour",
+        "provenance": "Independently selected synthetic nonzero gas-diffusion input so the kTopCh=-2 atmospheric transfer term is active; not copied from a manual or output."
+      },
+      "species.1.henry_coefficient": {
+        "value": 1.0,
+        "units": "source Henry coefficient",
+        "provenance": "Independently selected synthetic nonzero Henry coefficient so the kTopCh=-2 atmospheric exchange term is active; not copied from a manual or output."
+      }
+    }
+  },
+  "request_sha256": "911711b756c19d3872babfeb44a150622316a6993533ca80f7e369091baf0d25",
+  "input_files": {
+    "LEVEL_01.DIR": "eb4bd64f7014f7d42e9d358035802242741b974e8dfcd37c59f9c21ce29d781e",
+    "PROFILE.DAT": "81bc1fa627743fa2a6794d3b34a68e409aa00c190c871188b32596b61903a60e",
+    "SELECTOR.IN": "a1b235aa542d94fe7f9c585964ee4a0934876976e9c608f3266313c2f779222c"
+  },
+  "runner": {
+    "inputs": [
+      "LEVEL_01.DIR",
+      "SELECTOR.IN",
+      "PROFILE.DAT"
+    ],
+    "outputs": [
+      {
+        "name": "I_CHECK.OUT",
+        "marker": "end"
+      },
+      {
+        "name": "RUN_INF.OUT",
+        "marker": "end"
+      },
+      {
+        "name": "T_LEVEL.OUT",
+        "marker": "end"
+      },
+      {
+        "name": "NOD_INF.OUT",
+        "marker": "end"
+      },
+      {
+        "name": "OBS_NODE.OUT",
+        "marker": "end"
+      },
+      {
+        "name": "PROFILE.OUT",
+        "marker": "end"
+      },
+      {
+        "name": "solute1.out",
+        "marker": "end"
+      },
+      {
+        "name": "solute2.out",
+        "marker": "end"
+      },
+      {
+        "name": "solute3.out",
+        "marker": "end"
+      },
+      {
+        "name": "BALANCE.OUT",
+        "marker": "Calculation time"
+      }
+    ],
+    "aliases": {
+      "SELECTOR.IN": "Selector.in",
+      "PROFILE.DAT": "Profile.dat"
+    },
+    "data_prefix": "solute-input"
+  }
+}

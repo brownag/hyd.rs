@@ -1,0 +1,62 @@
+Pcp_File_Version=4
+*** BLOCK A: BASIC INFORMATION *****************************************
+Independently derived negative-native-flow upper atmospheric endpoint branch probe.
+Not a recovered manual deck; see CASE.json for source-based input derivation.
+LUnit TUnit MUnit
+cm
+hours
+mmol
+lWat lChem lTemp lSink lRoot lShort lWDep lScreen lVariabBC lEquil
+t t f f f f f f f t
+lSnow lHP1 lMeteo lVapor lActiveU lFluxes
+f f f f f f
+NMat NLay CosAlpha
+1 1 1
+*** BLOCK B: WATER FLOW INFORMATION ************************************
+MaxIt TolTh TolH
+20 0.001 1
+TopInf WLayer KodTop InitCond
+f f 1 f
+BotInf qGWLF FreeD SeepF KodBot DrainF hSeep
+f f f f 1 f 0
+hTab1 hTabN
+0.0001 100
+Model Hysteresis
+0 0
+thr ths Alfa n Ks l
+0.08 0.43 0.015 1.875 0.43 0.5
+*** BLOCK C: TIME INFORMATION ******************************************
+dt dtMin dtMax DMul DMul2 ItMin ItMax MPL
+0.1 0.1 0.1 1.2 0.5 1 20 3
+tInit tMax
+0 0.1
+lPrintD nPrintSteps tPrintInterval lEnter
+f 1 0.1 f
+TPrint(1...MPL)
+0.1 0 0
+*** BLOCK D: SOLUTE TRANSPORT INFORMATION ******************************
+epsi lUpW lArtD lTDep cTolA cTolR MaxItC PeCr NS lTort iBact lFiltr
+0.5 t f f 0.000001 0.000001 20 100 3 f 0 f
+iNonEqul lMoistDep lDualNEq lMassIni lEqInit lVar
+0 f f f f f
+BulkDensity Dispersivity Fraction ImmobileWaterContent
+0.8 0.18 1 0
+Species 1: Dw Dg
+0 0.01
+Species 1: Ks Nu Beta Henry GamL GamS GamG GamL1 GamS1 GamG1 xMuL xMuS xMuG Omega
+0.5375 0 1 1 0 0 0 0 0 0 0 0 0 0
+Species 2: Dw Dg
+0 0
+Species 2: Ks Nu Beta Henry GamL GamS GamG GamL1 GamS1 GamG1 xMuL xMuS xMuG Omega
+0 0 1 0 0 0 0 0 0 0 0 0 0 0
+Species 3: Dw Dg
+0 0
+Species 3: Ks Nu Beta Henry GamL GamS GamG GamL1 GamS1 GamG1 xMuL xMuS xMuG Omega
+0 0 1 0 0 0 0 0 0 0 0 0 0 0
+kTopCh cTop(NH4 NO2 NO3) kBotCh cBot(NH4 NO2 NO3)
+-2 1 0 0 -1 0 0 0
+Atmospheric surface distance and atmospheric concentration (independently derived inputs)
+0.25 0.25
+tPulse
+200
+*** END OF INPUT FILE 'SELECTOR.IN' ***********************************

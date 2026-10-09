@@ -1,0 +1,1372 @@
+{
+  "schema_version": "solute-observation-map-v1",
+  "fixture_id": "endpoint-upper-0-negative",
+  "coverage_note": "Maps every column in the active per-species solute output record; values are read from the retained raw Fortran output, never authored here.",
+  "record_format": "OUTPUT.FOR format 190: F14.4, 12E13.5, I8, E13.5, 2E13.5; format 191 uses E15.8 for scientific-time rows. Optional flux-observation pairs are not printed because the retained PROFILE.DAT selects zero observation nodes.",
+  "observations": [
+    {
+      "file": "solute1.out",
+      "row_identity": {
+        "species": 1,
+        "time_schedule_hour": [
+          0.1
+        ]
+      },
+      "species": 1,
+      "time": "row time field",
+      "node": null,
+      "field": "time",
+      "column": 1,
+      "units": "hour",
+      "source_precision_interval": {
+        "format": "F14.4",
+        "interval": "0.0001 hour"
+      },
+      "source": "src_reference/OUTPUT.FOR:183-224,276-290"
+    },
+    {
+      "file": "solute1.out",
+      "row_identity": {
+        "species": 1,
+        "time_schedule_hour": [
+          0.1
+        ]
+      },
+      "species": 1,
+      "time": "row time field",
+      "node": null,
+      "field": "cvTop",
+      "column": 2,
+      "units": "mass/length2/hour",
+      "source_precision_interval": {
+        "format": "E13.5",
+        "interval": "source-format rounding; half one unit in final printed place"
+      },
+      "source": "src_reference/OUTPUT.FOR:183-224,276-290"
+    },
+    {
+      "file": "solute1.out",
+      "row_identity": {
+        "species": 1,
+        "time_schedule_hour": [
+          0.1
+        ]
+      },
+      "species": 1,
+      "time": "row time field",
+      "node": null,
+      "field": "cvBot",
+      "column": 3,
+      "units": "mass/length2/hour",
+      "source_precision_interval": {
+        "format": "E13.5",
+        "interval": "source-format rounding; half one unit in final printed place"
+      },
+      "source": "src_reference/OUTPUT.FOR:183-224,276-290"
+    },
+    {
+      "file": "solute1.out",
+      "row_identity": {
+        "species": 1,
+        "time_schedule_hour": [
+          0.1
+        ]
+      },
+      "species": 1,
+      "time": "row time field",
+      "node": null,
+      "field": "sumCvTop",
+      "column": 4,
+      "units": "mass/length2",
+      "source_precision_interval": {
+        "format": "E13.5",
+        "interval": "source-format rounding; half one unit in final printed place"
+      },
+      "source": "src_reference/OUTPUT.FOR:183-224,276-290"
+    },
+    {
+      "file": "solute1.out",
+      "row_identity": {
+        "species": 1,
+        "time_schedule_hour": [
+          0.1
+        ]
+      },
+      "species": 1,
+      "time": "row time field",
+      "node": null,
+      "field": "sumCvBot",
+      "column": 5,
+      "units": "mass/length2",
+      "source_precision_interval": {
+        "format": "E13.5",
+        "interval": "source-format rounding; half one unit in final printed place"
+      },
+      "source": "src_reference/OUTPUT.FOR:183-224,276-290"
+    },
+    {
+      "file": "solute1.out",
+      "row_identity": {
+        "species": 1,
+        "time_schedule_hour": [
+          0.1
+        ]
+      },
+      "species": 1,
+      "time": "row time field",
+      "node": null,
+      "field": "cvCh0",
+      "column": 6,
+      "units": "mass/length2",
+      "source_precision_interval": {
+        "format": "E13.5",
+        "interval": "source-format rounding; half one unit in final printed place"
+      },
+      "source": "src_reference/OUTPUT.FOR:183-224,276-290"
+    },
+    {
+      "file": "solute1.out",
+      "row_identity": {
+        "species": 1,
+        "time_schedule_hour": [
+          0.1
+        ]
+      },
+      "species": 1,
+      "time": "row time field",
+      "node": null,
+      "field": "cvCh1",
+      "column": 7,
+      "units": "mass/length2",
+      "source_precision_interval": {
+        "format": "E13.5",
+        "interval": "source-format rounding; half one unit in final printed place"
+      },
+      "source": "src_reference/OUTPUT.FOR:183-224,276-290"
+    },
+    {
+      "file": "solute1.out",
+      "row_identity": {
+        "species": 1,
+        "time_schedule_hour": [
+          0.1
+        ]
+      },
+      "species": 1,
+      "time": "row time field",
+      "node": 1001,
+      "field": "cTop",
+      "column": 8,
+      "units": "concentration",
+      "source_precision_interval": {
+        "format": "E13.5",
+        "interval": "source-format rounding; half one unit in final printed place"
+      },
+      "source": "src_reference/OUTPUT.FOR:183-224,276-290"
+    },
+    {
+      "file": "solute1.out",
+      "row_identity": {
+        "species": 1,
+        "time_schedule_hour": [
+          0.1
+        ]
+      },
+      "species": 1,
+      "time": "row time field",
+      "node": null,
+      "field": "cRoot",
+      "column": 9,
+      "units": "concentration",
+      "source_precision_interval": {
+        "format": "E13.5",
+        "interval": "source-format rounding; half one unit in final printed place"
+      },
+      "source": "src_reference/OUTPUT.FOR:183-224,276-290"
+    },
+    {
+      "file": "solute1.out",
+      "row_identity": {
+        "species": 1,
+        "time_schedule_hour": [
+          0.1
+        ]
+      },
+      "species": 1,
+      "time": "row time field",
+      "node": 1,
+      "field": "cBot",
+      "column": 10,
+      "units": "concentration",
+      "source_precision_interval": {
+        "format": "E13.5",
+        "interval": "source-format rounding; half one unit in final printed place"
+      },
+      "source": "src_reference/OUTPUT.FOR:183-224,276-290"
+    },
+    {
+      "file": "solute1.out",
+      "row_identity": {
+        "species": 1,
+        "time_schedule_hour": [
+          0.1
+        ]
+      },
+      "species": 1,
+      "time": "row time field",
+      "node": null,
+      "field": "cvRoot",
+      "column": 11,
+      "units": "mass/length2/hour",
+      "source_precision_interval": {
+        "format": "E13.5",
+        "interval": "source-format rounding; half one unit in final printed place"
+      },
+      "source": "src_reference/OUTPUT.FOR:183-224,276-290"
+    },
+    {
+      "file": "solute1.out",
+      "row_identity": {
+        "species": 1,
+        "time_schedule_hour": [
+          0.1
+        ]
+      },
+      "species": 1,
+      "time": "row time field",
+      "node": null,
+      "field": "sumCvRoot",
+      "column": 12,
+      "units": "mass/length2",
+      "source_precision_interval": {
+        "format": "E13.5",
+        "interval": "source-format rounding; half one unit in final printed place"
+      },
+      "source": "src_reference/OUTPUT.FOR:183-224,276-290"
+    },
+    {
+      "file": "solute1.out",
+      "row_identity": {
+        "species": 1,
+        "time_schedule_hour": [
+          0.1
+        ]
+      },
+      "species": 1,
+      "time": "row time field",
+      "node": null,
+      "field": "sumCvNEql",
+      "column": 13,
+      "units": "mass/length2",
+      "source_precision_interval": {
+        "format": "E13.5",
+        "interval": "source-format rounding; half one unit in final printed place"
+      },
+      "source": "src_reference/OUTPUT.FOR:183-224,276-290"
+    },
+    {
+      "file": "solute1.out",
+      "row_identity": {
+        "species": 1,
+        "time_schedule_hour": [
+          0.1
+        ]
+      },
+      "species": 1,
+      "time": "row time field",
+      "node": null,
+      "field": "timeLevel",
+      "column": 14,
+      "units": "integer",
+      "source_precision_interval": {
+        "format": "I8",
+        "interval": "exact integer"
+      },
+      "source": "src_reference/OUTPUT.FOR:183-224,276-290"
+    },
+    {
+      "file": "solute1.out",
+      "row_identity": {
+        "species": 1,
+        "time_schedule_hour": [
+          0.1
+        ]
+      },
+      "species": 1,
+      "time": "row time field",
+      "node": null,
+      "field": "cGWL",
+      "column": 15,
+      "units": "concentration",
+      "source_precision_interval": {
+        "format": "E13.5",
+        "interval": "source-format rounding; half one unit in final printed place"
+      },
+      "source": "src_reference/OUTPUT.FOR:183-224,276-290"
+    },
+    {
+      "file": "solute1.out",
+      "row_identity": {
+        "species": 1,
+        "time_schedule_hour": [
+          0.1
+        ]
+      },
+      "species": 1,
+      "time": "row time field",
+      "node": null,
+      "field": "cRunOff",
+      "column": 16,
+      "units": "mass/length2/hour",
+      "source_precision_interval": {
+        "format": "E13.5",
+        "interval": "source-format rounding; half one unit in final printed place"
+      },
+      "source": "src_reference/OUTPUT.FOR:183-224,276-290"
+    },
+    {
+      "file": "solute1.out",
+      "row_identity": {
+        "species": 1,
+        "time_schedule_hour": [
+          0.1
+        ]
+      },
+      "species": 1,
+      "time": "row time field",
+      "node": null,
+      "field": "sumCRunOff",
+      "column": 17,
+      "units": "mass/length2",
+      "source_precision_interval": {
+        "format": "E13.5",
+        "interval": "source-format rounding; half one unit in final printed place"
+      },
+      "source": "src_reference/OUTPUT.FOR:183-224,276-290"
+    },
+    {
+      "file": "solute2.out",
+      "row_identity": {
+        "species": 2,
+        "time_schedule_hour": [
+          0.1
+        ]
+      },
+      "species": 2,
+      "time": "row time field",
+      "node": null,
+      "field": "time",
+      "column": 1,
+      "units": "hour",
+      "source_precision_interval": {
+        "format": "F14.4",
+        "interval": "0.0001 hour"
+      },
+      "source": "src_reference/OUTPUT.FOR:183-224,276-290"
+    },
+    {
+      "file": "solute2.out",
+      "row_identity": {
+        "species": 2,
+        "time_schedule_hour": [
+          0.1
+        ]
+      },
+      "species": 2,
+      "time": "row time field",
+      "node": null,
+      "field": "cvTop",
+      "column": 2,
+      "units": "mass/length2/hour",
+      "source_precision_interval": {
+        "format": "E13.5",
+        "interval": "source-format rounding; half one unit in final printed place"
+      },
+      "source": "src_reference/OUTPUT.FOR:183-224,276-290"
+    },
+    {
+      "file": "solute2.out",
+      "row_identity": {
+        "species": 2,
+        "time_schedule_hour": [
+          0.1
+        ]
+      },
+      "species": 2,
+      "time": "row time field",
+      "node": null,
+      "field": "cvBot",
+      "column": 3,
+      "units": "mass/length2/hour",
+      "source_precision_interval": {
+        "format": "E13.5",
+        "interval": "source-format rounding; half one unit in final printed place"
+      },
+      "source": "src_reference/OUTPUT.FOR:183-224,276-290"
+    },
+    {
+      "file": "solute2.out",
+      "row_identity": {
+        "species": 2,
+        "time_schedule_hour": [
+          0.1
+        ]
+      },
+      "species": 2,
+      "time": "row time field",
+      "node": null,
+      "field": "sumCvTop",
+      "column": 4,
+      "units": "mass/length2",
+      "source_precision_interval": {
+        "format": "E13.5",
+        "interval": "source-format rounding; half one unit in final printed place"
+      },
+      "source": "src_reference/OUTPUT.FOR:183-224,276-290"
+    },
+    {
+      "file": "solute2.out",
+      "row_identity": {
+        "species": 2,
+        "time_schedule_hour": [
+          0.1
+        ]
+      },
+      "species": 2,
+      "time": "row time field",
+      "node": null,
+      "field": "sumCvBot",
+      "column": 5,
+      "units": "mass/length2",
+      "source_precision_interval": {
+        "format": "E13.5",
+        "interval": "source-format rounding; half one unit in final printed place"
+      },
+      "source": "src_reference/OUTPUT.FOR:183-224,276-290"
+    },
+    {
+      "file": "solute2.out",
+      "row_identity": {
+        "species": 2,
+        "time_schedule_hour": [
+          0.1
+        ]
+      },
+      "species": 2,
+      "time": "row time field",
+      "node": null,
+      "field": "cvCh0",
+      "column": 6,
+      "units": "mass/length2",
+      "source_precision_interval": {
+        "format": "E13.5",
+        "interval": "source-format rounding; half one unit in final printed place"
+      },
+      "source": "src_reference/OUTPUT.FOR:183-224,276-290"
+    },
+    {
+      "file": "solute2.out",
+      "row_identity": {
+        "species": 2,
+        "time_schedule_hour": [
+          0.1
+        ]
+      },
+      "species": 2,
+      "time": "row time field",
+      "node": null,
+      "field": "cvCh1",
+      "column": 7,
+      "units": "mass/length2",
+      "source_precision_interval": {
+        "format": "E13.5",
+        "interval": "source-format rounding; half one unit in final printed place"
+      },
+      "source": "src_reference/OUTPUT.FOR:183-224,276-290"
+    },
+    {
+      "file": "solute2.out",
+      "row_identity": {
+        "species": 2,
+        "time_schedule_hour": [
+          0.1
+        ]
+      },
+      "species": 2,
+      "time": "row time field",
+      "node": 1001,
+      "field": "cTop",
+      "column": 8,
+      "units": "concentration",
+      "source_precision_interval": {
+        "format": "E13.5",
+        "interval": "source-format rounding; half one unit in final printed place"
+      },
+      "source": "src_reference/OUTPUT.FOR:183-224,276-290"
+    },
+    {
+      "file": "solute2.out",
+      "row_identity": {
+        "species": 2,
+        "time_schedule_hour": [
+          0.1
+        ]
+      },
+      "species": 2,
+      "time": "row time field",
+      "node": null,
+      "field": "cRoot",
+      "column": 9,
+      "units": "concentration",
+      "source_precision_interval": {
+        "format": "E13.5",
+        "interval": "source-format rounding; half one unit in final printed place"
+      },
+      "source": "src_reference/OUTPUT.FOR:183-224,276-290"
+    },
+    {
+      "file": "solute2.out",
+      "row_identity": {
+        "species": 2,
+        "time_schedule_hour": [
+          0.1
+        ]
+      },
+      "species": 2,
+      "time": "row time field",
+      "node": 1,
+      "field": "cBot",
+      "column": 10,
+      "units": "concentration",
+      "source_precision_interval": {
+        "format": "E13.5",
+        "interval": "source-format rounding; half one unit in final printed place"
+      },
+      "source": "src_reference/OUTPUT.FOR:183-224,276-290"
+    },
+    {
+      "file": "solute2.out",
+      "row_identity": {
+        "species": 2,
+        "time_schedule_hour": [
+          0.1
+        ]
+      },
+      "species": 2,
+      "time": "row time field",
+      "node": null,
+      "field": "cvRoot",
+      "column": 11,
+      "units": "mass/length2/hour",
+      "source_precision_interval": {
+        "format": "E13.5",
+        "interval": "source-format rounding; half one unit in final printed place"
+      },
+      "source": "src_reference/OUTPUT.FOR:183-224,276-290"
+    },
+    {
+      "file": "solute2.out",
+      "row_identity": {
+        "species": 2,
+        "time_schedule_hour": [
+          0.1
+        ]
+      },
+      "species": 2,
+      "time": "row time field",
+      "node": null,
+      "field": "sumCvRoot",
+      "column": 12,
+      "units": "mass/length2",
+      "source_precision_interval": {
+        "format": "E13.5",
+        "interval": "source-format rounding; half one unit in final printed place"
+      },
+      "source": "src_reference/OUTPUT.FOR:183-224,276-290"
+    },
+    {
+      "file": "solute2.out",
+      "row_identity": {
+        "species": 2,
+        "time_schedule_hour": [
+          0.1
+        ]
+      },
+      "species": 2,
+      "time": "row time field",
+      "node": null,
+      "field": "sumCvNEql",
+      "column": 13,
+      "units": "mass/length2",
+      "source_precision_interval": {
+        "format": "E13.5",
+        "interval": "source-format rounding; half one unit in final printed place"
+      },
+      "source": "src_reference/OUTPUT.FOR:183-224,276-290"
+    },
+    {
+      "file": "solute2.out",
+      "row_identity": {
+        "species": 2,
+        "time_schedule_hour": [
+          0.1
+        ]
+      },
+      "species": 2,
+      "time": "row time field",
+      "node": null,
+      "field": "timeLevel",
+      "column": 14,
+      "units": "integer",
+      "source_precision_interval": {
+        "format": "I8",
+        "interval": "exact integer"
+      },
+      "source": "src_reference/OUTPUT.FOR:183-224,276-290"
+    },
+    {
+      "file": "solute2.out",
+      "row_identity": {
+        "species": 2,
+        "time_schedule_hour": [
+          0.1
+        ]
+      },
+      "species": 2,
+      "time": "row time field",
+      "node": null,
+      "field": "cGWL",
+      "column": 15,
+      "units": "concentration",
+      "source_precision_interval": {
+        "format": "E13.5",
+        "interval": "source-format rounding; half one unit in final printed place"
+      },
+      "source": "src_reference/OUTPUT.FOR:183-224,276-290"
+    },
+    {
+      "file": "solute2.out",
+      "row_identity": {
+        "species": 2,
+        "time_schedule_hour": [
+          0.1
+        ]
+      },
+      "species": 2,
+      "time": "row time field",
+      "node": null,
+      "field": "cRunOff",
+      "column": 16,
+      "units": "mass/length2/hour",
+      "source_precision_interval": {
+        "format": "E13.5",
+        "interval": "source-format rounding; half one unit in final printed place"
+      },
+      "source": "src_reference/OUTPUT.FOR:183-224,276-290"
+    },
+    {
+      "file": "solute2.out",
+      "row_identity": {
+        "species": 2,
+        "time_schedule_hour": [
+          0.1
+        ]
+      },
+      "species": 2,
+      "time": "row time field",
+      "node": null,
+      "field": "sumCRunOff",
+      "column": 17,
+      "units": "mass/length2",
+      "source_precision_interval": {
+        "format": "E13.5",
+        "interval": "source-format rounding; half one unit in final printed place"
+      },
+      "source": "src_reference/OUTPUT.FOR:183-224,276-290"
+    },
+    {
+      "file": "solute3.out",
+      "row_identity": {
+        "species": 3,
+        "time_schedule_hour": [
+          0.1
+        ]
+      },
+      "species": 3,
+      "time": "row time field",
+      "node": null,
+      "field": "time",
+      "column": 1,
+      "units": "hour",
+      "source_precision_interval": {
+        "format": "F14.4",
+        "interval": "0.0001 hour"
+      },
+      "source": "src_reference/OUTPUT.FOR:183-224,276-290"
+    },
+    {
+      "file": "solute3.out",
+      "row_identity": {
+        "species": 3,
+        "time_schedule_hour": [
+          0.1
+        ]
+      },
+      "species": 3,
+      "time": "row time field",
+      "node": null,
+      "field": "cvTop",
+      "column": 2,
+      "units": "mass/length2/hour",
+      "source_precision_interval": {
+        "format": "E13.5",
+        "interval": "source-format rounding; half one unit in final printed place"
+      },
+      "source": "src_reference/OUTPUT.FOR:183-224,276-290"
+    },
+    {
+      "file": "solute3.out",
+      "row_identity": {
+        "species": 3,
+        "time_schedule_hour": [
+          0.1
+        ]
+      },
+      "species": 3,
+      "time": "row time field",
+      "node": null,
+      "field": "cvBot",
+      "column": 3,
+      "units": "mass/length2/hour",
+      "source_precision_interval": {
+        "format": "E13.5",
+        "interval": "source-format rounding; half one unit in final printed place"
+      },
+      "source": "src_reference/OUTPUT.FOR:183-224,276-290"
+    },
+    {
+      "file": "solute3.out",
+      "row_identity": {
+        "species": 3,
+        "time_schedule_hour": [
+          0.1
+        ]
+      },
+      "species": 3,
+      "time": "row time field",
+      "node": null,
+      "field": "sumCvTop",
+      "column": 4,
+      "units": "mass/length2",
+      "source_precision_interval": {
+        "format": "E13.5",
+        "interval": "source-format rounding; half one unit in final printed place"
+      },
+      "source": "src_reference/OUTPUT.FOR:183-224,276-290"
+    },
+    {
+      "file": "solute3.out",
+      "row_identity": {
+        "species": 3,
+        "time_schedule_hour": [
+          0.1
+        ]
+      },
+      "species": 3,
+      "time": "row time field",
+      "node": null,
+      "field": "sumCvBot",
+      "column": 5,
+      "units": "mass/length2",
+      "source_precision_interval": {
+        "format": "E13.5",
+        "interval": "source-format rounding; half one unit in final printed place"
+      },
+      "source": "src_reference/OUTPUT.FOR:183-224,276-290"
+    },
+    {
+      "file": "solute3.out",
+      "row_identity": {
+        "species": 3,
+        "time_schedule_hour": [
+          0.1
+        ]
+      },
+      "species": 3,
+      "time": "row time field",
+      "node": null,
+      "field": "cvCh0",
+      "column": 6,
+      "units": "mass/length2",
+      "source_precision_interval": {
+        "format": "E13.5",
+        "interval": "source-format rounding; half one unit in final printed place"
+      },
+      "source": "src_reference/OUTPUT.FOR:183-224,276-290"
+    },
+    {
+      "file": "solute3.out",
+      "row_identity": {
+        "species": 3,
+        "time_schedule_hour": [
+          0.1
+        ]
+      },
+      "species": 3,
+      "time": "row time field",
+      "node": null,
+      "field": "cvCh1",
+      "column": 7,
+      "units": "mass/length2",
+      "source_precision_interval": {
+        "format": "E13.5",
+        "interval": "source-format rounding; half one unit in final printed place"
+      },
+      "source": "src_reference/OUTPUT.FOR:183-224,276-290"
+    },
+    {
+      "file": "solute3.out",
+      "row_identity": {
+        "species": 3,
+        "time_schedule_hour": [
+          0.1
+        ]
+      },
+      "species": 3,
+      "time": "row time field",
+      "node": 1001,
+      "field": "cTop",
+      "column": 8,
+      "units": "concentration",
+      "source_precision_interval": {
+        "format": "E13.5",
+        "interval": "source-format rounding; half one unit in final printed place"
+      },
+      "source": "src_reference/OUTPUT.FOR:183-224,276-290"
+    },
+    {
+      "file": "solute3.out",
+      "row_identity": {
+        "species": 3,
+        "time_schedule_hour": [
+          0.1
+        ]
+      },
+      "species": 3,
+      "time": "row time field",
+      "node": null,
+      "field": "cRoot",
+      "column": 9,
+      "units": "concentration",
+      "source_precision_interval": {
+        "format": "E13.5",
+        "interval": "source-format rounding; half one unit in final printed place"
+      },
+      "source": "src_reference/OUTPUT.FOR:183-224,276-290"
+    },
+    {
+      "file": "solute3.out",
+      "row_identity": {
+        "species": 3,
+        "time_schedule_hour": [
+          0.1
+        ]
+      },
+      "species": 3,
+      "time": "row time field",
+      "node": 1,
+      "field": "cBot",
+      "column": 10,
+      "units": "concentration",
+      "source_precision_interval": {
+        "format": "E13.5",
+        "interval": "source-format rounding; half one unit in final printed place"
+      },
+      "source": "src_reference/OUTPUT.FOR:183-224,276-290"
+    },
+    {
+      "file": "solute3.out",
+      "row_identity": {
+        "species": 3,
+        "time_schedule_hour": [
+          0.1
+        ]
+      },
+      "species": 3,
+      "time": "row time field",
+      "node": null,
+      "field": "cvRoot",
+      "column": 11,
+      "units": "mass/length2/hour",
+      "source_precision_interval": {
+        "format": "E13.5",
+        "interval": "source-format rounding; half one unit in final printed place"
+      },
+      "source": "src_reference/OUTPUT.FOR:183-224,276-290"
+    },
+    {
+      "file": "solute3.out",
+      "row_identity": {
+        "species": 3,
+        "time_schedule_hour": [
+          0.1
+        ]
+      },
+      "species": 3,
+      "time": "row time field",
+      "node": null,
+      "field": "sumCvRoot",
+      "column": 12,
+      "units": "mass/length2",
+      "source_precision_interval": {
+        "format": "E13.5",
+        "interval": "source-format rounding; half one unit in final printed place"
+      },
+      "source": "src_reference/OUTPUT.FOR:183-224,276-290"
+    },
+    {
+      "file": "solute3.out",
+      "row_identity": {
+        "species": 3,
+        "time_schedule_hour": [
+          0.1
+        ]
+      },
+      "species": 3,
+      "time": "row time field",
+      "node": null,
+      "field": "sumCvNEql",
+      "column": 13,
+      "units": "mass/length2",
+      "source_precision_interval": {
+        "format": "E13.5",
+        "interval": "source-format rounding; half one unit in final printed place"
+      },
+      "source": "src_reference/OUTPUT.FOR:183-224,276-290"
+    },
+    {
+      "file": "solute3.out",
+      "row_identity": {
+        "species": 3,
+        "time_schedule_hour": [
+          0.1
+        ]
+      },
+      "species": 3,
+      "time": "row time field",
+      "node": null,
+      "field": "timeLevel",
+      "column": 14,
+      "units": "integer",
+      "source_precision_interval": {
+        "format": "I8",
+        "interval": "exact integer"
+      },
+      "source": "src_reference/OUTPUT.FOR:183-224,276-290"
+    },
+    {
+      "file": "solute3.out",
+      "row_identity": {
+        "species": 3,
+        "time_schedule_hour": [
+          0.1
+        ]
+      },
+      "species": 3,
+      "time": "row time field",
+      "node": null,
+      "field": "cGWL",
+      "column": 15,
+      "units": "concentration",
+      "source_precision_interval": {
+        "format": "E13.5",
+        "interval": "source-format rounding; half one unit in final printed place"
+      },
+      "source": "src_reference/OUTPUT.FOR:183-224,276-290"
+    },
+    {
+      "file": "solute3.out",
+      "row_identity": {
+        "species": 3,
+        "time_schedule_hour": [
+          0.1
+        ]
+      },
+      "species": 3,
+      "time": "row time field",
+      "node": null,
+      "field": "cRunOff",
+      "column": 16,
+      "units": "mass/length2/hour",
+      "source_precision_interval": {
+        "format": "E13.5",
+        "interval": "source-format rounding; half one unit in final printed place"
+      },
+      "source": "src_reference/OUTPUT.FOR:183-224,276-290"
+    },
+    {
+      "file": "solute3.out",
+      "row_identity": {
+        "species": 3,
+        "time_schedule_hour": [
+          0.1
+        ]
+      },
+      "species": 3,
+      "time": "row time field",
+      "node": null,
+      "field": "sumCRunOff",
+      "column": 17,
+      "units": "mass/length2",
+      "source_precision_interval": {
+        "format": "E13.5",
+        "interval": "source-format rounding; half one unit in final printed place"
+      },
+      "source": "src_reference/OUTPUT.FOR:183-224,276-290"
+    }
+  ],
+  "record_templates": [
+    {
+      "file": "NOD_INF.OUT",
+      "row_identity": {
+        "time_header_then_node_rows": true,
+        "time_schedule_hour": [
+          0.0,
+          0.1
+        ],
+        "node_range_inclusive": [
+          1,
+          1001
+        ],
+        "native_node_order": "printed node index; source input profile is reversed into solver-native arrays"
+      },
+      "source": "src_reference/OUTPUT.FOR:821-823,903-923",
+      "record_format": "I4, F10.4, F11.3, F6.4, 4E12.4, I8, E11.3, F8.2, 30E12.4; active NS=3 non-dual-domain branch",
+      "fields": [
+        {
+          "field": "node",
+          "species": null,
+          "time_schedule_hour": [
+            0.0,
+            0.1
+          ],
+          "node_range_inclusive": [
+            1,
+            1001
+          ],
+          "column": 1,
+          "column_label": "node index",
+          "units": "integer",
+          "source_precision_interval": {
+            "format": "I4",
+            "interval": "exact integer"
+          }
+        },
+        {
+          "field": "depth",
+          "species": null,
+          "time_schedule_hour": [
+            0.0,
+            0.1
+          ],
+          "node_range_inclusive": [
+            1,
+            1001
+          ],
+          "column": 2,
+          "column_label": "native node coordinate",
+          "units": "cm",
+          "source_precision_interval": {
+            "format": "F10.4",
+            "interval": "0.0001 cm"
+          }
+        },
+        {
+          "field": "head",
+          "species": null,
+          "time_schedule_hour": [
+            0.0,
+            0.1
+          ],
+          "node_range_inclusive": [
+            1,
+            1001
+          ],
+          "column": 3,
+          "column_label": "pressure head",
+          "units": "cm",
+          "source_precision_interval": {
+            "format": "F11.3",
+            "interval": "0.001 cm"
+          }
+        },
+        {
+          "field": "waterContent",
+          "species": null,
+          "time_schedule_hour": [
+            0.0,
+            0.1
+          ],
+          "node_range_inclusive": [
+            1,
+            1001
+          ],
+          "column": 4,
+          "column_label": "volumetric water content",
+          "units": "dimensionless",
+          "source_precision_interval": {
+            "format": "F6.4",
+            "interval": "0.0001"
+          }
+        },
+        {
+          "field": "hydraulicConductivity",
+          "species": null,
+          "time_schedule_hour": [
+            0.0,
+            0.1
+          ],
+          "node_range_inclusive": [
+            1,
+            1001
+          ],
+          "column": 5,
+          "column_label": "K",
+          "units": "cm/hour",
+          "source_precision_interval": {
+            "format": "E12.4",
+            "interval": "half one unit in final printed place"
+          }
+        },
+        {
+          "field": "capacity",
+          "species": null,
+          "time_schedule_hour": [
+            0.0,
+            0.1
+          ],
+          "node_range_inclusive": [
+            1,
+            1001
+          ],
+          "column": 6,
+          "column_label": "C",
+          "units": "1/cm",
+          "source_precision_interval": {
+            "format": "E12.4",
+            "interval": "half one unit in final printed place"
+          }
+        },
+        {
+          "field": "waterFlux",
+          "species": null,
+          "time_schedule_hour": [
+            0.0,
+            0.1
+          ],
+          "node_range_inclusive": [
+            1,
+            1001
+          ],
+          "column": 7,
+          "column_label": "Flux",
+          "units": "cm/hour",
+          "source_precision_interval": {
+            "format": "E12.4",
+            "interval": "half one unit in final printed place"
+          }
+        },
+        {
+          "field": "sink",
+          "species": null,
+          "time_schedule_hour": [
+            0.0,
+            0.1
+          ],
+          "node_range_inclusive": [
+            1,
+            1001
+          ],
+          "column": 8,
+          "column_label": "Sink",
+          "units": "1/hour",
+          "source_precision_interval": {
+            "format": "E12.4",
+            "interval": "half one unit in final printed place"
+          }
+        },
+        {
+          "field": "kappa",
+          "species": null,
+          "time_schedule_hour": [
+            0.0,
+            0.1
+          ],
+          "node_range_inclusive": [
+            1,
+            1001
+          ],
+          "column": 9,
+          "column_label": "Kappa",
+          "units": "dimensionless",
+          "source_precision_interval": {
+            "format": "I8",
+            "interval": "exact integer"
+          }
+        },
+        {
+          "field": "relativeFlux",
+          "species": null,
+          "time_schedule_hour": [
+            0.0,
+            0.1
+          ],
+          "node_range_inclusive": [
+            1,
+            1001
+          ],
+          "column": 10,
+          "column_label": "v/KsTop",
+          "units": "dimensionless",
+          "source_precision_interval": {
+            "format": "E11.3",
+            "interval": "half one unit in final printed place"
+          }
+        },
+        {
+          "field": "temperature",
+          "species": null,
+          "time_schedule_hour": [
+            0.0,
+            0.1
+          ],
+          "node_range_inclusive": [
+            1,
+            1001
+          ],
+          "column": 11,
+          "column_label": "Temp",
+          "units": "Celsius",
+          "source_precision_interval": {
+            "format": "F8.2",
+            "interval": "0.01 Celsius"
+          }
+        },
+        {
+          "field": "concentration",
+          "species": 1,
+          "time_schedule_hour": [
+            0.0,
+            0.1
+          ],
+          "node_range_inclusive": [
+            1,
+            1001
+          ],
+          "column": 12,
+          "column_label": "Conc(1)",
+          "units": "legacy concentration (M/L3 label; source display unit label is mmol)",
+          "source_precision_interval": {
+            "format": "E12.4",
+            "interval": "half one unit in final printed place"
+          }
+        },
+        {
+          "field": "sorbedConcentration",
+          "species": 1,
+          "time_schedule_hour": [
+            0.0,
+            0.1
+          ],
+          "node_range_inclusive": [
+            1,
+            1001
+          ],
+          "column": 15,
+          "column_label": "Sorb(1)",
+          "units": "legacy concentration (M/L3 label; source display unit label is mmol)",
+          "source_precision_interval": {
+            "format": "E12.4",
+            "interval": "half one unit in final printed place"
+          }
+        },
+        {
+          "field": "concentration",
+          "species": 2,
+          "time_schedule_hour": [
+            0.0,
+            0.1
+          ],
+          "node_range_inclusive": [
+            1,
+            1001
+          ],
+          "column": 13,
+          "column_label": "Conc(2)",
+          "units": "legacy concentration (M/L3 label; source display unit label is mmol)",
+          "source_precision_interval": {
+            "format": "E12.4",
+            "interval": "half one unit in final printed place"
+          }
+        },
+        {
+          "field": "sorbedConcentration",
+          "species": 2,
+          "time_schedule_hour": [
+            0.0,
+            0.1
+          ],
+          "node_range_inclusive": [
+            1,
+            1001
+          ],
+          "column": 16,
+          "column_label": "Sorb(2)",
+          "units": "legacy concentration (M/L3 label; source display unit label is mmol)",
+          "source_precision_interval": {
+            "format": "E12.4",
+            "interval": "half one unit in final printed place"
+          }
+        },
+        {
+          "field": "concentration",
+          "species": 3,
+          "time_schedule_hour": [
+            0.0,
+            0.1
+          ],
+          "node_range_inclusive": [
+            1,
+            1001
+          ],
+          "column": 14,
+          "column_label": "Conc(3)",
+          "units": "legacy concentration (M/L3 label; source display unit label is mmol)",
+          "source_precision_interval": {
+            "format": "E12.4",
+            "interval": "half one unit in final printed place"
+          }
+        },
+        {
+          "field": "sorbedConcentration",
+          "species": 3,
+          "time_schedule_hour": [
+            0.0,
+            0.1
+          ],
+          "node_range_inclusive": [
+            1,
+            1001
+          ],
+          "column": 17,
+          "column_label": "Sorb(3)",
+          "units": "legacy concentration (M/L3 label; source display unit label is mmol)",
+          "source_precision_interval": {
+            "format": "E12.4",
+            "interval": "half one unit in final printed place"
+          }
+        }
+      ]
+    }
+  ]
+}
