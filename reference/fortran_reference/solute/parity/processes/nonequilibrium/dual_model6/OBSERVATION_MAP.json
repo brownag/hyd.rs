@@ -1,0 +1,679 @@
+{
+  "observations": [
+    {
+      "field": "head",
+      "field_identity": "head",
+      "location_identity": {
+        "node": "each printed node/index",
+        "species_name": null,
+        "species_position": null,
+        "time_hour": "each printed time"
+      },
+      "native_to_canonical": {
+        "node": "printed node/index; native coordinate cm",
+        "time": "PROFILE.OUT Time header hours"
+      },
+      "pool": "hydraulic_or_thermal",
+      "precision_interval": "source format 120/130 in OUTPUT.FOR; typically f12.5, 5e14.6, 3f11.3, i8; confirm actual selected format from raw output.",
+      "raw_file": "PROFILE.OUT",
+      "row_selector": {
+        "kind": "profile_node",
+        "native_coordinate": "PROFILE.OUT native coordinate",
+        "node": "each printed node/index",
+        "time_header": "PROFILE.OUT Time header"
+      },
+      "source_column": 3,
+      "source_format": "source format 120/130 in OUTPUT.FOR; typically f12.5, 5e14.6, 3f11.3, i8; confirm actual selected format from raw output.",
+      "species_name": null,
+      "species_position": null,
+      "units": "cm"
+    },
+    {
+      "field": "water_content",
+      "field_identity": "water_content",
+      "location_identity": {
+        "node": "each printed node/index",
+        "species_name": null,
+        "species_position": null,
+        "time_hour": "each printed time"
+      },
+      "native_to_canonical": {
+        "node": "printed node/index; native coordinate cm",
+        "time": "PROFILE.OUT Time header hours"
+      },
+      "pool": "hydraulic_or_thermal",
+      "precision_interval": "source format 120/130 in OUTPUT.FOR; typically f12.5, 5e14.6, 3f11.3, i8; confirm actual selected format from raw output.",
+      "raw_file": "PROFILE.OUT",
+      "row_selector": {
+        "kind": "profile_node",
+        "native_coordinate": "PROFILE.OUT native coordinate",
+        "node": "each printed node/index",
+        "time_header": "PROFILE.OUT Time header"
+      },
+      "source_column": 4,
+      "source_format": "source format 120/130 in OUTPUT.FOR; typically f12.5, 5e14.6, 3f11.3, i8; confirm actual selected format from raw output.",
+      "species_name": null,
+      "species_position": null,
+      "units": "1"
+    },
+    {
+      "field": "temperature",
+      "field_identity": "temperature",
+      "location_identity": {
+        "node": "each printed node/index",
+        "species_name": null,
+        "species_position": null,
+        "time_hour": "each printed time"
+      },
+      "native_to_canonical": {
+        "node": "printed node/index; native coordinate cm",
+        "time": "PROFILE.OUT Time header hours"
+      },
+      "pool": "hydraulic_or_thermal",
+      "precision_interval": "source format 120/130 in OUTPUT.FOR; typically f12.5, 5e14.6, 3f11.3, i8; confirm actual selected format from raw output.",
+      "raw_file": "PROFILE.OUT",
+      "row_selector": {
+        "kind": "profile_node",
+        "native_coordinate": "PROFILE.OUT native coordinate",
+        "node": "each printed node/index",
+        "time_header": "PROFILE.OUT Time header"
+      },
+      "source_column": 11,
+      "source_format": "source format 120/130 in OUTPUT.FOR; typically f12.5, 5e14.6, 3f11.3, i8; confirm actual selected format from raw output.",
+      "species_name": null,
+      "species_position": null,
+      "units": "degC"
+    },
+    {
+      "field": "Conc",
+      "field_identity": "Conc",
+      "location_identity": {
+        "node": "each printed node/index",
+        "species_name": "S1",
+        "species_position": 1,
+        "time_hour": "each printed time"
+      },
+      "native_to_canonical": {
+        "node": "printed node/index; native coordinate cm",
+        "time": "PROFILE.OUT Time header hours"
+      },
+      "pool": "dissolved",
+      "precision_interval": "source format 120/130 in OUTPUT.FOR; typically f12.5, 5e14.6, 3f11.3, i8; confirm actual selected format from raw output.",
+      "raw_file": "PROFILE.OUT",
+      "row_selector": {
+        "kind": "profile_node",
+        "native_coordinate": "PROFILE.OUT native coordinate",
+        "node": "each printed node/index",
+        "time_header": "PROFILE.OUT Time header"
+      },
+      "source_column": 12,
+      "source_format": "source format 120/130 in OUTPUT.FOR; typically f12.5, 5e14.6, 3f11.3, i8; confirm actual selected format from raw output.",
+      "species_name": "S1",
+      "species_position": 1,
+      "units": "C_ref"
+    },
+    {
+      "field": "Sorb",
+      "field_identity": "Sorb",
+      "location_identity": {
+        "node": "each printed node/index",
+        "species_name": "S1",
+        "species_position": 1,
+        "time_hour": "each printed time"
+      },
+      "native_to_canonical": {
+        "node": "printed node/index; native coordinate cm",
+        "time": "PROFILE.OUT Time header hours"
+      },
+      "pool": "source Sorb (not inferred from equilibrium Kd*C)",
+      "precision_interval": "source format 120/130 in OUTPUT.FOR; typically f12.5, 5e14.6, 3f11.3, i8; confirm actual selected format from raw output.",
+      "raw_file": "PROFILE.OUT",
+      "row_selector": {
+        "kind": "profile_node",
+        "native_coordinate": "PROFILE.OUT native coordinate",
+        "node": "each printed node/index",
+        "time_header": "PROFILE.OUT Time header"
+      },
+      "source_column": 13,
+      "source_format": "source format 120/130 in OUTPUT.FOR; typically f12.5, 5e14.6, 3f11.3, i8; confirm actual selected format from raw output.",
+      "species_name": "S1",
+      "species_position": 1,
+      "units": "source-defined sorbed concentration"
+    },
+    {
+      "availability": "unavailable",
+      "field": "Sorb2",
+      "field_identity": "Sorb2",
+      "location_identity": {
+        "node": "each printed node/index",
+        "species_name": "S1",
+        "species_position": 1,
+        "time_hour": "each printed time"
+      },
+      "native_to_canonical": {
+        "node": "printed node/index; coordinate remains native cm",
+        "time": "printed time hours"
+      },
+      "pool": "Sorb2",
+      "precision_interval": null,
+      "raw_file": "PROFILE.OUT",
+      "row_selector": {
+        "kind": "profile_node",
+        "native_coordinate": "PROFILE.OUT native coordinate",
+        "node": "each printed node/index",
+        "time_header": "PROFILE.OUT Time header"
+      },
+      "source_column": null,
+      "source_format": null,
+      "species_name": "S1",
+      "species_position": 1,
+      "unavailability_reason": "not active/printed for these fixtures; dual-nonequilibrium path excluded",
+      "units": "source Sorb2 units"
+    },
+    {
+      "field": "top_flux",
+      "field_identity": "top_flux",
+      "location_identity": {
+        "species_name": "S1",
+        "species_position": 1,
+        "time_hour": "each record time"
+      },
+      "native_to_canonical": {
+        "species": "file/species position/name",
+        "time": "record time hours"
+      },
+      "pool": "not_applicable",
+      "precision_interval": "OUTPUT.FOR format 190 (f14.4, 12e13.5, i8, e13.5, 8e13.5) or format 191 for large time; identity stays species/time-specific.",
+      "raw_file": "solute1.out",
+      "row_selector": {
+        "kind": "solute_record",
+        "time_hour": "record time column 1"
+      },
+      "source_column": 2,
+      "source_format": "OUTPUT.FOR format 190 (f14.4, 12e13.5, i8, e13.5, 8e13.5) or format 191 for large time; identity stays species/time-specific.",
+      "species_name": "S1",
+      "species_position": 1,
+      "units": "C_ref cm/hour"
+    },
+    {
+      "field": "bottom_flux",
+      "field_identity": "bottom_flux",
+      "location_identity": {
+        "species_name": "S1",
+        "species_position": 1,
+        "time_hour": "each record time"
+      },
+      "native_to_canonical": {
+        "species": "file/species position/name",
+        "time": "record time hours"
+      },
+      "pool": "not_applicable",
+      "precision_interval": "OUTPUT.FOR format 190 (f14.4, 12e13.5, i8, e13.5, 8e13.5) or format 191 for large time; identity stays species/time-specific.",
+      "raw_file": "solute1.out",
+      "row_selector": {
+        "kind": "solute_record",
+        "time_hour": "record time column 1"
+      },
+      "source_column": 3,
+      "source_format": "OUTPUT.FOR format 190 (f14.4, 12e13.5, i8, e13.5, 8e13.5) or format 191 for large time; identity stays species/time-specific.",
+      "species_name": "S1",
+      "species_position": 1,
+      "units": "C_ref cm/hour"
+    },
+    {
+      "field": "cumulative_top",
+      "field_identity": "cumulative_top",
+      "location_identity": {
+        "species_name": "S1",
+        "species_position": 1,
+        "time_hour": "each record time"
+      },
+      "native_to_canonical": {
+        "species": "file/species position/name",
+        "time": "record time hours"
+      },
+      "pool": "not_applicable",
+      "precision_interval": "OUTPUT.FOR format 190 (f14.4, 12e13.5, i8, e13.5, 8e13.5) or format 191 for large time; identity stays species/time-specific.",
+      "raw_file": "solute1.out",
+      "row_selector": {
+        "kind": "solute_record",
+        "time_hour": "record time column 1"
+      },
+      "source_column": 4,
+      "source_format": "OUTPUT.FOR format 190 (f14.4, 12e13.5, i8, e13.5, 8e13.5) or format 191 for large time; identity stays species/time-specific.",
+      "species_name": "S1",
+      "species_position": 1,
+      "units": "source cumulative solute amount"
+    },
+    {
+      "field": "cumulative_bottom",
+      "field_identity": "cumulative_bottom",
+      "location_identity": {
+        "species_name": "S1",
+        "species_position": 1,
+        "time_hour": "each record time"
+      },
+      "native_to_canonical": {
+        "species": "file/species position/name",
+        "time": "record time hours"
+      },
+      "pool": "not_applicable",
+      "precision_interval": "OUTPUT.FOR format 190 (f14.4, 12e13.5, i8, e13.5, 8e13.5) or format 191 for large time; identity stays species/time-specific.",
+      "raw_file": "solute1.out",
+      "row_selector": {
+        "kind": "solute_record",
+        "time_hour": "record time column 1"
+      },
+      "source_column": 5,
+      "source_format": "OUTPUT.FOR format 190 (f14.4, 12e13.5, i8, e13.5, 8e13.5) or format 191 for large time; identity stays species/time-specific.",
+      "species_name": "S1",
+      "species_position": 1,
+      "units": "source cumulative solute amount"
+    },
+    {
+      "field": "cumulative_reaction",
+      "field_identity": "cumulative_reaction",
+      "location_identity": {
+        "species_name": "S1",
+        "species_position": 1,
+        "time_hour": "each record time"
+      },
+      "native_to_canonical": {
+        "species": "file/species position/name",
+        "time": "record time hours"
+      },
+      "pool": "not_applicable",
+      "precision_interval": "OUTPUT.FOR format 190 (f14.4, 12e13.5, i8, e13.5, 8e13.5) or format 191 for large time; identity stays species/time-specific.",
+      "raw_file": "solute1.out",
+      "row_selector": {
+        "kind": "solute_record",
+        "time_hour": "record time column 1"
+      },
+      "source_column": 6,
+      "source_format": "OUTPUT.FOR format 190 (f14.4, 12e13.5, i8, e13.5, 8e13.5) or format 191 for large time; identity stays species/time-specific.",
+      "species_name": "S1",
+      "species_position": 1,
+      "units": "source cumulative solute amount"
+    },
+    {
+      "field": "cumulative_transfer",
+      "field_identity": "cumulative_transfer",
+      "location_identity": {
+        "species_name": "S1",
+        "species_position": 1,
+        "time_hour": "each record time"
+      },
+      "native_to_canonical": {
+        "species": "file/species position/name",
+        "time": "record time hours"
+      },
+      "pool": "not_applicable",
+      "precision_interval": "OUTPUT.FOR format 190 (f14.4, 12e13.5, i8, e13.5, 8e13.5) or format 191 for large time; identity stays species/time-specific.",
+      "raw_file": "solute1.out",
+      "row_selector": {
+        "kind": "solute_record",
+        "time_hour": "record time column 1"
+      },
+      "source_column": 7,
+      "source_format": "OUTPUT.FOR format 190 (f14.4, 12e13.5, i8, e13.5, 8e13.5) or format 191 for large time; identity stays species/time-specific.",
+      "species_name": "S1",
+      "species_position": 1,
+      "units": "source cumulative solute amount"
+    },
+    {
+      "field": "endpoint_concentration_N",
+      "field_identity": "endpoint_concentration_N",
+      "location_identity": {
+        "species_name": "S1",
+        "species_position": 1,
+        "time_hour": "each record time"
+      },
+      "native_to_canonical": {
+        "species": "file/species position/name",
+        "time": "record time hours"
+      },
+      "pool": "not_applicable",
+      "precision_interval": "OUTPUT.FOR format 190 (f14.4, 12e13.5, i8, e13.5, 8e13.5) or format 191 for large time; identity stays species/time-specific.",
+      "raw_file": "solute1.out",
+      "row_selector": {
+        "kind": "solute_record",
+        "time_hour": "record time column 1"
+      },
+      "source_column": 8,
+      "source_format": "OUTPUT.FOR format 190 (f14.4, 12e13.5, i8, e13.5, 8e13.5) or format 191 for large time; identity stays species/time-specific.",
+      "species_name": "S1",
+      "species_position": 1,
+      "units": "C_ref"
+    },
+    {
+      "field": "root_concentration",
+      "field_identity": "root_concentration",
+      "location_identity": {
+        "species_name": "S1",
+        "species_position": 1,
+        "time_hour": "each record time"
+      },
+      "native_to_canonical": {
+        "species": "file/species position/name",
+        "time": "record time hours"
+      },
+      "pool": "not_applicable",
+      "precision_interval": "OUTPUT.FOR format 190 (f14.4, 12e13.5, i8, e13.5, 8e13.5) or format 191 for large time; identity stays species/time-specific.",
+      "raw_file": "solute1.out",
+      "row_selector": {
+        "kind": "solute_record",
+        "time_hour": "record time column 1"
+      },
+      "source_column": 9,
+      "source_format": "OUTPUT.FOR format 190 (f14.4, 12e13.5, i8, e13.5, 8e13.5) or format 191 for large time; identity stays species/time-specific.",
+      "species_name": "S1",
+      "species_position": 1,
+      "units": "C_ref"
+    },
+    {
+      "field": "endpoint_concentration_1",
+      "field_identity": "endpoint_concentration_1",
+      "location_identity": {
+        "species_name": "S1",
+        "species_position": 1,
+        "time_hour": "each record time"
+      },
+      "native_to_canonical": {
+        "species": "file/species position/name",
+        "time": "record time hours"
+      },
+      "pool": "not_applicable",
+      "precision_interval": "OUTPUT.FOR format 190 (f14.4, 12e13.5, i8, e13.5, 8e13.5) or format 191 for large time; identity stays species/time-specific.",
+      "raw_file": "solute1.out",
+      "row_selector": {
+        "kind": "solute_record",
+        "time_hour": "record time column 1"
+      },
+      "source_column": 10,
+      "source_format": "OUTPUT.FOR format 190 (f14.4, 12e13.5, i8, e13.5, 8e13.5) or format 191 for large time; identity stays species/time-specific.",
+      "species_name": "S1",
+      "species_position": 1,
+      "units": "C_ref"
+    },
+    {
+      "field": "root_flux",
+      "field_identity": "root_flux",
+      "location_identity": {
+        "species_name": "S1",
+        "species_position": 1,
+        "time_hour": "each record time"
+      },
+      "native_to_canonical": {
+        "species": "file/species position/name",
+        "time": "record time hours"
+      },
+      "pool": "not_applicable",
+      "precision_interval": "OUTPUT.FOR format 190 (f14.4, 12e13.5, i8, e13.5, 8e13.5) or format 191 for large time; identity stays species/time-specific.",
+      "raw_file": "solute1.out",
+      "row_selector": {
+        "kind": "solute_record",
+        "time_hour": "record time column 1"
+      },
+      "source_column": 11,
+      "source_format": "OUTPUT.FOR format 190 (f14.4, 12e13.5, i8, e13.5, 8e13.5) or format 191 for large time; identity stays species/time-specific.",
+      "species_name": "S1",
+      "species_position": 1,
+      "units": "C_ref cm/hour"
+    },
+    {
+      "field": "cumulative_process_5",
+      "field_identity": "cumulative_process_5",
+      "location_identity": {
+        "species_name": "S1",
+        "species_position": 1,
+        "time_hour": "each record time"
+      },
+      "native_to_canonical": {
+        "species": "file/species position/name",
+        "time": "record time hours"
+      },
+      "pool": "not_applicable",
+      "precision_interval": "OUTPUT.FOR format 190 (f14.4, 12e13.5, i8, e13.5, 8e13.5) or format 191 for large time; identity stays species/time-specific.",
+      "raw_file": "solute1.out",
+      "row_selector": {
+        "kind": "solute_record",
+        "time_hour": "record time column 1"
+      },
+      "source_column": 12,
+      "source_format": "OUTPUT.FOR format 190 (f14.4, 12e13.5, i8, e13.5, 8e13.5) or format 191 for large time; identity stays species/time-specific.",
+      "species_name": "S1",
+      "species_position": 1,
+      "units": "source cumulative solute amount"
+    },
+    {
+      "field": "cumulative_process_6",
+      "field_identity": "cumulative_process_6",
+      "location_identity": {
+        "species_name": "S1",
+        "species_position": 1,
+        "time_hour": "each record time"
+      },
+      "native_to_canonical": {
+        "species": "file/species position/name",
+        "time": "record time hours"
+      },
+      "pool": "not_applicable",
+      "precision_interval": "OUTPUT.FOR format 190 (f14.4, 12e13.5, i8, e13.5, 8e13.5) or format 191 for large time; identity stays species/time-specific.",
+      "raw_file": "solute1.out",
+      "row_selector": {
+        "kind": "solute_record",
+        "time_hour": "record time column 1"
+      },
+      "source_column": 13,
+      "source_format": "OUTPUT.FOR format 190 (f14.4, 12e13.5, i8, e13.5, 8e13.5) or format 191 for large time; identity stays species/time-specific.",
+      "species_name": "S1",
+      "species_position": 1,
+      "units": "source cumulative solute amount"
+    },
+    {
+      "field": "time_level",
+      "field_identity": "time_level",
+      "location_identity": {
+        "species_name": "S1",
+        "species_position": 1,
+        "time_hour": "each record time"
+      },
+      "native_to_canonical": {
+        "species": "file/species position/name",
+        "time": "record time hours"
+      },
+      "pool": "not_applicable",
+      "precision_interval": "OUTPUT.FOR format 190 (f14.4, 12e13.5, i8, e13.5, 8e13.5) or format 191 for large time; identity stays species/time-specific.",
+      "raw_file": "solute1.out",
+      "row_selector": {
+        "kind": "solute_record",
+        "time_hour": "record time column 1"
+      },
+      "source_column": 14,
+      "source_format": "OUTPUT.FOR format 190 (f14.4, 12e13.5, i8, e13.5, 8e13.5) or format 191 for large time; identity stays species/time-specific.",
+      "species_name": "S1",
+      "species_position": 1,
+      "units": "integer"
+    },
+    {
+      "field": "groundwater_concentration",
+      "field_identity": "groundwater_concentration",
+      "location_identity": {
+        "species_name": "S1",
+        "species_position": 1,
+        "time_hour": "each record time"
+      },
+      "native_to_canonical": {
+        "species": "file/species position/name",
+        "time": "record time hours"
+      },
+      "pool": "not_applicable",
+      "precision_interval": "OUTPUT.FOR format 190 (f14.4, 12e13.5, i8, e13.5, 8e13.5) or format 191 for large time; identity stays species/time-specific.",
+      "raw_file": "solute1.out",
+      "row_selector": {
+        "kind": "solute_record",
+        "time_hour": "record time column 1"
+      },
+      "source_column": 15,
+      "source_format": "OUTPUT.FOR format 190 (f14.4, 12e13.5, i8, e13.5, 8e13.5) or format 191 for large time; identity stays species/time-specific.",
+      "species_name": "S1",
+      "species_position": 1,
+      "units": "C_ref"
+    },
+    {
+      "field": "runoff_concentration",
+      "field_identity": "runoff_concentration",
+      "location_identity": {
+        "species_name": "S1",
+        "species_position": 1,
+        "time_hour": "each record time"
+      },
+      "native_to_canonical": {
+        "species": "file/species position/name",
+        "time": "record time hours"
+      },
+      "pool": "not_applicable",
+      "precision_interval": "OUTPUT.FOR format 190 (f14.4, 12e13.5, i8, e13.5, 8e13.5) or format 191 for large time; identity stays species/time-specific.",
+      "raw_file": "solute1.out",
+      "row_selector": {
+        "kind": "solute_record",
+        "time_hour": "record time column 1"
+      },
+      "source_column": 16,
+      "source_format": "OUTPUT.FOR format 190 (f14.4, 12e13.5, i8, e13.5, 8e13.5) or format 191 for large time; identity stays species/time-specific.",
+      "species_name": "S1",
+      "species_position": 1,
+      "units": "C_ref"
+    },
+    {
+      "field": "cumulative_process_10",
+      "field_identity": "cumulative_process_10",
+      "location_identity": {
+        "species_name": "S1",
+        "species_position": 1,
+        "time_hour": "each record time"
+      },
+      "native_to_canonical": {
+        "species": "file/species position/name",
+        "time": "record time hours"
+      },
+      "pool": "not_applicable",
+      "precision_interval": "OUTPUT.FOR format 190 (f14.4, 12e13.5, i8, e13.5, 8e13.5) or format 191 for large time; identity stays species/time-specific.",
+      "raw_file": "solute1.out",
+      "row_selector": {
+        "kind": "solute_record",
+        "time_hour": "record time column 1"
+      },
+      "source_column": 17,
+      "source_format": "OUTPUT.FOR format 190 (f14.4, 12e13.5, i8, e13.5, 8e13.5) or format 191 for large time; identity stays species/time-specific.",
+      "species_name": "S1",
+      "species_position": 1,
+      "units": "source cumulative solute amount"
+    },
+    {
+      "field": "dual_immobile_water_volume",
+      "field_identity": "VolumeIm",
+      "location_identity": {
+        "node": "whole-profile",
+        "species_name": null,
+        "species_position": null,
+        "time_hour": "each printed time"
+      },
+      "native_to_canonical": {
+        "node": "whole-profile integrated volume",
+        "time": "BALANCE.OUT Time [T] record immediately preceding summary block"
+      },
+      "pool": "dual_water_storage",
+      "precision_interval": "OUTPUT.FOR format 151 (e13.5); half one unit in the last printed decimal place",
+      "raw_file": "BALANCE.OUT",
+      "row_selector": {
+        "kind": "labeled_record",
+        "label": "W-volumeI[L]",
+        "node": "whole-profile",
+        "time_header": "BALANCE.OUT Time [T] record"
+      },
+      "source_column": 2,
+      "source_format": "OUTPUT.FOR format 151: e13.5; emitted only when iDualPor>0",
+      "units": "cm"
+    },
+    {
+      "availability": "unavailable",
+      "field": "ThOldIm",
+      "field_identity": "ThOldIm",
+      "location_identity": {
+        "node": "not observed",
+        "species_name": null,
+        "species_position": null,
+        "time_hour": "not observed"
+      },
+      "reason": "internal node history is not printed; only integrated initialized storage is exposed through VolumeIm",
+      "units": "cm3/cm3"
+    },
+    {
+      "availability": "unavailable",
+      "field": "ThNewIm",
+      "field_identity": "ThNewIm",
+      "location_identity": {
+        "node": "not observed",
+        "species_name": null,
+        "species_position": null,
+        "time_hour": "not observed"
+      },
+      "reason": "internal node history is not printed; only integrated initialized storage is exposed through VolumeIm",
+      "units": "cm3/cm3"
+    },
+    {
+      "availability": "unavailable",
+      "field": "SinkIm",
+      "field_identity": "SinkIm",
+      "location_identity": {
+        "node": "not observed",
+        "species_name": null,
+        "species_position": null,
+        "time_hour": "not observed"
+      },
+      "reason": "internal field is not printed; InitDualPor initializes it to zero and WATFLOW.FOR:42-46 comments out dynamic DualPor exchange",
+      "units": "cm3/cm3/hour"
+    },
+    {
+      "availability": "unavailable",
+      "field": "NEquil update",
+      "field_identity": "NEquil update",
+      "location_identity": {
+        "node": "not observed",
+        "species_name": null,
+        "species_position": null,
+        "time_hour": "not observed"
+      },
+      "reason": "call is commented on the active path; helper state is not executed or printed",
+      "units": "source process state"
+    },
+    {
+      "availability": "unavailable",
+      "field": "SorbConc update",
+      "field_identity": "SorbConc update",
+      "location_identity": {
+        "node": "not observed",
+        "species_name": null,
+        "species_position": null,
+        "time_hour": "not observed"
+      },
+      "reason": "call is commented on the active path; helper state is not executed or printed",
+      "units": "source process state"
+    },
+    {
+      "availability": "unavailable",
+      "field": "NonEqInit update",
+      "field_identity": "NonEqInit update",
+      "location_identity": {
+        "node": "not observed",
+        "species_name": null,
+        "species_position": null,
+        "time_hour": "not observed"
+      },
+      "reason": "call is commented on the active path; helper state is not executed or printed",
+      "units": "source process state"
+    }
+  ],
+  "schema_version": "solute-observation-map-v1"
+}
