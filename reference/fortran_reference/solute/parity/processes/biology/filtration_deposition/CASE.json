@@ -1,0 +1,180 @@
+{
+  "branch_coverage": {
+    "lBact": true,
+    "lFiltr": true,
+    "blocking_iPsi": null,
+    "Deposit": true,
+    "Exclusion": "inactive; HYDRUS.FOR:391 call is commented",
+    "species_count": 1
+  },
+  "case_id": "filtration_deposition",
+  "fixture_id": "filtration_deposition",
+  "input_files": {
+    "LEVEL_01.DIR": "eb4bd64f7014f7d42e9d358035802242741b974e8dfcd37c59f9c21ce29d781e",
+    "SELECTOR.IN": "1fcfdc75666f2454c3e4fe6c251f0ec75c3b7ab68179f90421b75a9405517e6f",
+    "PROFILE.DAT": "4f75ac5620699c5c99424ef07127877d0634f5128887bd69b28448e46bd9e6f8"
+  },
+  "provenance": "Inputs independently derived for this fixture from the documented source input layout and the pinned HYDRUS reference source; no Rust output or expected Rust values used.",
+  "purpose": "active lBact+lFiltr Deposit/filtration discriminator",
+  "request": {
+    "fields": {
+      "equilibrium_mode": {
+        "units": "boolean",
+        "value": true
+      },
+      "fraction_equilibrium": {
+        "units": "1",
+        "value": 1.0
+      },
+      "immobile_water_content": {
+        "units": "cm3/cm3",
+        "value": 0.0
+      },
+      "initial_dissolved_concentration": {
+        "units": "C_ref",
+        "value": [
+          1.0
+        ]
+      },
+      "initial_equilibrium_sorbed_pool": {
+        "availability": "derived as equilibrium state / no explicit input column",
+        "reason": "initial dissolved profile and active linear equilibrium coefficients specify the source equilibrium state",
+        "units": "source Sorb units"
+      },
+      "linearity_mode": {
+        "units": "boolean",
+        "value": true
+      },
+      "observation_times": {
+        "units": "hour",
+        "value": [
+          1.0,
+          2.0,
+          4.0
+        ]
+      },
+      "ordered_species": {
+        "units": "ordered species records",
+        "value": [
+          {
+            "chain_rate_per_hour": 0.2,
+            "initial_concentration_C_ref": 1.0,
+            "linear_equilibrium_kd_cm3_per_g": 0.5375,
+            "name": "S1",
+            "position": 1
+          }
+        ]
+      },
+      "reaction_pattern": {
+        "units": "source branch identity",
+        "value": "single-species-nonzero-terminal-loss"
+      },
+      "secondary_sorbed_pool": {
+        "availability": "inactive",
+        "reason": "Sorb2 process is excluded; dual-nonequilibrium selector is false",
+        "units": "source Sorb2 units"
+      },
+      "biology_mode": {
+        "units": "ChemIn source flags",
+        "value": {
+          "iBact": 1,
+          "lFiltr": true
+        }
+      },
+      "biology_parameters": {
+        "units": "source ChPar slots; selector file units",
+        "value": {
+          "blocking_iPsi": null,
+          "grain_diameter": 0.05,
+          "particle_diameter": 0.00095,
+          "attachment_capacity_1": 0.2,
+          "attachment_rate_1": 0.1
+        },
+        "provenance": "independently authored source branch probe; no solver outputs used"
+      }
+    },
+    "schema_version": "solute-request-v1"
+  },
+  "request_sha256": "d7cba4fb75e0181d1c5e2b52fb883bddaf8613db9b47d9bd71ee767352f110d0",
+  "runner": {
+    "aliases": {
+      "PROFILE.DAT": "Profile.dat",
+      "SELECTOR.IN": "Selector.in"
+    },
+    "data_prefix": "filtration_deposition",
+    "inputs": [
+      "LEVEL_01.DIR",
+      "SELECTOR.IN",
+      "PROFILE.DAT"
+    ],
+    "outputs": [
+      {
+        "marker": "end",
+        "name": "I_CHECK.OUT"
+      },
+      {
+        "marker": "end",
+        "name": "RUN_INF.OUT"
+      },
+      {
+        "marker": "end",
+        "name": "T_LEVEL.OUT"
+      },
+      {
+        "marker": "end",
+        "name": "NOD_INF.OUT"
+      },
+      {
+        "marker": "Calculation time",
+        "name": "BALANCE.OUT"
+      },
+      {
+        "marker": "end",
+        "name": "OBS_NODE.OUT"
+      },
+      {
+        "marker": "end",
+        "name": "PROFILE.OUT"
+      },
+      {
+        "marker": "end",
+        "name": "solute1.out"
+      }
+    ]
+  },
+  "schema_version": "solute-parity-fixture-v1",
+  "setup": {
+    "bulk_density_g_per_cm3": 0.8,
+    "equilibrium_fraction": 1,
+    "gravity_cosine": 0,
+    "immobile_water_content": 0,
+    "initial_pressure_head_cm": 0,
+    "initial_profile": "uniform; only species 1 is nonzero",
+    "initial_water_content": 0.43,
+    "native_coordinate_start_cm": 0,
+    "node_count": 9,
+    "observation_times_hour": [
+      1,
+      2,
+      4
+    ],
+    "spacing_cm": 0.25
+  },
+  "species": [
+    {
+      "chain_rate_per_hour": 0.2,
+      "initial_concentration_C_ref": 1.0,
+      "linear_equilibrium_kd_cm3_per_g": 0.5375,
+      "name": "S1",
+      "position": 1
+    }
+  ],
+  "status": "independently authored executable source-reference fixture; not a recovered manual deck",
+  "units": {
+    "concentration": "C_ref",
+    "flux": "C_ref cm/hour",
+    "length": "cm",
+    "sorbed": "C_ref cm3/g",
+    "time": "hour"
+  }
+}
