@@ -1,0 +1,205 @@
+{
+  "branch_coverage": {
+    "equilibrium_sorption": true,
+    "excluded": [
+      "kinetic/two-site sorption",
+      "mobile-immobile",
+      "dual-domain",
+      "Sorb2 process"
+    ],
+    "lLinear_false": "inactive: active ChemIn initializes lLinear true; the only false assignment is commented out at INPUT.FOR 1368-1369; no selector input exists for it",
+    "linear_sorption": true,
+    "reaction_rate_pattern": "distinct-parent-and-terminal",
+    "species_count": 3
+  },
+  "case_id": "chain_distinct_rates",
+  "fixture_id": "chain_distinct_rates",
+  "input_files": {
+    "LEVEL_01.DIR": "eb4bd64f7014f7d42e9d358035802242741b974e8dfcd37c59f9c21ce29d781e",
+    "PROFILE.DAT": "97a7b143f576cfad9b76aab5c6e33ae896b87bd9e261883b1b0299252fe02105",
+    "SELECTOR.IN": "ad23a9674d2a936e06bc8888acf1122e17d6e2589768a04d98b3add7faacb069"
+  },
+  "provenance": "Inputs independently derived for this fixture from the documented source input layout and the pinned HYDRUS reference source; no Rust output or expected Rust values used.",
+  "purpose": "distinct rates including a nonzero terminal loss; mixed linear equilibrium sorption",
+  "request": {
+    "fields": {
+      "equilibrium_mode": {
+        "units": "boolean",
+        "value": true
+      },
+      "fraction_equilibrium": {
+        "units": "1",
+        "value": 1.0
+      },
+      "immobile_water_content": {
+        "units": "cm3/cm3",
+        "value": 0.0
+      },
+      "initial_dissolved_concentration": {
+        "units": "C_ref",
+        "value": [
+          1.0,
+          0.0,
+          0.0
+        ]
+      },
+      "initial_equilibrium_sorbed_pool": {
+        "availability": "derived as equilibrium state / no explicit input column",
+        "reason": "initial dissolved profile and active linear equilibrium coefficients specify the source equilibrium state",
+        "units": "source Sorb units"
+      },
+      "linearity_mode": {
+        "units": "boolean",
+        "value": true
+      },
+      "observation_times": {
+        "units": "hour",
+        "value": [
+          1.0,
+          2.0,
+          4.0
+        ]
+      },
+      "ordered_species": {
+        "units": "ordered species records",
+        "value": [
+          {
+            "chain_rate_per_hour": 0.2,
+            "initial_concentration_C_ref": 1.0,
+            "linear_equilibrium_kd_cm3_per_g": 0.5375,
+            "name": "S1",
+            "position": 1
+          },
+          {
+            "chain_rate_per_hour": 0.4,
+            "initial_concentration_C_ref": 0.0,
+            "linear_equilibrium_kd_cm3_per_g": 0.0,
+            "name": "S2",
+            "position": 2
+          },
+          {
+            "chain_rate_per_hour": 0.1,
+            "initial_concentration_C_ref": 0.0,
+            "linear_equilibrium_kd_cm3_per_g": 0.26875,
+            "name": "S3",
+            "position": 3
+          }
+        ]
+      },
+      "reaction_pattern": {
+        "units": "source branch identity",
+        "value": "distinct-parent-and-terminal"
+      },
+      "secondary_sorbed_pool": {
+        "availability": "inactive",
+        "reason": "Sorb2 process is excluded; dual-nonequilibrium selector is false",
+        "units": "source Sorb2 units"
+      }
+    },
+    "schema_version": "solute-request-v1"
+  },
+  "request_sha256": "5bf1d0d2c8aab79486f9a910909c549679262e19e6e7e8c62d9a10ed80204089",
+  "runner": {
+    "aliases": {
+      "PROFILE.DAT": "Profile.dat",
+      "SELECTOR.IN": "Selector.in"
+    },
+    "data_prefix": "chain-distinct-rates",
+    "inputs": [
+      "LEVEL_01.DIR",
+      "SELECTOR.IN",
+      "PROFILE.DAT"
+    ],
+    "outputs": [
+      {
+        "marker": "end",
+        "name": "I_CHECK.OUT"
+      },
+      {
+        "marker": "end",
+        "name": "RUN_INF.OUT"
+      },
+      {
+        "marker": "end",
+        "name": "T_LEVEL.OUT"
+      },
+      {
+        "marker": "end",
+        "name": "NOD_INF.OUT"
+      },
+      {
+        "marker": "Calculation time",
+        "name": "BALANCE.OUT"
+      },
+      {
+        "marker": "end",
+        "name": "OBS_NODE.OUT"
+      },
+      {
+        "marker": "end",
+        "name": "PROFILE.OUT"
+      },
+      {
+        "marker": "end",
+        "name": "solute1.out"
+      },
+      {
+        "marker": "end",
+        "name": "solute2.out"
+      },
+      {
+        "marker": "end",
+        "name": "solute3.out"
+      }
+    ]
+  },
+  "schema_version": "solute-parity-fixture-v1",
+  "setup": {
+    "bulk_density_g_per_cm3": 0.8,
+    "equilibrium_fraction": 1,
+    "gravity_cosine": 0,
+    "immobile_water_content": 0,
+    "initial_pressure_head_cm": 0,
+    "initial_profile": "uniform; only species 1 is nonzero",
+    "initial_water_content": 0.43,
+    "native_coordinate_start_cm": 0,
+    "node_count": 9,
+    "observation_times_hour": [
+      1,
+      2,
+      4
+    ],
+    "spacing_cm": 0.25
+  },
+  "species": [
+    {
+      "chain_rate_per_hour": 0.2,
+      "initial_concentration_C_ref": 1.0,
+      "linear_equilibrium_kd_cm3_per_g": 0.5375,
+      "name": "S1",
+      "position": 1
+    },
+    {
+      "chain_rate_per_hour": 0.4,
+      "initial_concentration_C_ref": 0.0,
+      "linear_equilibrium_kd_cm3_per_g": 0.0,
+      "name": "S2",
+      "position": 2
+    },
+    {
+      "chain_rate_per_hour": 0.1,
+      "initial_concentration_C_ref": 0.0,
+      "linear_equilibrium_kd_cm3_per_g": 0.26875,
+      "name": "S3",
+      "position": 3
+    }
+  ],
+  "status": "independently authored executable source-reference fixture; not a recovered manual deck",
+  "units": {
+    "concentration": "C_ref",
+    "flux": "C_ref cm/hour",
+    "length": "cm",
+    "sorbed": "C_ref cm3/g",
+    "time": "hour"
+  }
+}
