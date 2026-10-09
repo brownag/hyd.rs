@@ -1,7 +1,7 @@
 # State — Orchestration 18
 
 Plan status: **Approved by user on 2026-10-08 (“yes”).**
-Execution status: **Waves 1–3 complete; Wave 4 is next.** Wave 2 tooling and Wave 3 fixtures are committed; Wave 3 runs authenticated raw outputs only. Compatibility backend must not become default until the full in-scope parity gate passes.
+Execution status: **Wave 3 is blocked on task 18.3.4; Wave 4 has not started.** Task 18.3.5 is complete. Compatibility backend must not become default until the full in-scope parity gate passes.
 Plan: [EXECUTION_PLAN_18.md](EXECUTION_PLAN_18.md). Worker template: [PROMPT_TEMPLATE_18.md](PROMPT_TEMPLATE_18.md).
 
 ## Baseline and guardrails
@@ -29,8 +29,8 @@ Plan: [EXECUTION_PLAN_18.md](EXECUTION_PLAN_18.md). Worker template: [PROMPT_TEM
 | 3 | 18.3.1 | Transport/weighting/boundary fixtures | done |
 | 3 | 18.3.2 | Reaction/sorption fixtures | done |
 | 3 | 18.3.3 | Optional transport-property fixtures | done |
-| 3 | 18.3.4 | Nonequilibrium/dual-domain fixtures | pending |
-| 3 | 18.3.5 | Biology/filtration/deposition fixtures | pending |
+| 3 | 18.3.4 | Nonequilibrium/dual-domain fixtures | blocked — fixture input contract lacks caller-produced dual-domain history injection |
+| 3 | 18.3.5 | Biology/filtration/deposition fixtures | done |
 | 4 | 18.4.1 | Compatibility types/state/precision model | pending |
 | 5 | 18.5.1 | Transport and matrix assembly kernel | pending |
 | 5 | 18.5.2 | Endpoint rows and flux closure | pending |
@@ -81,6 +81,20 @@ Plan: [EXECUTION_PLAN_18.md](EXECUTION_PLAN_18.md). Worker template: [PROMPT_TEM
 - 18.3.3: five property fixtures authenticated, including vapor-enabled diagnostics. Density and moisture-dependent paths are documented inactive from the active caller/input path.
 - Three workers ran in separate worktrees; all run attempts remain in `.development/18-worktrees/18.3.{1,2,3}/.development/`. Each task's exact hashes and output inventory are in its TODO and retained manifests. Reaction maps use the versioned flat observation schema; their input/output provenance was rechecked after conversion without rerunning.
 - Orchestrator check across imported fixtures: all 27 `CASE.json` inputs and observation maps validate. Acceptance is raw output authentication only; normalization and paired parity remain pending.
+
+### 18.3.4 — Nonequilibrium/dual-domain fixtures
+
+- **Status:** blocked before fixture creation or solver execution. The approved fixture contract has no input mapping for `ThOldIm`, `ThNewIm`, `SinkIm`, and related dual-flow histories consumed by `Solute`.
+- `INPUT.FOR` selects `iDualPor` from water models 6/7, but `HYDRUS` initializes dual state and `WATFLOW` evolves the histories. The current manifest/request maps deck inputs only and cannot inject those arrays at the active call boundary. Independent derivation would not test the pinned active `HYDRUS`→`Solute` path.
+- `planning/tasks/18.3.4.todo.md` records the evidence and requests an amendment defining a reproducible supported injection/mapping or driver harness. Dormant `NEquil`, `SorbConc`, and `NonEqInit` updates remain explicitly inactive.
+- Wave 4 is gated on all Wave 3 deliverables; do not begin 18.4.1 until this contract blocker is resolved or the plan is formally amended.
+
+### 18.3.5 — Biology/filtration/deposition fixtures
+
+- **Status:** done; six fixtures and task report are staged for integration.
+- Cases discriminate blocking codes 1–5 (including source no-op code 3) and filtration/deposition with valid positive particle/grain diameters. Reader mappings for bacteria/filtration and `ChPar` values are present; `Exclusion` remains inactive.
+- Reference-only run authenticated all six raw output inventories and source/archive, patch, executable, request, and input hashes under `.development/18.3.5/attempt-20261009T000000Z/`; no normalized parity claim.
+- Orchestrator contract validation: all 33 manifests and observation maps validate; maps use `solute-observation-map-v1` with nonempty observations.
 
 ### Wave 2 verification
 
