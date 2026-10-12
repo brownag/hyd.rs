@@ -198,6 +198,8 @@ impl MassTotals {
         Ok(())
     }
 
+    // Keep the source routine's individual state and interval arguments visible.
+    #[allow(clippy::too_many_arguments)]
     fn accumulate_bacteria(
         &mut self,
         input: &MassTranInput<'_>,
@@ -370,6 +372,10 @@ fn blocking(kind: i32, smax: f32, ss: f32, x: f32, dc: f32, smax2: f32) -> f32 {
         _ => 1.0,
     }
 }
+// Mirrors the source Deposit parameter list and operation inputs.
+#[allow(clippy::too_many_arguments)]
+// Preserve the source's approximate PI literal used in the deposition equation.
+#[allow(clippy::approx_constant)]
 fn deposit(
     ka1: f32,
     ka2: f32,
@@ -387,6 +393,7 @@ fn deposit(
         return Err("source Deposit stops when both particle and grain diameters are nonpositive");
     }
     let (eta, pore_velocity) = if q.abs() > 0.0 {
+        // Preserve the source literal rather than substituting a rounded PI constant.
         let pi = 3.1415_f32;
         let mu = 0.00093_f32;
         let bk = 1.38048e-23_f32;
@@ -455,8 +462,7 @@ pub fn flux_concentration(
     {
         return Err("FluxConc node arrays must have matching lengths and at least two nodes");
     }
-    if input.dual_domain_model.is_some() && input.dual_immobile_water.map_or(true, |v| v.len() != n)
-    {
+    if input.dual_domain_model.is_some() && input.dual_immobile_water.is_none_or(|v| v.len() != n) {
         return Err("dual-domain FluxConc requires a nodewise immobile-water array");
     }
     if input
