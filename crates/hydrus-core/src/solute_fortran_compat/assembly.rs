@@ -158,6 +158,8 @@ pub(crate) fn assemble_interior(
 /// Source `BanSol`: forward elimination in ascending index order followed by
 /// back-substitution in descending index order. There is deliberately no
 /// pivoting or diagonal repair.
+// Preserve the source subtraction expressions and operation order for fidelity.
+#[allow(clippy::assign_op_pattern)]
 pub(crate) fn ban_solve(
     lower: &mut [f64],
     diagonal: &mut [f64],
