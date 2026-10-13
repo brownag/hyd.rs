@@ -205,6 +205,8 @@ pub struct EndpointPrimitiveState {
     pub old_retardation: Vec<DefaultReal>,
     pub new_retardation: Vec<DefaultReal>,
     pub old_concentration: Vec<DefaultReal>,
+    /// Source `ChPar(4,M)` used by `MatSet` mobile/immobile water adjustment.
+    pub material_immobile_water: Vec<DefaultReal>,
     pub source_g0: Vec<DefaultReal>,
     pub source_g1: Vec<DefaultReal>,
     pub upwind_weight: Vec<DefaultReal>,
@@ -231,6 +233,9 @@ pub struct EndpointPrimitiveState {
     pub new_accepted_concentration: Vec<DefaultReal>,
     pub old_accepted_flow: Vec<DefaultReal>,
     pub new_accepted_flow: Vec<DefaultReal>,
+    /// `vO` and `vN` are distinct source velocity states used by MatSet.
+    pub old_matrix_velocity: Vec<DefaultReal>,
+    pub new_matrix_velocity: Vec<DefaultReal>,
     pub t_level: i32,
     pub vapor: bool,
     pub r_min: DefaultReal,

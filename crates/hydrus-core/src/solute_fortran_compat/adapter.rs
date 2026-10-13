@@ -617,12 +617,15 @@ fn validate_cross_field_dimensions(fields: &RequestFields) -> Result<(), String>
                 ("old_retardation", &s.old_retardation),
                 ("new_retardation", &s.new_retardation),
                 ("old_concentration", &s.old_concentration),
+                ("material_immobile_water", &s.material_immobile_water),
                 ("source_g0", &s.source_g0),
                 ("source_g1", &s.source_g1),
                 ("old_accepted_concentration", &s.old_accepted_concentration),
                 ("new_accepted_concentration", &s.new_accepted_concentration),
                 ("old_accepted_flow", &s.old_accepted_flow),
                 ("new_accepted_flow", &s.new_accepted_flow),
+                ("old_matrix_velocity", &s.old_matrix_velocity),
+                ("new_matrix_velocity", &s.new_matrix_velocity),
             ] {
                 if values.len() != n {
                     return Err(format!(
@@ -635,14 +638,13 @@ fn validate_cross_field_dimensions(fields: &RequestFields) -> Result<(), String>
                     "endpoint_primitives.upwind_weight must have one value per element".into(),
                 );
             }
-            if s.source_tdep
-                .as_ref()
-                .is_some_and(|v| v.len() < s.mobile_immobile.len() * 20)
-            {
-                return Err("endpoint_primitives source TDep lacks material slots".into());
-            }
             if s.material_ids.len() != n || s.mobile_immobile.len() == 0 {
                 return Err("endpoint_primitives material and mobility maps are incomplete".into());
+            }
+            if s.material_immobile_water.len() != s.mobile_immobile.len() {
+                return Err(
+                    "endpoint_primitives material_immobile_water must match material count".into(),
+                );
             }
             if s.material_ids
                 .iter()
@@ -651,13 +653,14 @@ fn validate_cross_field_dimensions(fields: &RequestFields) -> Result<(), String>
                 return Err("endpoint_primitives material_ids must index mobile_immobile".into());
             }
             let species_base = s.source_species.saturating_sub(1) * 16;
+            let max_material = s.material_ids.iter().copied().max().unwrap_or(0);
             if s.source_species == 0
                 || s.source_chpar
                     .as_ref()
-                    .is_some_and(|v| v.len() < species_base + 10)
+                    .is_some_and(|v| v.len() < species_base + (max_material - 1) * 20 + 10)
                 || s.source_tdep
                     .as_ref()
-                    .is_some_and(|v| v.len() < species_base + 10)
+                    .is_some_and(|v| v.len() < species_base + (max_material - 1) * 20 + 10)
             {
                 return Err("endpoint_primitives source ChPar/TDep lacks species slots".into());
             }
@@ -1200,6 +1203,7 @@ fn maybe_endpoint_state(
                     "old_retardation",
                     "new_retardation",
                     "old_concentration",
+                    "material_immobile_water",
                     "source_g0",
                     "source_g1",
                     "upwind_weight",
@@ -1217,6 +1221,8 @@ fn maybe_endpoint_state(
                     "material_ids",
                     "old_accepted_flow",
                     "new_accepted_flow",
+                    "old_matrix_velocity",
+                    "new_matrix_velocity",
                     "mobile_immobile",
                     "source_species",
                     "bacteria",
@@ -1268,6 +1274,7 @@ fn maybe_endpoint_state(
                 old_retardation: array("old_retardation")?,
                 new_retardation: array("new_retardation")?,
                 old_concentration: array("old_concentration")?,
+                material_immobile_water: array("material_immobile_water")?,
                 source_g0: array("source_g0")?,
                 source_g1: array("source_g1")?,
                 upwind_weight: array("upwind_weight")?,
@@ -1306,6 +1313,8 @@ fn maybe_endpoint_state(
                 new_accepted_concentration: array("new_accepted_concentration")?,
                 old_accepted_flow: array("old_accepted_flow")?,
                 new_accepted_flow: array("new_accepted_flow")?,
+                old_matrix_velocity: array("old_matrix_velocity")?,
+                new_matrix_velocity: array("new_matrix_velocity")?,
                 t_level: o
                     .get("t_level")
                     .map(|v| as_i32(v, "t_level"))
