@@ -68,6 +68,10 @@ pub struct SourceSwitches {
     pub bacteria: bool,
     pub filtration: bool,
     pub blocking: BlockingMode,
+    pub flux_concentration: bool,
+    pub moisture_selector: u8,
+    pub mass_initialization: bool,
+    pub equilibrium_initialization: bool,
 }
 
 impl Default for SourceSwitches {
@@ -86,15 +90,16 @@ impl Default for SourceSwitches {
             bacteria: false,
             filtration: false,
             blocking: BlockingMode::Default,
+            flux_concentration: false,
+            moisture_selector: 0,
+            mass_initialization: false,
+            equilibrium_initialization: false,
         }
     }
 }
 
 impl SourceSwitches {
     pub fn validate(self, species_count: usize) -> Result<(), &'static str> {
-        if !self.linear {
-            return Err("nonlinear mode is not reachable through active ChemIn");
-        }
         if self.bacteria && species_count > 1 {
             return Err("bacteria with a multi-species chain is unsupported");
         }
@@ -183,6 +188,52 @@ pub struct TransportInputs {
     pub flow_orientation: Option<UnitValue<FlowOrientation>>,
     pub atmospheric_concentration: Option<UnitValue<DefaultReal>>,
     pub atmospheric_surface_distance: Option<UnitValue<DefaultReal>>,
+    pub flux_concentration: Option<UnitValue<bool>>,
+    pub vapor_lower_boundary_exception: Option<UnitValue<bool>>,
+    pub endpoint_state: Option<UnitValue<EndpointPrimitiveState>>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct EndpointPrimitiveState {
+    pub coordinates: Vec<DefaultReal>,
+    pub old_water: Vec<DefaultReal>,
+    pub new_water: Vec<DefaultReal>,
+    pub old_velocity: Vec<DefaultReal>,
+    pub new_velocity: Vec<DefaultReal>,
+    pub old_dispersion: Vec<DefaultReal>,
+    pub new_dispersion: Vec<DefaultReal>,
+    pub old_retardation: Vec<DefaultReal>,
+    pub new_retardation: Vec<DefaultReal>,
+    pub old_concentration: Vec<DefaultReal>,
+    pub source_g0: Vec<DefaultReal>,
+    pub source_g1: Vec<DefaultReal>,
+    pub upwind_weight: Vec<DefaultReal>,
+    pub epsi: DefaultReal,
+    pub dt: DefaultReal,
+    pub alf: DefaultReal,
+    pub top_atmospheric_concentration: Option<DefaultReal>,
+    pub top_surface_distance: Option<DefaultReal>,
+    pub henry_coefficient: Option<DefaultReal>,
+    pub gas_diffusion: Option<DefaultReal>,
+    pub old_temperature: Option<DefaultReal>,
+    pub new_temperature: Option<DefaultReal>,
+    pub source_chpar: Option<Vec<DefaultReal>>,
+    pub source_tdep: Option<Vec<DefaultReal>>,
+    pub material_ids: Vec<usize>,
+    pub source_species: usize,
+    pub mobile_immobile: Vec<bool>,
+    pub bacteria: bool,
+    pub dual_porosity: u8,
+    pub bottom_resistance: DefaultReal,
+    pub bottom_prescribed: DefaultReal,
+    pub top_prescribed: DefaultReal,
+    pub old_accepted_concentration: Vec<DefaultReal>,
+    pub new_accepted_concentration: Vec<DefaultReal>,
+    pub old_accepted_flow: Vec<DefaultReal>,
+    pub new_accepted_flow: Vec<DefaultReal>,
+    pub t_level: i32,
+    pub vapor: bool,
+    pub r_min: DefaultReal,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -206,6 +257,24 @@ pub struct ReactionInputs {
     pub ordered_species: Option<UnitValue<Vec<SpeciesRecord>>>,
     pub reaction_pattern: Option<UnitValue<String>>,
     pub secondary_sorbed_pool: Option<UnitValue<Vec<DefaultReal>>>,
+    pub material_species_chpar: Option<UnitValue<Vec<MaterialSpeciesParameters>>>,
+    pub moisture_dependency: Option<UnitValue<MoistureDependencyRequest>>,
+    pub mass_initialization: Option<UnitValue<bool>>,
+    pub equilibrium_initialization: Option<UnitValue<bool>>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct MaterialSpeciesParameters {
+    pub species: usize,
+    pub material: usize,
+    /// Source `ChPar` slots 1..20 for this species/material.
+    pub slots: Vec<DefaultReal>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct MoistureDependencyRequest {
+    pub selector: u8,
+    pub table: Vec<DefaultReal>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -283,6 +352,9 @@ impl Default for RequestFields {
                 flow_orientation: None,
                 atmospheric_concentration: None,
                 atmospheric_surface_distance: None,
+                flux_concentration: None,
+                vapor_lower_boundary_exception: None,
+                endpoint_state: None,
             },
             reactions: ReactionInputs {
                 equilibrium_mode: None,
@@ -295,6 +367,10 @@ impl Default for RequestFields {
                 ordered_species: None,
                 reaction_pattern: None,
                 secondary_sorbed_pool: None,
+                material_species_chpar: None,
+                moisture_dependency: None,
+                mass_initialization: None,
+                equilibrium_initialization: None,
             },
             transport_properties: TransportPropertyInputs {
                 coordinates: None,
@@ -451,7 +527,7 @@ pub(crate) mod tests {
             ..switches
         }
         .validate(1)
-        .is_err());
+        .is_ok());
         assert!(SourceSwitches {
             dual_domain_model: Some(8),
             ..switches

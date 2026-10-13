@@ -235,6 +235,8 @@ fn map_fields(
         "boundary.upper.code",
         "boundary.upper.atmospheric_concentration",
         "boundary.upper.atmospheric_surface_distance",
+        "solute.flux_concentration",
+        "endpoint_primitives",
         "equilibrium_mode",
         "fraction_equilibrium",
         "immobile_water_content",
@@ -246,6 +248,10 @@ fn map_fields(
         "ordered_species",
         "reaction_pattern",
         "secondary_sorbed_pool",
+        "material_species_chpar",
+        "moisture_dependency",
+        "initialization.mass",
+        "initialization.equilibrium",
         "dual_domain",
         "dynamic_exchange_sink",
         "biology_mode",
@@ -288,6 +294,9 @@ fn map_fields(
     )?;
     request_fields.transport.atmospheric_surface_distance =
         maybe_number(fields, "boundary.upper.atmospheric_surface_distance", "cm")?;
+    request_fields.transport.flux_concentration =
+        maybe_bool(fields, "solute.flux_concentration", "boolean")?;
+    request_fields.transport.endpoint_state = maybe_endpoint_state(fields)?;
 
     request_fields.reactions.equilibrium_mode = maybe_bool(fields, "equilibrium_mode", "boolean")?;
     request_fields.reactions.fraction_equilibrium =
@@ -309,6 +318,12 @@ fn map_fields(
         maybe_string(fields, "reaction_pattern", "source branch identity")?;
     request_fields.reactions.secondary_sorbed_pool =
         maybe_number_vec(fields, "secondary_sorbed_pool", "source Sorb2 units")?;
+    request_fields.reactions.material_species_chpar = maybe_chpar(fields)?;
+    request_fields.reactions.moisture_dependency = maybe_moisture_dependency(fields)?;
+    request_fields.reactions.mass_initialization =
+        maybe_bool(fields, "initialization.mass", "boolean")?;
+    request_fields.reactions.equilibrium_initialization =
+        maybe_bool(fields, "initialization.equilibrium", "boolean")?;
 
     request_fields.transport_properties.coordinates = maybe_coordinates(fields)?;
     request_fields.transport_properties.temperature_history =
@@ -357,6 +372,7 @@ fn map_fields(
 
     validate_cross_field_dimensions(&request_fields)?;
     let switches = derive_switches(&request_fields)?;
+    validate_required_mode_inputs(&request_fields, &switches)?;
     let species = derive_species(&request_fields);
     switches
         .validate(species.len().max(species_count(&request_fields)))
@@ -556,10 +572,8 @@ fn validate_cross_field_dimensions(fields: &RequestFields) -> Result<(), String>
     }
     if let Some(dual) = &fields.nonequilibrium.dual_domain {
         if let Explicit::Available(dual) = &dual.value {
-            if dual.dynamic_exchange_claimed {
-                return Err(
-                    "dynamic dual-domain exchange is not active on the audited source path".into(),
-                );
+            if dual.dynamic_exchange_claimed && dual.i_dual_por == 0 {
+                return Err("dynamic exchange requires iDualPor > 0".into());
             }
             if dual.i_dual_por == 0 {
                 if dual.water_model != 0 {
@@ -569,6 +583,135 @@ fn validate_cross_field_dimensions(fields: &RequestFields) -> Result<(), String>
                 return Err("dual-domain water model must be 6 or 7".into());
             }
         }
+    }
+    if let Some(chpar) = &fields.reactions.material_species_chpar {
+        if let Explicit::Available(records) = &chpar.value {
+            let mut keys = HashSet::new();
+            for record in records {
+                if record.species == 0
+                    || record.material == 0
+                    || !keys.insert((record.species, record.material))
+                {
+                    return Err(
+                        "material_species_chpar requires unique positive species/material indices"
+                            .into(),
+                    );
+                }
+            }
+        }
+    }
+    if let Some(state) = &fields.transport.endpoint_state {
+        if let Explicit::Available(s) = &state.value {
+            let n = s.coordinates.len();
+            if n < 2 {
+                return Err("endpoint_primitives requires at least two nodes".into());
+            }
+            for (name, values) in [
+                ("coordinates", &s.coordinates),
+                ("old_water", &s.old_water),
+                ("new_water", &s.new_water),
+                ("old_velocity", &s.old_velocity),
+                ("new_velocity", &s.new_velocity),
+                ("old_dispersion", &s.old_dispersion),
+                ("new_dispersion", &s.new_dispersion),
+                ("old_retardation", &s.old_retardation),
+                ("new_retardation", &s.new_retardation),
+                ("old_concentration", &s.old_concentration),
+                ("source_g0", &s.source_g0),
+                ("source_g1", &s.source_g1),
+                ("old_accepted_concentration", &s.old_accepted_concentration),
+                ("new_accepted_concentration", &s.new_accepted_concentration),
+                ("old_accepted_flow", &s.old_accepted_flow),
+                ("new_accepted_flow", &s.new_accepted_flow),
+            ] {
+                if values.len() != n {
+                    return Err(format!(
+                        "endpoint_primitives.{name} length must match coordinates"
+                    ));
+                }
+            }
+            if s.upwind_weight.len() != n - 1 {
+                return Err(
+                    "endpoint_primitives.upwind_weight must have one value per element".into(),
+                );
+            }
+            if s.source_tdep
+                .as_ref()
+                .is_some_and(|v| v.len() < s.mobile_immobile.len() * 20)
+            {
+                return Err("endpoint_primitives source TDep lacks material slots".into());
+            }
+            if s.material_ids.len() != n || s.mobile_immobile.len() == 0 {
+                return Err("endpoint_primitives material and mobility maps are incomplete".into());
+            }
+            if s.material_ids
+                .iter()
+                .any(|&m| m == 0 || m > s.mobile_immobile.len())
+            {
+                return Err("endpoint_primitives material_ids must index mobile_immobile".into());
+            }
+            let species_base = s.source_species.saturating_sub(1) * 16;
+            if s.source_species == 0
+                || s.source_chpar
+                    .as_ref()
+                    .is_some_and(|v| v.len() < species_base + 10)
+                || s.source_tdep
+                    .as_ref()
+                    .is_some_and(|v| v.len() < species_base + 10)
+            {
+                return Err("endpoint_primitives source ChPar/TDep lacks species slots".into());
+            }
+            if let Some(code) = fields.transport.upper_boundary_code.as_ref() {
+                if matches!(&code.value, Explicit::Available(-2))
+                    && (s.source_chpar.is_none()
+                        || s.source_tdep.is_none()
+                        || s.old_temperature.is_none()
+                        || s.top_surface_distance.is_none()
+                        || s.top_atmospheric_concentration.is_none())
+                {
+                    return Err("atmospheric endpoint requires ChPar/TDep, temperatures, surface distance, and atmospheric concentration".into());
+                }
+            }
+            if s.dual_porosity > 2 || !matches!(s.t_level, 1 | 2) {
+                return Err("endpoint_primitives dual_por/TLevel selector is invalid".into());
+            }
+            if s.dt.0 <= 0.0
+                || !(0.0..=1.0).contains(&s.epsi.0)
+                || (s.alf.0 - (1.0 - s.epsi.0)).abs() > 1.0e-6
+                || s.r_min.0 < 0.0
+                || s.bottom_resistance.0 < 0.0
+                || s.coordinates.windows(2).any(|w| w[1].0 <= w[0].0)
+            {
+                return Err(
+                    "endpoint_primitives requires positive dt and consistent epsi/alf".into(),
+                );
+            }
+        }
+    }
+    Ok(())
+}
+
+fn validate_required_mode_inputs(
+    fields: &RequestFields,
+    switches: &SourceSwitches,
+) -> Result<(), String> {
+    if switches.flux_concentration && fields.transport.time_interval.is_none() {
+        return Err("FluxConc requires the source time interval".into());
+    }
+    if switches.moisture_selector == 1 && fields.reactions.moisture_dependency.is_none() {
+        return Err("moisture selector 1 requires explicit WDep input".into());
+    }
+    if (switches.mass_initialization || switches.equilibrium_initialization)
+        && fields.reactions.initial_dissolved_concentration.is_none()
+        && fields.reactions.ordered_species.is_none()
+    {
+        return Err("selected initialization requires initial dissolved concentrations".into());
+    }
+    if fields.transport.endpoint_state.is_some()
+        && (fields.transport.lower_boundary_code.is_none()
+            || fields.transport.upper_boundary_code.is_none())
+    {
+        return Err("endpoint_primitives require both source boundary codes".into());
     }
     Ok(())
 }
@@ -598,6 +741,79 @@ fn derive_switches(fields: &RequestFields) -> Result<SourceSwitches, String> {
     if let Some(v) = &fields.reactions.linearity_mode {
         if let Explicit::Available(x) = v.value {
             switches.linear = x;
+        }
+    }
+    if let Some(chpar) = &fields.reactions.material_species_chpar {
+        if let Explicit::Available(records) = &chpar.value {
+            let species_count = species_count_value(fields).unwrap_or(0);
+            let material_count = records.iter().map(|r| r.material).max().unwrap_or(0);
+            let bacteria = fields
+                .biology
+                .mode
+                .as_ref()
+                .is_some_and(|v| matches!(&v.value, Explicit::Available(m) if m.i_bact != 0));
+            let mut linear = vec![true; species_count];
+            let mut has_record = vec![false; species_count];
+            let mut seen = HashSet::new();
+            for record in records {
+                if record.species == 0
+                    || record.species > species_count
+                    || record.material == 0
+                    || record.slots.len() != 20
+                {
+                    return Err(
+                        "material_species_chpar requires species in range and 20 source slots"
+                            .into(),
+                    );
+                }
+                if !seen.insert((record.species, record.material)) {
+                    return Err("duplicate material_species_chpar pair".into());
+                }
+                let idx = record.species - 1;
+                has_record[idx] = true;
+                if record.slots[7].0.abs() > 1.0e-12 || (record.slots[8].0 - 1.0).abs() > 0.001 {
+                    linear[idx] = false;
+                }
+                if bacteria && (record.slots[17].0 > 0.0 || record.slots[14].0 > 0.0) {
+                    linear[idx] = false;
+                }
+            }
+            let expected_pairs = species_count.saturating_mul(material_count);
+            if seen.len() != expected_pairs {
+                return Err("material_species_chpar must cover every species/material pair".into());
+            }
+            if has_record.into_iter().all(|x| x) {
+                switches.linear = linear.into_iter().all(|x| x);
+            } else {
+                return Err("material_species_chpar must cover every species".into());
+            }
+        }
+    }
+    if let Some(v) = &fields.transport.flux_concentration {
+        if let Explicit::Available(enabled) = v.value {
+            switches.flux_concentration = enabled;
+        }
+    }
+    if let Some(v) = &fields.reactions.moisture_dependency {
+        if let Explicit::Available(dep) = &v.value {
+            switches.moisture_selector = dep.selector;
+        }
+    }
+    if let Some(v) = &fields.reactions.mass_initialization {
+        if let Explicit::Available(enabled) = v.value {
+            switches.mass_initialization = enabled;
+        }
+    }
+    if let Some(v) = &fields.reactions.equilibrium_initialization {
+        if let Explicit::Available(enabled) = v.value {
+            switches.equilibrium_initialization = enabled;
+        }
+    }
+    if let Some(dep) = &fields.reactions.moisture_dependency {
+        if let Explicit::Available(dep) = &dep.value {
+            if dep.selector == 1 && dep.table.is_empty() {
+                return Err("selector 1 requires a WDep table".into());
+            }
         }
     }
     if let Some(v) = &fields.nonequilibrium.dual_domain {
@@ -895,6 +1111,248 @@ fn maybe_number_vec(
     units: &str,
 ) -> Result<Option<UnitValue<Vec<DefaultReal>>>, String> {
     unit_value(fields, name, units, |x| number_vec(x, name))
+}
+
+fn maybe_chpar(
+    fields: &Map<String, Value>,
+) -> Result<Option<UnitValue<Vec<MaterialSpeciesParameters>>>, String> {
+    unit_value(
+        fields,
+        "material_species_chpar",
+        "source ChPar slots by species/material",
+        |x| {
+            x.as_array()
+                .ok_or("material_species_chpar value must be an array")?
+                .iter()
+                .map(|entry| {
+                    let o = entry
+                        .as_object()
+                        .ok_or("material_species_chpar entries must be objects")?;
+                    validate_object_keys(
+                        "material_species_chpar",
+                        o,
+                        &["species", "material", "slots"],
+                    )?;
+                    let species = o
+                        .get("species")
+                        .map(|v| as_usize(v, "material_species_chpar.species"))
+                        .transpose()?
+                        .ok_or("material_species_chpar.species missing")?;
+                    let material = o
+                        .get("material")
+                        .map(|v| as_usize(v, "material_species_chpar.material"))
+                        .transpose()?
+                        .ok_or("material_species_chpar.material missing")?;
+                    let slots_value = o
+                        .get("slots")
+                        .ok_or("material_species_chpar.slots missing")?;
+                    let slots = number_vec(slots_value, "material_species_chpar.slots")?;
+                    if slots.len() != 20 {
+                        return Err("material_species_chpar slots must have length 20".into());
+                    }
+                    Ok(MaterialSpeciesParameters {
+                        species,
+                        material,
+                        slots,
+                    })
+                })
+                .collect()
+        },
+    )
+}
+
+fn maybe_endpoint_state(
+    fields: &Map<String, Value>,
+) -> Result<Option<UnitValue<EndpointPrimitiveState>>, String> {
+    unit_value(
+        fields,
+        "endpoint_primitives",
+        "source primitive endpoint state",
+        |x| {
+            let o = x
+                .as_object()
+                .ok_or("endpoint_primitives value must be an object")?;
+            let array = |name: &str| -> Result<Vec<DefaultReal>, String> {
+                number_vec(
+                    o.get(name)
+                        .ok_or_else(|| format!("endpoint_primitives.{name} missing"))?,
+                    name,
+                )
+            };
+            let scalar = |name: &str| -> Result<DefaultReal, String> {
+                Ok(DefaultReal::from_input(as_f64(
+                    o.get(name)
+                        .ok_or_else(|| format!("endpoint_primitives.{name} missing"))?,
+                    name,
+                )?))
+            };
+            validate_object_keys(
+                "endpoint_primitives",
+                o,
+                &[
+                    "coordinates",
+                    "old_water",
+                    "new_water",
+                    "old_velocity",
+                    "new_velocity",
+                    "old_dispersion",
+                    "new_dispersion",
+                    "old_retardation",
+                    "new_retardation",
+                    "old_concentration",
+                    "source_g0",
+                    "source_g1",
+                    "upwind_weight",
+                    "epsi",
+                    "dt",
+                    "alf",
+                    "top_atmospheric_concentration",
+                    "top_surface_distance",
+                    "henry_coefficient",
+                    "gas_diffusion",
+                    "old_temperature",
+                    "new_temperature",
+                    "source_chpar",
+                    "source_tdep",
+                    "material_ids",
+                    "old_accepted_flow",
+                    "new_accepted_flow",
+                    "mobile_immobile",
+                    "source_species",
+                    "bacteria",
+                    "dual_porosity",
+                    "bottom_resistance",
+                    "bottom_prescribed",
+                    "top_prescribed",
+                    "old_accepted_concentration",
+                    "new_accepted_concentration",
+                    "t_level",
+                    "vapor",
+                    "r_min",
+                ],
+            )?;
+            let opt_real = |name: &str| -> Result<Option<DefaultReal>, String> {
+                o.get(name)
+                    .map(|v| as_f64(v, name).map(|x| DefaultReal::from_input(x)))
+                    .transpose()
+            };
+            let opt_vec = |name: &str| -> Result<Option<Vec<DefaultReal>>, String> {
+                o.get(name).map(|v| number_vec(v, name)).transpose()
+            };
+            let usize_vec = |name: &str| -> Result<Vec<usize>, String> {
+                o.get(name)
+                    .ok_or_else(|| format!("endpoint_primitives.{name} missing"))?
+                    .as_array()
+                    .ok_or_else(|| format!("endpoint_primitives.{name} must be an array"))?
+                    .iter()
+                    .map(|v| as_usize(v, name))
+                    .collect()
+            };
+            let bool_vec = |name: &str| -> Result<Vec<bool>, String> {
+                o.get(name)
+                    .ok_or_else(|| format!("endpoint_primitives.{name} missing"))?
+                    .as_array()
+                    .ok_or_else(|| format!("endpoint_primitives.{name} must be an array"))?
+                    .iter()
+                    .map(|v| as_bool(v, name))
+                    .collect()
+            };
+            Ok(EndpointPrimitiveState {
+                coordinates: array("coordinates")?,
+                old_water: array("old_water")?,
+                new_water: array("new_water")?,
+                old_velocity: array("old_velocity")?,
+                new_velocity: array("new_velocity")?,
+                old_dispersion: array("old_dispersion")?,
+                new_dispersion: array("new_dispersion")?,
+                old_retardation: array("old_retardation")?,
+                new_retardation: array("new_retardation")?,
+                old_concentration: array("old_concentration")?,
+                source_g0: array("source_g0")?,
+                source_g1: array("source_g1")?,
+                upwind_weight: array("upwind_weight")?,
+                epsi: scalar("epsi")?,
+                dt: scalar("dt")?,
+                alf: scalar("alf")?,
+                top_atmospheric_concentration: opt_real("top_atmospheric_concentration")?,
+                top_surface_distance: opt_real("top_surface_distance")?,
+                henry_coefficient: opt_real("henry_coefficient")?,
+                gas_diffusion: opt_real("gas_diffusion")?,
+                old_temperature: opt_real("old_temperature")?,
+                new_temperature: opt_real("new_temperature")?,
+                source_chpar: opt_vec("source_chpar")?,
+                source_tdep: opt_vec("source_tdep")?,
+                material_ids: usize_vec("material_ids")?,
+                mobile_immobile: bool_vec("mobile_immobile")?,
+                source_species: o
+                    .get("source_species")
+                    .map(|v| as_usize(v, "source_species"))
+                    .transpose()?
+                    .unwrap_or(1),
+                bacteria: o
+                    .get("bacteria")
+                    .map(|v| as_bool(v, "bacteria"))
+                    .transpose()?
+                    .unwrap_or(false),
+                dual_porosity: o
+                    .get("dual_porosity")
+                    .map(|v| as_u8(v, "dual_porosity"))
+                    .transpose()?
+                    .unwrap_or(0),
+                bottom_resistance: scalar("bottom_resistance")?,
+                bottom_prescribed: scalar("bottom_prescribed")?,
+                top_prescribed: scalar("top_prescribed")?,
+                old_accepted_concentration: array("old_accepted_concentration")?,
+                new_accepted_concentration: array("new_accepted_concentration")?,
+                old_accepted_flow: array("old_accepted_flow")?,
+                new_accepted_flow: array("new_accepted_flow")?,
+                t_level: o
+                    .get("t_level")
+                    .map(|v| as_i32(v, "t_level"))
+                    .transpose()?
+                    .unwrap_or(0),
+                vapor: o
+                    .get("vapor")
+                    .map(|v| as_bool(v, "endpoint_primitives.vapor"))
+                    .transpose()?
+                    .unwrap_or(false),
+                r_min: scalar("r_min")?,
+            })
+        },
+    )
+}
+
+fn maybe_moisture_dependency(
+    fields: &Map<String, Value>,
+) -> Result<Option<UnitValue<MoistureDependencyRequest>>, String> {
+    unit_value(
+        fields,
+        "moisture_dependency",
+        "source selector and WDep table",
+        |x| {
+            let o = x
+                .as_object()
+                .ok_or("moisture_dependency value must be an object")?;
+            validate_object_keys("moisture_dependency", o, &["selector", "table"])?;
+            let selector = o
+                .get("selector")
+                .map(|v| as_u8(v, "moisture_dependency.selector"))
+                .transpose()?
+                .ok_or("moisture_dependency.selector missing")?;
+            if selector > 2 {
+                return Err("moisture_dependency.selector must be 0, 1, or 2".into());
+            }
+            let table = o
+                .get("table")
+                .map(|v| number_vec(v, "moisture_dependency.table"))
+                .transpose()?
+                .unwrap_or_default();
+            if selector == 1 && table.is_empty() {
+                return Err("selector 1 requires a WDep table".into());
+            }
+            Ok(MoistureDependencyRequest { selector, table })
+        },
+    )
 }
 
 fn maybe_orientation(
@@ -1218,12 +1676,11 @@ pub(crate) mod tests {
         assert!(parse_request(&format!(r#"{{"request":{request}}}"#), &"0".repeat(64)).is_err());
     }
     #[test]
-    fn rejects_dimension_units_and_unreachable_modes() {
+    fn rejects_dimension_units_and_accepts_reader_reachable_nonlinear_mode() {
         let bad = r#"{"schema_version":"solute-request-v1","fields":{"linearity_mode":{"units":"boolean","value":false}}}"#;
         let hash = canonical_hash(&serde_json::from_str(bad).unwrap());
-        assert!(parse_request(&format!(r#"{{"request":{bad}}}"#), &hash)
-            .unwrap_err()
-            .contains("nonlinear"));
+        let parsed = parse_request(&format!(r#"{{"request":{bad}}}"#), &hash).unwrap();
+        assert!(!parsed.input.switches.linear);
         let bad = r#"{"schema_version":"solute-normalized-request-v1","fields":{"coordinates":{"units":"cm","value":{"native":"x","canonical":"d","nodes":2}},"temperature_history":{"units":"degC","value":[20.0]}}}"#;
         let hash = canonical_hash(&serde_json::from_str(bad).unwrap());
         assert!(parse_request(&format!(r#"{{"request":{bad}}}"#), &hash)
@@ -1234,6 +1691,32 @@ pub(crate) mod tests {
         assert!(parse_request(&format!(r#"{{"request":{bad}}}"#), &hash)
             .unwrap_err()
             .contains("expected units"));
+    }
+
+    #[test]
+    fn derives_source_selectors_and_primitive_endpoint_inputs() {
+        let request = r#"{"schema_version":"solute-request-v1","fields":{"species_count":{"units":"count","value":1},"ordered_species":{"units":"ordered species records","value":[{"name":"S1","position":1,"chain_rate_per_hour":0.0,"initial_concentration_C_ref":1.0,"linear_equilibrium_kd_cm3_per_g":0.0}]},"biology_mode":{"units":"ChemIn source flags","value":{"iBact":0,"lFiltr":false}},"material_species_chpar":{"units":"source ChPar slots by species/material","value":[{"species":1,"material":1,"slots":[1.0,0.0,1.0,0.0,0.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0]}]},"time.interval":{"units":"hour","value":1.0},"solute.flux_concentration":{"units":"boolean","value":true},"moisture_dependency":{"units":"source selector and WDep table","value":{"selector":1,"table":[1.0,0.0,0.8,0.2]}},"initialization.mass":{"units":"boolean","value":true},"initialization.equilibrium":{"units":"boolean","value":false},"initial_dissolved_concentration":{"units":"C_ref","value":[1.0]},"boundary.lower.code":{"units":"source integer code","value":1},"boundary.upper.code":{"units":"source integer code","value":1}}}"#;
+        let parsed = parse_request_text(request);
+        assert!(parsed.input.switches.linear);
+        assert!(parsed.input.switches.flux_concentration);
+        assert_eq!(parsed.input.switches.moisture_selector, 1);
+        assert!(parsed.input.switches.mass_initialization);
+        assert!(!parsed.input.switches.equilibrium_initialization);
+
+        let mut nonlinear = serde_json::from_str::<Value>(request).unwrap();
+        let slots = nonlinear["fields"]["material_species_chpar"]["value"][0]["slots"]
+            .as_array_mut()
+            .unwrap();
+        slots[7] = Value::from(0.2);
+        let hash = canonical_hash(&nonlinear);
+        let wrapped = format!(r#"{{"request":{nonlinear},"request_sha256":"{hash}"}}"#);
+        assert!(
+            !parse_request(&wrapped, &hash)
+                .unwrap()
+                .input
+                .switches
+                .linear
+        );
     }
 
     #[test]
