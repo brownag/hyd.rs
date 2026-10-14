@@ -3,13 +3,14 @@ use crate::atmospheric::{
 };
 use crate::forcing::AtmosphericRates;
 use crate::hydraulics::{
-    nodal_control_volume_width, solve_tridiagonal_in_place, transform_boundary_row,
-    BoundaryCondition, BoundaryRow, BoundaryRowLocation, FaceAveraging, HydraulicModel, Mesh1D,
-    PivotDiagnostics, ResetRow, ResetRowInput,
+    arithmetic_face_conductivity, geometric_face_conductivity, nodal_control_volume_width,
+    solve_tridiagonal_in_place, transform_boundary_row, BoundaryCondition, BoundaryRow,
+    BoundaryRowLocation, FaceAveraging, HydraulicModel, Mesh1D, PivotDiagnostics, ResetRow,
+    ResetRowInput,
 };
 use crate::lower_boundary::{LowerBoundaryMode, LowerTrial};
 use crate::root_uptake::RootUptakeInput;
-use crate::water_state::validate_finite;
+use crate::water_state::{validate_finite, AcceptedWaterSnapshot};
 use crate::{WaterState, WaterStepError, WaterWorkspace};
 
 /// Validated capability contract for the first single-domain water product.
@@ -162,6 +163,21 @@ pub struct WaterStepReport<'a> {
     /// Trial-state values that caused each active-set mode change.
     pub atmospheric_transitions: &'a [AtmosphericTransition],
     pub balance: WaterBalance,
+    /// Accepted soil water contents, one per node.
+    pub water_contents: &'a [f64],
+    /// Accepted face fluxes, `node_count + 1`, positive toward the upper boundary.
+    pub face_fluxes: &'a [f64],
+}
+
+impl<'a> WaterStepReport<'a> {
+    /// The accepted water values a solute step may rely on.
+    pub fn accepted_water(&self) -> AcceptedWaterSnapshot<'a> {
+        AcceptedWaterSnapshot {
+            accepted_time: self.accepted_time,
+            water_contents: self.water_contents,
+            face_fluxes: self.face_fluxes,
+        }
+    }
 }
 
 pub fn advance_water_step<'a>(
@@ -226,6 +242,12 @@ fn advance_water_step_impl<'a>(
                         surface_storage_change: next_ponded - state.atmospheric.ponded_depth,
                     },
                 )?;
+                fill_face_fluxes(
+                    workspace,
+                    input,
+                    trial.lower_boundary_flux,
+                    soil_upper_flux.unwrap_or(input.upper.measured_flux().unwrap_or(0.0)),
+                )?;
                 state.heads.copy_from_slice(&workspace.trial_heads);
                 state.water_contents.copy_from_slice(&workspace.trial_water);
                 let accepted_time = if timestep >= input.target_time - state.time {
@@ -261,6 +283,8 @@ fn advance_water_step_impl<'a>(
                     atmospheric_transitions: &workspace.atmospheric_transitions
                         [..workspace.atmospheric_transition_count],
                     balance,
+                    water_contents: &workspace.trial_water,
+                    face_fluxes: &workspace.face_fluxes,
                 });
             }
             None => {
@@ -489,6 +513,40 @@ fn assemble(
     validate_finite("assembled coefficients", &workspace.upper)?;
     validate_finite("assembled rhs", &workspace.rhs)?;
     Ok((upper_mode, prepared_lower.exchange_flux))
+}
+
+/// Fills `workspace.face_fluxes` for the accepted trial, positive toward the
+/// upper boundary (ascending coordinates).
+///
+/// Balance terms are positive when water enters the soil. Entry at the lower
+/// boundary points toward increasing coordinate, entry at the upper boundary
+/// points against it, so the upper endpoint is the negated balance flux (exact).
+/// Interior faces use the assembled rows' own terms: `evaluated_conductivity`
+/// (conductivity at the last Picard iterate fed to the final `assemble`) with the
+/// solved `trial_heads`, as `q = -K_face * (dh/dx + gravity)`.
+fn fill_face_fluxes(
+    workspace: &mut WaterWorkspace,
+    input: WaterStepInput<'_>,
+    lower_boundary_flux: f64,
+    soil_upper_flux: f64,
+) -> Result<(), WaterStepError> {
+    let count = workspace.node_count();
+    let gravity = input.mesh.inclination_cosine();
+    let coordinates = input.mesh.coordinates();
+    workspace.face_fluxes[0] = lower_boundary_flux;
+    for face in 1..count {
+        let left = workspace.evaluated_conductivity[face - 1];
+        let right = workspace.evaluated_conductivity[face];
+        let conductivity = match input.face_averaging {
+            FaceAveraging::Arithmetic => arithmetic_face_conductivity(left, right)?,
+            FaceAveraging::Geometric => geometric_face_conductivity(left, right)?,
+        };
+        let dx = coordinates[face] - coordinates[face - 1];
+        workspace.face_fluxes[face] = -conductivity
+            * ((workspace.trial_heads[face] - workspace.trial_heads[face - 1]) / dx + gravity);
+    }
+    workspace.face_fluxes[count] = -soil_upper_flux;
+    validate_finite("face fluxes", &workspace.face_fluxes)
 }
 
 struct BalanceInput {

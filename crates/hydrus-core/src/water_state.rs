@@ -63,6 +63,18 @@ impl WaterState {
     }
 }
 
+/// Borrowed accepted water values used to couple one solute step.
+#[derive(Clone, Copy, Debug)]
+pub struct AcceptedWaterSnapshot<'a> {
+    pub accepted_time: f64,
+    pub water_contents: &'a [f64],
+    /// `node_count + 1` fluxes: lower boundary, internal faces, upper boundary.
+    /// All entries are signed positive toward increasing mesh coordinates.
+    /// Nodes are in ascending coordinate order and the upper boundary is the
+    /// last node, so positive means toward the upper boundary.
+    pub face_fluxes: &'a [f64],
+}
+
 /// Fixed-size buffers owned by one water simulation.
 #[derive(Clone, Debug)]
 pub struct WaterWorkspace {
@@ -76,6 +88,8 @@ pub struct WaterWorkspace {
     pub(crate) evaluated_conductivity: Vec<f64>,
     pub(crate) evaluated_capacity: Vec<f64>,
     pub(crate) trial_sink: Vec<f64>,
+    /// Accepted-step face fluxes, `node_count + 1`, written only on acceptance.
+    pub(crate) face_fluxes: Vec<f64>,
     snapshot_heads: Vec<f64>,
     snapshot_water: Vec<f64>,
     snapshot_time: f64,
@@ -113,6 +127,7 @@ impl WaterWorkspace {
             evaluated_conductivity: vec![0.0; node_count],
             evaluated_capacity: vec![0.0; node_count],
             trial_sink: vec![0.0; node_count],
+            face_fluxes: vec![0.0; node_count + 1],
             snapshot_heads: vec![0.0; node_count],
             snapshot_water: vec![0.0; node_count],
             snapshot_time: 0.0,

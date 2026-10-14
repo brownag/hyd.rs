@@ -638,15 +638,7 @@ fn validate_accounting(
     Ok(())
 }
 
-/// Borrowed accepted water values used to couple one solute step.
-#[derive(Clone, Copy, Debug)]
-pub struct AcceptedWaterSnapshot<'a> {
-    pub accepted_time: f64,
-    pub water_contents: &'a [f64],
-    /// `node_count + 1` fluxes: lower boundary, internal faces, upper boundary.
-    /// All entries are signed positive toward increasing mesh coordinates.
-    pub face_fluxes: &'a [f64],
-}
+pub use crate::water_state::AcceptedWaterSnapshot;
 
 /// Inputs held fixed while solving one dissolved transport step.
 #[derive(Clone, Copy, Debug)]
