@@ -1,29 +1,32 @@
 //! Source-mapped compatibility data contracts. Values retain source precision explicitly.
 
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub struct DefaultReal(pub f32);
+/// Error type shared by compatibility kernels; static messages, not owned strings.
+pub(crate) type KernelError = &'static str;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
-pub struct DoubleReal(pub f64);
+pub(crate) struct DefaultReal(pub f32);
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) struct DoubleReal(pub f64);
 
 impl DefaultReal {
-    pub fn from_input(value: f64) -> Self {
+    pub(crate) fn from_input(value: f64) -> Self {
         Self(value as f32)
     }
-    pub fn to_double(self) -> DoubleReal {
+    pub(crate) fn to_double(self) -> DoubleReal {
         DoubleReal(self.0 as f64)
     }
 }
 
 impl DoubleReal {
     /// Mirrors `sngl(F(i))` followed by the active nonnegative concentration clamp.
-    pub fn accepted_concentration(self) -> DefaultReal {
+    pub(crate) fn accepted_concentration(self) -> DefaultReal {
         DefaultReal((self.0 as f32).max(0.0))
     }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum BoundaryForm {
+pub(crate) enum BoundaryForm {
     Prescribed,
     TypeThree,
     ZeroGradient,
@@ -31,13 +34,13 @@ pub enum BoundaryForm {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum FlowOrientation {
+pub(crate) enum FlowOrientation {
     PositiveNative,
     NegativeNative,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum BlockingMode {
+pub(crate) enum BlockingMode {
     Default,
     Type1,
     Type2,
@@ -47,14 +50,14 @@ pub enum BlockingMode {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum SorptionMode {
+pub(crate) enum SorptionMode {
     Equilibrium,
     MobileImmobile,
     DualDomain,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct SourceSwitches {
+pub(crate) struct SourceSwitches {
     pub upstream: bool,
     pub artificial_dispersion: bool,
     pub tortuosity: bool,
@@ -113,7 +116,7 @@ impl Default for SourceSwitches {
 }
 
 impl SourceSwitches {
-    pub fn validate(self, species_count: usize) -> Result<(), &'static str> {
+    pub(crate) fn validate(self, species_count: usize) -> Result<(), KernelError> {
         if self.bacteria && species_count > 1 {
             return Err("bacteria with a multi-species chain is unsupported");
         }
@@ -130,18 +133,18 @@ impl SourceSwitches {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct SourceIndices {
+pub(crate) struct SourceIndices {
     /// For each canonical node, its one-based native Fortran node index.
     pub canonical_to_native: Vec<usize>,
 }
 
 impl SourceIndices {
-    pub fn identity(nodes: usize) -> Self {
+    pub(crate) fn identity(nodes: usize) -> Self {
         Self {
             canonical_to_native: (1..=nodes).collect(),
         }
     }
-    pub fn validate(&self, nodes: usize) -> Result<(), &'static str> {
+    pub(crate) fn validate(&self, nodes: usize) -> Result<(), KernelError> {
         if self.canonical_to_native.len() != nodes {
             return Err("node permutation length mismatch");
         }
@@ -157,19 +160,19 @@ impl SourceIndices {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct UnavailableValue {
+pub(crate) struct UnavailableValue {
     pub availability: String,
     pub reason: String,
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub enum Explicit<T> {
+pub(crate) enum Explicit<T> {
     Available(T),
     Unavailable(UnavailableValue),
 }
 
 impl<T> Explicit<T> {
-    pub fn unavailable_reason(&self) -> Option<&str> {
+    pub(crate) fn unavailable_reason(&self) -> Option<&str> {
         match self {
             Self::Available(_) => None,
             Self::Unavailable(u) => Some(&u.reason),
@@ -178,20 +181,20 @@ impl<T> Explicit<T> {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct UnitValue<T> {
+pub(crate) struct UnitValue<T> {
     pub units: String,
     pub value: Explicit<T>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct CoordinatesSpec {
+pub(crate) struct CoordinatesSpec {
     pub native: String,
     pub canonical: String,
     pub nodes: usize,
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct TransportInputs {
+pub(crate) struct TransportInputs {
     pub temporal_weighting_epsi: Option<UnitValue<DefaultReal>>,
     pub time_interval: Option<UnitValue<DefaultReal>>,
     pub dispersivity: Option<UnitValue<DefaultReal>>,
@@ -212,7 +215,7 @@ pub struct TransportInputs {
 /// (`65-84`, `197-225`) receive. No preassembled row, right-hand side,
 /// residual, endpoint flux or atmospheric coefficient is representable here.
 #[derive(Clone, Debug, PartialEq)]
-pub struct EndpointPrimitiveState {
+pub(crate) struct EndpointPrimitiveState {
     /// `x` (`763`), in native node order.
     pub coordinates: Vec<DefaultReal>,
     /// `thO` (`763`) before the `MatSet` mobile/immobile adjustment (`768-776`).
@@ -282,7 +285,7 @@ pub struct EndpointPrimitiveState {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct SpeciesRecord {
+pub(crate) struct SpeciesRecord {
     pub name: String,
     pub position: usize,
     pub chain_rate_per_hour: DefaultReal,
@@ -291,7 +294,7 @@ pub struct SpeciesRecord {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct ReactionInputs {
+pub(crate) struct ReactionInputs {
     pub equilibrium_mode: Option<UnitValue<bool>>,
     pub fraction_equilibrium: Option<UnitValue<DefaultReal>>,
     pub immobile_water_content: Option<UnitValue<DefaultReal>>,
@@ -309,7 +312,7 @@ pub struct ReactionInputs {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct MaterialSpeciesParameters {
+pub(crate) struct MaterialSpeciesParameters {
     pub species: usize,
     pub material: usize,
     /// Source `ChPar` slots 1..20 for this species/material.
@@ -317,13 +320,13 @@ pub struct MaterialSpeciesParameters {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct MoistureDependencyRequest {
+pub(crate) struct MoistureDependencyRequest {
     pub selector: u8,
     pub table: Vec<DefaultReal>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct TransportPropertyInputs {
+pub(crate) struct TransportPropertyInputs {
     pub coordinates: Option<UnitValue<CoordinatesSpec>>,
     pub temperature_history: Option<UnitValue<Vec<DefaultReal>>>,
     pub species_count: Option<UnitValue<usize>>,
@@ -339,7 +342,7 @@ pub struct TransportPropertyInputs {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct DualDomainRequest {
+pub(crate) struct DualDomainRequest {
     pub dynamic_exchange_claimed: bool,
     pub i_dual_por: u8,
     pub water_model: u8,
@@ -354,7 +357,7 @@ pub struct DualDomainRequest {
 /// `ParD` column (`thr(M)=Par(1,M)`, `ths(M)=Par(2,M)`, `INPUT.FOR:796-797`),
 /// so carrying them here would let a request contradict `ParD(1)`/`ParD(2)`.
 #[derive(Clone, Debug, PartialEq)]
-pub struct DualPorMaterial {
+pub(crate) struct DualPorMaterial {
     /// `ParD(1,M)`; becomes `thr(M)` in `GenMat` (`INPUT.FOR:796`).
     pub mobile_residual_water: DefaultReal,
     /// `ParD(2,M)`; becomes `ths(M)` in `GenMat` (`INPUT.FOR:797`).
@@ -385,7 +388,7 @@ pub struct DualPorMaterial {
 /// `ThNewIm` at `1068` and nothing reads it before the routine returns, and
 /// `ThOldIm(i)=ThNewIm(i)` belongs to `Update` (`WATFLOW.FOR:1112`).
 #[derive(Clone, Debug, PartialEq)]
-pub struct DualPorPrimitiveState {
+pub(crate) struct DualPorPrimitiveState {
     /// `x` (`1029`), native node coordinates in source node order.
     pub coordinates: Vec<DefaultReal>,
     /// `ThOld` (`1027`), the mobile water content at the step's old level.
@@ -414,7 +417,7 @@ pub struct DualPorPrimitiveState {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct NonequilibriumInputs {
+pub(crate) struct NonequilibriumInputs {
     pub dual_domain: Option<UnitValue<DualDomainRequest>>,
     pub dynamic_exchange_sink: Option<UnitValue<Vec<DefaultReal>>>,
     pub dual_porosity_exchange_state: Option<UnitValue<DualPorPrimitiveState>>,
@@ -436,7 +439,7 @@ pub struct NonequilibriumInputs {
 /// are never defaulted anywhere in `src_reference`; the port therefore requires all
 /// five explicitly instead of reusing a reader default as a substitute.
 #[derive(Clone, Debug, PartialEq)]
-pub struct RootUptakePrimitiveState {
+pub(crate) struct RootUptakePrimitiveState {
     /// `jS`, the species index `Solute` passes from its `do 18 jS=1,NS` loop
     /// (`SOLUTE.FOR:51`); it selects `Conc(jS,·)` and guards the unit-78 record.
     pub species: usize,
@@ -495,7 +498,7 @@ pub struct RootUptakePrimitiveState {
 /// `M=1` is hard-coded at `1721`, so the routine is single-material: `Par(·,1)` and
 /// `ChPar(·,1)` are the only columns it can reach.
 #[derive(Clone, Debug, PartialEq)]
-pub struct SizeExclusionPrimitiveState {
+pub(crate) struct SizeExclusionPrimitiveState {
     /// `NumNP` (`1713`), the loop bound of the `1772-1777` write loop.
     pub nodes: usize,
     /// `Par(1,1)`, `thr` (`1725`).
@@ -524,7 +527,7 @@ pub struct SizeExclusionPrimitiveState {
 /// `SourceSwitches` by the adapter), so a request cannot assert a guard value in a
 /// bundle that contradicts the control record and reach a call the source forbids.
 #[derive(Clone, Debug, PartialEq)]
-pub struct SourceCouplingInputs {
+pub(crate) struct SourceCouplingInputs {
     /// `lWat` and `SinkF` only, i.e. the subset of the `INPUT.FOR:31` control read
     /// that guards `Exclusion` and `SetSSnk`. Parsed into the shared
     /// `SourceSwitches` type so each flag keeps exactly one home.
@@ -534,13 +537,13 @@ pub struct SourceCouplingInputs {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct BiologyModeRequest {
+pub(crate) struct BiologyModeRequest {
     pub i_bact: u8,
     pub filtration: bool,
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct BiologyParameters {
+pub(crate) struct BiologyParameters {
     pub blocking_i_psi: Option<u8>,
     pub grain_diameter: Option<DefaultReal>,
     pub particle_diameter: Option<DefaultReal>,
@@ -549,13 +552,13 @@ pub struct BiologyParameters {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct BiologyInputs {
+pub(crate) struct BiologyInputs {
     pub mode: Option<UnitValue<BiologyModeRequest>>,
     pub parameters: Option<UnitValue<BiologyParameters>>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct RequestFields {
+pub(crate) struct RequestFields {
     pub transport: TransportInputs,
     pub reactions: ReactionInputs,
     pub transport_properties: TransportPropertyInputs,
@@ -633,7 +636,7 @@ impl Default for RequestFields {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct SpeciesInput {
+pub(crate) struct SpeciesInput {
     pub name: String,
     pub chpar: Vec<DefaultReal>,
     pub initial_concentration: Vec<DefaultReal>,
@@ -642,7 +645,7 @@ pub struct SpeciesInput {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct CompatibilityInput {
+pub(crate) struct CompatibilityInput {
     pub schema_version: String,
     pub request_sha256: String,
     pub input_sha256: Vec<(String, String)>,
@@ -662,7 +665,7 @@ pub struct CompatibilityInput {
 }
 
 impl CompatibilityInput {
-    pub fn validate_dimensions(&self) -> Result<(), &'static str> {
+    pub(crate) fn validate_dimensions(&self) -> Result<(), KernelError> {
         let species_count = self.species.len().max(
             self.fields
                 .transport_properties
@@ -694,7 +697,7 @@ impl CompatibilityInput {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct CompatibilityState {
+pub(crate) struct CompatibilityState {
     pub time: DefaultReal,
     pub concentration: Vec<Vec<DefaultReal>>,
     pub sorb: Vec<Explicit<Vec<DefaultReal>>>,
@@ -702,7 +705,7 @@ pub struct CompatibilityState {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct CompatibilityWorkspace {
+pub(crate) struct CompatibilityWorkspace {
     pub lower: Vec<DoubleReal>,
     pub diagonal: Vec<DoubleReal>,
     pub upper: Vec<DoubleReal>,
@@ -711,7 +714,7 @@ pub struct CompatibilityWorkspace {
 }
 
 #[derive(Clone, Debug, PartialEq)]
-pub struct TraceObservation {
+pub(crate) struct TraceObservation {
     pub species: usize,
     pub native_node: Option<usize>,
     pub checkpoint: String,

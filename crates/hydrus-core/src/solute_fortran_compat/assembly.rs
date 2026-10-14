@@ -4,6 +4,8 @@
 //! task 18.5.2. `g0`/`g1` are likewise caller-provided source-term seams for
 //! process modules; this module does not derive reaction or sorption terms.
 
+use super::types::KernelError;
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum AssemblyLevel {
     Old,
@@ -52,7 +54,7 @@ pub(crate) fn assemble_interior(
     alf: f32,
     dt: f32,
     endpoint_seam: EndpointAssemblySeam,
-) -> Result<InteriorRows, &'static str> {
+) -> Result<InteriorRows, KernelError> {
     let n = inputs.x.len();
     if n < 3
         || inputs.theta_old.len() != n
@@ -165,7 +167,7 @@ pub(crate) fn ban_solve(
     diagonal: &mut [f64],
     upper: &mut [f64],
     rhs: &mut [f64],
-) -> Result<(), &'static str> {
+) -> Result<(), KernelError> {
     let n = diagonal.len();
     if n == 0 || lower.len() != n || upper.len() != n || rhs.len() != n {
         return Err("tridiagonal arrays must have the same nonzero length");

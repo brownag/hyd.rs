@@ -1,6 +1,6 @@
 //! Source-ordered mass accounting and the conditionally active flux-concentration helper.
 
-use super::types::{DefaultReal, Explicit};
+use super::types::{DefaultReal, Explicit, KernelError};
 
 /// Cumulative values written by the active end-of-step `MassTran` call.
 #[derive(Clone, Debug, PartialEq)]
@@ -49,7 +49,7 @@ pub struct MassTranInput<'a> {
 
 impl MassTotals {
     /// Accumulate one species in source node/operation order using default REAL.
-    pub fn accumulate(&mut self, input: &MassTranInput<'_>) -> Result<(), &'static str> {
+    pub fn accumulate(&mut self, input: &MassTranInput<'_>) -> Result<(), KernelError> {
         let n = input.coordinates.len();
         let node_slices = [
             input.material_ids.len(),
@@ -211,7 +211,7 @@ impl MassTotals {
         tti: f32,
         ttj: f32,
         dx: f32,
-    ) -> Result<(), &'static str> {
+    ) -> Result<(), KernelError> {
         let ch = input.chpar;
         let par = |row: usize, m: usize, tt: f32| ch[m][row].0 * (input.tdep[row].0 * tt).exp();
         let rhoi = par(0, mi, tti);
@@ -386,7 +386,7 @@ fn deposit(
     temp: f32,
     x_conv: f32,
     t_conv: f32,
-) -> Result<(f32, f32), &'static str> {
+) -> Result<(f32, f32), KernelError> {
     let dc = dc1 / x_conv;
     let dp = dp1 / x_conv;
     if dp <= 0.0 && dc <= 0.0 {
@@ -450,7 +450,7 @@ pub struct FluxConcInput<'a> {
 /// integration requirement.
 pub fn flux_concentration(
     input: &FluxConcInput<'_>,
-) -> Result<Explicit<Vec<DefaultReal>>, &'static str> {
+) -> Result<Explicit<Vec<DefaultReal>>, KernelError> {
     let n = input.coordinates.len();
     if n < 2
         || input.concentration.len() != n

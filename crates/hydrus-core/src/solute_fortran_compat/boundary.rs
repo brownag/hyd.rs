@@ -5,7 +5,7 @@
 //! [`DefaultReal`] and only the `B`/`D`/`E`/`F` accumulations widen, statement by
 //! statement, as the source evaluates them.
 
-use super::types::{DefaultReal, EndpointPrimitiveState};
+use super::types::{DefaultReal, EndpointPrimitiveState, KernelError};
 
 /// `Tr` (`42`, `76`, `885`, `918`).
 const REFERENCE_TEMPERATURE_K: f32 = 293.15;
@@ -102,7 +102,7 @@ pub(crate) fn assemble_endpoints(
     state: &EndpointPrimitiveState,
     lower_code: i32,
     upper_code: i32,
-) -> Result<EndpointResult, &'static str> {
+) -> Result<EndpointResult, KernelError> {
     validate(state, lower_code, upper_code)?;
     let lower = natural_lower(state);
     let upper = natural_upper(state);
@@ -117,7 +117,7 @@ pub(super) fn validate(
     state: &EndpointPrimitiveState,
     lower_code: i32,
     upper_code: i32,
-) -> Result<(), &'static str> {
+) -> Result<(), KernelError> {
     let n = state.coordinates.len();
     if n < 2 {
         return Err("the endpoint kernel needs at least two nodes");
@@ -445,7 +445,7 @@ fn assemble_upper(
     state: &EndpointPrimitiveState,
     natural: &NaturalUpper,
     code: i32,
-) -> Result<EndpointNode, &'static str> {
+) -> Result<EndpointNode, KernelError> {
     let top = state.coordinates.len() - 1;
     let prescribed = state.top_prescribed.0;
     let mut level_old = EndpointRow {
@@ -520,7 +520,7 @@ struct Atmosphere {
     concentration: f32,
 }
 
-fn atmosphere(state: &EndpointPrimitiveState) -> Result<Atmosphere, &'static str> {
+fn atmosphere(state: &EndpointPrimitiveState) -> Result<Atmosphere, KernelError> {
     let surface = state
         .top_surface_distance
         .ok_or("the atmospheric endpoint needs the source surface distance")?
@@ -576,7 +576,7 @@ fn source_chpar(
     state: &EndpointPrimitiveState,
     material: usize,
     slot: usize,
-) -> Result<f32, &'static str> {
+) -> Result<f32, KernelError> {
     let records = state
         .source_chpar
         .as_ref()
@@ -597,7 +597,7 @@ fn source_chpar(
 
 /// `TDep((jS-1)*16+slot)` (`766`, `887-890`), the flat reader layout with a
 /// 16-entry stride per species (`INPUT.FOR:1379-1390`).
-fn source_tdep(state: &EndpointPrimitiveState, slot: usize) -> Result<f32, &'static str> {
+fn source_tdep(state: &EndpointPrimitiveState, slot: usize) -> Result<f32, KernelError> {
     let tdep = state
         .source_tdep
         .as_ref()
@@ -626,7 +626,7 @@ fn endpoint_flux(
     upper: &NaturalUpper,
     bottom_code: i32,
     top_code: i32,
-) -> Result<EndpointFlux, &'static str> {
+) -> Result<EndpointFlux, KernelError> {
     let n = state.coordinates.len();
     let top = n - 1;
     let c_bot = state.bottom_prescribed.0;

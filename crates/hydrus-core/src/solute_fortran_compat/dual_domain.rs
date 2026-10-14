@@ -38,7 +38,7 @@
 //! which the reader remaps to `iModel=0`, and `0 < nTabMod` (`INPUT.FOR:1685`,
 //! `nTabMod=10`).
 
-use super::types::{DefaultReal, DualPorPrimitiveState};
+use super::types::{DefaultReal, DualPorPrimitiveState, KernelError};
 
 /// `FH`'s and `FK`'s `Par` actual argument, i.e. one `ParD` column.
 ///
@@ -89,7 +89,7 @@ pub(crate) struct DualPorExchange {
 /// `subroutine DualPor` for one water step (`WATFLOW.FOR:1027-1075`).
 pub(crate) fn dual_porosity_exchange(
     state: &DualPorPrimitiveState,
-) -> Result<DualPorExchange, &'static str> {
+) -> Result<DualPorExchange, KernelError> {
     validate(state)?;
     let nodes = state.coordinates.len();
     let dt = state.dt.0;
@@ -224,6 +224,7 @@ pub(crate) fn dual_porosity_exchange(
 /// `Qm=Qs` and `Qa=Qr` come from the `iModel` branches that fall through for 0
 /// (`355-363`). `HMin=-1.d300**(1.d0/n)/max(Alfa,1.d0)` (`367`) parses as
 /// `-(1d300**(1/n))/max(Alfa,1d0)`, because `**` outranks unary minus.
+/// Intentionally not shared with `hydraulics`; see ADR-0015.
 fn retention_head(qe: DefaultReal, par: &ImmobilePar) -> f32 {
     let qe = f64::from(qe.0);
     let q_r = f64::from(par.q_r);
@@ -252,6 +253,7 @@ fn retention_head(qe: DefaultReal, par: &ImmobilePar) -> f32 {
 /// empty. `67`, `144` and `148` are sequential assignments to the `FK` result, so a
 /// later one overwrites an earlier one; with `Hk == Hs` exactly one of `67` and
 /// `148` ever fires. `PPar=2` (`32`).
+/// Intentionally not shared with `hydraulics`; see ADR-0015.
 fn conductivity(head: DefaultReal, par: &ImmobilePar) -> f32 {
     let h = f64::from(head.0);
     let q_r = f64::from(par.q_r);
@@ -305,7 +307,7 @@ fn conductivity(head: DefaultReal, par: &ImmobilePar) -> f32 {
 /// otherwise carry into `SinkIm`, and they mirror the predicates
 /// `hydraulics::HydraulicModel::validate` already applies to the mobile-domain
 /// pair.
-pub(super) fn validate(state: &DualPorPrimitiveState) -> Result<(), &'static str> {
+pub(super) fn validate(state: &DualPorPrimitiveState) -> Result<(), KernelError> {
     let nodes = state.coordinates.len();
     if nodes == 0 {
         return Err("dual-porosity exchange needs at least one node");
