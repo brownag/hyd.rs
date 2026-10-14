@@ -171,7 +171,7 @@ Plan: [EXECUTION_PLAN_18.md](EXECUTION_PLAN_18.md). Worker template: [PROMPT_TEM
   source arguments. A pre-existing defect that validated `ChPar(4,M)` per node
   instead of per material is fixed and tested. Boundary 9 -> 14 tests, adapter
   5 -> 7 tests.
-| 8 | 18.8.1–18.8.2 | Conditional initialization and selector-2 audit resolution | amended; pending |
+| 8 | 18.8.1–18.8.2 | Conditional initialization and selector-2 audit resolution | done |
 | 9 | 18.9.1–18.9.5 | Source-faithful process kernels | pending |
 | 10 | 18.10.1 | Source-ordered solute step driver | pending |
 | 11 | 18.11.1 | Nonlinear iteration and convergence | pending |
@@ -325,3 +325,22 @@ Plan: [EXECUTION_PLAN_18.md](EXECUTION_PLAN_18.md). Worker template: [PROMPT_TEM
 - This wave establishes isolated raw Fortran execution and parity plumbing only. Fixture-specific normalization and paired Rust comparison remain planned in Waves 3 and 10–11; no parity claim is made here.
 
 The orchestrator owns wave verification and state updates. Preserve all pre-existing working-tree changes. A blocker requiring out-of-scope edits requires a plan amendment.
+
+## 18.8.2 — Resolve remaining moisture-dependent selector path
+
+- Status: done (3659398). Doc-only; no runtime change.
+- Evidence: only `iMoistDep` assignments are `INPUT.FOR:1693` (=0) and `INPUT.FOR:1320` (`if(lMoistDep) iMoistDep=1`); `INPUT.FOR:1330` writes it, `:1655` is a comment; `SOLUTE.FOR` uses are `.gt.0` guards/pass-through. Sole `MoistDepIn` caller `HYDRUS.FOR:279–281` gated on `.eq.2` → selector 2 unselected; `MoistDepIn` not implemented.
+- Files: `planning/master/SOLUTE_FORTRAN_COMPATIBILITY_18.md` (matrix row + follow-on note), `planning/tasks/18.8.2.todo.md`. Grep log `.development/18.8.2/`.
+- Follow-up: adapter still accepts moisture selector 2 (`adapter/reactions.rs:100`); needs a rejection task.
+
+## 18.8.1 — Port conditional source initializers
+
+- Status: done (a727cae). New `initialization.rs` (registered dead-code until 18.10.1): `MassInit`, `NonEqInit`, `cInit`/`SolMass`/`ZBRAK1`/`ZBRENT1` in f32 source order; `initialize_sources` reproduces `HYDRUS.FOR:279–288` gating (iDualPor>0 forces lEquil false; MassInit before NonEqInit, which sees converted Conc).
+- Tests: `cargo test -p hydrus-core solute_fortran_compat::initialization::tests` 10/10.
+- Source quirks pinned by tests: `xKs2` reuses `rKa1/rKd1`; `Par(6)` uses `TDep(jjj+7)`; `fExp` no TDep; MassInit reads TempN, NonEqInit TempO; Conc<=0 skipped. PAUSE paths → `KernelError`; validate before mutation.
+- Deviations: `needless_range_loop` allows (source index order); expected values hand-computed (planned independent script not written).
+- For 18.10.1: kernel takes own `pub(crate)` records `InitConfig`/`InitState`/`InitFlags`; driver maps adapter state into them.
+
+## Wave 8 closed — 2026-10-14
+
+- Gate at a727cae: Rust 313 passed / 0 failed / 1 ignored; Python 291 OK; fmt, clippy -D warnings, diff-check clean.
