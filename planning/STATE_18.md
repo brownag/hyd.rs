@@ -1,7 +1,7 @@
 # State — Orchestration 18
 
 Plan status: **Approved by user on 2026-10-08 (“yes”).**
-Execution status: **Waves 1–6 complete; Wave 7 active.** 18.7.4 selector/state mapping was accepted 2026-10-12. 18.7.1 contract amendment is implemented; endpoint kernels and independent acceptance coverage remain incomplete. Accepted Wave 5 work includes 18.5.1 and 18.5.3; 18.5.2 is incomplete and superseded by 18.7.1. Wave 3 fixtures authenticate raw outputs only; normalized parity remains pending. Default backend must not change before the full parity gate.
+Execution status: **Waves 1–6 complete; Wave 7 active.** 18.7.4 selector/state mapping was accepted 2026-10-12 and 18.7.1 endpoint equations were accepted 2026-10-13 (`49192d7`); the remaining Wave 7 work is the Fortran fixtures and the active-path/dual-domain tasks. Accepted Wave 5 work includes 18.5.1 and 18.5.3; 18.5.2 is incomplete and superseded by 18.7.1. Wave 3 fixtures authenticate raw outputs only; normalized parity remains pending. Default backend must not change before the full parity gate.
 Plan: [EXECUTION_PLAN_18.md](EXECUTION_PLAN_18.md). Worker template: [PROMPT_TEMPLATE_18.md](PROMPT_TEMPLATE_18.md).
 
 ## Baseline and guardrails
@@ -44,7 +44,41 @@ Plan: [EXECUTION_PLAN_18.md](EXECUTION_PLAN_18.md). Worker template: [PROMPT_TEM
 | 5 | 18.5.2 | Endpoint rows and flux closure | superseded/incomplete; replaced by 18.7.1 |
 | 5 | 18.5.3 | Source accounting and observations | done; fixed-form corrections accepted |
 | 6 | 18.6.6 | Fixed-form reachability re-audit | done; consistency review accepted |
-| 7 | 18.7.4 → 18.7.1–18.7.3, 18.7.5–18.7.8 | Selector mapping first, then endpoint/active kernels and fixtures | 18.7.1 in progress; contract and partial kernel present, acceptance coverage not met |
+| 7 | 18.7.4 → 18.7.1–18.7.3, 18.7.5–18.7.8 | Selector mapping first, then endpoint/active kernels and fixtures | 18.7.4 and 18.7.1 done; 18.7.6 in flight; 18.7.7 and 18.7.3 ready; 18.7.8 then 18.7.4/18.7.5 follow |
+| 7A | 18.7.1 | Primitive-input endpoint equations | done (commit `49192d7`) |
+| 7A | 18.7.6 | Explicit Fortran fixtures | in flight |
+| 7B | 18.7.2 → 18.7.3 | Exchange fixture, then dynamic transfer kernel | ready once 18.7.1 is approved |
+| 7C | 18.7.5 → 18.7.7 → 18.7.8 | Root-uptake fixture, kernel, then composed active path | pending |
+
+## Active tasks
+
+- 18.7.6: ready (Wave 7A), dispatched to worker in
+  `.development/18-worktrees/18.7.6` from `49192d7`. Touches only
+  `reference/fortran/**`, `tools/**` and its own test and task files; it must not
+  edit `types.rs`, `adapter.rs`, `boundary.rs`, `src_reference/**` or any
+  canonical deck.
+
+## Completed tasks
+
+- 18.7.1: done (commit `49192d7`, "feat(solute): derive endpoint rows from
+  source primitives", parent `79b26af`, worktree
+  `.development/18-worktrees/18.7.1` on branch `orchestration/18.7.1`, merged
+  and removed). `boundary.rs` derives the node-1 and node-N equations of both
+  `MatSet` levels and the single `cvBot`/`cvTop` pair per species and step from
+  primitives only: the `iDualPor.eq.0` water reduction with `.and.` precedence
+  (768-776), `g0`/`g1`/`Disp`/`Retard` at both levels (781-800, 869-902), the
+  strict `vN(1).gt.0` and `vN(N).lt.0` predicates, the vapor zero-resistance
+  exception (811), the `kTopCh.le.0`-only guard on the Level-1 `F(N)` (880), the
+  `kTopCh <= 0` prescribed term including `-2` (915), the unit `TLevel` coefficient
+  (201), `rMin` (224-225), and unsupported codes rejected instead of leaving
+  stale `D/E/F`. `EndpointPrimitiveState` now carries `ChPar((jS-1)*16+slot, M)`
+  as per-species/per-material records, flat 1-D `TDep`, both `TempO(N)` and
+  `TempN(N)`, and separate matrix (`vCorr`-free) and closure velocity families;
+  `old_accepted_flow`, `new_accepted_flow`, `old_accepted_concentration`,
+  `henry_coefficient` and `gas_diffusion` are deleted because they are not
+  source arguments. A pre-existing defect that validated `ChPar(4,M)` per node
+  instead of per material is fixed and tested. Boundary 9 -> 14 tests, adapter
+  5 -> 7 tests.
 | 8 | 18.8.1–18.8.2 | Conditional initialization and selector-2 audit resolution | amended; pending |
 | 9 | 18.9.1–18.9.5 | Source-faithful process kernels | pending |
 | 10 | 18.10.1 | Source-ordered solute step driver | pending |
@@ -54,6 +88,32 @@ Plan: [EXECUTION_PLAN_18.md](EXECUTION_PLAN_18.md). Worker template: [PROMPT_TEM
 | 14 | 18.14.1 | Wire paired Fortran/Rust execution and comparison | pending |
 | 15 | 18.15.1 | All-mode parity report and acceptance | pending |
 | 16 | 18.16.1 | Switch default after accepted parity; retain FV/BE | pending |
+
+## Verification — Wave 7 in progress
+
+- At `49192d7` (18.7.1 merged): `cargo test --workspace` 186 passed, 0 failed;
+  `cargo test -p hydrus-core --lib solute_fortran_compat` 41 passed, 0 failed
+  (boundary 14, adapter 7, transport 8, other 12); `cargo fmt --all -- --check`
+  clean; `cargo clippy -p hydrus-core --all-targets` emits zero warnings (the two
+  pre-existing lib warnings at the baseline are gone and none were introduced);
+  `git diff --check` clean; exactly one commit; worktree removed;
+  `.development/**/target/` untracked and ignored.
+- Baseline re-recorded at `726662f`: `cargo test --workspace` 179 passed, 0
+  failed; Python unittest suite 291 tests, OK.
+- **BLOCKER for the Wave 7-end gate:** the recorded Python interpreter
+  `/home/andrew/miniconda3/envs/hydrus_rust/bin/python` — and the whole
+  `/home/andrew/miniconda3` tree — no longer exist on this host, and the
+  repository has no `.venv`, so the 291-test Python suite cannot be re-run.
+  System `/usr/bin/python3` (3.12) cannot even discover it (`TypeError: expected
+  str, bytes or os.PathLike object, not NoneType`). 18.7.1 changed no Python or
+  fixture file (`git show --stat 49192d7` covers three Rust files and the task
+  TODO), so its Python baseline is unchanged; later Wave 7 tasks that touch
+  `tools/**` cannot be gated until the interpreter is restored.
+- State-file integrity note: mid-session (2026-10-13 ~20:11) `planning/STATE_18.md`
+  in the working tree was replaced by an older revision that had no Active
+  tasks/Completed tasks/Verification sections; `79b26af` committed that revision
+  plus the sequencing amendment. The sections above are re-established from the
+  session record; no other planning document was affected.
 
 ## Task reports
 
