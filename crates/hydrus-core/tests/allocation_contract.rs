@@ -9,6 +9,10 @@ use hydrus_core::{
     WaterStepInput, WaterStepPolicy, WaterWorkspace,
 };
 
+mod common;
+
+use common::{mesh, policy};
+
 struct AllocationModel {
     conductivity: f64,
     capacity: f64,
@@ -50,21 +54,6 @@ unsafe impl GlobalAlloc for CountingAllocator {
 
 #[global_allocator]
 static ALLOCATOR: CountingAllocator = CountingAllocator;
-
-fn mesh() -> Mesh1D {
-    Mesh1D::new(vec![0.0, 1.0, 2.0], vec![0; 3], None, 1, 0, 0.0).unwrap()
-}
-
-fn policy(max_iterations: usize, minimum_timestep: f64) -> WaterStepPolicy {
-    WaterStepPolicy {
-        max_iterations,
-        head_tolerance: 0.5,
-        water_tolerance: 0.5,
-        minimum_timestep,
-        retry_factor: 3.0,
-        minimum_pivot: 1e-12,
-    }
-}
 
 fn input<'a>(
     mesh: &'a Mesh1D,

@@ -7,6 +7,10 @@ use hydrus_core::{
     WaterState, WaterStepError, WaterStepInput, WaterStepPolicy, WaterWorkspace,
 };
 
+mod common;
+
+use common::default_policy as policy;
+
 struct Model;
 
 impl HydraulicModel for Model {
@@ -23,17 +27,6 @@ impl HydraulicModel for Model {
             dconductivity_dhead: 0.0,
             dcapacity_dhead: 0.0,
         })
-    }
-}
-
-fn policy() -> WaterStepPolicy {
-    WaterStepPolicy {
-        max_iterations: 8,
-        head_tolerance: 1e-10,
-        water_tolerance: 1e-10,
-        minimum_timestep: 0.01,
-        retry_factor: 2.0,
-        minimum_pivot: 1e-12,
     }
 }
 

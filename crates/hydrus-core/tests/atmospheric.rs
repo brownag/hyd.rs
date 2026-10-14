@@ -8,6 +8,10 @@ use hydrus_core::{
     WaterStepInput, WaterStepPolicy, WaterWorkspace,
 };
 
+mod common;
+
+use common::default_policy as policy;
+
 struct LinearModel;
 
 impl HydraulicModel for LinearModel {
@@ -56,17 +60,6 @@ fn setup<'a>(
         upper_condition: BoundaryCondition::Dirichlet { value: 0.0 },
         lower_boundary_flux: 0.0,
         upper_boundary_flux: 0.0,
-    }
-}
-
-fn policy() -> WaterStepPolicy {
-    WaterStepPolicy {
-        max_iterations: 8,
-        head_tolerance: 1e-10,
-        water_tolerance: 1e-10,
-        minimum_timestep: 0.01,
-        retry_factor: 2.0,
-        minimum_pivot: 1e-12,
     }
 }
 

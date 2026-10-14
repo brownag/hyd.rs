@@ -3,8 +3,12 @@ use hydrus_core::hydraulics::{
 };
 use hydrus_core::{
     advance_water_step, HydraulicError, HydraulicModel, LowerBoundaryMode, WaterState,
-    WaterStepError, WaterStepInput, WaterStepPolicy, WaterWorkspace,
+    WaterStepError, WaterStepInput, WaterWorkspace,
 };
+
+mod common;
+
+use common::policy;
 
 struct TransactionModel {
     conductivity: f64,
@@ -45,16 +49,6 @@ static MATERIALS: [&dyn HydraulicModel; 3] = [&LOWER_MODEL, &INTERIOR_MODEL, &UP
 
 fn mesh() -> Mesh1D {
     Mesh1D::new(vec![0.0, 1.0, 2.0], vec![0, 1, 2], None, 3, 0, 0.0).unwrap()
-}
-fn policy(max_iterations: usize, minimum_timestep: f64) -> WaterStepPolicy {
-    WaterStepPolicy {
-        max_iterations,
-        head_tolerance: 0.5,
-        water_tolerance: 0.5,
-        minimum_timestep,
-        retry_factor: 3.0,
-        minimum_pivot: 1e-12,
-    }
 }
 fn input<'a>(mesh: &'a Mesh1D, timestep: f64) -> WaterStepInput<'a> {
     WaterStepInput {

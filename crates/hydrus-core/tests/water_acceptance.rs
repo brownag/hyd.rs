@@ -21,6 +21,10 @@ use hydrus_core::{
     WaterStepInput, WaterStepPolicy, WaterWorkspace,
 };
 
+mod common;
+
+use common::mesh;
+
 struct LinearModel;
 
 impl HydraulicModel for LinearModel {
@@ -39,10 +43,6 @@ impl HydraulicModel for LinearModel {
             dcapacity_dhead: 0.0,
         })
     }
-}
-
-fn mesh() -> Mesh1D {
-    Mesh1D::new(vec![0.0, 1.0, 2.0], vec![0; 3], None, 1, 0, 0.0).unwrap()
 }
 
 fn policy() -> WaterStepPolicy {
