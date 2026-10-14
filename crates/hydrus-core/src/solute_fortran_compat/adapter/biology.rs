@@ -4,16 +4,6 @@ use super::*;
 use serde::Deserialize;
 use serde_json::{Map, Value};
 
-/// Serde reads a JSON array as a positional tuple; the old `as_object` decoders
-/// rejected it, so every struct DTO level is guarded before decoding.
-fn require_object(value: &Value, name: &str) -> Result<(), String> {
-    if value.is_object() {
-        Ok(())
-    } else {
-        Err(format!("field {name}: value must be an object"))
-    }
-}
-
 fn require_wrapped_object(fields: &Map<String, Value>, name: &str) -> Result<(), String> {
     match fields.get(name).and_then(|w| w.get("value")) {
         Some(v) => require_object(v, name),

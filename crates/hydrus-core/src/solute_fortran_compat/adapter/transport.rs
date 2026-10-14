@@ -117,9 +117,27 @@ impl TryFrom<EndpointDto> for EndpointPrimitiveState {
     }
 }
 
+/// Struct DTOs take the unit wrapper's `value`; reject a non-object before serde
+/// reads an array as a tuple.
+fn guard_wrapper_object(
+    fields: &Map<String, Value>,
+    name: &str,
+    units: &str,
+) -> Result<(), String> {
+    match field_value(fields, name, units)?.and_then(|w| w.get("value")) {
+        Some(v) => require_object(v, name),
+        None => Ok(()),
+    }
+}
+
 pub(super) fn maybe_endpoint_state(
     fields: &Map<String, Value>,
 ) -> Result<Option<UnitValue<EndpointPrimitiveState>>, String> {
+    guard_wrapper_object(
+        fields,
+        "endpoint_primitives",
+        "source primitive endpoint state",
+    )?;
     let dto = decode_unit_value::<EndpointDto>(
         fields,
         "endpoint_primitives",
@@ -170,6 +188,7 @@ struct SwitchesDto {
 pub(super) fn maybe_transport_switches(
     fields: &Map<String, Value>,
 ) -> Result<Option<UnitValue<SourceSwitches>>, String> {
+    guard_wrapper_object(fields, "transport_switches", "source flags")?;
     let dto = decode_unit_value::<SwitchesDto>(fields, "transport_switches", "source flags")?;
     map_available(dto, |d| {
         Ok(SourceSwitches {
@@ -412,5 +431,48 @@ mod tests {
         let mut o = Map::new();
         o.insert("o".into(), json!({"units": "orientation", "value": ""}));
         err_has(maybe_orientation(&o, "o"), "field o");
+    }
+
+    #[test]
+    fn rejects_array_as_endpoint_struct() {
+        // A complete positional tuple in field order: serde would accept it.
+        let a = json!([1.0, 2.0]);
+        let mut positional = vec![a.clone(); 14];
+        positional.extend([json!(0.5), json!(1.0), json!(0.0)]);
+        positional.extend([
+            json!(1.0),
+            json!(1.0),
+            json!(1.0),
+            json!(1.0),
+            json!([]),
+            a.clone(),
+        ]);
+        positional.extend([json!([1, 1]), a.clone(), a.clone(), json!([false])]);
+        positional.extend([json!(1), json!(false), json!(0)]);
+        positional.extend([json!(0.0), json!(0.0), json!(0.0), a]);
+        positional.extend([json!(0), json!(false), json!(1.0)]);
+        let positional = Value::Array(positional);
+        let mut m = Map::new();
+        m.insert(
+            "endpoint_primitives".into(),
+            json!({"units": "source primitive endpoint state", "value": positional}),
+        );
+        err_has(maybe_endpoint_state(&m), "endpoint_primitives");
+    }
+
+    #[test]
+    fn rejects_array_as_switches_struct() {
+        err_has(
+            maybe_transport_switches(&switches(json!([true, false]))),
+            "transport_switches",
+        );
+    }
+
+    #[test]
+    fn rejects_empty_array_as_switches_struct() {
+        err_has(
+            maybe_transport_switches(&switches(json!([]))),
+            "transport_switches",
+        );
     }
 }

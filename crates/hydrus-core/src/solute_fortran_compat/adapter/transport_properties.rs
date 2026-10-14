@@ -4,16 +4,6 @@ use super::*;
 use serde::Deserialize;
 use serde_json::{Map, Value};
 
-/// Rejects a non-object before a struct DTO sees it: serde would read a JSON
-/// array as a tuple struct, where the old decoders required an object.
-fn require_object(value: &Value, name: &str) -> Result<(), String> {
-    if value.is_object() {
-        Ok(())
-    } else {
-        Err(format!("field {name}: value must be an object"))
-    }
-}
-
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct CoordinatesDto {

@@ -58,13 +58,6 @@ pub(super) fn as_f64(v: &Value, name: &str) -> Result<f64, String> {
         .ok_or_else(|| format!("field {name}: expected finite number"))
 }
 
-pub(super) fn as_u8(v: &Value, name: &str) -> Result<u8, String> {
-    let n = v
-        .as_u64()
-        .ok_or_else(|| format!("field {name}: expected nonnegative integer"))?;
-    u8::try_from(n).map_err(|_| format!("field {name}: integer out of range"))
-}
-
 pub(super) fn as_i32(v: &Value, name: &str) -> Result<i32, String> {
     let n = v
         .as_i64()
@@ -214,6 +207,16 @@ impl<'de, T: Deserialize<'de>> Deserialize<'de> for UnitValue<T> {
             units: w.units,
             value,
         })
+    }
+}
+
+/// Serde reads a JSON array as a positional tuple; the old `as_object` decoders
+/// rejected it, so every struct DTO level is guarded before decoding.
+pub(super) fn require_object(value: &Value, name: &str) -> Result<(), String> {
+    if value.is_object() {
+        Ok(())
+    } else {
+        Err(format!("field {name}: value must be an object"))
     }
 }
 
