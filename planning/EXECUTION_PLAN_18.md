@@ -252,6 +252,8 @@ Tasks within each wave own disjoint files. Waves are sequential because the norm
 - **Do not touch:** shared types/adapter, transport/boundary/accounting, dual-domain, other process modules, public API, fixtures, or pinned source.
 - **Anchors:** corrected 18.6.6 call matrix; `SOLUTE.FOR` `NEquil` 631–641 / 1078–1204 and `SorbConc` 184–188 / 1212–1313.
 - **Acceptance:** `cargo test -p hydrus-core solute_fortran_compat::nonequilibrium::tests` and `cargo test -p hydrus-core solute_fortran_compat::processes::tests`; independent source-derived tests cover each reachable updater/factor family, table/material/species selection, state/pool order, and selector guards. Selector-2 status is evidenced explicitly. No parity claim.
+- **Amendment 2026-10-14 (Orchestration 19):** New kernel files are registered in `compat/mod.rs` with `#[allow(dead_code)] // wired by 18.10.1` (STATE_19, 19.2.1). Kernel errors use `KernelError`; shared types are `pub(crate)`. Shape checks live in the kernel's `validate` and the adapter calls it (ADR-0014). `adapter.rs` no longer exists: it is `adapter/{mod,json_guard,fields,tests}.rs` plus group files `transport`, `reactions`, `transport_properties`, `nonequilibrium`, `biology`, `source_coupling` (19.3.1). New request records are serde DTOs in the matching group file, using the `fields.rs` helpers `decode_unit_value`, `present`, `map_available` and `require_object` (at every struct level, D12) with `deny_unknown_fields` (19.4.1); run rejection tests against the old code first. `Cargo.*` stays frozen (ADR-0011).
+
 ### 18.7.3 — Port active dynamic dual-porosity exchange
 
 - **Repo:** `/home/andrew/AI/hyd.rs`.
@@ -282,6 +284,8 @@ Tasks within each wave own disjoint files. Waves are sequential because the norm
 - **Spec:** Add the source call at `SOLUTE.FOR:135–140`, guarded by `Level==1 && Iter==1`, using old-level temperature, water, velocity, pools, and `alf`. Preserve separation from the existing end-of-step call and prove call ordering/cumulative state effect. Do not modify the driver or introduce oracle-fed aggregate values. The driver task owns invoking this implementation.
 - **Do not touch:** driver, transport/boundary, shared adapter/types, other kernels, fixtures, or pinned source.
 - **Acceptance:** `cargo test -p hydrus-core solute_fortran_compat::accounting::tests`; source-derived tests distinguish old/new snapshots, guard behavior, weighting (`alf` vs `epsi`), and cumulative order. No parity claim.
+- **Amendment 2026-10-14 (Orchestration 19):** New kernel files are registered in `compat/mod.rs` with `#[allow(dead_code)] // wired by 18.10.1` (STATE_19, 19.2.1). Kernel errors use `KernelError`; shared types are `pub(crate)`. Shape checks live in the kernel's `validate` and the adapter calls it (ADR-0014). `adapter.rs` no longer exists: it is `adapter/{mod,json_guard,fields,tests}.rs` plus group files `transport`, `reactions`, `transport_properties`, `nonequilibrium`, `biology`, `source_coupling` (19.3.1). New request records are serde DTOs in the matching group file, using the `fields.rs` helpers `decode_unit_value`, `present`, `map_available` and `require_object` (at every struct level, D12) with `deny_unknown_fields` (19.4.1); run rejection tests against the old code first. `Cargo.*` stays frozen (ADR-0011).
+
 ### 18.7.6 — Add authenticated dynamic dual-exchange reference fixtures
 
 - **Repo:** `/home/andrew/AI/hyd.rs`.
@@ -302,6 +306,8 @@ Tasks within each wave own disjoint files. Waves are sequential because the norm
 - **Do not touch:** prior fixture groups/artifacts, kernels, parity normalizer/comparator, pinned source, or tolerances.
 - **Anchors:** `HYDRUS.FOR` lFlux flag setup, `SOLUTE.FOR` FluxConc call/output, Wave 3 observation-map schema.
 - **Acceptance:** a complete authenticated reference-only run proves the enabled selector reaches the call; map every printed output or declare explicit unavailability and a blocker. Validate request/input/output/provenance hashes; no parity claim.
+- **Amendment 2026-10-14 (Orchestration 19):** New kernel files are registered in `compat/mod.rs` with `#[allow(dead_code)] // wired by 18.10.1` (STATE_19, 19.2.1). Kernel errors use `KernelError`; shared types are `pub(crate)`. Shape checks live in the kernel's `validate` and the adapter calls it (ADR-0014). `adapter.rs` no longer exists: it is `adapter/{mod,json_guard,fields,tests}.rs` plus group files `transport`, `reactions`, `transport_properties`, `nonequilibrium`, `biology`, `source_coupling` (19.3.1). New request records are serde DTOs in the matching group file, using the `fields.rs` helpers `decode_unit_value`, `present`, `map_available` and `require_object` (at every struct level, D12) with `deny_unknown_fields` (19.4.1); run rejection tests against the old code first. `Cargo.*` stays frozen (ADR-0011). Its producer state reaches the kernel through `adapter/source_coupling.rs` (D10). 18.7.8 is done and is not amended.
+
 ### 18.8.1 — Port conditional source initializers
 
 - **Repo:** `/home/andrew/AI/hyd.rs`.
@@ -312,6 +318,7 @@ Tasks within each wave own disjoint files. Waves are sequential because the norm
 - **Do not touch:** shared types/adapter (owned by 18.7.4), transport, boundary, accounting, process kernels, public API, fixtures, or pinned source.
 - **Anchors:** 18.6.6 physical-column evidence; `HYDRUS.FOR:282–288`; `INPUT.FOR` version-4 initialization selectors/defaults; `SOLUTE.FOR` `MassInit`, `NonEqInit`, `SolMass`, `ZBRAK1`, and `ZBRENT1`.
 - **Acceptance:** `cargo test -p hydrus-core solute_fortran_compat::initialization::tests`; tests cover selected and disabled calls, species/material traversal, pool mutation/order, root-solve behavior, and invalid/missing state rejection. No parity claim until wired by the driver.
+- **Amendment 2026-10-14 (Orchestration 19):** New kernel files are registered in `compat/mod.rs` with `#[allow(dead_code)] // wired by 18.10.1` (STATE_19, 19.2.1). Kernel errors use `KernelError`; shared types are `pub(crate)`. Shape checks live in the kernel's `validate` and the adapter calls it (ADR-0014). `adapter.rs` no longer exists: it is `adapter/{mod,json_guard,fields,tests}.rs` plus group files `transport`, `reactions`, `transport_properties`, `nonequilibrium`, `biology`, `source_coupling` (19.3.1). New request records are serde DTOs in the matching group file, using the `fields.rs` helpers `decode_unit_value`, `present`, `map_available` and `require_object` (at every struct level, D12) with `deny_unknown_fields` (19.4.1); run rejection tests against the old code first. `Cargo.*` stays frozen (ADR-0011).
 
 ### 18.7.8 — Implement root and exclusion source-coupling consumers
 
@@ -333,6 +340,7 @@ Tasks within each wave own disjoint files. Waves are sequential because the norm
 - **Do not touch:** runtime code, adapter/types, transport/boundary/accounting, dual-domain, biology/deposition, public API, fixtures, or pinned source.
 - **Anchors:** 18.6.6 source-column evidence; `INPUT.FOR:1318–1320,1393–1406`; `SOLUTE.FOR:330–368,434–447,464–492,1232–1259`; `rMD` implementation in `SOLUTE.FOR`.
 - **Acceptance:** source audit traces every assignment to `iMoistDep` and caller guard. If selector 2 is reachable, focused tests cover selected table loading and source order; otherwise provide exact caller/assignment evidence and classify selector 2 unselected. No parity claim.
+- **Amendment 2026-10-14 (Orchestration 19):** New kernel files are registered in `compat/mod.rs` with `#[allow(dead_code)] // wired by 18.10.1` (STATE_19, 19.2.1). Kernel errors use `KernelError`; shared types are `pub(crate)`. Shape checks live in the kernel's `validate` and the adapter calls it (ADR-0014). `adapter.rs` no longer exists: it is `adapter/{mod,json_guard,fields,tests}.rs` plus group files `transport`, `reactions`, `transport_properties`, `nonequilibrium`, `biology`, `source_coupling` (19.3.1). New request records are serde DTOs in the matching group file, using the `fields.rs` helpers `decode_unit_value`, `present`, `map_available` and `require_object` (at every struct level, D12) with `deny_unknown_fields` (19.4.1); run rejection tests against the old code first. `Cargo.*` stays frozen (ADR-0011).
 
 ### 18.9.1 — Port reaction chains and equilibrium sorption
 
@@ -344,6 +352,7 @@ Tasks within each wave own disjoint files. Waves are sequential because the norm
 - **Do not touch:** types, transport, boundary, accounting modules, public API, or Fortran source.
 - **Anchors:** `SOLUTE.FOR` `Solute` 44–230; `Coeff` reaction and sorption regions; `SolMass`, reaction fixture group, and independent operator reports.
 - **Acceptance:** `cargo test -p hydrus-core solute_fortran_compat::processes::tests`; tests cover zero/equal/distinct chain, terminal loss, linear equilibrium, and the nonlinear coefficient interface assigned from audit 18.6.6. Cross-language parity is gated to 18.15.1.
+- **Amendment 2026-10-14 (Orchestration 19):** New kernel files are registered in `compat/mod.rs` with `#[allow(dead_code)] // wired by 18.10.1` (STATE_19, 19.2.1). Kernel errors use `KernelError`; shared types are `pub(crate)`. Shape checks live in the kernel's `validate` and the adapter calls it (ADR-0014). `adapter.rs` no longer exists: it is `adapter/{mod,json_guard,fields,tests}.rs` plus group files `transport`, `reactions`, `transport_properties`, `nonequilibrium`, `biology`, `source_coupling` (19.3.1). New request records are serde DTOs in the matching group file, using the `fields.rs` helpers `decode_unit_value`, `present`, `map_available` and `require_object` (at every struct level, D12) with `deny_unknown_fields` (19.4.1); run rejection tests against the old code first. `Cargo.*` stays frozen (ADR-0011).
 
 ### 18.9.2 — Port active mobile/immobile coefficients
 
@@ -355,6 +364,7 @@ Tasks within each wave own disjoint files. Waves are sequential because the norm
 - **Do not touch:** shared types, other numerical kernels, API, fixtures, or pinned source.
 - **Anchors:** `SOLUTE.FOR` `Coeff` mobile/immobile rows; active update call matrix in 18.6.6; compatibility contract.
 - **Acceptance:** `cargo test -p hydrus-core solute_fortran_compat::nonequilibrium::tests`; tests verify active coefficient behavior and corrected state-update interfaces. Cross-language parity is gated to 18.15.1.
+- **Amendment 2026-10-14 (Orchestration 19):** New kernel files are registered in `compat/mod.rs` with `#[allow(dead_code)] // wired by 18.10.1` (STATE_19, 19.2.1). Kernel errors use `KernelError`; shared types are `pub(crate)`. Shape checks live in the kernel's `validate` and the adapter calls it (ADR-0014). `adapter.rs` no longer exists: it is `adapter/{mod,json_guard,fields,tests}.rs` plus group files `transport`, `reactions`, `transport_properties`, `nonequilibrium`, `biology`, `source_coupling` (19.3.1). New request records are serde DTOs in the matching group file, using the `fields.rs` helpers `decode_unit_value`, `present`, `map_available` and `require_object` (at every struct level, D12) with `deny_unknown_fields` (19.4.1); run rejection tests against the old code first. `Cargo.*` stays frozen (ADR-0011).
 
 ### 18.9.3 — Port active dual-domain coefficients
 
@@ -366,6 +376,7 @@ Tasks within each wave own disjoint files. Waves are sequential because the norm
 - **Do not touch:** shared types, transport/boundary/reaction/nonequilibrium modules, public API, fixtures, or Fortran source.
 - **Anchors:** `SOLUTE.FOR` `Coeff` dual-domain paths; `INPUT.FOR` caller-derived `iDualPor`; active `NEquil` updater; domain fixtures.
 - **Acceptance:** `cargo test -p hydrus-core solute_fortran_compat::dual_domain::tests`; source-anchored tests cover active domain coefficient and exchange behavior based on Wave 6 audit. Cross-language parity is gated to 18.15.1.
+- **Amendment 2026-10-14 (Orchestration 19):** New kernel files are registered in `compat/mod.rs` with `#[allow(dead_code)] // wired by 18.10.1` (STATE_19, 19.2.1). Kernel errors use `KernelError`; shared types are `pub(crate)`. Shape checks live in the kernel's `validate` and the adapter calls it (ADR-0014). `adapter.rs` no longer exists: it is `adapter/{mod,json_guard,fields,tests}.rs` plus group files `transport`, `reactions`, `transport_properties`, `nonequilibrium`, `biology`, `source_coupling` (19.3.1). New request records are serde DTOs in the matching group file, using the `fields.rs` helpers `decode_unit_value`, `present`, `map_available` and `require_object` (at every struct level, D12) with `deny_unknown_fields` (19.4.1); run rejection tests against the old code first. `Cargo.*` stays frozen (ADR-0011).
 
 ### 18.9.4 — Port bacteria and filtration branches
 
@@ -377,6 +388,7 @@ Tasks within each wave own disjoint files. Waves are sequential because the norm
 - **Do not touch:** shared types, transport/boundary/reaction/nonequilibrium/dual-domain/deposition modules, public API, fixtures, or Fortran source.
 - **Anchors:** `SOLUTE.FOR` `Coeff` 372–541; process/biology fixture group.
 - **Acceptance:** `cargo test -p hydrus-core solute_fortran_compat::biology::tests`; source-anchored tests cover assigned bacteria/filtration equations or stop for explicit scope amendment. Cross-language parity is gated to 18.15.1.
+- **Amendment 2026-10-14 (Orchestration 19):** New kernel files are registered in `compat/mod.rs` with `#[allow(dead_code)] // wired by 18.10.1` (STATE_19, 19.2.1). Kernel errors use `KernelError`; shared types are `pub(crate)`. Shape checks live in the kernel's `validate` and the adapter calls it (ADR-0014). `adapter.rs` no longer exists: it is `adapter/{mod,json_guard,fields,tests}.rs` plus group files `transport`, `reactions`, `transport_properties`, `nonequilibrium`, `biology`, `source_coupling` (19.3.1). New request records are serde DTOs in the matching group file, using the `fields.rs` helpers `decode_unit_value`, `present`, `map_available` and `require_object` (at every struct level, D12) with `deny_unknown_fields` (19.4.1); run rejection tests against the old code first. `Cargo.*` stays frozen (ADR-0011).
 
 ### 18.9.5 — Port deposition/blocking
 
@@ -388,6 +400,7 @@ Tasks within each wave own disjoint files. Waves are sequential because the norm
 - **Do not touch:** shared types, other numerical modules, public API, fixtures, or Fortran source.
 - **Anchors:** active `SOLUTE.FOR` `Blocking` 1561–1594 and `Deposit` 1595–1660; biology fixture group.
 - **Acceptance:** `cargo test -p hydrus-core solute_fortran_compat::deposition::tests`; tests cover active deposition/blocking; no claim about `Exclusion`, which is owned by 18.7.8. Cross-language parity is gated to 18.15.1.
+- **Amendment 2026-10-14 (Orchestration 19):** New kernel files are registered in `compat/mod.rs` with `#[allow(dead_code)] // wired by 18.10.1` (STATE_19, 19.2.1). Kernel errors use `KernelError`; shared types are `pub(crate)`. Shape checks live in the kernel's `validate` and the adapter calls it (ADR-0014). `adapter.rs` no longer exists: it is `adapter/{mod,json_guard,fields,tests}.rs` plus group files `transport`, `reactions`, `transport_properties`, `nonequilibrium`, `biology`, `source_coupling` (19.3.1). New request records are serde DTOs in the matching group file, using the `fields.rs` helpers `decode_unit_value`, `present`, `map_available` and `require_object` (at every struct level, D12) with `deny_unknown_fields` (19.4.1); run rejection tests against the old code first. `Cargo.*` stays frozen (ADR-0011).
 
 ### 18.10.1 — Port source-ordered solute step driver
 
@@ -399,6 +412,7 @@ Tasks within each wave own disjoint files. Waves are sequential because the norm
 - **Do not touch:** public `advance_solute_step` dispatch, source kernels owned by prior tasks, runner/comparator, fixtures, or Fortran source.
 - **Anchors:** `SOLUTE.FOR` `Solute` 6–240 and calls to `Coeff`, `MatSet`, `BanSol`, `NEquil`, `MassTran`; all prior module tests and fixture matrix.
 - **Acceptance:** `cargo test -p hydrus-core solute_fortran_compat::driver::tests`; source-anchored tests verify both `MassTran` call sites, call ordering and state transitions for every branch assigned by 18.6.6. Full cross-language parity is gated to 18.15.1.
+- **Amendment 2026-10-14 (Orchestration 19):** The driver builds `EndpointPrimitiveState`/`DualPorPrimitiveState` from step state in source order and does not re-validate what kernel `validate` covers (19.1.1). It removes each `wired by 18.10.1` allowance it satisfies (19.2.1). It consumes `WaterStepReport::accepted_water()` for accepted water state; `AcceptedWaterSnapshot` now lives in `water_state.rs` (19.6.2). `WaterStepInput` now has `lower: LowerBoundaryMode` and `upper: UpperBoundary` (19.4.2, 19.5.3). In `Head`/`Flux` modes the caller-owned upper row defines the last cell's equation, so it must be a true half-cell balance (19.6.2). It calls `source_coupling::{root_solute_uptake, size_exclusion}` at their source call sites. Adapter group files reach kernels as `super::super::<module>` (19.3.1).
 
 ### 18.11.1 — Implement nonlinear iteration and convergence behavior
 
@@ -410,6 +424,7 @@ Tasks within each wave own disjoint files. Waves are sequential because the norm
 - **Do not touch:** public `solute.rs` dispatch, other kernel modules, runner/comparator, fixtures, or Fortran source.
 - **Anchors:** corrected `INPUT.FOR` `ChemIn` source assignments; `SOLUTE.FOR` `Solute` nonlinear branch; normalized mode contract.
 - **Acceptance:** `cargo test -p hydrus-core solute_fortran_compat::iteration::tests`; source-derived tests cover linear/nonlinear reader selection, convergence success/failure, retry/timestep behavior, and state sequencing. No reachable branch is silently omitted; no parity claim.
+- **Amendment 2026-10-14 (Orchestration 19):** New kernel files are registered in `compat/mod.rs` with `#[allow(dead_code)] // wired by 18.10.1` (STATE_19, 19.2.1). Kernel errors use `KernelError`; shared types are `pub(crate)`. Shape checks live in the kernel's `validate` and the adapter calls it (ADR-0014). `adapter.rs` no longer exists: it is `adapter/{mod,json_guard,fields,tests}.rs` plus group files `transport`, `reactions`, `transport_properties`, `nonequilibrium`, `biology`, `source_coupling` (19.3.1). New request records are serde DTOs in the matching group file, using the `fields.rs` helpers `decode_unit_value`, `present`, `map_available` and `require_object` (at every struct level, D12) with `deny_unknown_fields` (19.4.1); run rejection tests against the old code first. `Cargo.*` stays frozen (ADR-0011).
 
 ### 18.12.1 — Expose compatibility candidate without changing default
 
@@ -421,6 +436,7 @@ Tasks within each wave own disjoint files. Waves are sequential because the norm
 - **Do not touch:** compatibility kernels, Fortran fixtures/source, parity limits, analytical evaluator, or prior evidence artifacts.
 - **Anchors:** `solute.rs` public advance entry points, `lib.rs`, existing solute integration tests, normalized contract from 18.1.1.
 - **Acceptance:** `cargo test -p hydrus-core --test solute_solver_selection`, `cargo test -p hydrus-core --test solute_fortran_compat_harness`, and `cargo test -p hydrus-core --tests`; candidate emits schema-valid observations, current default remains FV/BE, and explicit FV/BE results/contracts remain unchanged.
+- **Amendment 2026-10-14 (Orchestration 19):** Add `SoluteBackend::FortranCompatible` to the enum from 19.7.1 (`SoluteBackend::ALL`, `SoluteConfig::with_backend`, `SoluteConfig::backend()`); the `FortranCompatible`/`FiniteVolumeBackwardEuler` "selectors" are the enum variants. Remove the `wired by 18.12.1` allowances (19.2.1). `tests/solute_backend_contract.rs` extends: adding the variant to `SoluteBackend::ALL` makes its existing loop cover it; add variant-specific assertions only if needed, and add that file to Must edit. D11: this task edits `solute.rs`, so it also re-pins `POLICY_HASHES["crates/hydrus-core/src/solute.rs"]` in `tools/solute_benchmark_bridge.py`, with a bitwise-preservation justification for the FV/BE path. Add `tools/solute_benchmark_bridge.py` to Must edit for that one line.
 
 ### 18.13.1 — Normalize raw Fortran outputs from fixture maps
 
@@ -465,6 +481,7 @@ Tasks within each wave own disjoint files. Waves are sequential because the norm
 - **Do not touch:** compatibility kernels, Fortran source/fixtures, parity evidence artifacts, or unrelated API modules.
 - **Anchors:** accepted `SOLUTE_FORTRAN_PARITY_18.md`; solver-selection code/tests from 18.12.1; public solute entry points.
 - **Acceptance:** default-selection test proves `advance_solute_step` uses the verified Fortran-compatible backend; opt-in FV/BE tests remain unchanged and pass. Run `cargo test -p hydrus-core --test solute_solver_selection`, `cargo test -p hydrus-core --tests`, and `git diff --check`.
+- **Amendment 2026-10-14 (Orchestration 19):** "Switch the default" means changing `SoluteConfig`'s default backend. D11: this task edits `solute.rs`, so it also re-pins `POLICY_HASHES["crates/hydrus-core/src/solute.rs"]` in `tools/solute_benchmark_bridge.py`, with a bitwise-preservation justification for the FV/BE path. Add `tools/solute_benchmark_bridge.py` to Must edit for that one line.
 
 ## Approval and handoff
 
