@@ -64,9 +64,7 @@ Plan: [EXECUTION_PLAN_18.md](EXECUTION_PLAN_18.md). Worker template: [PROMPT_TEM
 
 ## Active tasks
 
-- 18.7.7 (`SINK.FOR` root-uptake producer) and 18.7.5 (root-uptake fixture) are
-  still open; 18.7.8 consumed the producer state directly as primitive inputs,
-  which is sufficient for its own gate but does not close either one.
+- Wave 7 has no open tasks. The old note that 18.7.7/18.7.5 were the root-uptake producer and fixture had mislabelled them: in `EXECUTION_PLAN_18.md` they are the FluxConc fixture and the start-of-step MassTran call, both done. No plan task ports the `SINK.FOR` root-uptake producer. 18.7.8 takes its state as primitive inputs, and it remains a gap to decide on before the 18.10.1 driver.
 - No task may add a second `DualPor` state type: `DualPorPrimitiveState` and
   `DualPorMaterial` (added by 18.7.3) are the accepted shape.
 - 18.7.6: blocked on Fortran fixtures only. The interpreter blocker recorded
