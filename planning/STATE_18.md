@@ -1,7 +1,7 @@
 # State — Orchestration 18
 
 Plan status: **Approved by user on 2026-10-08 (“yes”).**
-Execution status: **Waves 1–6 complete; Wave 7 active.** 18.7.4 selector/state mapping was accepted 2026-10-12 and 18.7.1 endpoint equations were accepted 2026-10-13 (`49192d7`); the remaining Wave 7 work is the Fortran fixtures and the active-path/dual-domain tasks. Accepted Wave 5 work includes 18.5.1 and 18.5.3; 18.5.2 is incomplete and superseded by 18.7.1. Wave 3 fixtures authenticate raw outputs only; normalized parity remains pending. Default backend must not change before the full parity gate.
+Execution status: **Waves 1–6 complete; Wave 7 active.** 18.7.4 selector/state mapping was accepted 2026-10-12, 18.7.1 endpoint equations were accepted 2026-10-13 (`49192d7`) and 18.7.3 dynamic dual-porosity exchange was accepted 2026-10-14 (`716a7ea`); the remaining Wave 7 work is 18.7.8 plus the fixture tasks 18.7.2/18.7.5/18.7.6, and 18.7.6 is blocked on the missing Python interpreter. Accepted Wave 5 work includes 18.5.1 and 18.5.3; 18.5.2 is incomplete and superseded by 18.7.1. Wave 3 fixtures authenticate raw outputs only; normalized parity remains pending. Default backend must not change before the full parity gate.
 Plan: [EXECUTION_PLAN_18.md](EXECUTION_PLAN_18.md). Worker template: [PROMPT_TEMPLATE_18.md](PROMPT_TEMPLATE_18.md).
 
 ## Baseline and guardrails
@@ -44,18 +44,20 @@ Plan: [EXECUTION_PLAN_18.md](EXECUTION_PLAN_18.md). Worker template: [PROMPT_TEM
 | 5 | 18.5.2 | Endpoint rows and flux closure | superseded/incomplete; replaced by 18.7.1 |
 | 5 | 18.5.3 | Source accounting and observations | done; fixed-form corrections accepted |
 | 6 | 18.6.6 | Fixed-form reachability re-audit | done; consistency review accepted |
-| 7 | 18.7.4 → 18.7.1–18.7.3, 18.7.5–18.7.8 | Selector mapping first, then endpoint/active kernels and fixtures | 18.7.4 and 18.7.1 done; 18.7.6 in flight; 18.7.7 and 18.7.3 ready; 18.7.8 then 18.7.4/18.7.5 follow |
+| 7 | 18.7.4 → 18.7.1–18.7.3, 18.7.5–18.7.8 | Selector mapping first, then endpoint/active kernels and fixtures | 18.7.4, 18.7.1 and 18.7.3 done; 18.7.2/18.7.5/18.7.6 blocked on Fortran fixtures and the Python interpreter; 18.7.7 and 18.7.8 remain |
 | 7A | 18.7.1 | Primitive-input endpoint equations | done (commit `49192d7`) |
-| 7A | 18.7.6 | Explicit Fortran fixtures | in flight |
-| 7B | 18.7.2 → 18.7.3 | Exchange fixture, then dynamic transfer kernel | ready once 18.7.1 is approved |
+| 7A | 18.7.6 | Explicit Fortran fixtures | blocked on the missing Python interpreter |
+| 7B | 18.7.3 | Dynamic dual-porosity transfer kernel | done (commit `716a7ea`) |
+| 7B | 18.7.2 | Exchange fixture | blocked with 18.7.6 (Fortran fixtures) |
 | 7C | 18.7.5 → 18.7.7 → 18.7.8 | Root-uptake fixture, kernel, then composed active path | pending |
 
 ## Active tasks
 
-- 18.7.3: implementing (worker in `.development/18-worktrees/18.7.3`, branch
-  `orchestration/18.7.3`, base `98299cd`). Wave 7B, unblocked by the 18.7.1
-  merge; it owns `dual_domain.rs` plus the `types.rs`/`adapter.rs` primitive
-  state `DualPor` consumes, and holds that single ownership until 18.7.8.
+- 18.7.8: next Wave 7 dispatch once 18.7.3's ownership of `types.rs` and
+  `adapter.rs` is released; it composes the active path and is the only task
+  allowed to touch those two files until then.
+- No task may add a second `DualPor` state type: `DualPorPrimitiveState` and
+  `DualPorMaterial` (added by 18.7.3) are the accepted shape.
 - 18.7.6: **blocked on tooling, not on decomposition** — its acceptance runs the
   Python `tools/**` suite, and no usable interpreter exists on this host (see
   Verification). Do not dispatch it until the user restores the interpreter or
@@ -63,6 +65,36 @@ Plan: [EXECUTION_PLAN_18.md](EXECUTION_PLAN_18.md). Worker template: [PROMPT_TEM
 
 ## Completed tasks
 
+- 18.7.3: done (commit `716a7ea`, "feat(solute): port dynamic dual-porosity
+  exchange", parent `e724f38`, worktree `.development/18-worktrees/18.7.3` on
+  branch `orchestration/18.7.3`, merged and removed). `dual_domain.rs` ports
+  `subroutine DualPor` (`WATFLOW.FOR:1027-1075`) in statement order — `WTransf=0.`
+  (1034), `SeIm` (1037), the `iDualPor=1` water-content pool (1039-1042), the
+  `iDualPor=2` pressure-head pool with `FH`/`FK` (1044-1053), the top-node
+  `hCritA` guard (1054-1055), both `TrMaxIm` clamps as sequential assignments
+  (1057-1066), the `ThNewIm` clamp (1068), and the live `if(i.ge.2)` trapezoid
+  (1070-1071) — with private `retention_head`/`conductivity` reproducing `FH`
+  and `FK` at `iModel=0` including the `implicit double precision (A-H,O-Z)`
+  widening, `sngl()` narrowing, and `-1.d300**(1.d0/n)` parsed as
+  `-(1d300**(1/n))` (`MATERIAL.FOR:61`, `67`, `367`). `types.rs` adds
+  `DualPorMaterial` (`ParD(1)/(2)/(6)/(7)/(8)/(9)` plus optional model-7-only
+  `ParD(10)/(11)`), `DualPorPrimitiveState` (`x`, `ThOld`, `hNew`, `ThOldIm`,
+  `MatNum`, `ParD`, `hCritA`, `dt`, `iModel`, `iDualPor`) and
+  `NonequilibriumInputs::dual_porosity_exchange_state`; `ThNewIm` is an output
+  because the routine writes it (1068) and only `Update` reads it (1112). Adapter
+  7 → 11 tests, `dual_domain` 0 → 11 tests, all rejections assert. Three review
+  corrections were applied at the gate: `thr`/`ths` derive from `ParD(1)/(2)`
+  through `GenMat` (`INPUT.FOR:762`, `796-797`, `816-817`, called at
+  `HYDRUS.FOR:219`) rather than being accepted as request keys; `FH`'s third
+  argument is `real Par(10)`, so `ParD(7,M)` aliases `Par(1..5)` with no explicit
+  shuffle (unlike `FK`, which gets the `1045-1050` assembly); and the
+  `ParD(8,M)<=ParD(7,M)` case is rejected as a documented contract rejection
+  instead of dividing by zero at 1037. The worker's call-site argument list in
+  the module doc was wrong and is corrected in the merge; the real list is
+  `(NumNP,NMat,MatNum,iDualPor,ThOld,ths,thr,ThNewIm,ThOldIm,ParD,SinkIm,dt,
+  iModel,hNew,hCritA,x,WTransf)` and is positionally identical to `1027-1029`.
+  `pinned_requests_cannot_supply_the_dual_porosity_exchange_state` walks the
+  pinned decks and asserts the blocker: no request carries node state.
 - 18.7.1: done (commit `49192d7`, "feat(solute): derive endpoint rows from
   source primitives", parent `79b26af`, worktree
   `.development/18-worktrees/18.7.1` on branch `orchestration/18.7.1`, merged
@@ -117,6 +149,26 @@ Plan: [EXECUTION_PLAN_18.md](EXECUTION_PLAN_18.md). Worker template: [PROMPT_TEM
   tasks/Completed tasks/Verification sections; `79b26af` committed that revision
   plus the sequencing amendment. The sections above are re-established from the
   session record; no other planning document was affected.
+- At `716a7ea` (18.7.3 merged): `cargo test -p hydrus-core --lib
+  solute_fortran_compat` 57 passed, 0 failed (`dual_domain` 11, `adapter` 11,
+  `boundary` 14, `transport` 8, other 13); `cargo test --workspace` 202 passed,
+  0 failed; `cargo fmt --all -- --check` clean; `cargo clippy -p hydrus-core
+  --all-targets` zero warnings; `git diff --check` clean; one task commit, no
+  `target/` path staged. Python was not rerun: the commit touches three Rust
+  files and the task TODO, and the adapter's deck walk is read-only, so the
+  Python baseline is unchanged. This does not waive the Wave 7 Python gate.
+- Reader-patch fact (settled while reviewing 18.7.3): there is **no patched
+  Fortran reader in this repository.** No `.f90` file exists anywhere outside
+  `target/`, and `reference/fortran_reference/PATCH_NOTES.md` shows the pinned
+  gfortran portability patch rewrites only `HYDRUS.FOR` and `TIME.FOR`. Later
+  tasks must read material and flag provenance from `src_reference/INPUT.FOR`
+  itself and stop assuming a `patch/INPUT.f90` variant.
+- Worker-lane note: both Wave 7 workers hit the 30-minute async wall while
+  sitting at the micro-plan gate (`cafcf458`, then `06d8b508`). Resuming with an
+  implementation-only directive works; keep analysis phases time-boxed and ask
+  for an interim `git diff --stat` instead of idling. If a third lane stalls the
+  same way, run the remaining Wave 7B/7C kernels interactively in the
+  orchestrator session.
 
 ## Task reports
 
