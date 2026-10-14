@@ -331,10 +331,79 @@ pub struct DualDomainRequest {
     pub water_model: u8,
 }
 
+/// One material's `ParD(·,M)` column entries that the active `DualPor` call
+/// reads (`WATFLOW.FOR:1036-1068`). Slots a model-6 deck never reaches are
+/// optional; the reader fills `ParD(1..9,M)` for water model 6 and
+/// `ParD(1..11,M)` for model 7 (`INPUT.FOR:618-634`).
+///
+/// `thr`/`ths` are deliberately absent: `GenMat` derives them from the same
+/// `ParD` column (`thr(M)=Par(1,M)`, `ths(M)=Par(2,M)`, `INPUT.FOR:796-797`),
+/// so carrying them here would let a request contradict `ParD(1)`/`ParD(2)`.
+#[derive(Clone, Debug, PartialEq)]
+pub struct DualPorMaterial {
+    /// `ParD(1,M)`; becomes `thr(M)` in `GenMat` (`INPUT.FOR:796`).
+    pub mobile_residual_water: DefaultReal,
+    /// `ParD(2,M)`; becomes `ths(M)` in `GenMat` (`INPUT.FOR:797`).
+    pub mobile_saturated_water: DefaultReal,
+    /// `ParD(6,M)`, the deck's `l` path-length term; `FK` receives it as `BPar`
+    /// (`WATFLOW.FOR:1050`, `MATERIAL.FOR:29`). Unread when `iDualPor=1`.
+    pub mobile_tortuosity: Option<DefaultReal>,
+    /// `ParD(7,M)`, immobile-region residual water content.
+    pub immobile_residual_water: DefaultReal,
+    /// `ParD(8,M)`, immobile-region saturated water content.
+    pub immobile_saturated_water: DefaultReal,
+    /// `ParD(9,M)`: the first-order transfer coefficient of `1040` when
+    /// `iDualPor=1`, and the immobile-region van Genuchten `Alfa` of `1047`
+    /// when `iDualPor=2`.
+    pub immobile_alpha: DefaultReal,
+    /// `ParD(10,M)`, the immobile-region van Genuchten `n` (`WATFLOW.FOR:1048`,
+    /// `MATERIAL.FOR:359`). Unread when `iDualPor=1`.
+    pub immobile_n: Option<DefaultReal>,
+    /// `ParD(11,M)`, the immobile-region saturated conductivity, `FK`'s `Ks`
+    /// (`WATFLOW.FOR:1049`, `MATERIAL.FOR:28`). Unread when `iDualPor=1`.
+    pub immobile_saturated_conductivity: Option<DefaultReal>,
+}
+
+/// The primitive state the active dynamic dual-porosity call receives
+/// (`WATFLOW.FOR:43-46`, argument list `1027-1029`). The routine's three
+/// outputs - `SinkIm`, `ThNewIm` and `WTransf` - are not representable here:
+/// `ThOldIm` is the only immobile-water input, because `DualPor` overwrites
+/// `ThNewIm` at `1068` and nothing reads it before the routine returns, and
+/// `ThOldIm(i)=ThNewIm(i)` belongs to `Update` (`WATFLOW.FOR:1112`).
+#[derive(Clone, Debug, PartialEq)]
+pub struct DualPorPrimitiveState {
+    /// `x` (`1029`), native node coordinates in source node order.
+    pub coordinates: Vec<DefaultReal>,
+    /// `ThOld` (`1027`), the mobile water content at the step's old level.
+    pub old_water: Vec<DefaultReal>,
+    /// `hNew` (`1029`), the pressure head `WatFlow` advances the step from.
+    pub new_pressure_head: Vec<DefaultReal>,
+    /// `ThOldIm` (`1028`), immobile water content when `DualPor` is called.
+    pub old_immobile_water: Vec<DefaultReal>,
+    /// `MatNum` (`1027`), the one-based `ParD` column of each node.
+    pub material_ids: Vec<usize>,
+    /// `ParD(·,M)` (`1028`), one record per material.
+    pub materials: Vec<DualPorMaterial>,
+    /// `hCritA` (`1029`), the atmospheric-pressure ceiling of the `1054-1055`
+    /// guard. Required, never defaulted: neither `src_reference/INPUT.FOR:67`,
+    /// `102-103` nor any patched reader (there is no `patch/INPUT.f90` in this
+    /// tree, and the pinned patch rewrites only `HYDRUS.FOR`/`TIME.FOR`) reads it
+    /// from a data file.
+    pub critical_atmospheric_head: DefaultReal,
+    /// `dt` (`1028`), the water step's time step.
+    pub dt: DefaultReal,
+    /// `iModel` (`1028`) as `WatFlow` receives it, i.e. after the reader's
+    /// `iModel=0` remap of water models 6 and 7 (`INPUT.FOR:619-624`).
+    pub hydraulic_model: i32,
+    /// `iDualPor` (`1027`), 1 or 2; the call guard at `43` is `iDualPor.gt.0`.
+    pub dual_porosity: u8,
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct NonequilibriumInputs {
     pub dual_domain: Option<UnitValue<DualDomainRequest>>,
     pub dynamic_exchange_sink: Option<UnitValue<Vec<DefaultReal>>>,
+    pub dual_porosity_exchange_state: Option<UnitValue<DualPorPrimitiveState>>,
     pub initial_dual_immobile_water_content: Option<UnitValue<Vec<DefaultReal>>>,
     pub initial_water_content: Option<UnitValue<Vec<DefaultReal>>>,
 }
@@ -420,6 +489,7 @@ impl Default for RequestFields {
             nonequilibrium: NonequilibriumInputs {
                 dual_domain: None,
                 dynamic_exchange_sink: None,
+                dual_porosity_exchange_state: None,
                 initial_dual_immobile_water_content: None,
                 initial_water_content: None,
             },
@@ -573,6 +643,44 @@ pub(crate) mod tests {
         .validate(1)
         .is_err());
     }
+    #[test]
+    fn dual_porosity_materials_derive_thr_and_ths_from_the_pard_column() {
+        // GenMat (INPUT.FOR:796-797) assigns thr(M)=Par(1,M) and
+        // ths(M)=Par(2,M), so the exchange bundle carries the ParD column only:
+        // the pair the exchange reads is the mobile pair it stores.
+        let model6 = DualPorMaterial {
+            mobile_residual_water: DefaultReal(0.08),
+            mobile_saturated_water: DefaultReal(0.43),
+            mobile_tortuosity: None,
+            immobile_residual_water: DefaultReal(0.01),
+            immobile_saturated_water: DefaultReal(0.12),
+            immobile_alpha: DefaultReal(0.1),
+            immobile_n: None,
+            immobile_saturated_conductivity: None,
+        };
+        let state = DualPorPrimitiveState {
+            coordinates: vec![DefaultReal(0.0), DefaultReal(0.25)],
+            old_water: vec![DefaultReal(0.3), DefaultReal(0.3)],
+            new_pressure_head: vec![DefaultReal(-100.0), DefaultReal(-100.0)],
+            old_immobile_water: vec![DefaultReal(0.05), DefaultReal(0.05)],
+            material_ids: vec![1, 1],
+            materials: vec![model6.clone()],
+            critical_atmospheric_head: DefaultReal(-1.0e10),
+            dt: DefaultReal(0.1),
+            hydraulic_model: 0,
+            dual_porosity: 1,
+        };
+        let material = &state.materials[0];
+        assert_eq!(material.mobile_residual_water, DefaultReal(0.08));
+        assert_eq!(material.mobile_saturated_water, DefaultReal(0.43));
+        assert_eq!(
+            state.critical_atmospheric_head,
+            DefaultReal(-1.0e10),
+            "hCritA is an explicit primitive, never a reader default"
+        );
+        assert!(model6.mobile_tortuosity.is_none() && model6.immobile_n.is_none());
+    }
+
     #[test]
     fn compatibility_input_preserves_unavailable_fields_and_orientation() {
         let unavailable_usize = Explicit::Unavailable(UnavailableValue {

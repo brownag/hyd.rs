@@ -254,6 +254,7 @@ fn map_fields(
         "initialization.equilibrium",
         "dual_domain",
         "dynamic_exchange_sink",
+        "dual_porosity_exchange_state",
         "biology_mode",
         "biology_parameters",
         "species.1.gas_diffusion",
@@ -364,6 +365,8 @@ fn map_fields(
         .nonequilibrium
         .initial_dual_immobile_water_content =
         maybe_number_vec(fields, "initial_dual_immobile_water_content", "cm3/cm3")?;
+    request_fields.nonequilibrium.dual_porosity_exchange_state =
+        maybe_dual_porosity_exchange_state(fields)?;
     request_fields.nonequilibrium.initial_water_content =
         maybe_number_vec(fields, "initial_water_content", "cm3/cm3")?;
 
@@ -581,6 +584,66 @@ fn validate_cross_field_dimensions(fields: &RequestFields) -> Result<(), String>
                 }
             } else if !matches!(dual.water_model, 6 | 7) {
                 return Err("dual-domain water model must be 6 or 7".into());
+            }
+        }
+    }
+    if let Some(exchange) = &fields.nonequilibrium.dual_porosity_exchange_state {
+        if let Explicit::Available(state) = &exchange.value {
+            let nodes = state.coordinates.len();
+            for (name, len) in [
+                ("old_water", state.old_water.len()),
+                ("new_pressure_head", state.new_pressure_head.len()),
+                ("old_immobile_water", state.old_immobile_water.len()),
+                ("material_ids", state.material_ids.len()),
+            ] {
+                if len != nodes {
+                    return Err(format!(
+                        "dual_porosity_exchange_state.{name} length {len} does not match coordinates {nodes}"
+                    ));
+                }
+            }
+            let materials = state.materials.len();
+            if materials == 0 {
+                return Err("dual_porosity_exchange_state.materials must not be empty".into());
+            }
+            for (index, material_id) in state.material_ids.iter().enumerate() {
+                if *material_id == 0 || *material_id > materials {
+                    return Err(format!(
+                        "dual_porosity_exchange_state.material_ids[{index}] must index materials"
+                    ));
+                }
+            }
+            if let Some(dual) = &fields.nonequilibrium.dual_domain {
+                if let Explicit::Available(dual) = &dual.value {
+                    // One source variable, two spellings: the `iDualPor` of the
+                    // guard at `43` is also the bundle's `dual_porosity`.
+                    if dual.i_dual_por != state.dual_porosity {
+                        return Err(
+                            "dual_porosity_exchange_state.dual_porosity must match dual_domain.iDualPor"
+                                .into(),
+                        );
+                    }
+                    // The reader remaps models 6 and 7 to `iModel=0` before it
+                    // reads ParD (INPUT.FOR:619-624), and only a model 7 deck
+                    // fills ParD(10,M) and ParD(11,M) (INPUT.FOR:623, NPar=11).
+                    if matches!(dual.water_model, 6 | 7) && state.hydraulic_model != 0 {
+                        return Err(
+                            "dual-domain water models 6 and 7 reach DualPor as iModel 0".into()
+                        );
+                    }
+                    if dual.water_model == 7 {
+                        for (index, material) in state.materials.iter().enumerate() {
+                            if material.immobile_n.is_none()
+                                || material.immobile_saturated_conductivity.is_none()
+                                || material.mobile_tortuosity.is_none()
+                            {
+                                return Err(format!(
+                                    "water model 7 fills ParD(6,M), ParD(10,M) and ParD(11,M), so material {index} must carry them"
+                                ));
+                            }
+                        }
+                    }
+                }
             }
         }
     }
@@ -1547,6 +1610,153 @@ fn maybe_dual_domain(
         })
     })
 }
+
+/// One `ParD(·,M)` column as the exchange reads it. `mobile_residual_water` and
+/// `mobile_saturated_water` are `ParD(1,M)` and `ParD(2,M)`, i.e. the pair
+/// `GenMat` turns into `thr(M)`/`ths(M)` (`INPUT.FOR:796-797`); there is no
+/// `thr`/`ths` key, because a second spelling of that pair could contradict the
+/// column. The three optional slots are the ones a model 6 deck leaves out
+/// (`INPUT.FOR:618`, `NPar=9`); `validate_cross_field_dimensions` demands them
+/// for a model 7 deck.
+fn dual_porosity_material(record: &Value) -> Result<DualPorMaterial, String> {
+    let name = "dual_porosity_exchange_state.materials";
+    let o = record
+        .as_object()
+        .ok_or(format!("{name} records must be objects"))?;
+    validate_object_keys(
+        name,
+        o,
+        &[
+            "mobile_residual_water",
+            "mobile_saturated_water",
+            "mobile_tortuosity",
+            "immobile_residual_water",
+            "immobile_saturated_water",
+            "immobile_alpha",
+            "immobile_n",
+            "immobile_saturated_conductivity",
+        ],
+    )?;
+    let required = |slot: &str| -> Result<DefaultReal, String> {
+        Ok(DefaultReal::from_input(as_f64(
+            o.get(slot)
+                .ok_or_else(|| format!("{name}.{slot} missing"))?,
+            slot,
+        )?))
+    };
+    let optional = |slot: &str| -> Result<Option<DefaultReal>, String> {
+        o.get(slot)
+            .map(|v| as_f64(v, slot).map(DefaultReal::from_input))
+            .transpose()
+    };
+    Ok(DualPorMaterial {
+        mobile_residual_water: required("mobile_residual_water")?,
+        mobile_saturated_water: required("mobile_saturated_water")?,
+        mobile_tortuosity: optional("mobile_tortuosity")?,
+        immobile_residual_water: required("immobile_residual_water")?,
+        immobile_saturated_water: required("immobile_saturated_water")?,
+        immobile_alpha: required("immobile_alpha")?,
+        immobile_n: optional("immobile_n")?,
+        immobile_saturated_conductivity: optional("immobile_saturated_conductivity")?,
+    })
+}
+
+/// The primitive state of the active `DualPor` call (`WATFLOW.FOR:43-46`,
+/// arguments `1027-1029`). Nothing in it is a routine output: `SinkIm` and
+/// `WTransf` are results, and `ThNewIm` is written at `1068` and only reaches
+/// `ThOldIm` through `Update` (`1112`), so the bundle carries `old_immobile_water`
+/// as `ThOldIm` is read. `critical_atmospheric_head` is required and never
+/// defaulted: `INPUT.FOR:67` comment-swallowes `hCritA` out of the data read and
+/// `INPUT.FOR:102-103` assigns it `-abs(1.e+10)`. The patched reader the pinned
+/// cases compile agrees, because the staged build copies `src_reference` verbatim
+/// and then applies the pinned patch
+/// (`tools/run_solute_verification_reference.py:393-398`), which rewrites only
+/// `HYDRUS.FOR` and `TIME.FOR` (`reference/fortran_reference/PATCH_NOTES.md`,
+/// "Scope"); the generated `gnu_compatibility.FOR`
+/// (`tools/run_solute_verification_reference.py:403-405`) is a `GETDAT`/`GETTIM`
+/// shim. No `patch/INPUT.f90` - and no `.f90` source of any kind - exists in this
+/// tree, so `src_reference/INPUT.FOR` is the case reader on both the staged and the
+/// patched path, and `hCritA` has no data-file source in either.
+fn maybe_dual_porosity_exchange_state(
+    fields: &Map<String, Value>,
+) -> Result<Option<UnitValue<DualPorPrimitiveState>>, String> {
+    let name = "dual_porosity_exchange_state";
+    unit_value(
+        fields,
+        name,
+        "source primitive dual-porosity exchange state",
+        |x| {
+            let o = x
+                .as_object()
+                .ok_or(format!("{name} value must be an object"))?;
+            validate_object_keys(
+                name,
+                o,
+                &[
+                    "coordinates",
+                    "old_water",
+                    "new_pressure_head",
+                    "old_immobile_water",
+                    "material_ids",
+                    "materials",
+                    "critical_atmospheric_head",
+                    "dt",
+                    "hydraulic_model",
+                    "dual_porosity",
+                ],
+            )?;
+            let array = |field: &str| -> Result<Vec<DefaultReal>, String> {
+                number_vec(
+                    o.get(field)
+                        .ok_or_else(|| format!("{name}.{field} missing"))?,
+                    field,
+                )
+            };
+            let scalar = |field: &str| -> Result<DefaultReal, String> {
+                Ok(DefaultReal::from_input(as_f64(
+                    o.get(field)
+                        .ok_or_else(|| format!("{name}.{field} missing"))?,
+                    field,
+                )?))
+            };
+            let materials = o
+                .get("materials")
+                .ok_or(format!("{name}.materials missing"))?
+                .as_array()
+                .ok_or(format!("{name}.materials must be an array"))?
+                .iter()
+                .map(dual_porosity_material)
+                .collect::<Result<Vec<_>, String>>()?;
+            Ok(DualPorPrimitiveState {
+                coordinates: array("coordinates")?,
+                old_water: array("old_water")?,
+                new_pressure_head: array("new_pressure_head")?,
+                old_immobile_water: array("old_immobile_water")?,
+                material_ids: o
+                    .get("material_ids")
+                    .ok_or(format!("{name}.material_ids missing"))?
+                    .as_array()
+                    .ok_or(format!("{name}.material_ids must be an array"))?
+                    .iter()
+                    .map(|v| as_usize(v, "material_ids"))
+                    .collect::<Result<Vec<_>, String>>()?,
+                materials,
+                critical_atmospheric_head: scalar("critical_atmospheric_head")?,
+                dt: scalar("dt")?,
+                hydraulic_model: as_i32(
+                    o.get("hydraulic_model")
+                        .ok_or(format!("{name}.hydraulic_model missing"))?,
+                    "hydraulic_model",
+                )?,
+                dual_porosity: as_u8(
+                    o.get("dual_porosity")
+                        .ok_or(format!("{name}.dual_porosity missing"))?,
+                    "dual_porosity",
+                )?,
+            })
+        },
+    )
+}
 fn maybe_biology_mode(
     fields: &Map<String, Value>,
 ) -> Result<Option<UnitValue<BiologyModeRequest>>, String> {
@@ -2056,5 +2266,325 @@ pub(crate) mod tests {
         assert!(parse_case_manifest(&manifest_bad_hash)
             .unwrap_err()
             .contains("input_files.SELECTOR.IN"));
+    }
+
+    /// A model-6 deck: three nodes on 0.25 cm spacing, one material carrying the
+    /// `dual_model6` `ParD` column (`mobile_residual_water`/`mobile_saturated_water`
+    /// are `ParD(1)`/`ParD(2)`, `mobile_tortuosity` is `ParD(6)`, and the
+    /// immobile triple is `ParD(7)`/`ParD(8)`/`ParD(9)`), and the reader's own
+    /// `hCritA` (`INPUT.FOR:102-103`).
+    const DUAL_POROSITY_BUNDLE: &str = r#""coordinates":[0.0,0.25,0.5],"old_water":[0.3,0.3,0.3],"new_pressure_head":[-100.0,-100.0,-100.0],"old_immobile_water":[0.1,0.1,0.1],"material_ids":[1,1,1],"materials":[{"mobile_residual_water":0.08,"mobile_saturated_water":0.43,"mobile_tortuosity":0.5,"immobile_residual_water":0.05,"immobile_saturated_water":0.25,"immobile_alpha":0.1}],"critical_atmospheric_head":-1e10,"dt":0.1,"hydraulic_model":0,"dual_porosity":1"#;
+
+    fn dual_porosity_bundle() -> Value {
+        serde_json::from_str(&format!("{{{DUAL_POROSITY_BUNDLE}}}")).unwrap()
+    }
+
+    fn dual_porosity_request(bundle: Value, selector: Value) -> String {
+        serde_json::json!({
+            "schema_version": "solute-request-v1",
+            "fields": {
+                "dual_domain": {"units": "source iDualPor selector", "value": selector},
+                "dual_porosity_exchange_state": {
+                    "units": "source primitive dual-porosity exchange state",
+                    "value": bundle,
+                },
+            }
+        })
+        .to_string()
+    }
+
+    fn dual_porosity_state(bundle: Value, selector: Value) -> DualPorPrimitiveState {
+        let parsed = parse_request_text(&dual_porosity_request(bundle, selector));
+        let value = &parsed
+            .input
+            .fields
+            .nonequilibrium
+            .dual_porosity_exchange_state
+            .as_ref()
+            .unwrap()
+            .value;
+        match value {
+            Explicit::Available(state) => state.clone(),
+            Explicit::Unavailable(_) => panic!("the exchange bundle must be available"),
+        }
+    }
+
+    fn dual_porosity_rejection(request: &str) -> String {
+        let hash = canonical_hash(&serde_json::from_str(request).unwrap());
+        parse_request(
+            &format!(r#"{{"request":{request},"request_sha256":"{hash}"}}"#),
+            &hash,
+        )
+        .unwrap_err()
+    }
+
+    /// `"available"`, `"unavailable"` or `"absent"` for one optional field.
+    fn explicit_state<T>(field: Option<&Explicit<T>>) -> String {
+        match field {
+            None => "absent".to_string(),
+            Some(Explicit::Available(_)) => "available".to_string(),
+            Some(Explicit::Unavailable(_)) => "unavailable".to_string(),
+        }
+    }
+
+    #[test]
+    fn dual_porosity_exchange_state_maps_the_state_the_source_reads() {
+        let state = dual_porosity_state(
+            dual_porosity_bundle(),
+            serde_json::json!({ "iDualPor": 1, "water_model": 6 }),
+        );
+        assert_eq!(state.coordinates.len(), 3);
+        assert_eq!(state.old_water, vec![DefaultReal(0.3); 3]);
+        assert_eq!(state.new_pressure_head, vec![DefaultReal(-100.0); 3]);
+        assert_eq!(state.old_immobile_water, vec![DefaultReal(0.1); 3]);
+        assert_eq!(state.material_ids, vec![1, 1, 1]);
+        assert_eq!(state.critical_atmospheric_head, DefaultReal(-1e10));
+        assert_eq!(state.dt, DefaultReal(0.1));
+        assert_eq!((state.hydraulic_model, state.dual_porosity), (0, 1));
+        let material = &state.materials[0];
+        assert_eq!(material.mobile_residual_water, DefaultReal(0.08));
+        assert_eq!(material.mobile_saturated_water, DefaultReal(0.43));
+        assert_eq!(material.mobile_tortuosity, Some(DefaultReal(0.5)));
+        assert_eq!(material.immobile_residual_water, DefaultReal(0.05));
+        assert_eq!(material.immobile_saturated_water, DefaultReal(0.25));
+        assert_eq!(material.immobile_alpha, DefaultReal(0.1));
+        // A model-6 deck fills ParD(1..9,M) only (INPUT.FOR:618, NPar=9), so the
+        // ParD(10)/ParD(11) slots a model 7 deck adds stay absent.
+        assert_eq!(material.immobile_n, None);
+        assert_eq!(material.immobile_saturated_conductivity, None);
+    }
+
+    #[test]
+    fn dual_porosity_exchange_state_rejects_unknown_missing_and_ragged_state() {
+        let selector = serde_json::json!({ "iDualPor": 1, "water_model": 6 });
+
+        // thr and ths have no key of their own: GenMat derives them from
+        // ParD(1,M) and ParD(2,M) (INPUT.FOR:796-797), so the mobile pair is the
+        // only spelling and a second one would be able to contradict it.
+        let mut derived_pair = dual_porosity_bundle();
+        derived_pair["materials"][0]["thr"] = serde_json::json!(0.08);
+        assert!(
+            dual_porosity_rejection(&dual_porosity_request(derived_pair, selector.clone()))
+                .contains("unknown nested key thr")
+        );
+
+        // SinkIm and WTransf are results, and ThNewIm reaches ThOldIm only
+        // through Update (WATFLOW.FOR:1112), so no output key belongs here.
+        for output in ["sink_immobile", "transfer", "new_immobile_water"] {
+            let mut bundle = dual_porosity_bundle();
+            bundle[output] = serde_json::json!([0.0, 0.0, 0.0]);
+            assert!(
+                dual_porosity_rejection(&dual_porosity_request(bundle, selector.clone()))
+                    .contains(&format!("unknown nested key {output}"))
+            );
+        }
+
+        // hCritA is required and never defaulted.
+        let mut without_h_crit_a = dual_porosity_bundle();
+        without_h_crit_a
+            .as_object_mut()
+            .unwrap()
+            .remove("critical_atmospheric_head");
+        assert!(dual_porosity_rejection(&dual_porosity_request(
+            without_h_crit_a,
+            selector.clone()
+        ))
+        .contains("critical_atmospheric_head missing"));
+
+        // ParD(9,M) is read by both dual models (WATFLOW.FOR:1037, 1044).
+        let mut without_alpha = dual_porosity_bundle();
+        without_alpha.as_object_mut().unwrap()["materials"][0]
+            .as_object_mut()
+            .unwrap()
+            .remove("immobile_alpha");
+        assert!(
+            dual_porosity_rejection(&dual_porosity_request(without_alpha, selector.clone()))
+                .contains("immobile_alpha missing")
+        );
+
+        // Mixed-length quantities share one wrapper, so the units are fixed.
+        let mut wrong_units = serde_json::from_str::<Value>(&dual_porosity_request(
+            dual_porosity_bundle(),
+            selector.clone(),
+        ))
+        .unwrap();
+        wrong_units["fields"]["dual_porosity_exchange_state"]["units"] =
+            serde_json::json!("cm3/cm3");
+        assert!(dual_porosity_rejection(&wrong_units.to_string()).contains("expected units"));
+
+        // The four node arrays are the node count of the mesh's own coordinate
+        // description (x, ThOld, hNew and ThOldIm in WATFLOW.FOR:1029-1031).
+        let mut ragged = dual_porosity_bundle();
+        ragged["old_water"] = serde_json::json!([0.3, 0.3]);
+        let mut ragged_request =
+            serde_json::from_str::<Value>(&dual_porosity_request(ragged, selector.clone()))
+                .unwrap();
+        ragged_request["fields"]["coordinates"] = serde_json::json!({
+            "units": "cm",
+            "value": {"native": "x=0..0.5", "canonical": "flow_distance=0..0.5", "nodes": 3},
+        });
+        assert!(
+            dual_porosity_rejection(&ragged_request.to_string()).contains(
+                "dual_porosity_exchange_state.old_water length 2 does not match coordinates 3"
+            )
+        );
+
+        let mut empty_materials = dual_porosity_bundle();
+        empty_materials["materials"] = serde_json::json!([]);
+        assert!(
+            dual_porosity_rejection(&dual_porosity_request(empty_materials, selector.clone()))
+                .contains("materials must not be empty")
+        );
+
+        for id in [0, 2] {
+            let mut bad_ids = dual_porosity_bundle();
+            bad_ids["material_ids"] = serde_json::json!([1, 1, id]);
+            assert!(
+                dual_porosity_rejection(&dual_porosity_request(bad_ids, selector.clone()))
+                    .contains("material_ids[2] must index materials")
+            );
+        }
+
+        let mut text_slot = dual_porosity_bundle();
+        text_slot["materials"][0]["immobile_alpha"] = serde_json::json!("0.1");
+        assert!(
+            dual_porosity_rejection(&dual_porosity_request(text_slot, selector))
+                .contains("expected finite number")
+        );
+    }
+
+    #[test]
+    fn dual_porosity_exchange_state_agrees_with_the_dual_domain_selector() {
+        // iDualPor reaches the bundle and the guard of WATFLOW.FOR:43 from one
+        // deck, so the two spellings may not diverge.
+        let mismatch = dual_porosity_rejection(&dual_porosity_request(
+            dual_porosity_bundle(),
+            serde_json::json!({ "iDualPor": 2, "water_model": 7, "dynamic_exchange_claimed": true }),
+        ));
+        assert!(mismatch.contains("must match dual_domain.iDualPor"));
+
+        // INPUT.FOR:619-624 replaces models 6 and 7 with iModel=0 before ParD is
+        // read, so a bundle naming the deck model as iModel is not a state the
+        // call can be given.
+        let unremapped = dual_porosity_rejection(
+            &dual_porosity_request(
+                dual_porosity_bundle(),
+                serde_json::json!({ "iDualPor": 1, "water_model": 6 }),
+            )
+            .replace("\"hydraulic_model\":0", "\"hydraulic_model\":6"),
+        );
+        assert!(unremapped.contains("reach DualPor as iModel 0"));
+
+        // A model 7 deck fills ParD(6), ParD(10) and ParD(11) (INPUT.FOR:623);
+        // the model-6 bundle above cannot serve it.
+        let mut model7_bundle = dual_porosity_bundle();
+        model7_bundle["dual_porosity"] = serde_json::json!(2);
+        let missing_model7_slots = dual_porosity_rejection(&dual_porosity_request(
+            model7_bundle.clone(),
+            serde_json::json!({ "iDualPor": 2, "water_model": 7 }),
+        ));
+        assert!(missing_model7_slots.contains("water model 7 fills ParD(6,M), ParD(10,M)"));
+
+        model7_bundle["materials"][0]["immobile_n"] = serde_json::json!(1.2);
+        model7_bundle["materials"][0]["immobile_saturated_conductivity"] = serde_json::json!(0.01);
+        let state = dual_porosity_state(
+            model7_bundle,
+            serde_json::json!({ "iDualPor": 2, "water_model": 7 }),
+        );
+        assert_eq!(state.dual_porosity, 2);
+        assert_eq!(state.materials[0].immobile_n, Some(DefaultReal(1.2)));
+        assert_eq!(
+            state.materials[0].immobile_saturated_conductivity,
+            Some(DefaultReal(0.01))
+        );
+    }
+
+    /// Input blocker, recorded as a test: the pinned dual-domain requests carry
+    /// the `iDualPor` selector but none of the node state `DualPor` reads, so no
+    /// `dual_porosity_exchange_state` can be built from them without synthesizing
+    /// values (see the 18.7.3 report).
+    #[test]
+    fn pinned_requests_cannot_supply_the_dual_porosity_exchange_state() {
+        let root = Path::new("../../reference/fortran_reference/solute/parity");
+        let root = if root.exists() {
+            root.to_path_buf()
+        } else {
+            Path::new("reference/fortran_reference/solute/parity").to_path_buf()
+        };
+        let mut dual_decks = 0;
+        for entry in walkdir(&root) {
+            let text = std::fs::read_to_string(&entry).unwrap();
+            let parsed = parse_case_manifest(&text).unwrap();
+            let fields = &parsed.input.fields;
+            assert!(fields.nonequilibrium.dual_porosity_exchange_state.is_none());
+            if !entry.to_string_lossy().contains("nonequilibrium/dual") {
+                continue;
+            }
+            dual_decks += 1;
+            let selector = match &fields.nonequilibrium.dual_domain.as_ref().unwrap().value {
+                Explicit::Available(selector) => selector.clone(),
+                Explicit::Unavailable(_) => panic!("the dual decks carry a dual_domain selector"),
+            };
+            // The selector side of the state exists in every dual deck, and the
+            // reader sets iDualPor above zero only for water models 6 and 7
+            // (INPUT.FOR:619-624).
+            assert_eq!(
+                selector.i_dual_por > 0,
+                matches!(selector.water_model, 6 | 7),
+                "{entry:?}: {}",
+                selector.i_dual_por
+            );
+            // None of the node state does: x is a range description, and ThOld,
+            // hNew and ThOldIm are left to the run the case does not replay.
+            assert_ne!(
+                explicit_state(
+                    fields
+                        .transport_properties
+                        .coordinates
+                        .as_ref()
+                        .map(|v| &v.value)
+                ),
+                "available"
+            );
+            assert_eq!(
+                explicit_state(
+                    fields
+                        .nonequilibrium
+                        .initial_water_content
+                        .as_ref()
+                        .map(|v| &v.value)
+                ),
+                "unavailable"
+            );
+            if selector.i_dual_por > 0 {
+                assert_eq!(
+                    explicit_state(
+                        fields
+                            .nonequilibrium
+                            .initial_dual_immobile_water_content
+                            .as_ref()
+                            .map(|v| &v.value)
+                    ),
+                    "unavailable"
+                );
+            }
+            // The decks also claim SinkIm is unreachable because
+            // "WATFLOW.FOR:42-46 comments out call DualPor". That claim is not
+            // what the pinned source says: 43 is an `if(iDualPor.gt.0)` and only
+            // the continuation lines 44-46 are commented, i.e. the call is live
+            // (see the 18.7.3 notes). A corrected fixture must trip this
+            // assertion together with a corrected request.
+            let sink = fields
+                .nonequilibrium
+                .dynamic_exchange_sink
+                .as_ref()
+                .unwrap()
+                .value
+                .unavailable_reason()
+                .unwrap()
+                .to_string();
+            assert!(sink.contains("comments out call DualPor"), "{sink}");
+        }
+        assert_eq!(dual_decks, 3);
     }
 }
