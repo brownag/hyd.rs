@@ -52,11 +52,14 @@ Plan: [EXECUTION_PLAN_18.md](EXECUTION_PLAN_18.md). Worker template: [PROMPT_TEM
 
 ## Active tasks
 
-- 18.7.6: ready (Wave 7A), dispatched to worker in
-  `.development/18-worktrees/18.7.6` from `49192d7`. Touches only
-  `reference/fortran/**`, `tools/**` and its own test and task files; it must not
-  edit `types.rs`, `adapter.rs`, `boundary.rs`, `src_reference/**` or any
-  canonical deck.
+- 18.7.3: implementing (worker in `.development/18-worktrees/18.7.3`, branch
+  `orchestration/18.7.3`, base `98299cd`). Wave 7B, unblocked by the 18.7.1
+  merge; it owns `dual_domain.rs` plus the `types.rs`/`adapter.rs` primitive
+  state `DualPor` consumes, and holds that single ownership until 18.7.8.
+- 18.7.6: **blocked on tooling, not on decomposition** — its acceptance runs the
+  Python `tools/**` suite, and no usable interpreter exists on this host (see
+  Verification). Do not dispatch it until the user restores the interpreter or
+  names a replacement; its gate cannot be substituted with a Rust check.
 
 ## Completed tasks
 
