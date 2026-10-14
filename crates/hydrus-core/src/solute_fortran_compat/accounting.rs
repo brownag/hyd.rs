@@ -50,6 +50,34 @@ pub struct MassTranInput<'a> {
 impl MassTotals {
     /// Accumulate one species in source node/operation order using default REAL.
     pub fn accumulate(&mut self, input: &MassTranInput<'_>) -> Result<(), KernelError> {
+        self.accumulate_weighted(input, input.epsi)
+    }
+
+    /// Beginning-of-step `MassTran` (`SOLUTE.FOR:135-140`), run only when
+    /// `Level==1 && Iter==1`. `old` must hold the old-level temperature, water
+    /// content, velocity and pools; the weight is `alf`, never `old.epsi`.
+    /// Returns whether the call ran. The driver (18.10.1) invokes this before
+    /// the end-of-step `accumulate`.
+    pub fn accumulate_step_start(
+        &mut self,
+        level: u32,
+        iter: u32,
+        old: &MassTranInput<'_>,
+        alf: DefaultReal,
+    ) -> Result<bool, KernelError> {
+        if level != 1 || iter != 1 {
+            return Ok(false);
+        }
+        self.accumulate_weighted(old, alf)?;
+        Ok(true)
+    }
+
+    fn accumulate_weighted(
+        &mut self,
+        input: &MassTranInput<'_>,
+        weight: DefaultReal,
+    ) -> Result<(), KernelError> {
+        let w = weight.0;
         let n = input.coordinates.len();
         let node_slices = [
             input.material_ids.len(),
@@ -94,9 +122,9 @@ impl MassTotals {
         for i in 0..n - 1 {
             let j = i + 1;
             let dx = input.coordinates[i + 1].0 - input.coordinates[i].0;
-            self.cv_ch0[s].0 += input.epsi.0 * dx * (input.q0[i].0 + input.q0[i + 1].0) / 2.0;
-            self.cv_ch1[s].0 += input.epsi.0 * dx * (input.q1[i].0 + input.q1[i + 1].0) / 2.0;
-            self.cv_ch_r[s].0 += input.epsi.0 * dx * (input.sink[i].0 + input.sink[i + 1].0) / 2.0;
+            self.cv_ch0[s].0 += w * dx * (input.q0[i].0 + input.q0[i + 1].0) / 2.0;
+            self.cv_ch1[s].0 += w * dx * (input.q1[i].0 + input.q1[i + 1].0) / 2.0;
+            self.cv_ch_r[s].0 += w * dx * (input.sink[i].0 + input.sink[i + 1].0) / 2.0;
 
             if input.equilibrium {
                 continue;
@@ -130,14 +158,14 @@ impl MassTotals {
                             input.sorb[j].0
                         };
                 }
-                self.cv_ch_im[s].0 += input.epsi.0 * dx / 2.0
+                self.cv_ch_im[s].0 += w * dx / 2.0
                     * (omegai * (input.concentration[i].0 - input.sorb[i].0)
                         + omegaj * (input.concentration[j].0 - input.sorb[j].0)
                         + macro_i
                         + macro_j);
                 if s == 0 && !input.linear {
-                    self.s_trans[i].0 = input.epsi.0
-                        * (omegai * (input.concentration[i].0 - input.sorb[i].0) + macro_i);
+                    self.s_trans[i].0 =
+                        w * (omegai * (input.concentration[i].0 - input.sorb[i].0) + macro_i);
                 }
                 if input.tdep.len() <= jj + 15
                     || input.chpar[mi].len() <= jj + 15
@@ -164,12 +192,11 @@ impl MassTotals {
                     let omega_sj = parameter(input, jj + 15, mj, ttj);
                     let sorb_ei = sorb_dual(input.concentration[i].0, fraci, emi, ksi, nui, expi);
                     let sorb_ej = sorb_dual(input.concentration[j].0, fracj, emj, ksj, nuj, expj);
-                    self.cv_ch_im[s].0 += input.epsi.0 * dx / 2.0
+                    self.cv_ch_im[s].0 += w * dx / 2.0
                         * (rhoi * omega_si * (sorb_ei - input.sorb2[i].0)
                             + rhoj * omega_sj * (sorb_ej - input.sorb2[j].0));
                     if s == 0 && !input.linear {
-                        self.s_trans[i].0 +=
-                            input.epsi.0 * rhoi * omega_si * (sorb_ei - input.sorb2[i].0);
+                        self.s_trans[i].0 += w * rhoi * omega_si * (sorb_ei - input.sorb2[i].0);
                     }
                 }
             } else if !input.bacteria {
@@ -185,14 +212,14 @@ impl MassTotals {
                 let expj = input.chpar[mj][jj + 8].0;
                 let sorb_ei = sorb_two_site(input.concentration[i].0, fraci, ksi, nui, expi);
                 let sorb_ej = sorb_two_site(input.concentration[j].0, fracj, ksj, nuj, expj);
-                self.cv_ch_im[s].0 += input.epsi.0 * dx / 2.0
+                self.cv_ch_im[s].0 += w * dx / 2.0
                     * (rhoi * omegai * (sorb_ei - input.sorb[i].0)
                         + rhoj * omegaj * (sorb_ej - input.sorb[j].0));
                 if s == 0 {
-                    self.s_trans[i].0 = input.epsi.0 * rhoi * omegai * (sorb_ei - input.sorb[i].0);
+                    self.s_trans[i].0 = w * rhoi * omegai * (sorb_ei - input.sorb[i].0);
                 }
             } else {
-                self.accumulate_bacteria(input, i, j, mi, mj, jj, tti, ttj, dx)?;
+                self.accumulate_bacteria(input, i, j, mi, mj, jj, tti, ttj, dx, w)?;
             }
         }
         Ok(())
@@ -211,6 +238,7 @@ impl MassTotals {
         tti: f32,
         ttj: f32,
         dx: f32,
+        w: f32,
     ) -> Result<(), KernelError> {
         let ch = input.chpar;
         let par = |row: usize, m: usize, tt: f32| ch[m][row].0 * (input.tdep[row].0 * tt).exp();
@@ -300,13 +328,13 @@ impl MassTotals {
             ka2i = ka2;
             ka2j = ka2;
         }
-        self.cv_ch_im[input.species].0 += input.epsi.0 * dx / 2.0
+        self.cv_ch_im[input.species].0 += w * dx / 2.0
             * (input.concentration[i].0 * thetai * (psi1i * ka1i + psi2i * ka2i)
                 + input.concentration[j].0 * thetaj * (psi1j * ka1j + psi2j * ka2j)
                 - rhoi * (input.sorb[i].0 * kd1i + input.sorb2[i].0 * kd2i)
                 - rhoj * (input.sorb[j].0 * kd1j + input.sorb2[j].0 * kd2j));
         if input.species == 0 {
-            self.s_trans[i].0 = input.epsi.0
+            self.s_trans[i].0 = w
                 * (input.concentration[i].0 * thetai * (psi1i * ka1i + psi2i * ka2i)
                     - rhoi * (input.sorb[i].0 * kd1i + input.sorb2[i].0 * kd2i));
         }
@@ -844,5 +872,130 @@ pub(crate) mod tests {
         let ids = [0; 3];
         let got = flux_concentration(&flux_input(&c, &x, &v, &p, &ids)).unwrap();
         assert_eq!(got, Explicit::Available(c.to_vec()));
+    }
+
+    fn two_site_fixture() -> MassFixture {
+        let mut f = MassFixture::new();
+        f.params[0][0] = DefaultReal(1.5);
+        f.params[0][2] = DefaultReal(0.4);
+        f.params[0][6] = DefaultReal(0.3);
+        f.params[0][7] = DefaultReal(1.0);
+        f.params[0][8] = DefaultReal(1.0);
+        f.params[0][19] = DefaultReal(0.5);
+        f
+    }
+
+    fn zeroed() -> MassTotals {
+        MassFixture::totals()
+    }
+
+    #[test]
+    fn step_start_guard_runs_only_at_level_one_iter_one() {
+        let f = two_site_fixture();
+        let mut input = f.input(false, false, false, None, false);
+        input.epsi = DefaultReal(0.7);
+        for (l, i) in [(1, 2), (2, 1), (2, 2), (0, 0)] {
+            let mut t = zeroed();
+            assert_eq!(
+                t.accumulate_step_start(l, i, &input, DefaultReal(0.3)),
+                Ok(false)
+            );
+            assert_eq!(t, zeroed());
+        }
+        let mut t = zeroed();
+        assert_eq!(
+            t.accumulate_step_start(1, 1, &input, DefaultReal(0.3)),
+            Ok(true)
+        );
+        assert_ne!(t, zeroed());
+    }
+
+    #[test]
+    fn step_start_uses_alf_weight_and_ignores_input_epsi() {
+        let f = two_site_fixture();
+        let mut input = f.input(false, false, false, None, false);
+        input.epsi = DefaultReal(0.7);
+        let mut start = zeroed();
+        start
+            .accumulate_step_start(1, 1, &input, DefaultReal(0.25))
+            .unwrap();
+        // Hand value: alf*dx*(q0a+q0b)/2 = 0.25*1*(1+3)/2, same for q1.
+        assert_eq!(start.cv_ch0[0], DefaultReal(0.5));
+        assert_eq!(start.cv_ch1[0], DefaultReal(0.75));
+        let mut end = zeroed();
+        end.accumulate(&input).unwrap();
+        assert_eq!(end.cv_ch0[0], DefaultReal(0.7 * 2.0));
+        assert_ne!(start.cv_ch_im[0], DefaultReal(0.0));
+        assert!((start.cv_ch_im[0].0 / end.cv_ch_im[0].0 - 0.25 / 0.7).abs() < 1e-5);
+        assert!((start.s_trans[0].0 / end.s_trans[0].0 - 0.25 / 0.7).abs() < 1e-5);
+    }
+
+    #[test]
+    fn step_start_reads_old_snapshot_not_new() {
+        let old = two_site_fixture();
+        let mut new = two_site_fixture();
+        new.temp = [DefaultReal(35.0); 2];
+        new.conc = [DefaultReal(5.0), DefaultReal(6.0)];
+        new.sorb = [DefaultReal(0.1), DefaultReal(0.2)];
+        new.q0 = [DefaultReal(9.0), DefaultReal(9.0)];
+        new.theta = [DefaultReal(0.3); 2];
+        new.velocity = [DefaultReal(0.5); 2];
+        let io = old.input(false, false, false, None, false);
+        let in_ = new.input(false, false, false, None, false);
+        let alf = DefaultReal(0.4);
+        let (mut a, mut b, mut c) = (zeroed(), zeroed(), zeroed());
+        a.accumulate_step_start(1, 1, &io, alf).unwrap();
+        b.accumulate_step_start(1, 1, &in_, alf).unwrap();
+        assert_ne!(a.cv_ch0, b.cv_ch0);
+        assert_ne!(a.cv_ch_im, b.cv_ch_im);
+        let mut w = old.input(false, false, false, None, false);
+        w.epsi = alf;
+        c.accumulate(&w).unwrap();
+        assert_eq!(a, c);
+    }
+
+    #[test]
+    fn step_start_then_end_accumulates_cv_and_end_owns_s_trans() {
+        let old = two_site_fixture();
+        let mut new = two_site_fixture();
+        new.conc = [DefaultReal(4.0), DefaultReal(5.0)];
+        new.q0 = [DefaultReal(2.0), DefaultReal(2.0)];
+        let io = old.input(false, false, false, None, false);
+        let mut inew = new.input(false, false, false, None, false);
+        inew.epsi = DefaultReal(0.6);
+        let alf = DefaultReal(0.4);
+
+        let (mut s0, mut e0) = (zeroed(), zeroed());
+        s0.accumulate_step_start(1, 1, &io, alf).unwrap();
+        e0.accumulate(&inew).unwrap();
+
+        let mut both = zeroed();
+        both.accumulate_step_start(1, 1, &io, alf).unwrap();
+        both.accumulate(&inew).unwrap();
+        assert_eq!(both.cv_ch0[0].0, s0.cv_ch0[0].0 + e0.cv_ch0[0].0);
+        assert_eq!(both.cv_ch1[0].0, s0.cv_ch1[0].0 + e0.cv_ch1[0].0);
+        assert_eq!(both.cv_ch_im[0].0, s0.cv_ch_im[0].0 + e0.cv_ch_im[0].0);
+        // Two-site STrans is assigned, so the end call is the final writer.
+        assert_eq!(both.s_trans, e0.s_trans);
+        assert_ne!(s0.s_trans[0], e0.s_trans[0]);
+
+        let mut rev = zeroed();
+        rev.accumulate(&inew).unwrap();
+        rev.accumulate_step_start(1, 1, &io, alf).unwrap();
+        assert_eq!(rev.s_trans, s0.s_trans);
+        assert_ne!(rev.s_trans, both.s_trans);
+    }
+
+    #[test]
+    fn step_start_validation_error_leaves_totals_untouched() {
+        let f = two_site_fixture();
+        let mut input = f.input(false, false, false, None, false);
+        let short = [DefaultReal(1.0)];
+        input.q0 = &short;
+        let mut t = zeroed();
+        assert!(t
+            .accumulate_step_start(1, 1, &input, DefaultReal(0.3))
+            .is_err());
+        assert_eq!(t, zeroed());
     }
 }
