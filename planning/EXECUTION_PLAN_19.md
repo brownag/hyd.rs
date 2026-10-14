@@ -58,6 +58,7 @@
 | 2026-10-14 | Fact (recon). The `STATE_18.md` Python blocker is stale. System `/usr/bin/python3` 3.12.3 runs `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tools -p 'test_*.py'` with 291 tests OK (147 s) and leaves the tree clean. |
 | 2026-10-14 | D10 (amendment, Wave 0). 18.7.8 had been implemented on `orchestration/18.7.8` after this plan was approved (`planning/HANDOFF_18_PAUSE.md`). User chose "Review+merge 18.7.8 first". The review found that `SetSSnk` re-zeroed `SinkS` on every step, whereas `SINK.FOR:174-176` clears it once before `do 12`. It was fixed in `fc8bf8d` and merged as `60ee1b5`. D1 now reads: 18 pauses **after** 18.7.8. Pending 18 work at resume is 18.7.2, 18.7.5, 18.7.6, 18.7.7, then Waves 8–16. The anchors, the line counts and the compat lib test count (57 → 81) below are updated to `60ee1b5`. `source_coupling.rs` joins list C, 19.1.1, 19.3.1 and 19.5.2. |
 | 2026-10-14 | D11 (amendment, Wave 3 gate). `tools/solute_benchmark_bridge.py` `POLICY_HASHES` pins the SHA-256 of `crates/hydrus-core/src/solute.rs`, and every `solute.rs` edit fails 4 `test_solute_benchmark_bridge` tests. User chose "Re-pin with bitwise proof". After each task that edits `solute.rs` (19.3.3, 19.6.2, 19.7.1), the orchestrator alone updates that one digest. It records in `STATE_19.md` the non-test `solute.rs` diff and the passing `tests/solute_*.rs` run as the D8 justification. The retained evidence is not regenerated. This is the only `tools/**` edit plan 19 allows. 19.7.2 adds the same rule to 18.12.1/18.16.1. |
+| 2026-10-14 | D12 (amendment, Wave 5 review). 19.5.1's plan found that serde-derived structs accept JSON arrays as tuples. This means 19.4.1 widened the accepted set for `transport_switches`/`endpoint_primitives` (ADR-0004), and its tests missed it. Fix: 19.5.1/19.5.2 guard locally, and 19.6.1 hoists the guard into `fields.rs` and fixes `transport.rs` with tests. Until 19.6.1 lands, this is an open, known defect. |
 | 2026-10-14 | Template deviation (standards review). Workers report to the orchestrator instead of appending to `STATE_19.md`, because a worker-era replacement once corrupted `STATE_18.md`. The orchestrator distills each report into state. |
 
 ## Wave table
@@ -466,7 +467,7 @@ Waves are sequential, so every task also depends on all earlier waves.
 - **Spec:**
   - Replace `upper_row` + `upper_condition` with one `upper: UpperBoundary { Head{..} | Flux{..} | Atmospheric { critical_head } }`.
   - The atmospheric interface from 19.2.2 reads `critical_head` directly. This removes the Dirichlet-as-`hCritA` extraction and the validation of ignored rows (`water_solver.rs:784-790`).
-  - Remove `WaterStepError::UnsupportedAtmosphericInput` (`error.rs:110`, `:184`) if it has no remaining producer.
+  - Remove `WaterStepError::UnsupportedAtmosphericInput` (`error.rs:110`, `:184`) if it has no remaining producer. *Amended 2026-10-14:* it is replaced by `InvalidUpperBoundary { name }`, mirroring `InvalidLowerBoundary`, for entry-point/variant mismatches. The two tests named below therefore stay representable. They are kept, with only their asserted error variant changed, and per-file counts stay unchanged. `Natural`/`Unsupported` upper inputs are dropped (D3).
   - Delete exactly the two tests that become unrepresentable:
     - the `UnsupportedAtmosphericInput` assertion test ending at `tests/atmospheric.rs:~474`;
     - the one at `tests/water_acceptance.rs:~253`.
@@ -489,12 +490,13 @@ Waves are sequential, so every task also depends on all earlier waves.
 ### 19.6.1 — Remove orphaned adapter decode helpers
 
 - **Repo:** `/home/andrew/AI/hyd.rs`.
-- **Must edit:** `crates/hydrus-core/src/solute_fortran_compat/adapter/{fields,mod}.rs`.
+- **Must edit:** `crates/hydrus-core/src/solute_fortran_compat/adapter/{fields,mod}.rs`. *Amended 2026-10-14 (D12):* also `adapter/{transport,reactions,transport_properties,nonequilibrium,biology,source_coupling}.rs`, for the object-guard hoist only.
 - **Can create:** `planning/tasks/19.6.1.todo.md`.
 - **Depends on:** 19.5.1, 19.5.2.
 - **Spec:**
   - Delete `as_*`/`maybe_*` helpers in `fields.rs` with no remaining callers.
   - In `mod.rs`, inline group mappers into `map_fields` only where a mapper is now a one-line `serde_json::from_value` call.
+  - **D12 object guard.** serde-derived structs accept a JSON array as a positional tuple, but the old `as_object` decoders rejected it. 19.4.1's `transport.rs` (`SwitchesDto`, `EndpointDto`) shipped without a guard; 19.5.1/19.5.2 added identical local `require_object(value, name)` helpers. Hoist one `pub(super) fn require_object` into `fields.rs` and delete the local copies. Apply it in `transport.rs` at every struct-DTO level. Add array-as-struct rejection tests there, which fail on the current `transport.rs` and pass after. Assert the field name.
   - No behavior change.
   - The `dump_parsed_fixtures` snapshot is identical before and after.
 - **Do not touch:** group files, `json_guard.rs`, `tests.rs`.

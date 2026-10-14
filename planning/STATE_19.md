@@ -1,7 +1,7 @@
 # State — Orchestration 19
 
 Plan status: **Approved by user on 2026-10-14 (“yes”).**
-Execution status: **Waves 0–4 done; Wave 5 next.** 18.7.8 was reviewed, fixed and merged first (D10, `60ee1b5`), and Orchestration 18 is paused after it.
+Execution status: **Waves 0–5 done; Wave 6 next.** Open known defect D12 (serde array-as-struct in `adapter/transport.rs`) is owned by 19.6.1. 18.7.8 was reviewed, fixed and merged first (D10, `60ee1b5`), and Orchestration 18 is paused after it.
 Plan: [EXECUTION_PLAN_19.md](EXECUTION_PLAN_19.md). Worker template: [PROMPT_TEMPLATE_19.md](PROMPT_TEMPLATE_19.md).
 
 ## Baseline and guardrails
@@ -27,9 +27,9 @@ Plan: [EXECUTION_PLAN_19.md](EXECUTION_PLAN_19.md). Worker template: [PROMPT_TEM
 | 3 | 19.3.3 | Remove public solute workspace mutators | done (`4f09c77`) |
 | 4 | 19.4.1 | serde decoding: dependency + transport group | done (`273e65b`) |
 | 4 | 19.4.2 | One lower-boundary value in `WaterStepInput` | done (`658e5be`) |
-| 5 | 19.5.1 | serde decoding: reactions + transport properties | pending |
-| 5 | 19.5.2 | serde decoding: nonequilibrium + biology + source coupling | pending |
-| 5 | 19.5.3 | One upper-boundary value in `WaterStepInput` | pending |
+| 5 | 19.5.1 | serde decoding: reactions + transport properties | done (`e92e7bb`) |
+| 5 | 19.5.2 | serde decoding: nonequilibrium + biology + source coupling | done (`15ae09f`) |
+| 5 | 19.5.3 | One upper-boundary value in `WaterStepInput` | done (`65aea53`) |
 | 6 | 19.6.1 | Remove orphaned adapter decode helpers | pending |
 | 6 | 19.6.2 | Water step publishes the accepted water snapshot | pending |
 | 7 | 19.7.1 | Closed `SoluteBackend` dispatch + contract tests | pending |
@@ -41,6 +41,8 @@ Plan: [EXECUTION_PLAN_19.md](EXECUTION_PLAN_19.md). Worker template: [PROMPT_TEM
 - (19.4.2) `WaterStepInput.lower_boundary_flux` → removed; now `LowerBoundaryMode::FixedHead { flux }` (read only by fixed head).
 - (19.4.2) `LowerBoundaryMode::FixedHead { head }` → `FixedHead { head, row, flux }`. `WaterStepReport.lower_boundary_mode` keeps its name; its `FixedHead` value carries `row`/`flux`.
 - (19.4.2, crate-private) `LowerBoundaryPlan`, `PreparedLowerBoundaryMode`, `LowerBoundaryRowStrategy` removed; `LowerBoundaryMode::prepare(self, count, minimum_pivot)` (no `row`); `prepare_step(LowerTrial)` returns the row.
+- (19.5.3) `WaterStepInput.upper_row` + `.upper_condition` + `.upper_boundary_flux` → `WaterStepInput.upper: UpperBoundary` (new public type: `Head { head, row, flux } | Flux { flux, row } | Atmospheric { critical_head }`). `Natural`/`Unsupported` upper inputs are removed.
+- (19.5.3) `WaterStepError::UnsupportedAtmosphericInput` → `WaterStepError::InvalidUpperBoundary { name }` (entry-point/variant mismatch).
 - (19.3.3) `SoluteWorkspace::{trial_concentrations_mut, trial_kinetic_sorbed_mut, trial_boundary_mass_mut, set_trial_accepted_steps}` → `#[cfg(test)] pub(crate)`; `trial_reaction_mass_mut` → `pub(crate)` (no longer public).
 
 ## Verification
@@ -49,6 +51,7 @@ Plan: [EXECUTION_PLAN_19.md](EXECUTION_PLAN_19.md). Worker template: [PROMPT_TEM
 - Wave 2 (at `cfa0741`): `cargo test --workspace` 229 passed / 0 failed (226 + 3 new `atmospheric::tests`); Python 291 OK; fmt, clippy and diff-check clean.
 - Wave 3 (at `882fa87`): `cargo test --workspace` 229 passed / 0 failed / 1 ignored (`dump_parsed_fixtures`). Python first failed 4 tests in `test_solute_benchmark_bridge` with a `solute.rs` hash mismatch. Re-pinned under D11 in `882fa87` (bed1cd17… → 63f83901…); justification: the non-test `solute.rs` diff is five visibility/`#[cfg(test)]` lines and `tests/solute_*.rs` passes 53/0. Then Python 291 OK; fmt, clippy and diff-check clean.
 - Wave 4 (at `658e5be`): `cargo test --workspace` 236 passed / 0 failed / 1 ignored (229 + 7 `adapter::transport::tests`); Python 291 OK; fmt, clippy and diff-check clean.
+- Wave 5 (at `65aea53`): `cargo test --workspace` 264 passed / 0 failed / 1 ignored (236 + 5 from 19.5.1 + 23 from 19.5.2); `--lib solute_fortran_compat` 116 + 1 ignored. The merged `dump_parsed_fixtures` snapshot is identical to the pre-Wave-5 one (kept at `.development/19-snap/baseline.txt`). Python 291 OK; fmt, clippy and diff-check clean.
 
 ## Task reports
 
@@ -117,3 +120,23 @@ Plan: [EXECUTION_PLAN_19.md](EXECUTION_PLAN_19.md). Worker template: [PROMPT_TEM
 - Orchestrator literal audit: the only literals removed were unread rows and fluxes on flux/free-drainage sites (e.g. `atmospheric.rs` `no_flow_lower` lost an unread `{0, 1.05, -1, 0.05*h}` row and its `old_bottom_head` parameter). Fixed-head values moved with the same numbers.
 - List W 46, `api_contract` 4, `boundary_rows` 6 unchanged; the non-W tests needed no edit.
 - Gotcha: `validate`'s `boundary_fluxes` finite check covers fixed-head `flux` plus `upper_boundary_flux`, with unchanged precedence.
+
+### 19.5.1 — done (`e92e7bb`)
+- `chpar_records` (signature kept; also serves `endpoint_primitives.source_chpar`), `maybe_chpar`, `maybe_moisture_dependency`, `maybe_species` and `maybe_coordinates` now decode through `deny_unknown_fields` DTOs.
+- A local `require_object` runs at every struct level: the wrapper value, each `ordered_species` entry and each chpar entry. A local `decode_object` keeps the `unknown nested key X` text.
+- Snapshot identical (re-run by the orchestrator). `--lib solute_fortran_compat` 88 → 93; the 5 new tests passed on the old bodies.
+- D12 discovery: serde structs accept JSON arrays as tuples, so `transport.rs` from 19.4.1 is affected (fix owned by 19.6.1).
+
+### 19.5.2 — done (`15ae09f`)
+- Eight mappers moved to DTOs: `maybe_dual_domain`, `dual_porosity_material` (thin `pub(super)` wrapper kept), `maybe_dual_porosity_exchange_state`, `maybe_biology_mode`, `maybe_biology_parameters`, `maybe_control_switches`, `maybe_root_uptake_state`, `maybe_size_exclusion_state`. The validation wrappers and 19.1.1 kernel calls are untouched.
+- `require_object` runs at the wrapper values, each `materials[]` entry and direct `dual_porosity_material` calls.
+- `biology_parameters`: null-as-absent was confirmed on the old body, and only those fields use `Option` + `default`; every other optional uses `present`.
+- A `legacy_text` helper in `nonequilibrium.rs` rewrites serde errors to the pre-serde strings pinned by `tests.rs` (`… missing`, `expected finite number`, `unknown nested key …`).
+- Snapshot identical. `--lib solute_fortran_compat` 88 → 111 (+23, all run on the old bodies first). Pinned, `coupling_bundles_*` and `dual_porosity_exchange_state_*` tests are unchanged.
+
+### 19.5.3 — done (`65aea53`)
+- `WaterStepInput.upper: UpperBoundary`. `critical_head` is read from `Atmospheric` via `UpperBoundary::critical_head()`, so the Dirichlet-as-`hCritA` extraction is gone. `validate` no longer checks a row in atmospheric mode, which ignores it.
+- Spec amended: `InvalidUpperBoundary` replaces `UnsupportedAtmosphericInput`. The two mismatch tests are kept (atmospheric 11, acceptance 5), with only their asserted variant changed. The in-crate test was renamed `prepare_step_requires_atmospheric_and_picks_condition`.
+- `Flux` merges the row flux and balance flux into one `flux`. The worker checked that every `Neumann` site had identical values (all `0.0`, only in rejection tests).
+- `UpperBoundary::fixes_head()` is true for `Atmospheric`, as before.
+- Orchestrator literal audit: non-zero literals are identical and no assertion or tolerance changed. There are 12 more `0.0` from rows moved into variants.
