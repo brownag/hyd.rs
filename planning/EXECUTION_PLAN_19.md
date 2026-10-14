@@ -404,7 +404,7 @@ Waves are sequential, so every task also depends on all earlier waves.
 ### 19.4.2 — One lower-boundary value in `WaterStepInput`
 
 - **Repo:** `/home/andrew/AI/hyd.rs`.
-- **Must edit:** `crates/hydrus-core/src/{water_solver,lower_boundary,lib}.rs`, `crates/hydrus-core/tests/common/mod.rs`, list W.
+- **Must edit:** `crates/hydrus-core/src/{water_solver,lower_boundary,lib}.rs`, `crates/hydrus-core/tests/common/mod.rs`, list W. *Amended 2026-10-14:* also the `#[cfg(test)]` `WaterStepInput` construction in `atmospheric.rs`, which 19.2.2 added, and `lower_boundary_flux` folds into the fixed-head variant, because it is read only there.
 - **Can create:** `planning/tasks/19.4.2.todo.md`.
 - **Depends on:** 19.3.2.
 - **Spec:**
@@ -434,7 +434,7 @@ Waves are sequential, so every task also depends on all earlier waves.
 - **Can create:** `planning/tasks/19.5.1.todo.md`; `.development/19.5.1/`.
 - **Depends on:** 19.4.1.
 - **Spec:**
-  - Apply 19.4.1 steps 2–7 to `maybe_chpar`, `chpar_records`, `maybe_species`, `maybe_moisture_dependency` and the group's other mappers. Keep their names and signatures.
+  - Apply 19.4.1 steps 2–7 to `maybe_chpar`, `chpar_records`, `maybe_species`, `maybe_moisture_dependency` and the group's other mappers. *Amended 2026-10-14:* this includes `maybe_coordinates`, which 19.3.1 placed in `transport_properties.rs`. Keep their names and signatures.
   - Use `fields.rs` helpers without editing that file. If one is missing, stop and report (escalation rule 4).
 - **Do not touch:** `fields.rs`, `mod.rs`, `tests.rs`, other group files, `types.rs`, `Cargo.*`.
 - **Anchors:** the functions named above.

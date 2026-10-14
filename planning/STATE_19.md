@@ -1,7 +1,7 @@
 # State — Orchestration 19
 
 Plan status: **Approved by user on 2026-10-14 (“yes”).**
-Execution status: **Waves 0–3 done; Wave 4 next.** 18.7.8 was reviewed, fixed and merged first (D10, `60ee1b5`), and Orchestration 18 is paused after it.
+Execution status: **Waves 0–4 done; Wave 5 next.** 18.7.8 was reviewed, fixed and merged first (D10, `60ee1b5`), and Orchestration 18 is paused after it.
 Plan: [EXECUTION_PLAN_19.md](EXECUTION_PLAN_19.md). Worker template: [PROMPT_TEMPLATE_19.md](PROMPT_TEMPLATE_19.md).
 
 ## Baseline and guardrails
@@ -25,8 +25,8 @@ Plan: [EXECUTION_PLAN_19.md](EXECUTION_PLAN_19.md). Worker template: [PROMPT_TEM
 | 3 | 19.3.1 | Split the request adapter into submodules | done (`a98c777`) |
 | 3 | 19.3.2 | Shared water test fixtures | done (`46d6194`) |
 | 3 | 19.3.3 | Remove public solute workspace mutators | done (`4f09c77`) |
-| 4 | 19.4.1 | serde decoding: dependency + transport group | pending |
-| 4 | 19.4.2 | One lower-boundary value in `WaterStepInput` | pending |
+| 4 | 19.4.1 | serde decoding: dependency + transport group | done (`273e65b`) |
+| 4 | 19.4.2 | One lower-boundary value in `WaterStepInput` | done (`658e5be`) |
 | 5 | 19.5.1 | serde decoding: reactions + transport properties | pending |
 | 5 | 19.5.2 | serde decoding: nonequilibrium + biology + source coupling | pending |
 | 5 | 19.5.3 | One upper-boundary value in `WaterStepInput` | pending |
@@ -37,13 +37,18 @@ Plan: [EXECUTION_PLAN_19.md](EXECUTION_PLAN_19.md). Worker template: [PROMPT_TEM
 
 ## Public renames (D3)
 
-_None yet. Tasks append old → new here via the orchestrator._
+- (19.4.2) `WaterStepInput.lower_row` + `WaterStepInput.lower_boundary_mode` → `WaterStepInput.lower: LowerBoundaryMode`.
+- (19.4.2) `WaterStepInput.lower_boundary_flux` → removed; now `LowerBoundaryMode::FixedHead { flux }` (read only by fixed head).
+- (19.4.2) `LowerBoundaryMode::FixedHead { head }` → `FixedHead { head, row, flux }`. `WaterStepReport.lower_boundary_mode` keeps its name; its `FixedHead` value carries `row`/`flux`.
+- (19.4.2, crate-private) `LowerBoundaryPlan`, `PreparedLowerBoundaryMode`, `LowerBoundaryRowStrategy` removed; `LowerBoundaryMode::prepare(self, count, minimum_pivot)` (no `row`); `prepare_step(LowerTrial)` returns the row.
+- (19.3.3) `SoluteWorkspace::{trial_concentrations_mut, trial_kinetic_sorbed_mut, trial_boundary_mass_mut, set_trial_accepted_steps}` → `#[cfg(test)] pub(crate)`; `trial_reaction_mass_mut` → `pub(crate)` (no longer public).
 
 ## Verification
 
 - Wave 1 (at `4ed74fa`): `cargo test --workspace` 226 passed / 0 failed (baseline 226); Python 291 OK; fmt, clippy `-D warnings` and `git diff --check` clean.
 - Wave 2 (at `cfa0741`): `cargo test --workspace` 229 passed / 0 failed (226 + 3 new `atmospheric::tests`); Python 291 OK; fmt, clippy and diff-check clean.
 - Wave 3 (at `882fa87`): `cargo test --workspace` 229 passed / 0 failed / 1 ignored (`dump_parsed_fixtures`). Python first failed 4 tests in `test_solute_benchmark_bridge` with a `solute.rs` hash mismatch. Re-pinned under D11 in `882fa87` (bed1cd17… → 63f83901…); justification: the non-test `solute.rs` diff is five visibility/`#[cfg(test)]` lines and `tests/solute_*.rs` passes 53/0. Then Python 291 OK; fmt, clippy and diff-check clean.
+- Wave 4 (at `658e5be`): `cargo test --workspace` 236 passed / 0 failed / 1 ignored (229 + 7 `adapter::transport::tests`); Python 291 OK; fmt, clippy and diff-check clean.
 
 ## Task reports
 
@@ -97,3 +102,18 @@ _None yet. Tasks append old → new here via the orchestrator._
 - Two mutator tests moved verbatim into `solute.rs` `mod transaction_tests`. The spec was amended from 3: the public-API dimension test stays in `tests/solute_transaction.rs` (3 → 1); `--lib transaction_tests` has 2.
 - The first attempt dropped the last 4 lines of `rejected_trial_restores_…`. The orchestrator caught it; the worker restored them on its FAILED VERIFICATION retry, now verified identical.
 - Solute integration suites 55 → 53. This edit triggered D11.
+
+### 19.4.1 — done (`273e65b`)
+- `serde = { version = "1", features = ["derive"] }` added. `Cargo.lock` gains only two dependency lines, no `[[package]]` (D5, ADR-0016).
+- `adapter/fields.rs` adds `present` (a `deserialize_with` that rejects explicit null), `impl Deserialize for UnitValue<T>`, `decode_unit_value(fields, name, units)` (runs `field_value`/`expect_units` first) and `map_available`. Its usage comment is for 19.5.x.
+- `adapter/transport.rs`: `SwitchesDto`, `OrientationDto` and `EndpointDto` (`deny_unknown_fields`, `TryFrom`; `source_chpar` stays `Option<Value>` → `chpar_records`). Names and signatures are kept.
+- `dump_parsed_fixtures` before/after is byte-identical (orchestrator re-ran it). `--lib solute_fortran_compat` 81 → 88 (+7 rejection tests, each run against the old bodies first).
+- Deviation (accepted): serde type errors name the request field (`transport_switches`) rather than the nested key. Missing and unknown keys still name the key; `unknown nested key X` text is kept.
+- Gotchas for 19.5.x: a generic wire struct needs `#[serde(bound(deserialize = ...))]`. Never derive `Deserialize` on `types.rs`: use f64 DTOs and convert with `DefaultReal::from_input`. Absent-key defaults use `#[serde(default)]`, while optional keys use `default, deserialize_with = "present"`.
+
+### 19.4.2 — done (`658e5be`)
+- `WaterStepInput.lower: LowerBoundaryMode`; fixed head carries `row` and `flux`. The step derives the flux-mode rows (`lower_flux_row` moved unchanged into `prepare_step`). See D3 renames above.
+- Spec amended: the `atmospheric.rs` test-module literal and the `lower_boundary_flux` fold were added.
+- Orchestrator literal audit: the only literals removed were unread rows and fluxes on flux/free-drainage sites (e.g. `atmospheric.rs` `no_flow_lower` lost an unread `{0, 1.05, -1, 0.05*h}` row and its `old_bottom_head` parameter). Fixed-head values moved with the same numbers.
+- List W 46, `api_contract` 4, `boundary_rows` 6 unchanged; the non-W tests needed no edit.
+- Gotcha: `validate`'s `boundary_fluxes` finite check covers fixed-head `flux` plus `upper_boundary_flux`, with unchanged precedence.
