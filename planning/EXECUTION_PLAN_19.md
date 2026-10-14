@@ -57,6 +57,7 @@
 | 2026-10-14 | D9. New ADRs go in `docs/decisions/` as 0013–0016, in the format of `0002-keep-fvbe-and-source-compatible-backends-separate.md`. `CONTEXT.md` at the repo root holds the domain glossary. |
 | 2026-10-14 | Fact (recon). The `STATE_18.md` Python blocker is stale. System `/usr/bin/python3` 3.12.3 runs `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tools -p 'test_*.py'` with 291 tests OK (147 s) and leaves the tree clean. |
 | 2026-10-14 | D10 (amendment, Wave 0). 18.7.8 had been implemented on `orchestration/18.7.8` after this plan was approved (`planning/HANDOFF_18_PAUSE.md`). User chose "Review+merge 18.7.8 first". The review found that `SetSSnk` re-zeroed `SinkS` on every step, whereas `SINK.FOR:174-176` clears it once before `do 12`. It was fixed in `fc8bf8d` and merged as `60ee1b5`. D1 now reads: 18 pauses **after** 18.7.8. Pending 18 work at resume is 18.7.2, 18.7.5, 18.7.6, 18.7.7, then Waves 8–16. The anchors, the line counts and the compat lib test count (57 → 81) below are updated to `60ee1b5`. `source_coupling.rs` joins list C, 19.1.1, 19.3.1 and 19.5.2. |
+| 2026-10-14 | D11 (amendment, Wave 3 gate). `tools/solute_benchmark_bridge.py` `POLICY_HASHES` pins the SHA-256 of `crates/hydrus-core/src/solute.rs`, and every `solute.rs` edit fails 4 `test_solute_benchmark_bridge` tests. User chose "Re-pin with bitwise proof". After each task that edits `solute.rs` (19.3.3, 19.6.2, 19.7.1), the orchestrator alone updates that one digest. It records in `STATE_19.md` the non-test `solute.rs` diff and the passing `tests/solute_*.rs` run as the D8 justification. The retained evidence is not regenerated. This is the only `tools/**` edit plan 19 allows. 19.7.2 adds the same rule to 18.12.1/18.16.1. |
 | 2026-10-14 | Template deviation (standards review). Workers report to the orchestrator instead of appending to `STATE_19.md`, because a worker-era replacement once corrupted `STATE_18.md`. The orchestrator distills each report into state. |
 
 ## Wave table
@@ -364,13 +365,13 @@ Waves are sequential, so every task also depends on all earlier waves.
 - **Spec:**
   - In `impl SoluteWorkspace` (`solute.rs:411-549`), change `trial_reaction_mass_mut` to `pub(crate)`; it is used at `:1289`.
   - The other mutators have no `src` callers: `trial_concentrations_mut`, `trial_kinetic_sorbed_mut`, `trial_boundary_mass_mut`, `set_trial_accepted_steps`. Make them `#[cfg(test)] pub(crate)`.
-  - Move the three tests in `tests/solute_transaction.rs` that write through mutators (`~:81-116`) verbatim into a `#[cfg(test)] mod transaction_tests` in `solute.rs`, adapting only imports.
+  - Move the tests in `tests/solute_transaction.rs` that write through mutators (`~:76-116`). *Amended 2026-10-14: only 2 of the file's 3 tests use mutators, so 2 move and the public-API dimension test stays.* verbatim into a `#[cfg(test)] mod transaction_tests` in `solute.rs`, adapting only imports.
   - Read-only `trial_*` getters stay public.
 - **Do not touch:** FV/BE equations, `lib.rs`, other files.
 - **Anchors:** `impl SoluteWorkspace`; `grep -rn '_mut(\|set_trial' crates/hydrus-core/tests`.
 - **Acceptance:**
-  - `cargo test -p hydrus-core --lib transaction_tests` passes with 3 tests.
-  - `cargo test -p hydrus-core --test solute_transaction --test solute_contract --test solute_transport --test solute_acceptance --test solute_outlet --test solute_reactions --test solute_species_boundaries --test solute_fixture_parity --test solute_verification_harness` passes. The integration count drops by exactly the 3 moved tests.
+  - `cargo test -p hydrus-core --lib transaction_tests` passes with 2 tests (amended).
+  - `cargo test -p hydrus-core --test solute_transaction --test solute_contract --test solute_transport --test solute_acceptance --test solute_outlet --test solute_reactions --test solute_species_boundaries --test solute_fixture_parity --test solute_verification_harness` passes. The integration count drops by exactly the 2 moved tests (amended).
   - `grep -n 'pub fn .*_mut\|pub fn set_trial' crates/hydrus-core/src/solute.rs` returns nothing.
   - A1–A3.
 
@@ -567,6 +568,7 @@ Waves are sequential, so every task also depends on all earlier waves.
   - **18.10.1:** the driver builds `EndpointPrimitiveState`/`DualPorPrimitiveState` from step state in source order, does not re-validate what kernel `validate` covers, and removes each `wired by 18.10.1` allowance it satisfies. It consumes `WaterStepReport::accepted_water` where it needs accepted water state, and calls `source_coupling::{root_solute_uptake, size_exclusion}` at their source call sites.
   - **18.12.1:** add `SoluteBackend::FortranCompatible`, remove the `wired by 18.12.1` allowances, and run `tests/solute_backend_contract.rs` over both variants. Its `FortranCompatible`/`FiniteVolumeBackwardEuler` "selectors" are the enum variants.
   - **18.16.1:** "switch the default" means changing `SoluteConfig`'s default backend.
+  - **18.12.1, 18.16.1 (D11):** each edits `solute.rs`, so each must re-pin `POLICY_HASHES["crates/hydrus-core/src/solute.rs"]` in `tools/solute_benchmark_bridge.py`, with a bitwise-preservation justification for the FV/BE path. Add `tools/solute_benchmark_bridge.py` to their must-edit lists for that one line.
   - Apply every D3 rename from `STATE_19.md` wherever 18 text names an old public item.
 - **Do not touch:** any other file, including `STATE_18.md`, which the orchestrator updates.
 - **Anchors:** `^### 18\.` headings; `grep -n 'adapter.rs\|types.rs\|solute.rs\|advance_solute_step\|SoluteWorkspace' planning/EXECUTION_PLAN_18.md`.

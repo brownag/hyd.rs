@@ -1,7 +1,7 @@
 # State — Orchestration 19
 
 Plan status: **Approved by user on 2026-10-14 (“yes”).**
-Execution status: **Waves 0–2 done; Wave 3 next.** 18.7.8 was reviewed, fixed and merged first (D10, `60ee1b5`), and Orchestration 18 is paused after it.
+Execution status: **Waves 0–3 done; Wave 4 next.** 18.7.8 was reviewed, fixed and merged first (D10, `60ee1b5`), and Orchestration 18 is paused after it.
 Plan: [EXECUTION_PLAN_19.md](EXECUTION_PLAN_19.md). Worker template: [PROMPT_TEMPLATE_19.md](PROMPT_TEMPLATE_19.md).
 
 ## Baseline and guardrails
@@ -22,9 +22,9 @@ Plan: [EXECUTION_PLAN_19.md](EXECUTION_PLAN_19.md). Worker template: [PROMPT_TEM
 | 1 | 19.1.3 | ADRs 0013–0016 and `CONTEXT.md` | done (`4ed74fa`) |
 | 2 | 19.2.1 | Compat hygiene: dead code, error alias, visibility, stub docs | done (`074a627`) |
 | 2 | 19.2.2 | Deepen the atmospheric upper-boundary module | done (`cfa0741`) |
-| 3 | 19.3.1 | Split the request adapter into submodules | pending |
-| 3 | 19.3.2 | Shared water test fixtures | pending |
-| 3 | 19.3.3 | Remove public solute workspace mutators | pending |
+| 3 | 19.3.1 | Split the request adapter into submodules | done (`a98c777`) |
+| 3 | 19.3.2 | Shared water test fixtures | done (`46d6194`) |
+| 3 | 19.3.3 | Remove public solute workspace mutators | done (`4f09c77`) |
 | 4 | 19.4.1 | serde decoding: dependency + transport group | pending |
 | 4 | 19.4.2 | One lower-boundary value in `WaterStepInput` | pending |
 | 5 | 19.5.1 | serde decoding: reactions + transport properties | pending |
@@ -43,6 +43,7 @@ _None yet. Tasks append old → new here via the orchestrator._
 
 - Wave 1 (at `4ed74fa`): `cargo test --workspace` 226 passed / 0 failed (baseline 226); Python 291 OK; fmt, clippy `-D warnings` and `git diff --check` clean.
 - Wave 2 (at `cfa0741`): `cargo test --workspace` 229 passed / 0 failed (226 + 3 new `atmospheric::tests`); Python 291 OK; fmt, clippy and diff-check clean.
+- Wave 3 (at `882fa87`): `cargo test --workspace` 229 passed / 0 failed / 1 ignored (`dump_parsed_fixtures`). Python first failed 4 tests in `test_solute_benchmark_bridge` with a `solute.rs` hash mismatch. Re-pinned under D11 in `882fa87` (bed1cd17… → 63f83901…); justification: the non-test `solute.rs` diff is five visibility/`#[cfg(test)]` lines and `tests/solute_*.rs` passes 53/0. Then Python 291 OK; fmt, clippy and diff-check clean.
 
 ## Task reports
 
@@ -77,3 +78,22 @@ _None yet. Tasks append old → new here via the orchestrator._
 - The orchestrator compared the removed and added lines: identical arithmetic, reformatted only.
 - Targeted: atm 11, acceptance 5, solver 10, alloc 1 (unchanged). There are 3 new `atmospheric::tests`.
 - For 19.5.3: replace the body of `critical_head` (`atmospheric.rs`) with reading `UpperBoundary::Atmospheric{critical_head}`.
+
+### 19.3.1 — done (`a98c777`)
+- `adapter.rs` was split into `adapter/`: mod 665, json_guard 176, fields 164, transport 313, reactions 199, transport_properties 94, nonequilibrium 240, biology 70, source_coupling 225, tests 1197 lines.
+- New `pub(super)` wrappers hold verbatim blocks: `reactions::{validate_ordered_species, validate_material_species_chpar}`, `transport_properties::validate_dimensions`, `nonequilibrium::validate_dual_domain_dimensions`, `transport::validate_endpoint_state` (called in original order from `validate_cross_field_dimensions`), and `source_coupling::validate_source_coupling_guards(fields, switches)` (called from `validate_required_mode_inputs`).
+- Orchestrator check: every item of the old file appears whitespace-insensitively in the new files, up to rustfmt trailing commas. The wrapper bodies are verbatim substrings and cover the old dispatch exactly (5654/5654 chars).
+- `#[ignore]` `dump_parsed_fixtures` writes `## parsed_fixtures` (38 CASE.json, sorted) and `## rejection_texts` (5 literals), tab-separated, one record per line.
+- `--lib solute_fortran_compat` 81 → 81 (+1 ignored). Insertions were 5.1% over deletions (wrappers plus dump test); accepted.
+- Gotchas: group files `use super::*`. The kernel module is reached as `super::super::source_coupling` (name clash). `species_count_value`, `available_len`, `unavailable` and `explicit_from_option_vec` stay `pub(super)` in `mod.rs`.
+
+### 19.3.2 — done (`46d6194`)
+- `tests/common/mod.rs` holds `mesh()`, `policy(max_iterations, minimum_timestep)` and `default_policy()`, all proven byte-identical by hash. `atmospheric`/`lower_boundary` import `default_policy as policy`, so call sites are unchanged.
+- `input`, the test models, `close`, `assert_close` and `no_flow_lower` stay local: they differ between files or live in only one. List W 46 → 46; `wc -l` 2267 → 2266.
+- For 19.4.2/19.5.3: each list-W file's local `input` helper needs its own migration.
+
+### 19.3.3 — done (`4f09c77`)
+- `trial_reaction_mass_mut` is now `pub(crate)`. The other four mutators are `#[cfg(test)] pub(crate)`.
+- Two mutator tests moved verbatim into `solute.rs` `mod transaction_tests`. The spec was amended from 3: the public-API dimension test stays in `tests/solute_transaction.rs` (3 → 1); `--lib transaction_tests` has 2.
+- The first attempt dropped the last 4 lines of `rejected_trial_restores_…`. The orchestrator caught it; the worker restored them on its FAILED VERIFICATION retry, now verified identical.
+- Solute integration suites 55 → 53. This edit triggered D11.
