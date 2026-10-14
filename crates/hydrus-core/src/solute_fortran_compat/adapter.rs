@@ -257,6 +257,9 @@ fn map_fields(
         "dual_porosity_exchange_state",
         "biology_mode",
         "biology_parameters",
+        "control_switches",
+        "root_uptake_state",
+        "size_exclusion_state",
         "species.1.gas_diffusion",
         "species.1.henry_coefficient",
         "vapor_state",
@@ -372,6 +375,13 @@ fn map_fields(
 
     request_fields.biology.mode = maybe_biology_mode(fields)?;
     request_fields.biology.parameters = maybe_biology_parameters(fields)?;
+
+    // `SinkF` and `lWat` are read once, here, from the control-section state and
+    // merged into the one place they live (`SourceSwitches`); the two kernels take
+    // them as parameters, never through a bundle.
+    request_fields.source_coupling.control_switches = maybe_control_switches(fields)?;
+    request_fields.source_coupling.root_uptake_state = maybe_root_uptake_state(fields)?;
+    request_fields.source_coupling.size_exclusion_state = maybe_size_exclusion_state(fields)?;
 
     validate_cross_field_dimensions(&request_fields)?;
     let switches = derive_switches(&request_fields)?;
@@ -801,6 +811,54 @@ fn validate_required_mode_inputs(
     {
         return Err("endpoint_primitives require both source boundary codes".into());
     }
+    // Source-coupling guard cross-checks. Each bundle is only reachable through one
+    // call, and each call hangs from one guard, so a bundle whose guard cannot fire is
+    // a request that believes a flag value the control record does not carry.
+    let control = fields.source_coupling.control_switches.as_ref();
+    if let Some(UnitValue {
+        value: Explicit::Available(state),
+        ..
+    }) = &fields.source_coupling.root_uptake_state
+    {
+        if control.is_none() {
+            return Err("root_uptake_state requires the control-section SinkF mapping".into());
+        }
+        if !switches.root_sink {
+            return Err("root_uptake_state requires SinkF, the SOLUTE.FOR:94 call guard".into());
+        }
+        // `INPUT.FOR:1122` forces `lActRSU=.false.` as soon as `NS.gt.1`, and the
+        // `OmegaS,SPot,rKM,cMin,lOmegaW` read of `INPUT.FOR:1126` is gated on
+        // `lActRSU.and.NS.eq.1`, so active uptake with several species has no reader.
+        if state.active_uptake && state.species_count != 1 {
+            return Err(
+                "lActRSU requires species_count 1, INPUT.FOR:1122 disables it above that".into(),
+            );
+        }
+    }
+    if let Some(UnitValue {
+        value: Explicit::Available(_),
+        ..
+    }) = &fields.source_coupling.size_exclusion_state
+    {
+        if control.is_none() {
+            return Err("size_exclusion_state requires the control-section lWat mapping".into());
+        }
+        // `HYDRUS.FOR:390` is `if(lBact.and..not.lWat)`: both terms are guard terms,
+        // and `lBact` is not a free flag but `iBact.eq.1` (`INPUT.FOR:1313-1314`),
+        // which `derive_switches` already reads out of `biology_mode`.
+        if !switches.bacteria {
+            return Err(
+                "size_exclusion_state requires iBact=1, HYDRUS.FOR:390 guards on lBact".into(),
+            );
+        }
+        if switches.water_flow {
+            return Err(
+                "size_exclusion_state requires lWat=false, HYDRUS.FOR:390 guards on \
+                 .not.lWat"
+                    .into(),
+            );
+        }
+    }
     Ok(())
 }
 
@@ -937,6 +995,15 @@ fn derive_switches(fields: &RequestFields) -> Result<SourceSwitches, String> {
                 5 => BlockingMode::Type5,
                 _ => return Err("blocking_iPsi must be 1..5 when present".into()),
             };
+        }
+    }
+    // The one place `SinkF` and `lWat` enter the port, and the only place they are
+    // stored: `SourceSwitches::root_sink` and `SourceSwitches::water_flow`. The two
+    // kernels receive them as arguments instead of carrying copies in their bundles.
+    if let Some(v) = &fields.source_coupling.control_switches {
+        if let Explicit::Available(x) = &v.value {
+            switches.water_flow = x.water_flow;
+            switches.root_sink = x.root_sink;
         }
     }
     Ok(switches)
@@ -1821,6 +1888,167 @@ fn maybe_biology_parameters(
     )
 }
 
+/// `lWat` and `SinkF`, the two `Site.dat` control-section logicals of the
+/// `INPUT.FOR:31` read that guard the two source-coupling calls. Both keys are
+/// required whenever the field is present: a request that maps one of them and
+/// silently omits the other would leave the second at a Rust default instead of the
+/// control-record value, and `SOLUTE.FOR:94` / `HYDRUS.FOR:390` both test two flags.
+/// The result is merged into `SourceSwitches` by `derive_switches`, which is the only
+/// home of these two flags; the kernels take them as parameters.
+fn maybe_control_switches(
+    fields: &Map<String, Value>,
+) -> Result<Option<UnitValue<SourceSwitches>>, String> {
+    let name = "control_switches";
+    unit_value(fields, name, "Site.dat control logicals", |x| {
+        let o = x
+            .as_object()
+            .ok_or("control_switches value must be an object")?;
+        validate_object_keys(name, o, &["lWat", "SinkF"])?;
+        let required = |key: &str| -> Result<bool, String> {
+            o.get(key)
+                .map(|v| as_bool(v, &format!("{name}.{key}")))
+                .ok_or_else(|| format!("{name} requires {key} from the control read"))?
+        };
+        Ok(SourceSwitches {
+            water_flow: required("lWat")?,
+            root_sink: required("SinkF")?,
+            ..SourceSwitches::default()
+        })
+    })
+}
+
+/// The `SetSSnk` primitive bundle: every one of the 17 actuals of `SOLUTE.FOR:94-96`
+/// that the routine reads, in dummy-argument order (`SINK.FOR:138-139`). All keys are
+/// required, because a missing producer value has no default in `src_reference` that
+/// could stand in for it: `rKM` and `cMin` are read at `INPUT.FOR:1126` only under
+/// `lActRSU.and.NS.eq.1` and are never defaulted anywhere, and `INPUT.FOR:1695-1697`
+/// defaults only `OmegaS`, `SPot` and `OmegaW`, i.e. three of the six scalars.
+/// `cRootMax` is a scalar because the call passes the element `cRootMax(jS)`.
+fn maybe_root_uptake_state(
+    fields: &Map<String, Value>,
+) -> Result<Option<UnitValue<RootUptakePrimitiveState>>, String> {
+    let name = "root_uptake_state";
+    unit_value(fields, name, "source root uptake state", |x| {
+        let o = x
+            .as_object()
+            .ok_or("root_uptake_state value must be an object")?;
+        validate_object_keys(
+            name,
+            o,
+            &[
+                "species",
+                "species_count",
+                "time",
+                "coordinates",
+                "root_distribution",
+                "root_water_sink",
+                "species_concentration",
+                "omega_water",
+                "species_root_max_concentration",
+                "lActRSU",
+                "solute_stress_index",
+                "potential_uptake",
+                "michaelis_constant",
+                "minimum_concentration",
+            ],
+        )?;
+        let real = |key: &str| -> Result<DefaultReal, String> {
+            let v = o.get(key).ok_or_else(|| format!("{name} requires {key}"))?;
+            Ok(DefaultReal::from_input(as_f64(
+                v,
+                &format!("{name}.{key}"),
+            )?))
+        };
+        let vector = |key: &str| -> Result<Vec<DefaultReal>, String> {
+            let v = o.get(key).ok_or_else(|| format!("{name} requires {key}"))?;
+            number_vec(v, &format!("{name}.{key}"))
+        };
+        Ok(RootUptakePrimitiveState {
+            species: o
+                .get("species")
+                .map(|v| as_usize(v, &format!("{name}.species")))
+                .transpose()?
+                .ok_or_else(|| format!("{name} requires species"))?,
+            species_count: o
+                .get("species_count")
+                .map(|v| as_usize(v, &format!("{name}.species_count")))
+                .transpose()?
+                .ok_or_else(|| format!("{name} requires species_count"))?,
+            time: DoubleReal(as_f64(
+                o.get("time")
+                    .ok_or_else(|| format!("{name} requires time"))?,
+                &format!("{name}.time"),
+            )?),
+            coordinates: vector("coordinates")?,
+            root_distribution: vector("root_distribution")?,
+            root_water_sink: vector("root_water_sink")?,
+            species_concentration: vector("species_concentration")?,
+            omega_water: real("omega_water")?,
+            species_root_max_concentration: real("species_root_max_concentration")?,
+            active_uptake: o
+                .get("lActRSU")
+                .map(|v| as_bool(v, &format!("{name}.lActRSU")))
+                .transpose()?
+                .ok_or_else(|| format!("{name} requires lActRSU"))?,
+            solute_stress_index: real("solute_stress_index")?,
+            potential_uptake: real("potential_uptake")?,
+            michaelis_constant: real("michaelis_constant")?,
+            minimum_concentration: real("minimum_concentration")?,
+        })
+    })
+}
+
+/// The `Exclusion` primitive bundle: the seven values `SOLUTE.FOR:1713-1779` actually
+/// reads out of the nine actuals of `HYDRUS.FOR:390-391`, plus `NumNP`. `ThOld`,
+/// `vOld` and the non-first nodes of `ThNew`/`vNew` are write-only and `Par(3,1)` is a
+/// dead store whose only reader, `1770`, is a column-1 comment, so none of them is
+/// accepted here; an unknown key is rejected rather than ignored.
+fn maybe_size_exclusion_state(
+    fields: &Map<String, Value>,
+) -> Result<Option<UnitValue<SizeExclusionPrimitiveState>>, String> {
+    let name = "size_exclusion_state";
+    unit_value(fields, name, "source size-exclusion state", |x| {
+        let o = x
+            .as_object()
+            .ok_or("size_exclusion_state value must be an object")?;
+        validate_object_keys(
+            name,
+            o,
+            &[
+                "nodes",
+                "mobile_residual_water",
+                "mobile_saturated_water",
+                "mobile_n",
+                "mobile_tortuosity",
+                "colloid_exclusion_water_content",
+                "first_node_new_water",
+                "first_node_new_velocity",
+            ],
+        )?;
+        let real = |key: &str| -> Result<DefaultReal, String> {
+            let v = o.get(key).ok_or_else(|| format!("{name} requires {key}"))?;
+            Ok(DefaultReal::from_input(as_f64(
+                v,
+                &format!("{name}.{key}"),
+            )?))
+        };
+        Ok(SizeExclusionPrimitiveState {
+            nodes: o
+                .get("nodes")
+                .map(|v| as_usize(v, &format!("{name}.nodes")))
+                .transpose()?
+                .ok_or_else(|| format!("{name} requires nodes"))?,
+            mobile_residual_water: real("mobile_residual_water")?,
+            mobile_saturated_water: real("mobile_saturated_water")?,
+            mobile_n: real("mobile_n")?,
+            mobile_tortuosity: real("mobile_tortuosity")?,
+            colloid_exclusion_water_content: real("colloid_exclusion_water_content")?,
+            first_node_new_water: real("first_node_new_water")?,
+            first_node_new_velocity: real("first_node_new_velocity")?,
+        })
+    })
+}
+
 fn boundary_form(field: Option<&Value>, upper: bool) -> Result<Option<BoundaryForm>, String> {
     let Some(field) = field else {
         return Ok(None);
@@ -1870,6 +2098,437 @@ pub(crate) mod tests {
     fn parse_request_text(request: &str) -> ParsedRequest {
         let hash = canonical_hash(&serde_json::from_str(request).unwrap());
         parse_request(&format!(r#"{{"request":{request}}}"#), &hash).unwrap()
+    }
+
+    /// The `Site.dat` control logicals have exactly one home each, so a request cannot
+    /// assert `SinkF` or `lWat` in a bundle and a different value in the control record.
+    #[test]
+    fn control_switches_have_a_single_home_and_require_both_logicals() {
+        let parsed = parse_coupling_request(&coupling_request(control_section(false, true)));
+        assert!(parsed.input.switches.root_sink);
+        assert!(!parsed.input.switches.water_flow);
+        // Neither logical may be omitted: the second would fall back to a Rust default
+        // instead of the control-record value, and both guards test two flags.
+        for (entries, expected) in [
+            (vec![("SinkF", json(true))], "lWat"),
+            (vec![("lWat", json(false))], "SinkF"),
+        ] {
+            let mut request = Map::new();
+            request.insert(
+                "control_switches".into(),
+                field("Site.dat control logicals", &bundle(&entries, &[])),
+            );
+            assert!(coupling_rejection(&request).contains(expected));
+        }
+        // And the two flags have no other home: a bundle cannot carry them.
+        let mut request = coupling_request(control_section(false, true));
+        insert(
+            &mut request,
+            "root_uptake_state",
+            &root_uptake_bundle(&[("SinkF", json(true))]),
+        );
+        assert!(coupling_rejection(&request).contains("unknown nested key"));
+    }
+
+    /// Each bundle is reachable through exactly one call, so a bundle whose guard cannot
+    /// fire is rejected, and the reader-forced predicates (`iBact.eq.1` for `lBact`,
+    /// `NS.eq.1` for `lActRSU`) are cross-checked against the control section.
+    #[test]
+    fn coupling_bundles_are_rejected_when_their_call_guard_cannot_fire() {
+        // root_uptake_state needs SinkF, the `SOLUTE.FOR:94` guard.
+        let mut request = coupling_request(control_section(false, false));
+        insert(&mut request, "root_uptake_state", &root_uptake_bundle(&[]));
+        assert!(coupling_rejection(&request).contains("SinkF"));
+        // ... and a control section at all.
+        let mut request = Map::new();
+        insert(&mut request, "root_uptake_state", &root_uptake_bundle(&[]));
+        assert!(coupling_rejection(&request).contains("control-section SinkF"));
+        // lActRSU with a multi-species chain: `INPUT.FOR:1122` forces it false above one.
+        let mut request = coupling_request(control_section(false, true));
+        insert(
+            &mut request,
+            "root_uptake_state",
+            &root_uptake_bundle(&[("lActRSU", json(true)), ("species_count", json(2))]),
+        );
+        assert!(coupling_rejection(&request).contains("species_count"));
+        // size_exclusion_state needs iBact=1 and lWat=false (`HYDRUS.FOR:390`).
+        let mut request = coupling_request(control_section(false, false));
+        insert(
+            &mut request,
+            "size_exclusion_state",
+            &size_exclusion_bundle(&[]),
+        );
+        assert!(coupling_rejection(&request).contains("iBact=1"));
+        let mut request = coupling_request(control_section(true, false));
+        insert(&mut request, "biology_mode", &biology_mode_bundle());
+        insert(
+            &mut request,
+            "size_exclusion_state",
+            &size_exclusion_bundle(&[]),
+        );
+        assert!(coupling_rejection(&request).contains("lWat=false"));
+        // The accepted combination parses, with the guard flags held only in switches.
+        let mut request = coupling_request(control_section(false, true));
+        insert(&mut request, "biology_mode", &biology_mode_bundle());
+        insert(&mut request, "root_uptake_state", &root_uptake_bundle(&[]));
+        insert(
+            &mut request,
+            "size_exclusion_state",
+            &size_exclusion_bundle(&[]),
+        );
+        let parsed = parse_coupling_request(&request);
+        assert!(parsed.input.switches.root_sink);
+        assert!(parsed.input.switches.bacteria);
+        assert!(!parsed.input.switches.water_flow);
+        let Explicit::Available(uptake) = &parsed
+            .input
+            .fields
+            .source_coupling
+            .root_uptake_state
+            .as_ref()
+            .unwrap()
+            .value
+        else {
+            panic!("the root uptake bundle must be available");
+        };
+        assert_eq!(uptake.species_root_max_concentration, DefaultReal(1.5));
+        assert!(!uptake.active_uptake);
+        let Explicit::Available(exclusion) = &parsed
+            .input
+            .fields
+            .source_coupling
+            .size_exclusion_state
+            .as_ref()
+            .unwrap()
+            .value
+        else {
+            panic!("the size exclusion bundle must be available");
+        };
+        assert_eq!(exclusion.nodes, 3);
+    }
+
+    /// The two call sites pass fixed positional lists. `SetSSnk` receives the seventeen
+    /// actuals of `SOLUTE.FOR:94-96`, whose order is the dummy list of
+    /// `SINK.FOR:138-139`, with `cRootMax(jS)` reaching a scalar dummy; `Exclusion`
+    /// receives the eight actuals of `SOLUTE.FOR:1713-1714`.
+    #[test]
+    fn coupling_bundles_map_the_source_argument_lists() {
+        let mut request = coupling_request(control_section(false, true));
+        insert(&mut request, "biology_mode", &biology_mode_bundle());
+        insert(&mut request, "root_uptake_state", &root_uptake_bundle(&[]));
+        insert(
+            &mut request,
+            "size_exclusion_state",
+            &size_exclusion_bundle(&[]),
+        );
+        let parsed = parse_coupling_request(&request);
+        let Explicit::Available(state) = &parsed
+            .input
+            .fields
+            .source_coupling
+            .root_uptake_state
+            .as_ref()
+            .unwrap()
+            .value
+        else {
+            panic!("available");
+        };
+        // Seventeen actuals, minus `NSD` (a dimension parameter of `Conc`) and the
+        // written `SinkS`, leaves the fourteen fields of the bundle, and they are the
+        // values in dummy order.
+        assert_eq!(state.species, 1); // jS
+        assert_eq!(state.species_count, 1); // NS
+        assert_eq!(state.time, DoubleReal(3600.0)); // t, the only double dummy
+        assert_eq!(state.coordinates.len(), 3); // x
+        assert_eq!(state.root_distribution.len(), 3); // Beta
+        assert_eq!(state.root_water_sink.len(), 3); // Sink
+        assert_eq!(state.species_concentration.len(), 3); // Conc(jS,.)
+        assert_eq!(state.omega_water, DefaultReal(0.8)); // OmegaW
+        assert_eq!(state.species_root_max_concentration, DefaultReal(1.5)); // cRootMax(jS)
+        assert!(!state.active_uptake); // lActRSU
+        assert_eq!(state.solute_stress_index, DefaultReal(1.0)); // OmegaS
+        assert_eq!(state.potential_uptake, DefaultReal(0.0)); // SPot
+        assert_eq!(state.michaelis_constant, DefaultReal(1.0)); // rKM
+        assert_eq!(state.minimum_concentration, DefaultReal(0.5)); // cMin
+                                                                   // Source precision: `t` is double, every other scalar is default REAL.
+        assert_eq!(std::mem::size_of_val(&state.time), 8);
+        assert_eq!(std::mem::size_of_val(&state.omega_water), 4);
+        let Explicit::Available(state) = &parsed
+            .input
+            .fields
+            .source_coupling
+            .size_exclusion_state
+            .as_ref()
+            .unwrap()
+            .value
+        else {
+            panic!("available");
+        };
+        // Eight actuals: `NMat`/`NSD` are dimension parameters, `Par(3,1)` feeds only
+        // the dead `1766`, and `ThOld`/`vOld` plus nodes 2..N are write-only, which is
+        // why seven readable values remain and no material or species index is carried.
+        assert_eq!(state.nodes, 3); // NumNP, the 1772-1777 loop bound
+        assert_eq!(state.mobile_residual_water, DefaultReal(0.1)); // Par(1,1)
+        assert_eq!(state.mobile_saturated_water, DefaultReal(1.0)); // Par(2,1)
+        assert_eq!(state.mobile_n, DefaultReal(2.0)); // Par(4,1)
+        assert_eq!(state.mobile_tortuosity, DefaultReal(0.5)); // Par(6,1)
+        assert_eq!(state.colloid_exclusion_water_content, DefaultReal(0.2)); // ChPar(4,1)
+        assert_eq!(state.first_node_new_water, DefaultReal(0.6)); // ThNew(1)
+        assert_eq!(state.first_node_new_velocity, DefaultReal(-0.25)); // vNew(1)
+    }
+
+    /// Write-only and dead actuals are not accepted as input: `ThOld`, `vOld`, the
+    /// non-first nodes of `ThNew`/`vNew`, and `Par(3,1)` have no field, and a request
+    /// naming one is rejected rather than silently ignored. `SinkS` is an output.
+    #[test]
+    fn coupling_bundles_reject_write_only_and_dead_state() {
+        for key in [
+            "old_water",
+            "old_velocity",
+            "mobile_alpha",
+            "material_index",
+            "species_dimension",
+        ] {
+            let mut request = coupling_request(control_section(false, false));
+            insert(
+                &mut request,
+                "size_exclusion_state",
+                &size_exclusion_bundle(&[(key, json(1.0))]),
+            );
+            let rejection = coupling_rejection(&request);
+            assert!(rejection.contains("unknown nested key"), "{rejection}");
+            assert!(rejection.contains("size_exclusion_state"), "{rejection}");
+        }
+        for key in ["solute_sink", "i_dual_por", "water_flow", "root_sink"] {
+            let mut request = coupling_request(control_section(false, true));
+            insert(
+                &mut request,
+                "root_uptake_state",
+                &root_uptake_bundle(&[(key, json(1.0))]),
+            );
+            let rejection = coupling_rejection(&request);
+            assert!(rejection.contains("unknown nested key"), "{rejection}");
+        }
+    }
+
+    /// Every read actual is required: `rKM` and `cMin` are read only under
+    /// `lActRSU.and.NS.eq.1` (`INPUT.FOR:1123-1127`) and are never defaulted anywhere in
+    /// `src_reference`, so no reader default may stand in for a missing value.
+    #[test]
+    fn coupling_bundles_require_every_read_actual() {
+        for key in [
+            "species",
+            "species_count",
+            "time",
+            "coordinates",
+            "root_distribution",
+            "root_water_sink",
+            "species_concentration",
+            "omega_water",
+            "species_root_max_concentration",
+            "lActRSU",
+            "solute_stress_index",
+            "potential_uptake",
+            "michaelis_constant",
+            "minimum_concentration",
+        ] {
+            let mut request = coupling_request(control_section(false, true));
+            insert(
+                &mut request,
+                "root_uptake_state",
+                &bundle_without(&root_uptake_entries(), key),
+            );
+            let rejection = coupling_rejection(&request);
+            assert!(rejection.contains(key), "{key}: {rejection}");
+        }
+        for key in [
+            "nodes",
+            "mobile_residual_water",
+            "mobile_saturated_water",
+            "mobile_n",
+            "mobile_tortuosity",
+            "colloid_exclusion_water_content",
+            "first_node_new_water",
+            "first_node_new_velocity",
+        ] {
+            let mut request = coupling_request(control_section(false, false));
+            insert(
+                &mut request,
+                "size_exclusion_state",
+                &bundle_without(&size_exclusion_entries(), key),
+            );
+            let rejection = coupling_rejection(&request);
+            assert!(rejection.contains(key), "{key}: {rejection}");
+        }
+    }
+
+    /// The 38 pinned decks carry no root-uptake or size-exclusion state and enable
+    /// neither guard, so neither consumer is reachable from them.
+    /// The fourteen read actuals of the `SOLUTE.FOR:94-96` `SetSSnk` call.
+    fn root_uptake_entries() -> Vec<(&'static str, Value)> {
+        vec![
+            ("species", json(1)),
+            ("species_count", json(1)),
+            ("time", json(3600.0)),
+            ("coordinates", array(&[json(0.0), json(-10.0), json(-20.0)])),
+            (
+                "root_distribution",
+                array(&[json(1.0), json(1.0), json(1.0)]),
+            ),
+            (
+                "root_water_sink",
+                array(&[json(0.0), json(-10.0), json(-20.0)]),
+            ),
+            (
+                "species_concentration",
+                array(&[json(2.0), json(2.5), json(3.0)]),
+            ),
+            ("omega_water", json(0.8)),
+            ("species_root_max_concentration", json(1.5)),
+            ("lActRSU", json(false)),
+            ("solute_stress_index", json(1.0)),
+            ("potential_uptake", json(0.0)),
+            ("michaelis_constant", json(1.0)),
+            ("minimum_concentration", json(0.5)),
+        ]
+    }
+
+    /// The seven values `SOLUTE.FOR:1713-1779` reads, plus `NumNP`, which the call
+    /// passes as the loop bound of `1772-1777`.
+    fn size_exclusion_entries() -> Vec<(&'static str, Value)> {
+        vec![
+            ("nodes", json(3)),
+            ("mobile_residual_water", json(0.1)),
+            ("mobile_saturated_water", json(1.0)),
+            ("mobile_n", json(2.0)),
+            ("mobile_tortuosity", json(0.5)),
+            ("colloid_exclusion_water_content", json(0.2)),
+            ("first_node_new_water", json(0.6)),
+            ("first_node_new_velocity", json(-0.25)),
+        ]
+    }
+
+    fn root_uptake_bundle(overrides: &[(&str, Value)]) -> Map<String, Value> {
+        bundle(&root_uptake_entries(), overrides)
+    }
+
+    fn size_exclusion_bundle(overrides: &[(&str, Value)]) -> Map<String, Value> {
+        bundle(&size_exclusion_entries(), overrides)
+    }
+
+    fn biology_mode_bundle() -> Map<String, Value> {
+        bundle(&[("iBact", json(1)), ("lFiltr", json(false))], &[])
+    }
+
+    /// The `INPUT.FOR:31` control logicals `SinkF` and `lWat`.
+    fn control_section(l_wat: bool, sink_f: bool) -> Map<String, Value> {
+        bundle(&[("lWat", json(l_wat)), ("SinkF", json(sink_f))], &[])
+    }
+
+    fn coupling_request(control: Map<String, Value>) -> Map<String, Value> {
+        let mut request = Map::new();
+        request.insert(
+            "control_switches".into(),
+            field("Site.dat control logicals", &control),
+        );
+        request
+    }
+
+    fn insert(request: &mut Map<String, Value>, key: &str, value: &Map<String, Value>) {
+        let units = match key {
+            "biology_mode" => "ChemIn source flags",
+            "root_uptake_state" => "source root uptake state",
+            "size_exclusion_state" => "source size-exclusion state",
+            _ => "Site.dat control logicals",
+        };
+        request.insert(key.to_string(), field(units, value));
+    }
+
+    fn field(units: &str, value: &Map<String, Value>) -> Value {
+        let mut out = Map::new();
+        out.insert("units".to_string(), Value::String(units.to_string()));
+        out.insert("value".to_string(), Value::Object(value.clone()));
+        Value::Object(out)
+    }
+
+    fn bundle(entries: &[(&str, Value)], overrides: &[(&str, Value)]) -> Map<String, Value> {
+        let mut object = Map::new();
+        for (key, value) in entries.iter().chain(overrides.iter()) {
+            object.insert((*key).to_string(), value.clone());
+        }
+        object
+    }
+
+    fn bundle_without(entries: &[(&str, Value)], key: &str) -> Map<String, Value> {
+        let mut object = Map::new();
+        for (k, value) in entries {
+            if *k != key {
+                object.insert((*k).to_string(), value.clone());
+            }
+        }
+        object
+    }
+
+    fn array(entries: &[Value]) -> Value {
+        Value::Array(entries.to_vec())
+    }
+
+    fn json(value: impl Into<Value>) -> Value {
+        value.into()
+    }
+
+    /// Requests must carry the version the reader dispatches on (`adapter:157-159`).
+    fn with_schema(request: Map<String, Value>) -> Map<String, Value> {
+        let mut envelope = Map::new();
+        envelope.insert(
+            "schema_version".to_string(),
+            Value::String("solute-request-v1".into()),
+        );
+        envelope.insert("fields".to_string(), Value::Object(request));
+        envelope
+    }
+
+    fn coupling_rejection(request: &Map<String, Value>) -> String {
+        match parse_generated_request(request) {
+            Ok(_) => panic!("expected a rejection"),
+            Err(e) => e,
+        }
+    }
+
+    /// Serializes a field map the way `CASE.json` does and parses it through the real
+    /// entry point, so every coupling test exercises the shipped validation path.
+    fn parse_generated_request(request: &Map<String, Value>) -> Result<ParsedRequest, String> {
+        let text = Value::Object(with_schema(request.clone())).to_string();
+        let hash = canonical_hash(&serde_json::from_str(&text).unwrap());
+        parse_request(&format!(r#"{{"request":{text}}}"#), &hash)
+    }
+
+    fn parse_coupling_request(request: &Map<String, Value>) -> ParsedRequest {
+        parse_generated_request(request)
+            .unwrap_or_else(|e| panic!("expected acceptance, rejected: {e}"))
+    }
+
+    #[test]
+    fn pinned_requests_cannot_supply_the_source_coupling_state() {
+        let root = Path::new("../../reference/fortran_reference/solute/parity");
+        let root = if root.exists() {
+            root.to_path_buf()
+        } else {
+            Path::new("reference/fortran_reference/solute/parity").to_path_buf()
+        };
+        let mut cases = 0;
+        for entry in walkdir(&root) {
+            let text = std::fs::read_to_string(&entry).unwrap();
+            let parsed = parse_case_manifest(&text).unwrap();
+            let coupling = &parsed.input.fields.source_coupling;
+            assert!(coupling.control_switches.is_none(), "{}", entry.display());
+            assert!(coupling.root_uptake_state.is_none());
+            assert!(coupling.size_exclusion_state.is_none());
+            // And no pinned deck enables either guard, so neither call could run.
+            assert!(!parsed.input.switches.root_sink);
+            cases += 1;
+        }
+        assert_eq!(cases, 38);
     }
 
     #[test]
