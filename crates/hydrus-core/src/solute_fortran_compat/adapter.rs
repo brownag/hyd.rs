@@ -617,13 +617,9 @@ fn validate_cross_field_dimensions(fields: &RequestFields) -> Result<(), String>
                 ("old_retardation", &s.old_retardation),
                 ("new_retardation", &s.new_retardation),
                 ("old_concentration", &s.old_concentration),
-                ("material_immobile_water", &s.material_immobile_water),
                 ("source_g0", &s.source_g0),
                 ("source_g1", &s.source_g1),
-                ("old_accepted_concentration", &s.old_accepted_concentration),
                 ("new_accepted_concentration", &s.new_accepted_concentration),
-                ("old_accepted_flow", &s.old_accepted_flow),
-                ("new_accepted_flow", &s.new_accepted_flow),
                 ("old_matrix_velocity", &s.old_matrix_velocity),
                 ("new_matrix_velocity", &s.new_matrix_velocity),
             ] {
@@ -638,9 +634,11 @@ fn validate_cross_field_dimensions(fields: &RequestFields) -> Result<(), String>
                     "endpoint_primitives.upwind_weight must have one value per element".into(),
                 );
             }
-            if s.material_ids.len() != n || s.mobile_immobile.len() == 0 {
+            if s.material_ids.len() != n || s.mobile_immobile.is_empty() {
                 return Err("endpoint_primitives material and mobility maps are incomplete".into());
             }
+            // ChPar(4,M) (765, 771) is one value per material, so it is checked
+            // against the material count and not against the node count.
             if s.material_immobile_water.len() != s.mobile_immobile.len() {
                 return Err(
                     "endpoint_primitives material_immobile_water must match material count".into(),
@@ -652,27 +650,51 @@ fn validate_cross_field_dimensions(fields: &RequestFields) -> Result<(), String>
             {
                 return Err("endpoint_primitives material_ids must index mobile_immobile".into());
             }
-            let species_base = s.source_species.saturating_sub(1) * 16;
-            let max_material = s.material_ids.iter().copied().max().unwrap_or(0);
-            if s.source_species == 0
-                || s.source_chpar
-                    .as_ref()
-                    .is_some_and(|v| v.len() < species_base + (max_material - 1) * 20 + 10)
-                || s.source_tdep
-                    .as_ref()
-                    .is_some_and(|v| v.len() < species_base + (max_material - 1) * 20 + 10)
+            if s.source_species == 0 {
+                return Err(
+                    "endpoint_primitives.source_species must be a source species index".into(),
+                );
+            }
+            // TDep is one-dimensional with a 16-entry stride per species
+            // (INPUT.FOR:1379-1390); the atmospheric code reads slots 6, 9, 10.
+            let species_base = (s.source_species - 1) * 16;
+            if s.source_tdep
+                .as_ref()
+                .is_some_and(|v| v.len() < species_base + 10)
             {
-                return Err("endpoint_primitives source ChPar/TDep lacks species slots".into());
+                return Err("endpoint_primitives.source_tdep must cover TDep((jS-1)*16+10)".into());
+            }
+            if s.source_chpar.iter().flatten().any(|record| {
+                record.species == 0
+                    || record.material == 0
+                    || record.material > s.mobile_immobile.len()
+            }) {
+                return Err(
+                    "endpoint_primitives.source_chpar must name a known species and material"
+                        .into(),
+                );
             }
             if let Some(code) = fields.transport.upper_boundary_code.as_ref() {
-                if matches!(&code.value, Explicit::Available(-2))
-                    && (s.source_chpar.is_none()
-                        || s.source_tdep.is_none()
-                        || s.old_temperature.is_none()
-                        || s.top_surface_distance.is_none()
-                        || s.top_atmospheric_concentration.is_none())
-                {
-                    return Err("atmospheric endpoint requires ChPar/TDep, temperatures, surface distance, and atmospheric concentration".into());
+                if matches!(&code.value, Explicit::Available(-2)) {
+                    let complete = s.source_chpar.is_some()
+                        && s.source_tdep.is_some()
+                        && s.old_temperature.is_some()
+                        && s.new_temperature.is_some()
+                        && s.top_surface_distance.is_some()
+                        && s.top_atmospheric_concentration.is_some();
+                    if !complete {
+                        return Err("atmospheric endpoint requires ChPar/TDep, both temperatures, surface distance, and atmospheric concentration".into());
+                    }
+                    // MatNum(N) (884, 917, 207) is the only material the endpoint
+                    // atmosphere reads.
+                    let top_material = s.material_ids.last().copied().unwrap_or(0);
+                    if !s.source_chpar.as_ref().is_some_and(|records| {
+                        records
+                            .iter()
+                            .any(|r| r.species == s.source_species && r.material == top_material)
+                    }) {
+                        return Err("atmospheric endpoint requires a source ChPar record for the species at the top node material".into());
+                    }
                 }
             }
             if s.dual_porosity > 2 || !matches!(s.t_level, 1 | 2) {
@@ -1116,6 +1138,47 @@ fn maybe_number_vec(
     unit_value(fields, name, units, |x| number_vec(x, name))
 }
 
+/// `ChPar((jS-1)*16+slot, M)` records: the source reads four material slots and
+/// 16 slots per species, indexing the material in the second array dimension
+/// (`INPUT.FOR:1333-1352`).
+fn chpar_records(value: &Value, name: &str) -> Result<Vec<MaterialSpeciesParameters>, String> {
+    let entries = value
+        .as_array()
+        .ok_or_else(|| format!("{name} value must be an array"))?;
+    entries
+        .iter()
+        .map(|entry| {
+            let o = entry
+                .as_object()
+                .ok_or_else(|| format!("{name} entries must be objects"))?;
+            validate_object_keys(name, o, &["species", "material", "slots"])?;
+            let species = o
+                .get("species")
+                .map(|v| as_usize(v, &format!("{name}.species")))
+                .transpose()?
+                .ok_or_else(|| format!("{name}.species missing"))?;
+            let material = o
+                .get("material")
+                .map(|v| as_usize(v, &format!("{name}.material")))
+                .transpose()?
+                .ok_or_else(|| format!("{name}.material missing"))?;
+            let slots = number_vec(
+                o.get("slots")
+                    .ok_or_else(|| format!("{name}.slots missing"))?,
+                &format!("{name}.slots"),
+            )?;
+            if slots.len() != 20 {
+                return Err(format!("{name} slots must have length 20"));
+            }
+            Ok(MaterialSpeciesParameters {
+                species,
+                material,
+                slots,
+            })
+        })
+        .collect()
+}
+
 fn maybe_chpar(
     fields: &Map<String, Value>,
 ) -> Result<Option<UnitValue<Vec<MaterialSpeciesParameters>>>, String> {
@@ -1123,44 +1186,7 @@ fn maybe_chpar(
         fields,
         "material_species_chpar",
         "source ChPar slots by species/material",
-        |x| {
-            x.as_array()
-                .ok_or("material_species_chpar value must be an array")?
-                .iter()
-                .map(|entry| {
-                    let o = entry
-                        .as_object()
-                        .ok_or("material_species_chpar entries must be objects")?;
-                    validate_object_keys(
-                        "material_species_chpar",
-                        o,
-                        &["species", "material", "slots"],
-                    )?;
-                    let species = o
-                        .get("species")
-                        .map(|v| as_usize(v, "material_species_chpar.species"))
-                        .transpose()?
-                        .ok_or("material_species_chpar.species missing")?;
-                    let material = o
-                        .get("material")
-                        .map(|v| as_usize(v, "material_species_chpar.material"))
-                        .transpose()?
-                        .ok_or("material_species_chpar.material missing")?;
-                    let slots_value = o
-                        .get("slots")
-                        .ok_or("material_species_chpar.slots missing")?;
-                    let slots = number_vec(slots_value, "material_species_chpar.slots")?;
-                    if slots.len() != 20 {
-                        return Err("material_species_chpar slots must have length 20".into());
-                    }
-                    Ok(MaterialSpeciesParameters {
-                        species,
-                        material,
-                        slots,
-                    })
-                })
-                .collect()
-        },
+        |x| chpar_records(x, "material_species_chpar"),
     )
 }
 
@@ -1212,15 +1238,11 @@ fn maybe_endpoint_state(
                     "alf",
                     "top_atmospheric_concentration",
                     "top_surface_distance",
-                    "henry_coefficient",
-                    "gas_diffusion",
                     "old_temperature",
                     "new_temperature",
                     "source_chpar",
                     "source_tdep",
                     "material_ids",
-                    "old_accepted_flow",
-                    "new_accepted_flow",
                     "old_matrix_velocity",
                     "new_matrix_velocity",
                     "mobile_immobile",
@@ -1230,7 +1252,6 @@ fn maybe_endpoint_state(
                     "bottom_resistance",
                     "bottom_prescribed",
                     "top_prescribed",
-                    "old_accepted_concentration",
                     "new_accepted_concentration",
                     "t_level",
                     "vapor",
@@ -1239,9 +1260,13 @@ fn maybe_endpoint_state(
             )?;
             let opt_real = |name: &str| -> Result<Option<DefaultReal>, String> {
                 o.get(name)
-                    .map(|v| as_f64(v, name).map(|x| DefaultReal::from_input(x)))
+                    .map(|v| as_f64(v, name).map(DefaultReal::from_input))
                     .transpose()
             };
+            let source_chpar = o
+                .get("source_chpar")
+                .map(|v| chpar_records(v, "endpoint_primitives.source_chpar"))
+                .transpose()?;
             let opt_vec = |name: &str| -> Result<Option<Vec<DefaultReal>>, String> {
                 o.get(name).map(|v| number_vec(v, name)).transpose()
             };
@@ -1283,11 +1308,9 @@ fn maybe_endpoint_state(
                 alf: scalar("alf")?,
                 top_atmospheric_concentration: opt_real("top_atmospheric_concentration")?,
                 top_surface_distance: opt_real("top_surface_distance")?,
-                henry_coefficient: opt_real("henry_coefficient")?,
-                gas_diffusion: opt_real("gas_diffusion")?,
                 old_temperature: opt_real("old_temperature")?,
                 new_temperature: opt_real("new_temperature")?,
-                source_chpar: opt_vec("source_chpar")?,
+                source_chpar,
                 source_tdep: opt_vec("source_tdep")?,
                 material_ids: usize_vec("material_ids")?,
                 mobile_immobile: bool_vec("mobile_immobile")?,
@@ -1309,10 +1332,7 @@ fn maybe_endpoint_state(
                 bottom_resistance: scalar("bottom_resistance")?,
                 bottom_prescribed: scalar("bottom_prescribed")?,
                 top_prescribed: scalar("top_prescribed")?,
-                old_accepted_concentration: array("old_accepted_concentration")?,
                 new_accepted_concentration: array("new_accepted_concentration")?,
-                old_accepted_flow: array("old_accepted_flow")?,
-                new_accepted_flow: array("new_accepted_flow")?,
                 old_matrix_velocity: array("old_matrix_velocity")?,
                 new_matrix_velocity: array("new_matrix_velocity")?,
                 t_level: o
@@ -1726,6 +1746,172 @@ pub(crate) mod tests {
                 .switches
                 .linear
         );
+    }
+
+    /// The smallest state both `MatSet` and the flux closure can consume: three
+    /// nodes, one material, both codes prescribed.
+    const ENDPOINT_BUNDLE: &str = r#""coordinates":[0.0,2.0,5.0],"old_water":[0.4,0.5,0.6],"new_water":[0.45,0.55,0.65],"old_velocity":[0.3,0.2,-0.4],"new_velocity":[0.35,0.25,-0.5],"old_matrix_velocity":[0.3,0.2,-0.4],"new_matrix_velocity":[0.35,0.25,-0.5],"old_dispersion":[0.1,0.2,0.3],"new_dispersion":[0.12,0.22,0.32],"old_retardation":[1.1,1.2,1.3],"new_retardation":[1.15,1.25,1.35],"old_concentration":[1.0,2.0,3.0],"new_accepted_concentration":[1.5,2.5,3.5],"material_immobile_water":[0.05],"source_g0":[0.01,0.02,0.03],"source_g1":[0.04,0.05,0.06],"upwind_weight":[0.2,0.3],"epsi":0.6,"dt":2.0,"alf":0.4,"material_ids":[1,1,1],"mobile_immobile":[false],"bottom_resistance":1.0,"bottom_prescribed":4.0,"top_prescribed":5.0,"t_level":2,"r_min":1e-30"#;
+
+    /// `ChPar(6,1)` and `ChPar(10,1)`, the gas-diffusion and Henry pair of `79`.
+    const ENDPOINT_CHPAR: &str = r#","source_chpar":[{"species":1,"material":1,"slots":[0.0,0.0,0.0,0.0,0.0,0.8,0.0,0.0,0.0,0.25,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0]}]"#;
+
+    const TDEP_TEN: &str = r#","source_tdep":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0]"#;
+
+    const ATMOSPHERE: &str = r#","old_temperature":15.0,"new_temperature":25.0,"top_surface_distance":3.0,"top_atmospheric_concentration":0.7"#;
+
+    /// Wraps the primitive bundle, plus any `","key":value` extras, in a request
+    /// whose `kTopCh` is `upper_code`.
+    fn endpoint_request(upper_code: i32, extra: &str) -> String {
+        let primitives: Value =
+            serde_json::from_str(&format!("{{{ENDPOINT_BUNDLE}{extra}}}")).unwrap();
+        serde_json::json!({
+            "schema_version": "solute-request-v1",
+            "fields": {
+                "boundary.lower.code": {"units": "source integer code", "value": 1},
+                "boundary.upper.code": {"units": "source integer code", "value": upper_code},
+                "endpoint_primitives": {
+                    "units": "source primitive endpoint state",
+                    "value": primitives,
+                }
+            }
+        })
+        .to_string()
+    }
+
+    fn endpoint_state(request: &str) -> EndpointPrimitiveState {
+        let parsed = parse_request_text(request);
+        let value = &parsed
+            .input
+            .fields
+            .transport
+            .endpoint_state
+            .as_ref()
+            .unwrap()
+            .value;
+        match value {
+            Explicit::Available(state) => state.clone(),
+            Explicit::Unavailable(_) => panic!("the endpoint bundle must be available"),
+        }
+    }
+
+    fn endpoint_rejection(request: &str) -> String {
+        let hash = canonical_hash(&serde_json::from_str(request).unwrap());
+        parse_request(
+            &format!(r#"{{"request":{request},"request_sha256":"{hash}"}}"#),
+            &hash,
+        )
+        .unwrap_err()
+    }
+
+    #[test]
+    fn endpoint_primitives_are_exactly_the_state_the_source_reads() {
+        let state = endpoint_state(&endpoint_request(1, &format!("{ENDPOINT_CHPAR}{TDEP_TEN}")));
+        assert_eq!(state.source_species, 1);
+        assert_eq!(state.t_level, 2);
+        assert_eq!(state.material_ids, vec![1, 1, 1]);
+        assert_eq!(state.source_tdep.as_ref().unwrap().len(), 10);
+        let records = state.source_chpar.as_ref().expect("source ChPar records");
+        // One record per species/material pair carries the 20 slots, because the
+        // source indexes the material in the second ChPar dimension
+        // (INPUT.FOR:1341-1352).
+        assert_eq!(
+            (
+                records[0].species,
+                records[0].material,
+                records[0].slots.len()
+            ),
+            (1, 1, 20)
+        );
+        // Without kTopCh=-2 the atmospheric inputs stay optional (1409-1415).
+        assert_eq!(state.old_temperature, None);
+        assert_eq!(state.top_atmospheric_concentration, None);
+
+        // ChPar(4,M) is one value per material (765, 771), so a three-node
+        // bundle with two materials is the normal shape, not a length error.
+        let two_materials = endpoint_state(&endpoint_request(
+            1,
+            r#","material_immobile_water":[0.05,0.0],"material_ids":[1,2,2],"mobile_immobile":[false,true]"#,
+        ));
+        assert_eq!(two_materials.material_immobile_water.len(), 2);
+        assert_eq!(two_materials.material_ids, vec![1, 2, 2]);
+
+        // kTopCh=-2 reads all six of them (74-84, 884-893, 917-925).
+        let atmospheric = endpoint_state(&endpoint_request(
+            -2,
+            &format!("{ENDPOINT_CHPAR}{TDEP_TEN}{ATMOSPHERE}"),
+        ));
+        assert_eq!(atmospheric.old_temperature.unwrap().0, 15.0);
+        assert_eq!(atmospheric.new_temperature.unwrap().0, 25.0);
+        assert_eq!(
+            atmospheric.top_surface_distance.unwrap().0,
+            3.0,
+            "dSurf is a primitive; dSurfT is not"
+        );
+        assert_eq!(atmospheric.top_atmospheric_concentration.unwrap().0, 0.7);
+    }
+
+    #[test]
+    fn endpoint_primitives_reject_derived_and_inconsistent_state() {
+        // A precomputed Henry coefficient or gas diffusion would hide the
+        // ChPar/TDep/TT derivation of 79-81 from the kernel.
+        for key in [
+            "henry_coefficient",
+            "gas_diffusion",
+            "old_accepted_flow",
+            "new_accepted_flow",
+            "old_accepted_concentration",
+        ] {
+            let rejection = endpoint_rejection(&endpoint_request(1, &format!(r#","{key}":0.1"#)));
+            assert!(
+                rejection.contains(&format!("unknown nested key {key}")),
+                "{rejection}"
+            );
+        }
+
+        // TDep is one-dimensional with a 16-entry species stride, and the
+        // atmospheric code reads slots 6, 9 and 10 (INPUT.FOR:1379-1390).
+        assert!(endpoint_rejection(&endpoint_request(
+            1,
+            r#","source_tdep":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0]"#
+        ))
+        .contains("source_tdep"));
+        assert!(endpoint_rejection(&endpoint_request(
+            1,
+            r#","source_chpar":[{"species":1,"material":4,"slots":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0]}]"#
+        ))
+        .contains("source_chpar"));
+        assert!(
+            endpoint_rejection(&endpoint_request(1, r#","source_species":0"#))
+                .contains("source_species")
+        );
+        assert!(
+            endpoint_rejection(&endpoint_request(1, r#","material_ids":[1,1,3]"#))
+                .contains("material_ids")
+        );
+        assert!(
+            endpoint_rejection(&endpoint_request(1, r#","upwind_weight":[0.2]"#))
+                .contains("upwind_weight")
+        );
+        // TLevel is only ever 1 or 2 when Solute calls MatSet (107, 124-128).
+        assert!(endpoint_rejection(&endpoint_request(1, r#","t_level":0"#)).contains("TLevel"));
+        assert!(endpoint_rejection(&endpoint_request(1, r#","t_level":3"#)).contains("TLevel"));
+
+        // The atmospheric branch has no default for any of its six inputs.
+        let missing = endpoint_rejection(&endpoint_request(
+            -2,
+            &format!("{ENDPOINT_CHPAR}{TDEP_TEN}"),
+        ));
+        assert!(
+            missing.contains("atmospheric endpoint requires"),
+            "{missing}"
+        );
+        // MatNum(N) (884, 917, 207) needs the ChPar record of this species at
+        // the material of the top node, not just any record.
+        let no_record = endpoint_rejection(&endpoint_request(
+            -2,
+            r#","mobile_immobile":[false,true],"material_ids":[2,2,2],"material_immobile_water":[0.05,0.0],"source_chpar":[{"species":1,"material":1,"slots":[0.0,0.0,0.0,0.0,0.0,0.8,0.0,0.0,0.0,0.25,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0]}],"source_tdep":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],"old_temperature":15.0,"new_temperature":25.0,"top_surface_distance":3.0,"top_atmospheric_concentration":0.7"#,
+        ));
+        assert!(no_record.contains("source ChPar record"), "{no_record}");
     }
 
     #[test]

@@ -193,49 +193,75 @@ pub struct TransportInputs {
     pub endpoint_state: Option<UnitValue<EndpointPrimitiveState>>,
 }
 
+/// Primitives of one species time step, mirroring the arguments that
+/// `MatSet` (`SOLUTE.FOR:755-759`) and the `Solute` endpoint flux closure
+/// (`65-84`, `197-225`) receive. No preassembled row, right-hand side,
+/// residual, endpoint flux or atmospheric coefficient is representable here.
 #[derive(Clone, Debug, PartialEq)]
 pub struct EndpointPrimitiveState {
+    /// `x` (`763`), in native node order.
     pub coordinates: Vec<DefaultReal>,
+    /// `thO` (`763`) before the `MatSet` mobile/immobile adjustment (`768-776`).
     pub old_water: Vec<DefaultReal>,
+    /// `thN` (`763`) before the same adjustment.
     pub new_water: Vec<DefaultReal>,
+    /// `vO` and `vN` as `Solute` holds them where the flux closure runs: `vO`
+    /// before the level loop (phase A, `65-72`) and `vN` after this step's
+    /// `vCorr` restoration (`129-132`, phase B, `197-221`).
     pub old_velocity: Vec<DefaultReal>,
     pub new_velocity: Vec<DefaultReal>,
+    /// `vO` and `vN` as both `MatSet` calls receive them (`124-128`), i.e.
+    /// before `vCorr` is added at `129-132`.
+    pub old_matrix_velocity: Vec<DefaultReal>,
+    pub new_matrix_velocity: Vec<DefaultReal>,
+    /// `Disp` at `Level=1`/`Level=2` (`763`, `112-118`).
     pub old_dispersion: Vec<DefaultReal>,
     pub new_dispersion: Vec<DefaultReal>,
+    /// `Retard` at `Level=1`/`Level=2` (`764`, `112-118`).
     pub old_retardation: Vec<DefaultReal>,
     pub new_retardation: Vec<DefaultReal>,
+    /// `Conc(jS,·)` while the matrix is assembled and at flux phase A (`85`).
     pub old_concentration: Vec<DefaultReal>,
-    /// Source `ChPar(4,M)` used by `MatSet` mobile/immobile water adjustment.
+    /// `Conc(jS,·)` after `BanSol` and the `148-179` update, which flux phase B
+    /// reads (`204`, `211`, `216`, `221`).
+    pub new_accepted_concentration: Vec<DefaultReal>,
+    /// `ChPar(4,M)`, subtracted from both waters by `MatSet` (`771`, `932`).
     pub material_immobile_water: Vec<DefaultReal>,
+    /// `g0` and `g1` at `Level=1`/`Level=2` (`764`, `112-118`).
     pub source_g0: Vec<DefaultReal>,
     pub source_g1: Vec<DefaultReal>,
+    /// `wc` (`764`).
     pub upwind_weight: Vec<DefaultReal>,
+    /// `epsi`, `alf`, `dt` (`755`).
     pub epsi: DefaultReal,
     pub dt: DefaultReal,
     pub alf: DefaultReal,
+    /// `cAtm` and `dSurf` (`759`), the `kTopCh=-2` atmospheric inputs.
     pub top_atmospheric_concentration: Option<DefaultReal>,
     pub top_surface_distance: Option<DefaultReal>,
-    pub henry_coefficient: Option<DefaultReal>,
-    pub gas_diffusion: Option<DefaultReal>,
+    /// `TempO(N)` and `TempN(N)` (`765`).
     pub old_temperature: Option<DefaultReal>,
     pub new_temperature: Option<DefaultReal>,
-    pub source_chpar: Option<Vec<DefaultReal>>,
+    /// `ChPar((jS-1)*16+slot, M)` (`765`, `889-890`, `922-923`). The source
+    /// indexes the material in the second array dimension, so one record per
+    /// species/material pair carries the 20 `ChPar` slots.
+    pub source_chpar: Option<Vec<MaterialSpeciesParameters>>,
+    /// `TDep((jS-1)*16+slot)` (`766`, `887-890`), the flat reader layout with a
+    /// 16-entry stride per species (`INPUT.FOR:1379-1390`).
     pub source_tdep: Option<Vec<DefaultReal>>,
+    /// `MatNum` (`766`), one source material number per node.
     pub material_ids: Vec<usize>,
+    /// `jS`, the species index `Solute` passes to `MatSet` (`51`, `124`).
     pub source_species: usize,
+    /// `lMobIm`, `lBact`, `iDualPor` (`758-759`), the `768-776` water selectors.
     pub mobile_immobile: Vec<bool>,
     pub bacteria: bool,
     pub dual_porosity: u8,
+    /// `rBot`, `cBot(jS)`, `cTop(jS)` (`756`, `759`).
     pub bottom_resistance: DefaultReal,
     pub bottom_prescribed: DefaultReal,
     pub top_prescribed: DefaultReal,
-    pub old_accepted_concentration: Vec<DefaultReal>,
-    pub new_accepted_concentration: Vec<DefaultReal>,
-    pub old_accepted_flow: Vec<DefaultReal>,
-    pub new_accepted_flow: Vec<DefaultReal>,
-    /// `vO` and `vN` are distinct source velocity states used by MatSet.
-    pub old_matrix_velocity: Vec<DefaultReal>,
-    pub new_matrix_velocity: Vec<DefaultReal>,
+    /// `TLevel` (`24`), `lVapor` (`759`) and `rMin` (`41`).
     pub t_level: i32,
     pub vapor: bool,
     pub r_min: DefaultReal,
