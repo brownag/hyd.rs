@@ -1,7 +1,7 @@
 # State — Orchestration 18
 
 Plan status: **Approved by user on 2026-10-08 (“yes”).**
-Execution status: **Waves 1–6 complete; Wave 7 active.** 18.7.4 selector/state mapping was accepted 2026-10-12, 18.7.1 endpoint equations were accepted 2026-10-13 (`49192d7`) and 18.7.3 dynamic dual-porosity exchange was accepted 2026-10-14 (`716a7ea`); the remaining Wave 7 work is 18.7.8 plus the fixture tasks 18.7.2/18.7.5/18.7.6, and 18.7.6 is blocked on the missing Python interpreter. Accepted Wave 5 work includes 18.5.1 and 18.5.3; 18.5.2 is incomplete and superseded by 18.7.1. Wave 3 fixtures authenticate raw outputs only; normalized parity remains pending. Default backend must not change before the full parity gate.
+Execution status: **Waves 1–6 complete; Wave 7 active.** 18.7.8 (root and exclusion source-coupling consumers) is implemented in worktree `18.7.8` and awaits review. 18.7.4 selector/state mapping was accepted 2026-10-12, 18.7.1 endpoint equations were accepted 2026-10-13 (`49192d7`) and 18.7.3 dynamic dual-porosity exchange was accepted 2026-10-14 (`716a7ea`); the remaining Wave 7 work is 18.7.7 plus the fixture tasks 18.7.2/18.7.5/18.7.6, and 18.7.6 is blocked on the missing Python interpreter. Accepted Wave 5 work includes 18.5.1 and 18.5.3; 18.5.2 is incomplete and superseded by 18.7.1. Wave 3 fixtures authenticate raw outputs only; normalized parity remains pending. Default backend must not change before the full parity gate.
 Plan: [EXECUTION_PLAN_18.md](EXECUTION_PLAN_18.md). Worker template: [PROMPT_TEMPLATE_18.md](PROMPT_TEMPLATE_18.md).
 
 ## Baseline and guardrails
@@ -44,18 +44,18 @@ Plan: [EXECUTION_PLAN_18.md](EXECUTION_PLAN_18.md). Worker template: [PROMPT_TEM
 | 5 | 18.5.2 | Endpoint rows and flux closure | superseded/incomplete; replaced by 18.7.1 |
 | 5 | 18.5.3 | Source accounting and observations | done; fixed-form corrections accepted |
 | 6 | 18.6.6 | Fixed-form reachability re-audit | done; consistency review accepted |
-| 7 | 18.7.4 → 18.7.1–18.7.3, 18.7.5–18.7.8 | Selector mapping first, then endpoint/active kernels and fixtures | 18.7.4, 18.7.1 and 18.7.3 done; 18.7.2/18.7.5/18.7.6 blocked on Fortran fixtures and the Python interpreter; 18.7.7 and 18.7.8 remain |
+| 7 | 18.7.4 → 18.7.1–18.7.3, 18.7.5–18.7.8 | Selector mapping first, then endpoint/active kernels and fixtures | 18.7.4, 18.7.1, 18.7.3 done; 18.7.8 implemented pending review; 18.7.2/18.7.5/18.7.6 blocked on Fortran fixtures and the Python interpreter; 18.7.7 remains |
 | 7A | 18.7.1 | Primitive-input endpoint equations | done (commit `49192d7`) |
 | 7A | 18.7.6 | Explicit Fortran fixtures | blocked on the missing Python interpreter |
 | 7B | 18.7.3 | Dynamic dual-porosity transfer kernel | done (commit `716a7ea`) |
 | 7B | 18.7.2 | Exchange fixture | blocked with 18.7.6 (Fortran fixtures) |
-| 7C | 18.7.5 → 18.7.7 → 18.7.8 | Root-uptake fixture, kernel, then composed active path | pending |
+| 7C | 18.7.5 → 18.7.7 → 18.7.8 | Root-uptake fixture, kernel, then composed active path | 18.7.8 implemented (primitive-input, pending review); 18.7.5 blocked, 18.7.7 pending |
 
 ## Active tasks
 
-- 18.7.8: next Wave 7 dispatch once 18.7.3's ownership of `types.rs` and
-  `adapter.rs` is released; it composes the active path and is the only task
-  allowed to touch those two files until then.
+- 18.7.7 (`SINK.FOR` root-uptake producer) and 18.7.5 (root-uptake fixture) are
+  still open; 18.7.8 consumed the producer state directly as primitive inputs,
+  which is sufficient for its own gate but does not close either one.
 - No task may add a second `DualPor` state type: `DualPorPrimitiveState` and
   `DualPorMaterial` (added by 18.7.3) are the accepted shape.
 - 18.7.6: **blocked on tooling, not on decomposition** — its acceptance runs the
@@ -64,6 +64,37 @@ Plan: [EXECUTION_PLAN_18.md](EXECUTION_PLAN_18.md). Worker template: [PROMPT_TEM
   names a replacement; its gate cannot be substituted with a Rust check.
 
 ## Completed tasks
+- 18.7.8: implemented in worktree `.development/18-worktrees/18.7.8` (branch
+  `orchestration/18.7.8`, parent `4d151a1`), **awaiting orchestrator review**.
+  `source_coupling.rs` (new, 1192 lines) ports the two call targets of
+  `SOLUTE.FOR:94-96`: `SetSSnk` (`SINK.FOR:150-232`) as `root_solute_uptake`, and
+  the `if(lBact.and..not.lWat)` target `Exclusion` (`SOLUTE.FOR:1715-1773`) as
+  `size_exclusion`. `types.rs` gains `RootUptakePrimitiveState` /
+  `SizeExclusionPrimitiveState` and `adapter.rs` maps `SinkF`/`lActRSU`/`lWat`/
+  biology state plus the sink and rate arrays, with focused adapter tests.
+  Missing producer state rejects before mutation; nothing substitutes zero.
+  Fortran-parity findings recorded by this task, each pinned by a test:
+  `SINK.FOR:175-176` clears `SinkS` **inside** the step loop, so steps 2 and 3 do
+  not accumulate on step 1; `Omega1` is assigned only at `SINK.FOR:202` under
+  `SAUptakeP.gt.0.` and read at `205-206`, so a step-2 read is genuinely
+  undefined and the port rejects rather than defaulting to `0.`; the `182` test
+  orders `i.eq.N` first, which makes the `dx` weights for
+  `THREE=[0,-10,-20]` the non-symmetric `[+5,-10,-5]`; `SOLUTE.FOR:1723`'s
+  `1.e-20` is a **single-precision** literal under default real typing, so the
+  guard compares against `9.999999682655225e-21`; and `1742`'s
+  `ThC=ThNew(1)-ths*sw_c` is a double expression narrowed once, which on the
+  fixture lands on an exact f32 tie and round-half-to-even returns `0.40000004`
+  where both the decimal `0.4` and the single-precision rewrite
+  `ThNew(1)-th_c` are wrong. `1756-1763`'s `else` is `krw=0.` **and**
+  `VelC=vNew(1)`, a direct assignment: hoisting `1759`'s division above the branch
+  (the shape an `if/else`-returning-tuple refactor produces) divides by that zero
+  and writes NaN into every node. A non-finite `ThC`/`VelC` is rejected rather
+  than broadcast, because `1765-1768` copies it to every node of `ThNew`, `ThOld`,
+  `vNew` and `vOld`.
+  Verification: `cargo test -p hydrus-core --lib` 80 passed / 0 failed (adapter 7
+  → 17, `source_coupling` 0 → 17), `cargo test --workspace` 27 suites ok,
+  `cargo clippy --all-targets` clean, `cargo fmt --check` clean. No parity claim:
+  18.7.5/18.7.7 and the driver still gate these paths on Fortran fixtures.
 
 - 18.7.3: done (commit `716a7ea`, "feat(solute): port dynamic dual-porosity
   exchange", parent `e724f38`, worktree `.development/18-worktrees/18.7.3` on
