@@ -35,7 +35,6 @@ fn input<'a>(
     materials: &'a [&'a dyn HydraulicModel],
     sink: &'a [f64; 3],
     mode: LowerBoundaryMode,
-    fixed_head_flux: f64,
 ) -> WaterStepInput<'a> {
     WaterStepInput {
         mesh,
@@ -45,13 +44,7 @@ fn input<'a>(
         timestep: 0.25,
         target_time: 0.25,
         face_averaging: FaceAveraging::Arithmetic,
-        lower_row: BoundaryRow {
-            lower: 0.0,
-            diagonal: 0.0,
-            upper: 0.0,
-            rhs: 0.0,
-        },
-        lower_boundary_mode: mode,
+        lower: mode,
         upper_row: BoundaryRow {
             lower: 0.0,
             diagonal: 0.0,
@@ -59,7 +52,6 @@ fn input<'a>(
             rhs: 0.0,
         },
         upper_condition: BoundaryCondition::Dirichlet { value: 0.0 },
-        lower_boundary_flux: fixed_head_flux,
         upper_boundary_flux: 0.0,
     }
 }
@@ -79,15 +71,32 @@ fn fixed_head_preserves_caller_supplied_signed_exchange() {
             &mesh,
             &materials,
             &sink,
-            LowerBoundaryMode::FixedHead { head: 0.0 },
-            0.4,
+            LowerBoundaryMode::FixedHead {
+                head: 0.0,
+                row: BoundaryRow {
+                    lower: 0.0,
+                    diagonal: 0.0,
+                    upper: 0.0,
+                    rhs: 0.0,
+                },
+                flux: 0.4,
+            },
         ),
         policy(),
     )
     .unwrap();
     assert_eq!(
         report.lower_boundary_mode,
-        LowerBoundaryMode::FixedHead { head: 0.0 }
+        LowerBoundaryMode::FixedHead {
+            head: 0.0,
+            row: BoundaryRow {
+                lower: 0.0,
+                diagonal: 0.0,
+                upper: 0.0,
+                rhs: 0.0,
+            },
+            flux: 0.4,
+        }
     );
     assert!((report.balance.soil_boundary_flux - 0.1).abs() < 1e-10);
 }
@@ -109,7 +118,6 @@ fn prescribed_flux_sign_is_used_in_row_and_balance() {
                 &materials,
                 &sink,
                 LowerBoundaryMode::PrescribedFlux { flux },
-                0.0,
             ),
             policy(),
         )
@@ -133,13 +141,7 @@ fn free_drainage_uses_source_rhs_sign_as_inward_negative_flux() {
     let report = advance_water_step(
         &mut state,
         &mut workspace,
-        input(
-            &mesh,
-            &materials,
-            &sink,
-            LowerBoundaryMode::FreeDrainage,
-            0.0,
-        ),
+        input(&mesh, &materials, &sink, LowerBoundaryMode::FreeDrainage),
         policy(),
     )
     .unwrap();
@@ -164,6 +166,13 @@ fn invalid_and_unsupported_modes_fail_before_state_mutation() {
         (
             LowerBoundaryMode::FixedHead {
                 head: f64::INFINITY,
+                row: BoundaryRow {
+                    lower: 0.0,
+                    diagonal: 0.0,
+                    upper: 0.0,
+                    rhs: 0.0,
+                },
+                flux: 0.0,
             },
             WaterStepError::InvalidLowerBoundary { name: "head" },
         ),
@@ -184,7 +193,7 @@ fn invalid_and_unsupported_modes_fail_before_state_mutation() {
             advance_water_step(
                 &mut state,
                 &mut workspace,
-                input(&mesh, &materials, &sink, mode, 0.0),
+                input(&mesh, &materials, &sink, mode),
                 policy(),
             ),
             Err(expected)
@@ -219,7 +228,6 @@ fn rejected_lower_boundary_trial_does_not_mutate_accepted_state() {
                 &materials,
                 &sink,
                 LowerBoundaryMode::PrescribedFlux { flux: 0.3 },
-                0.0
             ),
             strict,
         ),

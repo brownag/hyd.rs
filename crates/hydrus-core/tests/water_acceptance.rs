@@ -71,13 +71,7 @@ fn input<'a>(
         timestep: target_time,
         target_time,
         face_averaging: FaceAveraging::Arithmetic,
-        lower_row: BoundaryRow {
-            lower: 0.0,
-            diagonal: 0.0,
-            upper: 0.0,
-            rhs: 0.0,
-        },
-        lower_boundary_mode: LowerBoundaryMode::PrescribedFlux { flux: 0.0 },
+        lower: LowerBoundaryMode::PrescribedFlux { flux: 0.0 },
         upper_row: BoundaryRow {
             lower: 0.0,
             diagonal: 0.0,
@@ -85,7 +79,6 @@ fn input<'a>(
             rhs: 0.0,
         },
         upper_condition: BoundaryCondition::Dirichlet { value: 0.1 },
-        lower_boundary_flux: 0.0,
         upper_boundary_flux: 0.0,
     }
 }
@@ -155,9 +148,17 @@ fn capillary_rise_moves_water_up_from_a_fixed_head_lower_boundary() {
     let materials: [&dyn HydraulicModel; 1] = [&model];
     let sink = [0.0; 3];
     let mut request = input(&mesh, &materials, &sink, 0.1, None);
-    request.lower_boundary_mode = LowerBoundaryMode::FixedHead { head: 0.0 };
     // Caller-supplied measured exchange closes this fixed-head step balance.
-    request.lower_boundary_flux = 0.8333333333333331;
+    request.lower = LowerBoundaryMode::FixedHead {
+        head: 0.0,
+        row: BoundaryRow {
+            lower: 0.0,
+            diagonal: 0.0,
+            upper: 0.0,
+            rhs: 0.0,
+        },
+        flux: 0.8333333333333331,
+    };
     request.upper_condition = BoundaryCondition::Dirichlet { value: -1.0 };
     let mut state = WaterState::new(0.0, vec![-1.0; 3], vec![0.9; 3]).unwrap();
     let mut workspace = WaterWorkspace::new(3).unwrap();
@@ -343,7 +344,7 @@ fn unsupported_seepage_and_water_table_modes_are_typed_errors() {
     ] {
         let request = input(&mesh, &materials, &sink, 0.1, None);
         let request = WaterStepInput {
-            lower_boundary_mode: mode,
+            lower: mode,
             ..request
         };
         assert_eq!(

@@ -59,13 +59,16 @@ fn step_input<'a>(
         timestep,
         target_time: 2.0,
         face_averaging: hydrus_core::hydraulics::FaceAveraging::Arithmetic,
-        lower_row: hydrus_core::hydraulics::BoundaryRow {
-            lower: 0.0,
-            diagonal: 0.0,
-            upper: 0.0,
-            rhs: 0.0,
+        lower: LowerBoundaryMode::FixedHead {
+            head: 0.0,
+            row: hydrus_core::hydraulics::BoundaryRow {
+                lower: 0.0,
+                diagonal: 0.0,
+                upper: 0.0,
+                rhs: 0.0,
+            },
+            flux: 0.0,
         },
-        lower_boundary_mode: LowerBoundaryMode::FixedHead { head: 0.0 },
         upper_row: hydrus_core::hydraulics::BoundaryRow {
             lower: 0.0,
             diagonal: 0.0,
@@ -73,7 +76,6 @@ fn step_input<'a>(
             rhs: 0.0,
         },
         upper_condition: BoundaryCondition::Dirichlet { value: 0.0 },
-        lower_boundary_flux: 0.0,
         upper_boundary_flux: 0.0,
     }
 }

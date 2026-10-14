@@ -68,13 +68,16 @@ fn input<'a>(
         timestep,
         target_time: 10.0,
         face_averaging: FaceAveraging::Arithmetic,
-        lower_row: BoundaryRow {
-            lower: 0.0,
-            diagonal: 0.0,
-            upper: 0.0,
-            rhs: 0.0,
+        lower: LowerBoundaryMode::FixedHead {
+            head: 0.0,
+            row: BoundaryRow {
+                lower: 0.0,
+                diagonal: 0.0,
+                upper: 0.0,
+                rhs: 0.0,
+            },
+            flux: 0.0,
         },
-        lower_boundary_mode: LowerBoundaryMode::FixedHead { head: 0.0 },
         upper_row: BoundaryRow {
             lower: 0.0,
             diagonal: 0.0,
@@ -82,7 +85,6 @@ fn input<'a>(
             rhs: 0.0,
         },
         upper_condition: BoundaryCondition::Dirichlet { value: 2.0 },
-        lower_boundary_flux: 0.0,
         upper_boundary_flux: 0.0,
     }
 }

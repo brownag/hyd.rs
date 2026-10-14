@@ -7,10 +7,7 @@ use crate::hydraulics::{
     BoundaryCondition, BoundaryRow, BoundaryRowLocation, FaceAveraging, HydraulicModel, Mesh1D,
     PivotDiagnostics, ResetRow, ResetRowInput,
 };
-use crate::lower_boundary::{
-    lower_flux_row, LowerBoundaryMode, LowerBoundaryPlan, LowerBoundaryRowStrategy,
-    LowerFluxRowInput,
-};
+use crate::lower_boundary::{LowerBoundaryMode, LowerTrial};
 use crate::root_uptake::RootUptakeInput;
 use crate::water_state::validate_finite;
 use crate::{WaterState, WaterStepError, WaterWorkspace};
@@ -66,14 +63,10 @@ pub struct WaterStepInput<'a> {
     /// Caller-selected time that this step must not pass.
     pub target_time: f64,
     pub face_averaging: FaceAveraging,
-    pub lower_row: BoundaryRow,
-    pub lower_boundary_mode: LowerBoundaryMode,
+    /// Lower endpoint selection; fixed-head carries its row and measured exchange.
+    pub lower: LowerBoundaryMode,
     pub upper_row: BoundaryRow,
     pub upper_condition: BoundaryCondition,
-    /// Signed water entering the domain through the lower endpoint.
-    /// Signed measured lower exchange for fixed-head steps; positive into the domain.
-    /// Prescribed-flux and free-drainage modes derive this value from their mode.
-    pub lower_boundary_flux: f64,
     /// Signed water entering the domain through the upper endpoint.
     pub upper_boundary_flux: f64,
 }
@@ -145,7 +138,7 @@ fn advance_water_step_impl<'a>(
     policy: WaterStepPolicy,
     atmospheric_rates: Option<AtmosphericRates>,
 ) -> Result<WaterStepReport<'a>, WaterStepError> {
-    let lower_boundary = validate(state, workspace, input, policy)?;
+    validate(state, workspace, input, policy)?;
     if atmospheric_rates.is_some()
         && workspace.atmospheric_transitions.len() < policy.max_iterations
     {
@@ -159,15 +152,7 @@ fn advance_water_step_impl<'a>(
     let mut retries = 0;
     loop {
         workspace.snapshot(state);
-        match solve_trial(
-            state,
-            workspace,
-            input,
-            lower_boundary,
-            policy,
-            timestep,
-            atmospheric_rates,
-        )? {
+        match solve_trial(state, workspace, input, policy, timestep, atmospheric_rates)? {
             Some(trial) => {
                 let (next_ponded, upper_flux, soil_upper_flux) = match atmospheric_rates {
                     Some(_) => (
@@ -219,7 +204,7 @@ fn advance_water_step_impl<'a>(
                     max_head_residual: trial.head_residual,
                     max_water_residual: trial.water_residual,
                     minimum_absolute_pivot: trial.pivots.minimum_absolute_pivot,
-                    lower_boundary_mode: input.lower_boundary_mode,
+                    lower_boundary_mode: input.lower,
                     atmospheric_mode_transitions: workspace.atmospheric_transition_count,
                     atmospheric_transitions: &workspace.atmospheric_transitions
                         [..workspace.atmospheric_transition_count],
@@ -261,7 +246,6 @@ fn solve_trial(
     state: &WaterState,
     workspace: &mut WaterWorkspace,
     input: WaterStepInput<'_>,
-    lower_boundary: LowerBoundaryPlan,
     policy: WaterStepPolicy,
     timestep: f64,
     atmospheric_rates: Option<AtmosphericRates>,
@@ -276,7 +260,6 @@ fn solve_trial(
             workspace,
             state,
             input,
-            lower_boundary,
             policy.minimum_pivot,
             timestep,
             atmospheric_rates.map(|rates| AtmosphericAssembly {
@@ -308,7 +291,7 @@ fn solve_trial(
                 return Err(WaterStepError::NonFiniteDiagnostic);
             }
             let next_water = next_evaluation.theta;
-            let prescribed_head = (index == 0 && lower_boundary.fixes_head())
+            let prescribed_head = (index == 0 && input.lower.fixes_head())
                 || (index == workspace.node_count() - 1
                     && matches!(input.upper_condition, BoundaryCondition::Dirichlet { .. }));
             if !prescribed_head {
@@ -353,7 +336,6 @@ fn assemble(
     workspace: &mut WaterWorkspace,
     state: &WaterState,
     input: WaterStepInput<'_>,
-    lower_boundary: LowerBoundaryPlan,
     minimum_pivot: f64,
     timestep: f64,
     atmospheric: Option<AtmosphericAssembly>,
@@ -387,43 +369,23 @@ fn assemble(
     } else {
         workspace.trial_sink.copy_from_slice(input.sink);
     }
-    let prepared_lower = lower_boundary.prepare_step(
-        workspace.evaluated_conductivity[0],
-        workspace.evaluated_conductivity[1],
-        input.mesh.inclination_cosine(),
-        input.face_averaging,
-        input.lower_boundary_flux,
-    )?;
-    let lower_row = match prepared_lower.row_strategy {
-        LowerBoundaryRowStrategy::CallerProvided => input.lower_row,
-        LowerBoundaryRowStrategy::Flux => {
-            let face_conductivity = match input.face_averaging {
-                FaceAveraging::Arithmetic => {
-                    (workspace.evaluated_conductivity[0] + workspace.evaluated_conductivity[1])
-                        / 2.0
-                }
-                FaceAveraging::Geometric => (workspace.evaluated_conductivity[0]
-                    * workspace.evaluated_conductivity[1])
-                    .sqrt(),
-            };
-            let spacing = input.mesh.coordinates()[1] - input.mesh.coordinates()[0];
-            lower_flux_row(LowerFluxRowInput {
-                face_conductivity,
-                capacity: workspace.evaluated_capacity[0],
-                head: workspace.trial_heads[0],
-                theta: workspace.evaluated_theta[0],
-                old_theta: state.water_contents[0],
-                sink: workspace.trial_sink[0],
-                spacing,
-                gravity: input.mesh.inclination_cosine(),
-                timestep,
-            })?
-        }
-    };
+    let prepared_lower = input.lower.prepare_step(LowerTrial {
+        conductivity_a: workspace.evaluated_conductivity[0],
+        conductivity_b: workspace.evaluated_conductivity[1],
+        capacity: workspace.evaluated_capacity[0],
+        head: workspace.trial_heads[0],
+        theta: workspace.evaluated_theta[0],
+        old_theta: state.water_contents[0],
+        sink: workspace.trial_sink[0],
+        spacing: input.mesh.coordinates()[1] - input.mesh.coordinates()[0],
+        gravity: input.mesh.inclination_cosine(),
+        timestep,
+        averaging: input.face_averaging,
+    })?;
     let lower = transform_boundary_row(
         count,
         BoundaryRowLocation::Lower,
-        lower_row,
+        prepared_lower.row,
         prepared_lower.condition,
         minimum_pivot,
     )?;
@@ -558,7 +520,7 @@ fn validate(
     workspace: &WaterWorkspace,
     input: WaterStepInput<'_>,
     policy: WaterStepPolicy,
-) -> Result<LowerBoundaryPlan, WaterStepError> {
+) -> Result<(), WaterStepError> {
     let count = state.heads.len();
     if input.mesh.coordinates().len() != count || workspace.node_count() != count {
         return Err(WaterStepError::DimensionMismatch);
@@ -582,10 +544,12 @@ fn validate(
     if let Some(root_uptake) = input.root_uptake {
         root_uptake.validate(count)?;
     }
-    validate_finite(
-        "boundary_fluxes",
-        &[input.lower_boundary_flux, input.upper_boundary_flux],
-    )?;
+    match input.lower.measured_flux() {
+        Some(lower_flux) => {
+            validate_finite("boundary_fluxes", &[lower_flux, input.upper_boundary_flux])?
+        }
+        None => validate_finite("boundary_fluxes", &[input.upper_boundary_flux])?,
+    }
     for (name, value) in [
         ("timestep", input.timestep),
         ("head_tolerance", policy.head_tolerance),
@@ -606,10 +570,7 @@ fn validate(
             name: "iteration/retry/timestep",
         });
     }
-    let lower_boundary =
-        input
-            .lower_boundary_mode
-            .prepare(count, input.lower_row, policy.minimum_pivot)?;
+    input.lower.prepare(count, policy.minimum_pivot)?;
     transform_boundary_row(
         count,
         BoundaryRowLocation::Upper,
@@ -617,5 +578,5 @@ fn validate(
         input.upper_condition,
         policy.minimum_pivot,
     )?;
-    Ok(lower_boundary)
+    Ok(())
 }

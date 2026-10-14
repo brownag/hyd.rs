@@ -44,13 +44,16 @@ fn setup<'a>(
         timestep: 2.0,
         target_time: 2.0,
         face_averaging: FaceAveraging::Arithmetic,
-        lower_row: BoundaryRow {
-            lower: 0.0,
-            diagonal: 0.0,
-            upper: 0.0,
-            rhs: 0.0,
+        lower: LowerBoundaryMode::FixedHead {
+            head: 0.0,
+            row: BoundaryRow {
+                lower: 0.0,
+                diagonal: 0.0,
+                upper: 0.0,
+                rhs: 0.0,
+            },
+            flux: 0.0,
         },
-        lower_boundary_mode: LowerBoundaryMode::FixedHead { head: 0.0 },
         upper_row: BoundaryRow {
             lower: 0.0,
             diagonal: 1.0,
@@ -58,7 +61,6 @@ fn setup<'a>(
             rhs: 0.0,
         },
         upper_condition: BoundaryCondition::Dirichlet { value: 0.0 },
-        lower_boundary_flux: 0.0,
         upper_boundary_flux: 0.0,
     }
 }
@@ -99,14 +101,8 @@ fn constant_schedule(precipitation: f64, evaporation: f64) -> ForcingSchedule<'s
     .unwrap()
 }
 
-fn no_flow_lower(input: &mut WaterStepInput<'_>, old_bottom_head: f64) {
-    input.lower_row = BoundaryRow {
-        lower: 0.0,
-        diagonal: 1.05,
-        upper: -1.0,
-        rhs: 0.05 * old_bottom_head,
-    };
-    input.lower_boundary_mode = LowerBoundaryMode::PrescribedFlux { flux: 0.0 };
+fn no_flow_lower(input: &mut WaterStepInput<'_>) {
+    input.lower = LowerBoundaryMode::PrescribedFlux { flux: 0.0 };
 }
 
 fn assert_close(actual: f64, expected: f64) {
@@ -123,7 +119,7 @@ fn isolated_atmospheric_flux_row_accepts_demand_limited_flux() {
     let materials: [&dyn HydraulicModel; 1] = [&model];
     let sink = [0.0; 3];
     let mut input = setup(&mesh, &materials, &sink);
-    no_flow_lower(&mut input, 0.0);
+    no_flow_lower(&mut input);
     input.timestep = 1.0;
     input.target_time = 1.0;
     input.upper_condition = BoundaryCondition::Dirichlet { value: 0.1 };
@@ -160,7 +156,7 @@ fn isolated_ponded_head_row_matches_discrete_top_flux_and_balance() {
     let materials: [&dyn HydraulicModel; 1] = [&model];
     let sink = [0.0; 3];
     let mut input = setup(&mesh, &materials, &sink);
-    no_flow_lower(&mut input, 0.0);
+    no_flow_lower(&mut input);
     input.timestep = 1.0;
     input.target_time = 1.0;
     input.upper_condition = BoundaryCondition::Dirichlet { value: 0.1 };
@@ -222,7 +218,7 @@ fn accepted_rain_infiltrates_then_excess_builds_ponded_storage() {
     let materials: [&dyn HydraulicModel; 1] = [&model];
     let sink = [0.0; 3];
     let mut input = setup(&mesh, &materials, &sink);
-    no_flow_lower(&mut input, 0.0);
+    no_flow_lower(&mut input);
     input.timestep = 1.0;
     input.target_time = 1.0;
     input.upper_condition = BoundaryCondition::Dirichlet { value: 0.1 };
@@ -246,7 +242,7 @@ fn accepted_rain_infiltrates_then_excess_builds_ponded_storage() {
     assert!(first.balance.absolute_residual < 1e-9, "{first:?}");
 
     input.target_time = 2.0;
-    no_flow_lower(&mut input, state.heads()[0]);
+    no_flow_lower(&mut input);
     let heavy_rain = constant_schedule(1.0, 0.0);
     let before_ponding = state.atmospheric().ponded_depth;
     let before_heads = state.heads().to_vec();
@@ -299,7 +295,7 @@ fn accepted_evaporation_is_limited_by_soil_supply_and_balanced() {
     let materials: [&dyn HydraulicModel; 1] = [&model];
     let sink = [0.0; 3];
     let mut input = setup(&mesh, &materials, &sink);
-    no_flow_lower(&mut input, 0.0);
+    no_flow_lower(&mut input);
     input.timestep = 1.0;
     input.target_time = 1.0;
     input.upper_condition = BoundaryCondition::Dirichlet { value: -0.01 };

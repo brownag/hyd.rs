@@ -372,11 +372,13 @@ mod tests {
             timestep: 2.0,
             target_time: 2.0,
             face_averaging: FaceAveraging::Arithmetic,
-            lower_row: ROW,
-            lower_boundary_mode: LowerBoundaryMode::FixedHead { head: 0.0 },
+            lower: LowerBoundaryMode::FixedHead {
+                head: 0.0,
+                row: ROW,
+                flux: 0.0,
+            },
             upper_row: ROW,
             upper_condition,
-            lower_boundary_flux: 0.0,
             upper_boundary_flux: 0.0,
         }
     }

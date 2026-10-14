@@ -61,13 +61,16 @@ fn input<'a>(
         timestep,
         target_time: 10.0,
         face_averaging: FaceAveraging::Arithmetic,
-        lower_row: BoundaryRow {
-            lower: 0.0,
-            diagonal: 0.0,
-            upper: 0.0,
-            rhs: 0.0,
+        lower: LowerBoundaryMode::FixedHead {
+            head: 0.0,
+            row: BoundaryRow {
+                lower: 0.0,
+                diagonal: 0.0,
+                upper: 0.0,
+                rhs: 0.0,
+            },
+            flux: boundary_flux,
         },
-        lower_boundary_mode: LowerBoundaryMode::FixedHead { head: 0.0 },
         upper_row: BoundaryRow {
             lower: 0.0,
             diagonal: 0.0,
@@ -75,7 +78,6 @@ fn input<'a>(
             rhs: 0.0,
         },
         upper_condition: BoundaryCondition::Dirichlet { value: 2.0 },
-        lower_boundary_flux: boundary_flux,
         upper_boundary_flux: 0.0,
     }
 }
@@ -171,9 +173,8 @@ fn nonuniform_mesh_balance_uses_control_volumes() {
     let mut workspace = WaterWorkspace::new(4).unwrap();
     let request = WaterStepInput {
         upper_condition: BoundaryCondition::Dirichlet { value: 0.0 },
-        lower_boundary_flux: 2.0,
         upper_boundary_flux: -0.5,
-        ..input(&mesh, &materials, &sink, 2.0, 0.0)
+        ..input(&mesh, &materials, &sink, 2.0, 2.0)
     };
     let report = advance_water_step(&mut state, &mut workspace, request, policy()).unwrap();
 
