@@ -12,7 +12,7 @@
   - consistent item visibility in `types.rs`;
   - stub docs reconciled with their owning 18 tasks;
   - a "do not unify" pointer on the precision-faithful `FH`/`FK` ports;
-  - `adapter.rs` (2590 lines) split into submodules.
+  - `adapter.rs` (3249 lines at `60ee1b5`) split into submodules.
 - [2] The water step publishes the accepted water snapshot (water contents plus `node_count + 1` face fluxes) that the solute step consumes.
 - [3] The atmospheric module owns upper-boundary mode switching, row building, top flux and ponding transitions.
 - [4] `WaterStepInput` takes one boundary value per endpoint. Rows are derived inside the step, and `hCritA` is no longer encoded in a Dirichlet value. Shared water-test fixtures go in `tests/common/`.
@@ -56,6 +56,7 @@
 | 2026-10-14 | D8. Acceptance is bitwise-preserving: no existing numeric expected value or tolerance in any test may change, and refactors reproduce results bit for bit. Test counts are unchanged except for deletions a task names explicitly. The Python suite gates every wave. |
 | 2026-10-14 | D9. New ADRs go in `docs/decisions/` as 0013–0016, in the format of `0002-keep-fvbe-and-source-compatible-backends-separate.md`. `CONTEXT.md` at the repo root holds the domain glossary. |
 | 2026-10-14 | Fact (recon). The `STATE_18.md` Python blocker is stale. System `/usr/bin/python3` 3.12.3 runs `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tools -p 'test_*.py'` with 291 tests OK (147 s) and leaves the tree clean. |
+| 2026-10-14 | D10 (amendment, Wave 0). 18.7.8 had been implemented on `orchestration/18.7.8` after this plan was approved (`planning/HANDOFF_18_PAUSE.md`). User chose "Review+merge 18.7.8 first". The review found that `SetSSnk` re-zeroed `SinkS` on every step, whereas `SINK.FOR:174-176` clears it once before `do 12`. It was fixed in `fc8bf8d` and merged as `60ee1b5`. D1 now reads: 18 pauses **after** 18.7.8. Pending 18 work at resume is 18.7.2, 18.7.5, 18.7.6, 18.7.7, then Waves 8–16. The anchors, the line counts and the compat lib test count (57 → 81) below are updated to `60ee1b5`. `source_coupling.rs` joins list C, 19.1.1, 19.3.1 and 19.5.2. |
 | 2026-10-14 | Template deviation (standards review). Workers report to the orchestrator instead of appending to `STATE_19.md`, because a worker-era replacement once corrupted `STATE_18.md`. The orchestrator distills each report into state. |
 
 ## Wave table
@@ -63,7 +64,7 @@
 | Wave | Task | Title | Must-edit / create (disjoint within wave) |
 |---|---|---|---|
 | 0 | — | Orchestrator baseline (no worker) | `planning/STATE_19.md`, `planning/STATE_18.md` |
-| 1 | 19.1.1 | Compat adapter delegates shape checks to kernels | `compat/{adapter,boundary,dual_domain}.rs` |
+| 1 | 19.1.1 | Compat adapter delegates shape checks to kernels | `compat/{adapter,boundary,dual_domain,source_coupling}.rs` |
 | 1 | 19.1.2 | `HydraulicModel` provided projections | `hydraulics/{mod,table}.rs`, list W |
 | 1 | 19.1.3 | ADRs 0013–0016 and `CONTEXT.md` | `docs/decisions/*`, `CONTEXT.md` |
 | 2 | 19.2.1 | Compat hygiene: dead code, error alias, visibility, stub docs | list C |
@@ -74,7 +75,7 @@
 | 4 | 19.4.1 | serde decoding: dependency + transport group | `Cargo.toml`, `Cargo.lock`, `compat/adapter/{fields,transport}.rs` |
 | 4 | 19.4.2 | One lower-boundary value in `WaterStepInput` | `water_solver.rs`, `lower_boundary.rs`, `lib.rs`, `tests/common/mod.rs`, list W |
 | 5 | 19.5.1 | serde decoding: reactions + transport-property groups | `compat/adapter/{reactions,transport_properties}.rs` |
-| 5 | 19.5.2 | serde decoding: nonequilibrium + biology groups | `compat/adapter/{nonequilibrium,biology}.rs` |
+| 5 | 19.5.2 | serde decoding: nonequilibrium + biology + source-coupling groups | `compat/adapter/{nonequilibrium,biology,source_coupling}.rs` |
 | 5 | 19.5.3 | One upper-boundary value in `WaterStepInput` | `water_solver.rs`, `atmospheric.rs`, `error.rs`, `lib.rs`, `tests/common/mod.rs`, list W |
 | 6 | 19.6.1 | Remove orphaned adapter decode helpers | `compat/adapter/{fields,mod}.rs` |
 | 6 | 19.6.2 | Water step publishes the accepted water snapshot | `water_solver.rs`, `water_state.rs`, `solute.rs`, `lib.rs`, `tests/water_solute_coupling.rs` (new) |
@@ -85,7 +86,7 @@
 
 **List W** (the eight water test files, the only callers of `WaterStepInput` and the only test implementations of `HydraulicModel`): `tests/{lower_boundary,water_solver,allocation_contract,atmospheric,water_transaction,water_contract,root_uptake,water_acceptance}.rs`.
 
-**List C** (19.2.1's 14 files): `compat/{mod,types,adapter,accounting,assembly,boundary,dual_domain,transport,biology,deposition,driver,iteration,nonequilibrium,processes}.rs`.
+**List C** (19.2.1's 15 files): `compat/{mod,types,adapter,accounting,assembly,boundary,dual_domain,transport,biology,deposition,driver,iteration,nonequilibrium,processes,source_coupling}.rs`.
 
 **Dependency chains:**
 - compat: 19.1.1 → 19.2.1 → 19.3.1 → 19.4.1 → {19.5.1, 19.5.2} → 19.6.1
@@ -98,9 +99,10 @@ Waves are sequential, so every task also depends on all earlier waves.
 ## Hazards (from reconnaissance and plan review)
 
 - **Large files.** Enter them through `grep -n` anchors only, never a whole-file read:
-  - `adapter.rs` (2590 lines; tests from `:1867`)
+  - `adapter.rs` (3249 lines at `60ee1b5`; tests from `:2095`)
   - `solute.rs` (1474)
   - `boundary.rs` (1279)
+  - `source_coupling.rs` (1230)
   - `dual_domain.rs` (898)
   - `water_solver.rs` (792)
 - **ADR-0010.** Compat kernels keep source expression grouping, call order and `f32`/`f64` conversion points. Clippy fixes in kernel files use a targeted `#[allow(...)]` that cites the source line, never a rewrite (precedent `6394d52`).
@@ -113,7 +115,7 @@ Waves are sequential, so every task also depends on all earlier waves.
 - **ADR-0002.** No FV/BE equation changes. `SoluteBackend` adds selection only.
 - **ADR-0011.** Only 19.4.1 may edit `Cargo.toml`/`Cargo.lock`.
 - **Mapper signatures.** `map_fields` (`adapter.rs:~211-430`, later `adapter/mod.rs`) calls each `maybe_*` mapper by name (e.g. `:368-369`). The serde tasks must keep every mapper's name and signature so `mod.rs` needs no edit until 19.6.1.
-- **Dead code.** Nothing outside `solute_fortran_compat` calls into it (`lib.rs:10`), so about 155 items are dead in the non-test build. Allowances are per module in `compat/mod.rs` (`#[allow(dead_code)] // wired by 18.10.1` above each `mod` line), not per item.
+- **Dead code.** Nothing outside `solute_fortran_compat` calls into it (`lib.rs:10`), so many items are dead (about 155 at recon, more after 18.7.8) in the non-test build. Allowances are per module in `compat/mod.rs` (`#[allow(dead_code)] // wired by 18.10.1` above each `mod` line), not per item.
 - **Allocation contract.** `tests/allocation_contract.rs` requires steps not to allocate. Any new workspace buffer (19.6.2 face fluxes) is sized at `WaterWorkspace` construction.
 - **Atmospheric capacity.** Atmospheric steps need `WaterWorkspace::with_transition_capacity(n, max_iterations)`, or they fail with `InsufficientAtmosphericTraceCapacity` (`water_solver.rs:147-154`).
 - **Ignored or overloaded inputs.**
@@ -141,8 +143,9 @@ Waves are sequential, so every task also depends on all earlier waves.
 ## Wave 0 — Orchestrator baseline (no worker)
 
 1. Record the baseline at the approved HEAD in `STATE_19.md` (A4 suite list; 202 Rust and 291 Python at recon).
-2. In `STATE_18.md`:
-   - set Execution status to **paused for Orchestration 19 before 18.7.8** and list the pending 18 tasks (D1);
+2. In `STATE_18.md` (amended by D10):
+   - record 18.7.8 as accepted (`fc8bf8d` fix, merge `60ee1b5`) and correct its recorded `SinkS` finding;
+   - set Execution status to **paused for Orchestration 19 after 18.7.8** and list the pending 18 tasks (D1 as amended by D10);
    - correct the Python blocker, so that 18.7.6 is blocked only on fixtures.
 3. Commit the plan files and state with `docs(planning): pause solute compatibility work for architecture deepening`.
 
@@ -153,22 +156,25 @@ Waves are sequential, so every task also depends on all earlier waves.
 ### 19.1.1 — Compat adapter delegates shape checks to kernels
 
 - **Repo:** `/home/andrew/AI/hyd.rs`.
-- **Must edit:** `crates/hydrus-core/src/solute_fortran_compat/{adapter,boundary,dual_domain}.rs`.
+- **Must edit:** `crates/hydrus-core/src/solute_fortran_compat/{adapter,boundary,dual_domain,source_coupling}.rs`.
 - **Can create:** `planning/tasks/19.1.1.todo.md`; scratch `.development/19.1.1/`.
 - **Depends on:** Wave 0.
 - **Spec:**
   - Expose the kernel validators as `pub(super)`:
     - `boundary::validate(state, lower_code, upper_code)` (`boundary.rs:116`);
-    - `dual_domain::validate(state)` (`dual_domain.rs:308`).
-  - In `validate_cross_field_dimensions` (`adapter.rs:494`), replace the per-state shape and range checks with calls to these validators:
-    - the `endpoint_state` block, `~:666-800`;
-    - the `dual_porosity_exchange_state` block, `~:590-635`.
+    - `dual_domain::validate(state)` (`dual_domain.rs:308`);
+    - `source_coupling::validate_uptake` (`source_coupling.rs:457`) and `validate_exclusion` (`:498`) (D10).
+  - In `validate_cross_field_dimensions` (`adapter.rs:504`), replace the per-state shape and range checks with calls to these validators:
+    - the `endpoint_state` block, `~:676-790`;
+    - the `dual_porosity_exchange_state` block, `~:600-645`.
+  - For the 18.7.8 bundles, call `validate_uptake`/`validate_exclusion` on available `root_uptake_state`/`size_exclusion_state` before mutation. Remove any duplicate shape checks in `maybe_root_uptake_state` (`:1927`) and `maybe_size_exclusion_state` (`:2006`). The guard cross-checks in `validate_required_mode_inputs` (`:792-863`) stay.
+  - If a kernel validator would reject a request the adapter accepts today, do not apply it silently. List it under Questions (ADR-0004), because it widens the rejected set.
 
     Map the error to `String` with the field name as prefix (`format!("endpoint_primitives: {e}")`).
   - Keep in the adapter every check the kernel cannot perform:
-    - both boundary codes present (`~:802`);
-    - `dual_porosity` agreeing with `dual_domain.iDualPor` (`~:618-622`);
-    - models 6/7 reaching `DualPor` as `iModel 0` (`~:631`).
+    - both boundary codes present (`~:808`);
+    - `dual_porosity` agreeing with `dual_domain.iDualPor` (`~:628-632`);
+    - models 6/7 reaching `DualPor` as `iModel 0` (`~:641`).
   - An adapter-only shape check that the kernel lacks moves into the kernel validator.
   - Every request currently rejected is still rejected before mutation.
 - **Do not touch:** kernel formulas, request field names and JSON shape, `types.rs`.
@@ -176,10 +182,10 @@ Waves are sequential, so every task also depends on all earlier waves.
   - `fn validate_cross_field_dimensions`
   - `if let Some(state) = &fields.transport.endpoint_state`
   - `fields.nonequilibrium.dual_porosity_exchange_state`
-  - tests `endpoint_primitives_reject_derived_and_inconsistent_state` (`~:2064`) and `dual_porosity_exchange_state_rejects_unknown_missing_and_ragged_state` (`~:2358`)
+  - tests `endpoint_primitives_reject_derived_and_inconsistent_state` (`~:2723`), `dual_porosity_exchange_state_rejects_unknown_missing_and_ragged_state` (`~:3017`) and the `coupling_bundles_*` tests
 - **Reference:** `assemble_endpoints` → `validate` (`boundary.rs:101-106`).
 - **Acceptance:**
-  - `cargo test -p hydrus-core --lib solute_fortran_compat` passes with 57 tests.
+  - `cargo test -p hydrus-core --lib solute_fortran_compat` passes with 81 tests (`60ee1b5`).
   - Each rejection test still rejects its case. Only the asserted substring may change, and it must still name the offending field.
   - The report lists the removed adapter line ranges.
   - A1–A3.
@@ -252,13 +258,13 @@ Waves are sequential, so every task also depends on all earlier waves.
 - **Can create:** `planning/tasks/19.2.1.todo.md`.
 - **Depends on:** 19.1.1, 19.1.3.
 - **Spec:**
-  1. **Dead code.** Replace `#![allow(dead_code)]` (`mod.rs:2`) with a `#[allow(dead_code)] // wired by 18.10.1` attribute line above each `mod` declaration whose items are still unreached, using `18.12.1` for `adapter`/`types`. No item-level allowances.
+  1. **Dead code.** Replace `#![allow(dead_code)]` (`mod.rs:2`; `source_coupling` is `wired by 18.10.1`) with a `#[allow(dead_code)] // wired by 18.10.1` attribute line above each `mod` declaration whose items are still unreached, using `18.12.1` for `adapter`/`types`. No item-level allowances.
   2. **Error alias.** Add `pub(crate) type KernelError = &'static str;` to `types.rs`, then replace `Result<_, &'static str>` with `Result<_, KernelError>` in kernel files. This is a type-alias change only. The adapter keeps `String`.
   3. **Visibility.** Change top-level `pub struct`/`pub enum`/`pub fn`/`impl` methods in `types.rs` to `pub(crate)`. Fields stay `pub`; the module is private, so fields are crate-visible already, matching `transport.rs:7-47`.
-  4. **Stub docs.** Correct each placeholder's doc comment to its current owning task in `EXECUTION_PLAN_18.md` (e.g. `driver.rs` → 18.10.1, `iteration.rs` → 18.11.1). Grep the plan for each file name.
+  4. **Stub docs.** Correct each placeholder's doc comment (`source_coupling.rs` is implemented, so it is not a stub) to its current owning task in `EXECUTION_PLAN_18.md` (e.g. `driver.rs` → 18.10.1, `iteration.rs` → 18.11.1). Grep the plan for each file name.
   5. **Unify pointer.** Add a one-line doc note above `retention_head` and `conductivity` in `dual_domain.rs` (`:227`, `:255`): "Intentionally not shared with `hydraulics`; see ADR-0015."
 - **Do not touch:** any expression, statement order or numeric literal (ADR-0010), and any name other than the alias.
-- **Anchors:** `mod.rs:2-16`; `grep -n "&'static str>" compat/*.rs`; `grep -n '^pub ' compat/types.rs`; `grep -n 'solute_fortran_compat/<file>' planning/EXECUTION_PLAN_18.md`.
+- **Anchors:** `mod.rs:2-17`; `grep -n "&'static str>" compat/*.rs`; `grep -n '^pub ' compat/types.rs`; `grep -n 'solute_fortran_compat/<file>' planning/EXECUTION_PLAN_18.md`.
 - **Acceptance:**
   - `cargo test -p hydrus-core --lib solute_fortran_compat` passes with unchanged count.
   - `grep -n '#!\[allow(dead_code)\]' -r crates/hydrus-core/src/solute_fortran_compat` returns nothing.
@@ -311,7 +317,8 @@ Waves are sequential, so every task also depends on all earlier waves.
     - `transport_properties.rs`
     - `nonequilibrium.rs`
     - `biology.rs`
-  - `tests.rs`: the former `mod tests`
+    - `source_coupling.rs` (D10): `maybe_control_switches`, `maybe_root_uptake_state`, `maybe_size_exclusion_state` and the source-coupling guard block of `validate_required_mode_inputs` (the latter called from `mod.rs`)
+  - `tests.rs`: the former `mod tests` (about 1150 lines at `60ee1b5`)
   - `planning/tasks/19.3.1.todo.md`
 - **Depends on:** 19.2.1.
 - **Spec:**
@@ -323,11 +330,11 @@ Waves are sequential, so every task also depends on all earlier waves.
     Later serde tasks diff this snapshot before and after.
   - The `mod adapter;` line in the parent `mod.rs` is unchanged; its 19.2.1 attribute is kept.
 - **Do not touch:** any other file.
-- **Anchors:** `grep -n '^fn \|^pub(crate) fn ' adapter.rs`; `pub(crate) struct RequestFields` groups in `types.rs`; `fn walkdir` (`~:1894`).
+- **Anchors:** `grep -n '^fn \|^pub(crate) fn ' adapter.rs`; `pub(crate) struct RequestFields` groups in `types.rs`; `fn walkdir` (`~:2553`).
 - **Acceptance:**
   - `cargo test -p hydrus-core --lib solute_fortran_compat` passes with unchanged count (the ignored test is not counted).
   - `HYDRUS_ADAPTER_SNAPSHOT=$PWD/.development/19.3.1/snap.txt cargo test -p hydrus-core --lib dump_parsed_fixtures -- --ignored` writes a non-empty file.
-  - No adapter file exceeds 900 lines.
+  - No adapter file exceeds 900 lines, except `tests.rs` (≤1250).
   - Insertions ≈ deletions ±5% in `git diff --stat`.
   - A1–A3.
 
@@ -433,14 +440,15 @@ Waves are sequential, so every task also depends on all earlier waves.
 - **Reference:** `adapter/transport.rs` after 19.4.1.
 - **Acceptance:** as in 19.4.1, minus the `Cargo.lock` check.
 
-### 19.5.2 — serde decoding: nonequilibrium + biology groups
+### 19.5.2 — serde decoding: nonequilibrium + biology + source-coupling groups
 
 - **Repo:** `/home/andrew/AI/hyd.rs`.
-- **Must edit:** `crates/hydrus-core/src/solute_fortran_compat/adapter/{nonequilibrium,biology}.rs`.
+- **Must edit:** `crates/hydrus-core/src/solute_fortran_compat/adapter/{nonequilibrium,biology,source_coupling}.rs`.
 - **Can create:** `planning/tasks/19.5.2.todo.md`; `.development/19.5.2/`.
 - **Depends on:** 19.4.1.
 - **Spec:**
-  - Apply 19.4.1 steps 2–7 to `maybe_dual_domain`, `dual_porosity_material`, `maybe_dual_porosity_exchange_state`, `maybe_biology_mode` and `maybe_biology_parameters`. Keep names and signatures.
+  - Apply 19.4.1 steps 2–7 to `maybe_dual_domain`, `dual_porosity_material`, `maybe_dual_porosity_exchange_state`, `maybe_biology_mode` and `maybe_biology_parameters`, and (D10) to `maybe_control_switches`, `maybe_root_uptake_state` and `maybe_size_exclusion_state`. Keep names and signatures.
+  - `pinned_requests_cannot_supply_the_source_coupling_state` and the `coupling_bundles_*` tests pass unchanged.
   - The 19.1.1 kernel-validate delegation and the `iDualPor` cross-field checks stay intact.
   - `pinned_requests_cannot_supply_the_dual_porosity_exchange_state` passes unchanged.
 - **Do not touch:** `fields.rs`, `mod.rs`, `tests.rs`, other group files, `types.rs`, `Cargo.*`.
@@ -554,16 +562,16 @@ Waves are sequential, so every task also depends on all earlier waves.
 - **Depends on:** all earlier 19 tasks. Input: the D3 rename list and task reports in `STATE_19.md`.
 - **Spec:**
   - Append a dated "Amendment 2026-10-14 (Orchestration 19)" block to each affected task. Do not rewrite existing text.
-  - **Every remaining compat kernel task** (18.7.2, 18.7.5, 18.7.7, 18.7.8, 18.8.1, 18.8.2, 18.9.1–18.9.5, 18.11.1): new kernel files are registered in `compat/mod.rs` with `#[allow(dead_code)] // wired by 18.10.1`. Kernel errors use `KernelError`; shared types are `pub(crate)`. Shape checks live in the kernel's `validate` and are called from the adapter (ADR-0014). New request records are serde DTOs in the matching `adapter/<group>.rs`; `adapter.rs` no longer exists. `Cargo.*` stays frozen (ADR-0011).
-  - **18.7.8:** its must-edit `types.rs`/`adapter.rs` becomes `types.rs` + `adapter/<group>.rs` (name the group from its mapped state).
-  - **18.10.1:** the driver builds `EndpointPrimitiveState`/`DualPorPrimitiveState` from step state in source order, does not re-validate what kernel `validate` covers, and removes each `wired by 18.10.1` allowance it satisfies. It consumes `WaterStepReport::accepted_water` where it needs accepted water state.
+  - **Every remaining compat kernel task** (18.7.2, 18.7.5, 18.7.7, 18.8.1, 18.8.2, 18.9.1–18.9.5, 18.11.1): new kernel files are registered in `compat/mod.rs` with `#[allow(dead_code)] // wired by 18.10.1`. Kernel errors use `KernelError`; shared types are `pub(crate)`. Shape checks live in the kernel's `validate` and are called from the adapter (ADR-0014). New request records are serde DTOs in the matching `adapter/<group>.rs`; `adapter.rs` no longer exists. `Cargo.*` stays frozen (ADR-0011).
+  - **18.7.7:** its producer state reaches the kernel through `adapter/source_coupling.rs` (D10). 18.7.8 is done and gets no amendment.
+  - **18.10.1:** the driver builds `EndpointPrimitiveState`/`DualPorPrimitiveState` from step state in source order, does not re-validate what kernel `validate` covers, and removes each `wired by 18.10.1` allowance it satisfies. It consumes `WaterStepReport::accepted_water` where it needs accepted water state, and calls `source_coupling::{root_solute_uptake, size_exclusion}` at their source call sites.
   - **18.12.1:** add `SoluteBackend::FortranCompatible`, remove the `wired by 18.12.1` allowances, and run `tests/solute_backend_contract.rs` over both variants. Its `FortranCompatible`/`FiniteVolumeBackwardEuler` "selectors" are the enum variants.
   - **18.16.1:** "switch the default" means changing `SoluteConfig`'s default backend.
   - Apply every D3 rename from `STATE_19.md` wherever 18 text names an old public item.
 - **Do not touch:** any other file, including `STATE_18.md`, which the orchestrator updates.
 - **Anchors:** `^### 18\.` headings; `grep -n 'adapter.rs\|types.rs\|solute.rs\|advance_solute_step\|SoluteWorkspace' planning/EXECUTION_PLAN_18.md`.
 - **Acceptance:**
-  - `grep -c 'Amendment 2026-10-14 (Orchestration 19)' planning/EXECUTION_PLAN_18.md` ≥ 15.
+  - `grep -c 'Amendment 2026-10-14 (Orchestration 19)' planning/EXECUTION_PLAN_18.md` ≥ 14.
   - Every D3 rename's old name either no longer appears outside amendment blocks, or appears beside its new name (the report lists the grep).
   - `git diff --check` is clean.
   - `git diff --stat` shows only `EXECUTION_PLAN_18.md` changed.

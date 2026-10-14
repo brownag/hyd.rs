@@ -1,7 +1,7 @@
 # State — Orchestration 18
 
 Plan status: **Approved by user on 2026-10-08 (“yes”).**
-Execution status: **Waves 1–6 complete; Wave 7 active.** 18.7.8 (root and exclusion source-coupling consumers) is implemented in worktree `18.7.8` and awaits review. 18.7.4 selector/state mapping was accepted 2026-10-12, 18.7.1 endpoint equations were accepted 2026-10-13 (`49192d7`) and 18.7.3 dynamic dual-porosity exchange was accepted 2026-10-14 (`716a7ea`); the remaining Wave 7 work is 18.7.7 plus the fixture tasks 18.7.2/18.7.5/18.7.6, and 18.7.6 is blocked on the missing Python interpreter. Accepted Wave 5 work includes 18.5.1 and 18.5.3; 18.5.2 is incomplete and superseded by 18.7.1. Wave 3 fixtures authenticate raw outputs only; normalized parity remains pending. Default backend must not change before the full parity gate.
+Execution status: **Paused 2026-10-14 for Orchestration 19, after 18.7.8.** Waves 1–6 complete; Wave 7 active. 18.7.4 was accepted 2026-10-12, 18.7.1 on 2026-10-13 (`49192d7`), 18.7.3 on 2026-10-14 (`716a7ea`), and 18.7.8 on 2026-10-14 (fix `fc8bf8d`, merge `60ee1b5`). Pending at resume: 18.7.7, the fixture tasks 18.7.5 → 18.7.2/18.7.6 (blocked on Fortran fixtures only; the Python suite runs, 291 OK), then Waves 8–16 as amended by 19.7.2. Resume only after Orchestration 19's Wave 7 ([STATE_19.md](STATE_19.md)). Accepted Wave 5 work includes 18.5.1 and 18.5.3; 18.5.2 is incomplete and superseded by 18.7.1. Wave 3 fixtures authenticate raw outputs only; normalized parity remains pending. The default backend must not change before the full parity gate.
 Plan: [EXECUTION_PLAN_18.md](EXECUTION_PLAN_18.md). Worker template: [PROMPT_TEMPLATE_18.md](PROMPT_TEMPLATE_18.md).
 
 ## Baseline and guardrails
@@ -44,12 +44,12 @@ Plan: [EXECUTION_PLAN_18.md](EXECUTION_PLAN_18.md). Worker template: [PROMPT_TEM
 | 5 | 18.5.2 | Endpoint rows and flux closure | superseded/incomplete; replaced by 18.7.1 |
 | 5 | 18.5.3 | Source accounting and observations | done; fixed-form corrections accepted |
 | 6 | 18.6.6 | Fixed-form reachability re-audit | done; consistency review accepted |
-| 7 | 18.7.4 → 18.7.1–18.7.3, 18.7.5–18.7.8 | Selector mapping first, then endpoint/active kernels and fixtures | 18.7.4, 18.7.1, 18.7.3 done; 18.7.8 implemented pending review; 18.7.2/18.7.5/18.7.6 blocked on Fortran fixtures and the Python interpreter; 18.7.7 remains |
+| 7 | 18.7.4 → 18.7.1–18.7.3, 18.7.5–18.7.8 | Selector mapping first, then endpoint/active kernels and fixtures | 18.7.4, 18.7.1, 18.7.3, 18.7.8 done; 18.7.2/18.7.5/18.7.6 blocked on Fortran fixtures; 18.7.7 remains; paused for Orchestration 19 |
 | 7A | 18.7.1 | Primitive-input endpoint equations | done (commit `49192d7`) |
-| 7A | 18.7.6 | Explicit Fortran fixtures | blocked on the missing Python interpreter |
+| 7A | 18.7.6 | Explicit Fortran fixtures | blocked on Fortran fixtures (the Python blocker was stale and was cleared 2026-10-14) |
 | 7B | 18.7.3 | Dynamic dual-porosity transfer kernel | done (commit `716a7ea`) |
 | 7B | 18.7.2 | Exchange fixture | blocked with 18.7.6 (Fortran fixtures) |
-| 7C | 18.7.5 → 18.7.7 → 18.7.8 | Root-uptake fixture, kernel, then composed active path | 18.7.8 implemented (primitive-input, pending review); 18.7.5 blocked, 18.7.7 pending |
+| 7C | 18.7.5 → 18.7.7 → 18.7.8 | Root-uptake fixture, kernel, then composed active path | 18.7.8 done (primitive-input; merge `60ee1b5`); 18.7.5 blocked on fixtures, 18.7.7 pending |
 
 ## Active tasks
 
@@ -58,14 +58,26 @@ Plan: [EXECUTION_PLAN_18.md](EXECUTION_PLAN_18.md). Worker template: [PROMPT_TEM
   which is sufficient for its own gate but does not close either one.
 - No task may add a second `DualPor` state type: `DualPorPrimitiveState` and
   `DualPorMaterial` (added by 18.7.3) are the accepted shape.
-- 18.7.6: **blocked on tooling, not on decomposition** — its acceptance runs the
-  Python `tools/**` suite, and no usable interpreter exists on this host (see
-  Verification). Do not dispatch it until the user restores the interpreter or
-  names a replacement; its gate cannot be substituted with a Rust check.
+- 18.7.6: blocked on Fortran fixtures only. The interpreter blocker recorded
+  under Verification is stale: on 2026-10-14 system `/usr/bin/python3` 3.12.3 ran
+  `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tools -p 'test_*.py'`
+  with 291 tests OK and left the tree clean. Grep the output for `^OK|^FAILED|^Ran`,
+  because the suite prints solver JSON.
 
 ## Completed tasks
-- 18.7.8: implemented in worktree `.development/18-worktrees/18.7.8` (branch
-  `orchestration/18.7.8`, parent `4d151a1`), **awaiting orchestrator review**.
+- 18.7.8: **accepted 2026-10-14** after review. The fix is `fc8bf8d` ("fix(solute):
+  clear root solute sink once per SetSSnk call") and the merge into
+  `phase4-water-acceptance` is `60ee1b5`. The review rejected the first `SinkS`
+  finding below. `SINK.FOR:174-176` clears `SinkS` once, before `do 12 iStep` at
+  `:178`, so step 2 (nStep=2) and step 3 add their active term onto the step-1
+  passive sink. Four tests were corrected and one discriminating test was added.
+  Line citations were corrected (e.g. `Compen=1.` is `:163`; label `12` closes at
+  `:218`). The `ThC` tie gives `0.40000004` for both the double and the
+  single-precision forms, so this fixture does not discriminate them. After the
+  fix, `cargo test -p hydrus-core --lib solute_fortran_compat` gives 81/0 and the
+  workspace 226/0; fmt, clippy and diff-check are clean. The original report
+  follows, superseded where it conflicts. It was implemented in worktree
+  `.development/18-worktrees/18.7.8` (branch `orchestration/18.7.8`, parent `4d151a1`).
   `source_coupling.rs` (new, 1192 lines) ports the two call targets of
   `SOLUTE.FOR:94-96`: `SetSSnk` (`SINK.FOR:150-232`) as `root_solute_uptake`, and
   the `if(lBact.and..not.lWat)` target `Exclusion` (`SOLUTE.FOR:1715-1773`) as
