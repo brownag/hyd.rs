@@ -15,20 +15,11 @@ struct LinearModel {
 }
 
 impl HydraulicModel for LinearModel {
-    fn theta(&self, head: f64) -> Result<f64, HydraulicError> {
-        Ok(self.theta_offset + self.capacity * head)
-    }
-    fn conductivity(&self, head: f64) -> Result<f64, HydraulicError> {
-        Ok(self.conductivity + self.conductivity_slope * head)
-    }
-    fn capacity(&self, _head: f64) -> Result<f64, HydraulicError> {
-        Ok(self.capacity)
-    }
     fn evaluate(&self, head: f64) -> Result<Evaluation, HydraulicError> {
         Ok(Evaluation {
-            theta: self.theta(head)?,
-            conductivity: self.conductivity(head)?,
-            capacity: self.capacity(head)?,
+            theta: self.theta_offset + self.capacity * head,
+            conductivity: self.conductivity + self.conductivity_slope * head,
+            capacity: self.capacity,
         })
     }
     fn derivatives(&self, _head: f64) -> Result<HydraulicDerivatives, HydraulicError> {

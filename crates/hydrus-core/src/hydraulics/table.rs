@@ -159,18 +159,6 @@ impl HydraulicTables {
 }
 
 impl HydraulicModel for HydraulicTables {
-    fn theta(&self, head: f64) -> Result<f64, HydraulicError> {
-        Ok(self.evaluate(head)?.theta)
-    }
-
-    fn conductivity(&self, head: f64) -> Result<f64, HydraulicError> {
-        Ok(self.evaluate(head)?.conductivity)
-    }
-
-    fn capacity(&self, head: f64) -> Result<f64, HydraulicError> {
-        Ok(self.evaluate(head)?.capacity)
-    }
-
     fn evaluate(&self, head: f64) -> Result<Evaluation, HydraulicError> {
         Self::evaluate(self, head)
     }

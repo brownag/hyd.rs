@@ -12,23 +12,11 @@ struct TransactionModel {
 }
 
 impl HydraulicModel for TransactionModel {
-    fn theta(&self, head: f64) -> Result<f64, HydraulicError> {
-        Ok(self.capacity * head)
-    }
-
-    fn conductivity(&self, _head: f64) -> Result<f64, HydraulicError> {
-        Ok(self.conductivity)
-    }
-
-    fn capacity(&self, _head: f64) -> Result<f64, HydraulicError> {
-        Ok(self.capacity)
-    }
-
     fn evaluate(&self, head: f64) -> Result<Evaluation, HydraulicError> {
         Ok(Evaluation {
-            theta: self.theta(head)?,
-            conductivity: self.conductivity(head)?,
-            capacity: self.capacity(head)?,
+            theta: self.capacity * head,
+            conductivity: self.conductivity,
+            capacity: self.capacity,
         })
     }
 

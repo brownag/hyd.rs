@@ -11,18 +11,9 @@ struct LinearModel {
 }
 
 impl HydraulicModel for LinearModel {
-    fn theta(&self, head: f64) -> Result<f64, hydrus_core::HydraulicError> {
-        Ok(self.theta_offset + head)
-    }
-    fn conductivity(&self, _head: f64) -> Result<f64, hydrus_core::HydraulicError> {
-        Ok(1.0)
-    }
-    fn capacity(&self, _head: f64) -> Result<f64, hydrus_core::HydraulicError> {
-        Ok(1.0)
-    }
     fn evaluate(&self, head: f64) -> Result<Evaluation, hydrus_core::HydraulicError> {
         Ok(Evaluation {
-            theta: self.theta(head)?,
+            theta: self.theta_offset + head,
             conductivity: 1.0,
             capacity: 1.0,
         })

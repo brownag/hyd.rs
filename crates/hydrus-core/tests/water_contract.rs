@@ -10,15 +10,6 @@ use hydrus_core::{
 struct TestModel;
 
 impl HydraulicModel for TestModel {
-    fn theta(&self, head: f64) -> Result<f64, HydraulicError> {
-        Ok(head)
-    }
-    fn conductivity(&self, _head: f64) -> Result<f64, HydraulicError> {
-        Ok(1.0)
-    }
-    fn capacity(&self, _head: f64) -> Result<f64, HydraulicError> {
-        Ok(1.0)
-    }
     fn evaluate(&self, head: f64) -> Result<Evaluation, HydraulicError> {
         Ok(Evaluation {
             theta: head,

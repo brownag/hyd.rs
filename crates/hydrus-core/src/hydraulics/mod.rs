@@ -37,9 +37,15 @@ impl HydraulicModelSelector {
 
 /// Value and derivative contract shared by hydraulic families.
 pub trait HydraulicModel: Send + Sync {
-    fn theta(&self, head: f64) -> Result<f64, HydraulicError>;
-    fn conductivity(&self, head: f64) -> Result<f64, HydraulicError>;
-    fn capacity(&self, head: f64) -> Result<f64, HydraulicError>;
+    fn theta(&self, head: f64) -> Result<f64, HydraulicError> {
+        Ok(self.evaluate(head)?.theta)
+    }
+    fn conductivity(&self, head: f64) -> Result<f64, HydraulicError> {
+        Ok(self.evaluate(head)?.conductivity)
+    }
+    fn capacity(&self, head: f64) -> Result<f64, HydraulicError> {
+        Ok(self.evaluate(head)?.capacity)
+    }
     fn evaluate(&self, head: f64) -> Result<Evaluation, HydraulicError>;
     fn derivatives(&self, head: f64) -> Result<HydraulicDerivatives, HydraulicError>;
 }
@@ -62,18 +68,6 @@ impl VanGenuchtenModel {
 }
 
 impl HydraulicModel for VanGenuchtenModel {
-    fn theta(&self, head: f64) -> Result<f64, HydraulicError> {
-        Ok(evaluate_model_zero(&self.parameters, head)?.theta)
-    }
-
-    fn conductivity(&self, head: f64) -> Result<f64, HydraulicError> {
-        Ok(evaluate_model_zero(&self.parameters, head)?.conductivity)
-    }
-
-    fn capacity(&self, head: f64) -> Result<f64, HydraulicError> {
-        Ok(evaluate_model_zero(&self.parameters, head)?.capacity)
-    }
-
     fn evaluate(&self, head: f64) -> Result<Evaluation, HydraulicError> {
         let evaluation = evaluate_model_zero(&self.parameters, head)?;
         Ok(Evaluation {

@@ -24,21 +24,9 @@ use hydrus_core::{
 struct LinearModel;
 
 impl HydraulicModel for LinearModel {
-    fn theta(&self, head: f64) -> Result<f64, HydraulicError> {
-        Ok(1.0 + 0.1 * head)
-    }
-
-    fn conductivity(&self, _head: f64) -> Result<f64, HydraulicError> {
-        Ok(1.0)
-    }
-
-    fn capacity(&self, _head: f64) -> Result<f64, HydraulicError> {
-        Ok(0.1)
-    }
-
     fn evaluate(&self, head: f64) -> Result<Evaluation, HydraulicError> {
         Ok(Evaluation {
-            theta: self.theta(head)?,
+            theta: 1.0 + 0.1 * head,
             conductivity: 1.0,
             capacity: 0.1,
         })
