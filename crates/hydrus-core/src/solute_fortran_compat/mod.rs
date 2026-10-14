@@ -15,6 +15,8 @@ mod deposition;
 mod driver;
 #[allow(dead_code)] // wired by 18.10.1
 mod dual_domain;
+#[allow(dead_code)] // wired by 18.10.1
+mod initialization;
 mod iteration;
 #[allow(dead_code)] // wired by 18.10.1
 mod nonequilibrium;
