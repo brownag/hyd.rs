@@ -1,7 +1,7 @@
 # State — Orchestration 19
 
 Plan status: **Approved by user on 2026-10-14 (“yes”).**
-Execution status: **Waves 0–6 done; Wave 7 next.** D12 closed by 19.6.1. 18.7.8 was reviewed, fixed and merged first (D10, `60ee1b5`), and Orchestration 18 is paused after it.
+Execution status: **Closed 2026-10-14. Waves 0–7 done.** Orchestration 18 is resumable under the 19.7.2 amendments ([STATE_18.md](STATE_18.md)). 18.7.8 was reviewed, fixed and merged first (D10, `60ee1b5`), and Orchestration 18 is paused after it.
 Plan: [EXECUTION_PLAN_19.md](EXECUTION_PLAN_19.md). Worker template: [PROMPT_TEMPLATE_19.md](PROMPT_TEMPLATE_19.md).
 
 ## Baseline and guardrails
@@ -32,8 +32,8 @@ Plan: [EXECUTION_PLAN_19.md](EXECUTION_PLAN_19.md). Worker template: [PROMPT_TEM
 | 5 | 19.5.3 | One upper-boundary value in `WaterStepInput` | done (`65aea53`) |
 | 6 | 19.6.1 | Remove orphaned adapter decode helpers | done (`f465316`) |
 | 6 | 19.6.2 | Water step publishes the accepted water snapshot | done (`30f9134`) |
-| 7 | 19.7.1 | Closed `SoluteBackend` dispatch + contract tests | pending |
-| 7 | 19.7.2 | Amend Orchestration 18 for 19's changes | pending |
+| 7 | 19.7.1 | Closed `SoluteBackend` dispatch + contract tests | done (`aabbd3c`) |
+| 7 | 19.7.2 | Amend Orchestration 18 for 19's changes | done (`43dc328`) |
 
 ## Public renames (D3)
 
@@ -44,6 +44,7 @@ Plan: [EXECUTION_PLAN_19.md](EXECUTION_PLAN_19.md). Worker template: [PROMPT_TEM
 - (19.5.3) `WaterStepInput.upper_row` + `.upper_condition` + `.upper_boundary_flux` → `WaterStepInput.upper: UpperBoundary` (new public type: `Head { head, row, flux } | Flux { flux, row } | Atmospheric { critical_head }`). `Natural`/`Unsupported` upper inputs are removed.
 - (19.5.3) `WaterStepError::UnsupportedAtmosphericInput` → `WaterStepError::InvalidUpperBoundary { name }` (entry-point/variant mismatch).
 - (19.6.2) `AcceptedWaterSnapshot` moved `solute.rs` → `water_state.rs`; `hydrus_core::AcceptedWaterSnapshot` and `hydrus_core::solute::AcceptedWaterSnapshot` both still resolve. New: `WaterStepReport.water_contents`, `WaterStepReport.face_fluxes`, `WaterStepReport::accepted_water()`.
+- (19.7.1) New: `SoluteBackend` (`#[non_exhaustive]`, `FiniteVolumeBackwardEuler`; `SoluteBackend::ALL`), `SoluteConfig::with_backend`, `SoluteConfig::backend()`, re-exported as `hydrus_core::SoluteBackend`.
 - (19.3.3) `SoluteWorkspace::{trial_concentrations_mut, trial_kinetic_sorbed_mut, trial_boundary_mass_mut, set_trial_accepted_steps}` → `#[cfg(test)] pub(crate)`; `trial_reaction_mass_mut` → `pub(crate)` (no longer public).
 
 ## Verification
@@ -54,6 +55,7 @@ Plan: [EXECUTION_PLAN_19.md](EXECUTION_PLAN_19.md). Worker template: [PROMPT_TEM
 - Wave 4 (at `658e5be`): `cargo test --workspace` 236 passed / 0 failed / 1 ignored (229 + 7 `adapter::transport::tests`); Python 291 OK; fmt, clippy and diff-check clean.
 - Wave 5 (at `65aea53`): `cargo test --workspace` 264 passed / 0 failed / 1 ignored (236 + 5 from 19.5.1 + 23 from 19.5.2); `--lib solute_fortran_compat` 116 + 1 ignored. The merged `dump_parsed_fixtures` snapshot is identical to the pre-Wave-5 one (kept at `.development/19-snap/baseline.txt`). Python 291 OK; fmt, clippy and diff-check clean.
 - Wave 6 (at `7d4b71b`): `cargo test --workspace` 274 passed / 0 failed / 1 ignored (264 + 3 from 19.6.1 + 7 `water_solute_coupling`). `solute.rs` was re-pinned under D11 in `7d4b71b` (63f83901… → ab9fcca3…); justification: the `solute.rs` diff is the removal of the `AcceptedWaterSnapshot` definition plus one `pub use`, and `tests/solute_*.rs` passes 53/0. Snapshot identical to baseline; Python 291 OK; fmt, clippy and diff-check clean.
+- Wave 7 / final (at `1c1b9da`): `cargo test --workspace` 279 passed / 0 failed / 1 ignored (274 + 5 `solute_backend_contract`; baseline at `60ee1b5` was 226). `solute.rs` re-pinned under D11 in `1c1b9da` (ab9fcca3… → cf175acf…); justification: the only removed `solute.rs` line is `advance_solute_step`'s one-line delegation (now a single-arm `match`), the FV/BE body moved byte-identical into a private function, and `tests/solute_*.rs` passes 58/0 (53 + 5). The `dump_parsed_fixtures` snapshot is identical to the pre-Wave-5 baseline. Python 291 OK; fmt, clippy `-D warnings` and `git diff --check` clean.
 
 ## Task reports
 
@@ -155,3 +157,23 @@ Plan: [EXECUTION_PLAN_19.md](EXECUTION_PLAN_19.md). Worker template: [PROMPT_TEM
 - Endpoints: `face_fluxes[0]` is the balance lower flux; `face_fluxes[n]` is the negated soil upper flux (soil flux on atmospheric steps). Both match the balance bitwise.
 - `tests/water_solute_coupling.rs` has 7 tests. They cover endpoints (bitwise), Σflux·dt vs storage, a water step followed by `advance_solute_step`, both public paths, and a per-cell balance at 1e-9 on a sloped non-uniform mesh with sinks (arithmetic, geometric, and atmospheric evaporation and ponding). The per-cell balance closed first time.
 - Gotcha for 18.10.1: in `Head`/`Flux` modes the caller-owned upper row defines the last cell's equation, so that cell balances only if the row is a true half-cell balance.
+
+### 19.7.1 — done (`aabbd3c`)
+- `SoluteBackend` (`#[non_exhaustive]`, one variant, `ALL`) is defined before `SoluteConfig`. `SoluteConfig` gains a private `backend` field (default FV/BE), `with_backend` and `backend()`, with constructors unchanged.
+- Both `advance_solute_step` and `advance_solute_step_with_processes` dispatch with an exhaustive single-arm `match` to the private `advance_finite_volume_backward_euler_step`, which is the old body byte-identical (orchestrator-checked: one removed line in total).
+- `tests/solute_backend_contract.rs` has 5 tests over `SoluteBackend::ALL`, with water from a real `advance_water_step` + `accepted_water()`: default/round-trip, accepted step reaches water time and keeps counts, process entry point, malformed input rejected before mutation, and a late failure (`minimum_pivot = 1e300` passes validation and fails in the solve) that leaves state equal to its clone with the workspace reusable.
+
+### 19.7.2 — done (`43dc328`)
+- 14 `Amendment 2026-10-14 (Orchestration 19)` blocks in `EXECUTION_PLAN_18.md`; no existing text changed.
+  - The shared kernel block (dead-code allowance, `KernelError`, `pub(crate)`, ADR-0014 validate, `adapter/` layout, serde DTO helpers incl. `require_object`, frozen `Cargo.*`) goes on 18.7.2, 18.7.5, 18.7.7 (+ D10 `adapter/source_coupling.rs`), 18.8.1, 18.8.2, 18.9.1–18.9.5 and 18.11.1.
+  - 18.10.1: driver block, citing STATE_19 gotchas by task id.
+  - 18.12.1: `FortranCompatible` variant, the contract test extends via `ALL`, D11 re-pin.
+  - 18.16.1: default-backend meaning, D11 re-pin.
+- No D3 old name appeared in `EXECUTION_PLAN_18.md`, so no inline renames. The `SoluteBackend` names were checked against 19.7.1 and match.
+- Older `adapter.rs` mentions in finished 18 tasks remain by design.
+
+## Exit (2026-10-14)
+
+- All 17 tasks are done. Final gates are green at `1c1b9da` (see Verification).
+- Amendments D10 (18.7.8 merged first), D11 (`solute.rs` policy-hash re-pin; three re-pins, all on a bitwise justification) and D12 (serde array-as-struct widening from 19.4.1, closed by 19.6.1) are recorded in the plan.
+- Orchestration 18 is set resumable in `STATE_18.md`.
