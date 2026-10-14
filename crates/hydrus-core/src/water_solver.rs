@@ -1,4 +1,6 @@
-use crate::atmospheric::{net_flux, AtmosphericTransition, UpperBoundaryMode};
+use crate::atmospheric::{
+    decide_transition, AtmosphericAssembly, AtmosphericTransition, UpperBoundaryMode,
+};
 use crate::forcing::AtmosphericRates;
 use crate::hydraulics::{
     nodal_control_volume_width, solve_tridiagonal_in_place, transform_boundary_row,
@@ -255,13 +257,6 @@ struct Trial {
     lower_boundary_flux: f64,
 }
 
-#[derive(Clone, Copy)]
-struct AtmosphericAssembly {
-    rates: AtmosphericRates,
-    upper_mode: UpperBoundaryMode,
-    ponded_depth: f64,
-}
-
 fn solve_trial(
     state: &WaterState,
     workspace: &mut WaterWorkspace,
@@ -328,49 +323,11 @@ fn solve_trial(
         }
         let mut active_set_stable = true;
         if let Some(rates) = atmospheric_rates {
-            let demand = net_flux(rates);
-            soil_flux = if upper_mode == UpperBoundaryMode::PondedHead {
-                atmospheric_top_flux_for_heads(workspace, state, input, timestep)?
-            } else {
-                demand
-            };
-            ponded_depth =
-                (state.atmospheric.ponded_depth + (demand - soil_flux) * timestep).max(0.0);
-            atmospheric_exchange =
-                soil_flux + (ponded_depth - state.atmospheric.ponded_depth) / timestep;
-            let critical_head = match input.upper_condition {
-                BoundaryCondition::Dirichlet { value } => value,
-                _ => return Err(WaterStepError::UnsupportedAtmosphericInput {
-                    name:
-                        "upper_condition must declare the atmospheric critical head with Dirichlet",
-                }),
-            };
-            let next_mode = atmospheric_mode(
-                upper_mode,
-                demand,
-                workspace.trial_heads[workspace.node_count() - 1],
-                critical_head,
-                soil_flux,
-                ponded_depth,
-            );
-            active_set_stable = next_mode == upper_mode;
-            if !active_set_stable {
-                let transition_soil_flux =
-                    atmospheric_top_flux_for_heads(workspace, state, input, timestep)?;
-                let transition_candidate_storage = (state.atmospheric.ponded_depth
-                    + (demand - transition_soil_flux) * timestep)
-                    .max(0.0);
-                workspace.atmospheric_transitions[workspace.atmospheric_transition_count] =
-                    AtmosphericTransition {
-                        from_mode: upper_mode,
-                        to_mode: next_mode,
-                        demand,
-                        top_head: workspace.trial_heads[workspace.node_count() - 1],
-                        soil_flux: transition_soil_flux,
-                        candidate_surface_storage: transition_candidate_storage,
-                    };
-                workspace.atmospheric_transition_count += 1;
-            }
+            let decision = decide_transition(rates, upper_mode, workspace, state, input, timestep)?;
+            soil_flux = decision.soil_flux;
+            ponded_depth = decision.ponded_depth;
+            atmospheric_exchange = decision.atmospheric_exchange;
+            active_set_stable = decision.stable;
         }
         if active_set_stable
             && head_residual <= policy.head_tolerance
@@ -471,36 +428,8 @@ fn assemble(
         minimum_pivot,
     )?;
     let (upper_condition, upper_row, upper_mode) = if let Some(assembly) = atmospheric {
-        let rates = assembly.rates;
-        let current_upper_mode = assembly.upper_mode;
-        let head = workspace.trial_heads[count - 1];
-        let demand = net_flux(rates);
-        let flux = atmospheric_top_flux(workspace, state, input, timestep);
-        let critical_head =
-            match input.upper_condition {
-                BoundaryCondition::Dirichlet { value } => value,
-                _ => return Err(WaterStepError::UnsupportedAtmosphericInput {
-                    name:
-                        "upper_condition must declare the atmospheric critical head with Dirichlet",
-                }),
-            };
-        let mode = atmospheric_mode(
-            current_upper_mode,
-            demand,
-            head,
-            critical_head,
-            flux,
-            assembly.ponded_depth,
-        );
-        let row = atmospheric_top_row(workspace, state, input, timestep)?;
-        let condition = if mode == UpperBoundaryMode::PondedHead {
-            BoundaryCondition::Dirichlet {
-                value: critical_head,
-            }
-        } else {
-            BoundaryCondition::Neumann { flux: demand }
-        };
-        (condition, row, mode)
+        let plan = assembly.prepare_step(workspace, state, input, timestep)?;
+        (plan.condition, plan.row, plan.mode)
     } else {
         (
             input.upper_condition,
@@ -550,106 +479,6 @@ fn assemble(
     validate_finite("assembled coefficients", &workspace.upper)?;
     validate_finite("assembled rhs", &workspace.rhs)?;
     Ok((upper_mode, prepared_lower.exchange_flux))
-}
-
-fn atmospheric_top_flux(
-    workspace: &WaterWorkspace,
-    state: &WaterState,
-    input: WaterStepInput<'_>,
-    timestep: f64,
-) -> f64 {
-    let top = workspace.node_count() - 1;
-    let previous = top - 1;
-    let dx = input.mesh.coordinates()[top] - input.mesh.coordinates()[previous];
-    let conductivity =
-        0.5 * (workspace.evaluated_conductivity[top] + workspace.evaluated_conductivity[previous]);
-    conductivity
-        * ((workspace.trial_heads[top] - workspace.trial_heads[previous]) / dx
-            + input.mesh.inclination_cosine())
-        + (workspace.evaluated_theta[top] - state.water_contents[top]) * dx / (2.0 * timestep)
-        + workspace.trial_sink[top] * dx / 2.0
-}
-
-fn atmospheric_top_flux_for_heads(
-    workspace: &WaterWorkspace,
-    state: &WaterState,
-    input: WaterStepInput<'_>,
-    timestep: f64,
-) -> Result<f64, WaterStepError> {
-    let top = workspace.node_count() - 1;
-    let previous = top - 1;
-    let top_evaluation =
-        input.materials[input.mesh.material_indices()[top]].evaluate(workspace.trial_heads[top])?;
-    let previous_evaluation = input.materials[input.mesh.material_indices()[previous]]
-        .evaluate(workspace.trial_heads[previous])?;
-    if !top_evaluation.theta.is_finite()
-        || !top_evaluation.conductivity.is_finite()
-        || !previous_evaluation.conductivity.is_finite()
-    {
-        return Err(WaterStepError::NonFiniteDiagnostic);
-    }
-    let dx = input.mesh.coordinates()[top] - input.mesh.coordinates()[previous];
-    let conductivity = 0.5 * (top_evaluation.conductivity + previous_evaluation.conductivity);
-    Ok(conductivity
-        * ((workspace.trial_heads[top] - workspace.trial_heads[previous]) / dx
-            + input.mesh.inclination_cosine())
-        + (top_evaluation.theta - state.water_contents[top]) * dx / (2.0 * timestep)
-        + workspace.trial_sink[top] * dx / 2.0)
-}
-
-fn atmospheric_mode(
-    current: UpperBoundaryMode,
-    demand: f64,
-    top_head: f64,
-    critical_head: f64,
-    soil_flux: f64,
-    candidate_ponded_depth: f64,
-) -> UpperBoundaryMode {
-    if (demand >= 0.0 && top_head > critical_head) || (demand < 0.0 && top_head < critical_head) {
-        return UpperBoundaryMode::PondedHead;
-    }
-    if current == UpperBoundaryMode::PondedHead {
-        let supply_satisfies_demand = if demand >= 0.0 {
-            soil_flux >= demand
-        } else {
-            soil_flux <= demand
-        };
-        if candidate_ponded_depth > 0.0 || !supply_satisfies_demand {
-            return UpperBoundaryMode::PondedHead;
-        }
-    }
-    UpperBoundaryMode::AtmosphericFlux
-}
-
-fn atmospheric_top_row(
-    workspace: &WaterWorkspace,
-    state: &WaterState,
-    input: WaterStepInput<'_>,
-    timestep: f64,
-) -> Result<BoundaryRow, WaterStepError> {
-    let top = workspace.node_count() - 1;
-    let previous = top - 1;
-    let dx_a = input.mesh.coordinates()[top] - input.mesh.coordinates()[previous];
-    let dx = dx_a / 2.0;
-    let conductivity =
-        0.5 * (workspace.evaluated_conductivity[top] + workspace.evaluated_conductivity[previous]);
-    let capacity = workspace.evaluated_capacity[top];
-    let head = workspace.trial_heads[top];
-    let theta_change = workspace.evaluated_theta[top] - state.water_contents[top];
-    let row = BoundaryRow {
-        lower: -conductivity / dx_a,
-        diagonal: conductivity / dx_a + capacity * dx / timestep,
-        upper: 0.0,
-        rhs: capacity * dx / timestep * head
-            - theta_change * dx / timestep
-            - conductivity * input.mesh.inclination_cosine()
-            - workspace.trial_sink[top] * dx,
-    };
-    validate_finite(
-        "atmospheric top row",
-        &[row.lower, row.diagonal, row.upper, row.rhs],
-    )?;
-    Ok(row)
 }
 
 struct BalanceInput {
