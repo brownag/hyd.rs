@@ -22,8 +22,8 @@ pub use lower_boundary::{LowerBoundaryMode, UnsupportedLowerBoundaryMode};
 pub use root_uptake::{feddes_reduction, RootUptakeInput, RootUptakeModel};
 pub use solute::{
     advance_solute_step, DeferredSoluteFeature, EquilibriumSorption, KineticSorption,
-    SoluteAccounting, SoluteBoundaries, SoluteBoundaryMode, SoluteConfig, SoluteEndpoint,
-    SoluteSpecies, SoluteState, SoluteStepError, SoluteTransportInput, SoluteUnits,
+    SoluteAccounting, SoluteBackend, SoluteBoundaries, SoluteBoundaryMode, SoluteConfig,
+    SoluteEndpoint, SoluteSpecies, SoluteState, SoluteStepError, SoluteTransportInput, SoluteUnits,
     SoluteWorkspace,
 };
 pub use water_solver::{

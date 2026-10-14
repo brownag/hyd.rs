@@ -112,12 +112,27 @@ impl DeferredSoluteFeature {
     }
 }
 
+/// Closed set of solute transport backends. Every step is dispatched by an
+/// exhaustive `match`, so adding a variant requires handling it everywhere.
+#[non_exhaustive]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum SoluteBackend {
+    /// Conservative finite-volume discretization with backward-Euler time stepping.
+    FiniteVolumeBackwardEuler,
+}
+
+impl SoluteBackend {
+    /// Every available backend, for contract tests and selection lists.
+    pub const ALL: &'static [SoluteBackend] = &[SoluteBackend::FiniteVolumeBackwardEuler];
+}
+
 /// Validated selected-M5 capabilities. This type defines configuration only; it does not step.
 #[derive(Clone, Debug, PartialEq)]
 pub struct SoluteConfig {
     units: SoluteUnits,
     species: Vec<SoluteSpecies>,
     boundaries: Vec<SoluteBoundaries>,
+    backend: SoluteBackend,
 }
 
 impl SoluteConfig {
@@ -251,7 +266,18 @@ impl SoluteConfig {
             units,
             species,
             boundaries,
+            backend: SoluteBackend::FiniteVolumeBackwardEuler,
         })
+    }
+
+    /// Select the transport backend; the default is finite-volume backward Euler.
+    pub fn with_backend(mut self, backend: SoluteBackend) -> Self {
+        self.backend = backend;
+        self
+    }
+
+    pub fn backend(&self) -> SoluteBackend {
+        self.backend
     }
 
     pub fn units(&self) -> &SoluteUnits {
@@ -722,12 +748,36 @@ pub fn advance_solute_step(
     config: &SoluteConfig,
     input: SoluteTransportInput<'_>,
 ) -> Result<(), SoluteStepError> {
-    advance_solute_step_with_processes(state, workspace, mesh, config, input, None)
+    match config.backend() {
+        SoluteBackend::FiniteVolumeBackwardEuler => {
+            advance_finite_volume_backward_euler_step(state, workspace, mesh, config, input, None)
+        }
+    }
 }
 
 /// Advances transport with the configured M5 reaction and sorption processes.
 /// `process_input` supplies bulk density and a bounded nonlinear solve policy.
 pub fn advance_solute_step_with_processes(
+    state: &mut SoluteState,
+    workspace: &mut SoluteWorkspace,
+    mesh: &Mesh1D,
+    config: &SoluteConfig,
+    input: SoluteTransportInput<'_>,
+    process_input: Option<SoluteProcessInput<'_>>,
+) -> Result<(), SoluteStepError> {
+    match config.backend() {
+        SoluteBackend::FiniteVolumeBackwardEuler => advance_finite_volume_backward_euler_step(
+            state,
+            workspace,
+            mesh,
+            config,
+            input,
+            process_input,
+        ),
+    }
+}
+
+fn advance_finite_volume_backward_euler_step(
     state: &mut SoluteState,
     workspace: &mut SoluteWorkspace,
     mesh: &Mesh1D,
