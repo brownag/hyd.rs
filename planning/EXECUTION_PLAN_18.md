@@ -59,7 +59,7 @@ Status: **Approved by user on 2026-10-08, with amendments through 2026-10-12.** 
 | 4 | 18.4.1 | Wave 3 | Rust compatibility state/types/precision and normalized-input adapter |
 | 5 | 18.5.1, 18.5.3 | 18.4.1; 18.5.2 superseded by 18.7.1 | Source-faithful transport/time assembly and accounting; primitive endpoint implementation deferred |
 | 6 | 18.6.6 | 18.5.1, 18.5.3; 18.5.2 superseded | Full fixed-form caller/reachability re-audit and corrected compatibility matrix |
-| 7 | 18.7.4, then 18.7.1–18.7.3 and 18.7.5–18.7.8 | 18.6.6 | Selector mapping gates numerical endpoints, active updates, accounting, coupling and fixtures |
+| 7 | 18.7.4, then 18.7.1–18.7.3 and 18.7.5–18.7.8 | 18.6.6 | Selector mapping gates numerical endpoints, active updates, accounting, coupling and fixtures. **Amended 2026-10-13:** Wave 7 runs as sequenced sub-waves because 18.7.1, 18.7.3 and 18.7.8 each need shared `types.rs`/`adapter.rs` additions — 7A: 18.7.1 ∥ 18.7.6; 7B: 18.7.2 ∥ 18.7.3; 7C: 18.7.5 ∥ 18.7.7 ∥ 18.7.8. |
 | 8 | 18.8.1–18.8.2 | Wave 7 | Conditional source initialization and selector-2 moisture-path resolution |
 | 9 | 18.9.1–18.9.5 | Wave 8 | Source-faithful species/process kernels |
 | 10 | 18.10.1 | Wave 9 and accepted Wave 7–8 prerequisites | Source-ordered solute driver, including both accounting call sites |
@@ -255,12 +255,12 @@ Tasks within each wave own disjoint files. Waves are sequential because the norm
 ### 18.7.3 — Port active dynamic dual-porosity exchange
 
 - **Repo:** `/home/andrew/AI/hyd.rs`.
-- **Must edit:** `crates/hydrus-core/src/solute_fortran_compat/dual_domain.rs` (unit tests in the module).
+- **Must edit:** `crates/hydrus-core/src/solute_fortran_compat/dual_domain.rs` (unit tests in the module) and, **as amended 2026-10-13**, the shared `types.rs`/`adapter.rs` primitive state that `DualPor` consumes (per-material `ParD(7..11)` retention/immobile bounds and transfer coefficient, `thr`/`ths`, native node coordinates, `hNew`, `hCritA`, `iModel`, `MatNum`, old/new immobile water) with focused adapter tests.
 - **Can create:** `planning/tasks/18.7.3.todo.md`.
-- **Depends on:** 18.6.6 and completed selector/state mapping from 18.7.4.
+- **Depends on:** 18.6.6, completed selector/state mapping from 18.7.4, and **merged 18.7.1** (amendment 2026-10-13: `DualPor` takes primitive state that no existing request type carries, and `types.rs`/`adapter.rs` are single-owner files, so this task is sequenced after 18.7.1 rather than run beside it). Where the pinned fixtures supply only coordinate *ranges* rather than numeric node arrays, the task must reject them explicitly or report the input blocker; it must not synthesize values.
 - **Spec:** Port the active guarded `DualPor` exchange behavior identified by fixed-form caller audit, including initialization/iteration state, `SinkIm` sign and source-pool selection, material/water-model branches, operation order, and outputs consumed by `Solute`/`MassTran`. Do not preserve the earlier erroneous “commented call” behavior. Respect the active reader's water model mapping and reject only truly unsupported requests.
-- **Do not touch:** shared types/adapter, boundary/transport/accounting/other process files, fixtures, public API, or pinned Fortran.
-- **Anchors:** corrected 18.6.6 caller matrix; `WATFLOW.FOR` `DualPor` call and `INPUT.FOR` `InitDualPor`/model mapping; `SOLUTE.FOR` dual-domain coefficient/accounting terms.
+- **Do not touch:** boundary/transport/accounting/other process files, fixtures, public API, or pinned Fortran.
+- **Anchors:** corrected 18.6.6 caller matrix; `WATFLOW.FOR:43–46` guarded `DualPor` call and `WATFLOW.FOR:1027–1071` body (including the column-6 continuation that activates the `WTransf` accumulation under `if(i.ge.2)`), `INPUT.FOR` `InitDualPor`/model mapping; `SOLUTE.FOR` dual-domain coefficient/accounting terms.
 - **Acceptance:** `cargo test -p hydrus-core solute_fortran_compat::dual_domain::tests`; source-derived tests discriminate zero/positive/negative exchange and both supported water models with correct pool selection and state timing.
 ### 18.7.4 — Map source selectors and conditional modes in normalized requests
 
@@ -316,9 +316,9 @@ Tasks within each wave own disjoint files. Waves are sequential because the norm
 ### 18.7.8 — Implement root and exclusion source-coupling consumers
 
 - **Repo:** `/home/andrew/AI/hyd.rs`.
-- **Must edit:** `crates/hydrus-core/src/solute_fortran_compat/source_coupling.rs`, `crates/hydrus-core/src/solute_fortran_compat/mod.rs` (module registration), and module tests.
+- **Must edit:** `crates/hydrus-core/src/solute_fortran_compat/source_coupling.rs`, `crates/hydrus-core/src/solute_fortran_compat/mod.rs` (module registration), and module tests; and, **as amended 2026-10-13**, the shared `types.rs`/`adapter.rs` mapping of the root/exclusion producer state this consumer reads (`lActRSU`, `SinkF`, sink/rate arrays, `lWat`, biology state) with focused adapter tests.
 - **Can create:** `planning/tasks/18.7.8.todo.md`.
-- **Depends on:** 18.6.6 and normalized selector/state contract in 18.7.4.
+- **Depends on:** 18.6.6, normalized selector/state contract in 18.7.4, and **merged 18.7.1** (amendment 2026-10-13: the producer state it must map has no home in the shared request types, and `types.rs`/`adapter.rs` are single-owner files).
 - **Spec:** Implement the continuation-completed `if(SinkF) call SetSSnk(...)` and guarded `if(lBact.and..not.lWat) call Exclusion(...)` consumers. Preserve source guards/order and arguments. Map required root/water/biology state, including `lActRSU` and sink arrays; do not implement producer algorithms. Missing external state must yield explicit unsupported before mutation, never a zero substitute.
 - **Do not touch:** external water/root producer, public API, fixtures, pinned source, or unrelated kernels.
 - **Anchors:** `SOLUTE.FOR:94–96`, `HYDRUS.FOR:345–355,390–391,482–487,513–517`, `INPUT.FOR:31,1313–1314`, and 18.6.6 evidence.

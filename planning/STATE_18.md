@@ -20,6 +20,13 @@ Plan: [EXECUTION_PLAN_18.md](EXECUTION_PLAN_18.md). Worker template: [PROMPT_TEM
 - [x] User approves this execution plan.
 - [ ] Full audited solute compatibility/parity gate passes before the default changes.
 
+## Wave 7 sequencing and worker-tier amendment — 2026-10-13
+
+- Wave 7 is now three sequenced sub-waves because `types.rs`/`adapter.rs` are single-owner files that 18.7.1, 18.7.3 and 18.7.8 each must extend: **7A** 18.7.1 ∥ 18.7.6, **7B** 18.7.2 ∥ 18.7.3, **7C** 18.7.5 ∥ 18.7.7 ∥ 18.7.8. 18.7.3 and 18.7.8 specs were re-scoped in `EXECUTION_PLAN_18.md` (escalation rule 4: shared-state additions are a decomposition gap, not ad hoc permission widening).
+- Green baseline re-recorded at `726662f`: `cargo test --workspace` — 179 passed, 0 failed; `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tools -p 'test_*.py'` — 291 passed, OK.
+- Worker-tier constraint: the `r9700` local server (`llama-cpp.service`, port 8001) is in a crash loop (`invalid device: ROCm0`, restart counter >4000), so the planned cheap/parallel worker tier is unavailable. Wave 7 workers run one at a time on the single reachable agent endpoint (`strata/qwen3.8-flash-next-unsloth-ud-iq4_xs`, the same engine as the orchestrator), which also caps practical concurrency below the approved three.
+- Fixed-form re-verification by the orchestrator: `src_reference/WATFLOW.FOR:44–46` (`call DualPor`) and `WATFLOW.FOR:1067–1068` (`WTransf` accumulation) are column-6 continuations, i.e. executable. The 18.6.6 correction stands.
+
 ## Wave board
 
 | Wave | Task | Deliverable | Status |
