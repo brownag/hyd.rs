@@ -57,10 +57,10 @@ Plan: [EXECUTION_PLAN_18.md](EXECUTION_PLAN_18.md). Worker template: [PROMPT_TEM
 | 6 | 18.6.6 | Fixed-form reachability re-audit | done; consistency review accepted |
 | 7 | 18.7.4 → 18.7.1–18.7.3, 18.7.5–18.7.8 | Selector mapping first, then endpoint/active kernels and fixtures | done 2026-10-14 (18.7.1–18.7.9) |
 | 7A | 18.7.1 | Primitive-input endpoint equations | done (commit `49192d7`) |
-| 7A | 18.7.6 | Explicit Fortran fixtures | blocked on Fortran fixtures (the Python blocker was stale and was cleared 2026-10-14) |
+| 7A | 18.7.6 | Dual-exchange fixtures | done (`80b7909`, repaired `fc4f050`) |
 | 7B | 18.7.3 | Dynamic dual-porosity transfer kernel | done (commit `716a7ea`) |
-| 7B | 18.7.2 | Exchange fixture | blocked with 18.7.6 (Fortran fixtures) |
-| 7C | 18.7.5 → 18.7.7 → 18.7.8 | Root-uptake fixture, kernel, then composed active path | 18.7.8 done (primitive-input; merge `60ee1b5`); 18.7.5 blocked on fixtures, 18.7.7 pending |
+| 7B | 18.7.2 | NEquil/SorbConc/rMD kernels | done (`05ae993`) |
+| 7C | 18.7.5, 18.7.7, 18.7.8 | Start-of-step MassTran, FluxConc fixture, source coupling | done (`5b17a70`, `2baeac0` repaired `fc4f050`, `60ee1b5`) |
 
 ## Active tasks
 
