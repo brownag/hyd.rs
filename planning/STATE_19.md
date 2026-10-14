@@ -1,7 +1,7 @@
 # State — Orchestration 19
 
 Plan status: **Approved by user on 2026-10-14 (“yes”).**
-Execution status: **Waves 0–5 done; Wave 6 next.** Open known defect D12 (serde array-as-struct in `adapter/transport.rs`) is owned by 19.6.1. 18.7.8 was reviewed, fixed and merged first (D10, `60ee1b5`), and Orchestration 18 is paused after it.
+Execution status: **Waves 0–6 done; Wave 7 next.** D12 closed by 19.6.1. 18.7.8 was reviewed, fixed and merged first (D10, `60ee1b5`), and Orchestration 18 is paused after it.
 Plan: [EXECUTION_PLAN_19.md](EXECUTION_PLAN_19.md). Worker template: [PROMPT_TEMPLATE_19.md](PROMPT_TEMPLATE_19.md).
 
 ## Baseline and guardrails
@@ -30,8 +30,8 @@ Plan: [EXECUTION_PLAN_19.md](EXECUTION_PLAN_19.md). Worker template: [PROMPT_TEM
 | 5 | 19.5.1 | serde decoding: reactions + transport properties | done (`e92e7bb`) |
 | 5 | 19.5.2 | serde decoding: nonequilibrium + biology + source coupling | done (`15ae09f`) |
 | 5 | 19.5.3 | One upper-boundary value in `WaterStepInput` | done (`65aea53`) |
-| 6 | 19.6.1 | Remove orphaned adapter decode helpers | pending |
-| 6 | 19.6.2 | Water step publishes the accepted water snapshot | pending |
+| 6 | 19.6.1 | Remove orphaned adapter decode helpers | done (`f465316`) |
+| 6 | 19.6.2 | Water step publishes the accepted water snapshot | done (`30f9134`) |
 | 7 | 19.7.1 | Closed `SoluteBackend` dispatch + contract tests | pending |
 | 7 | 19.7.2 | Amend Orchestration 18 for 19's changes | pending |
 
@@ -43,6 +43,7 @@ Plan: [EXECUTION_PLAN_19.md](EXECUTION_PLAN_19.md). Worker template: [PROMPT_TEM
 - (19.4.2, crate-private) `LowerBoundaryPlan`, `PreparedLowerBoundaryMode`, `LowerBoundaryRowStrategy` removed; `LowerBoundaryMode::prepare(self, count, minimum_pivot)` (no `row`); `prepare_step(LowerTrial)` returns the row.
 - (19.5.3) `WaterStepInput.upper_row` + `.upper_condition` + `.upper_boundary_flux` → `WaterStepInput.upper: UpperBoundary` (new public type: `Head { head, row, flux } | Flux { flux, row } | Atmospheric { critical_head }`). `Natural`/`Unsupported` upper inputs are removed.
 - (19.5.3) `WaterStepError::UnsupportedAtmosphericInput` → `WaterStepError::InvalidUpperBoundary { name }` (entry-point/variant mismatch).
+- (19.6.2) `AcceptedWaterSnapshot` moved `solute.rs` → `water_state.rs`; `hydrus_core::AcceptedWaterSnapshot` and `hydrus_core::solute::AcceptedWaterSnapshot` both still resolve. New: `WaterStepReport.water_contents`, `WaterStepReport.face_fluxes`, `WaterStepReport::accepted_water()`.
 - (19.3.3) `SoluteWorkspace::{trial_concentrations_mut, trial_kinetic_sorbed_mut, trial_boundary_mass_mut, set_trial_accepted_steps}` → `#[cfg(test)] pub(crate)`; `trial_reaction_mass_mut` → `pub(crate)` (no longer public).
 
 ## Verification
@@ -52,6 +53,7 @@ Plan: [EXECUTION_PLAN_19.md](EXECUTION_PLAN_19.md). Worker template: [PROMPT_TEM
 - Wave 3 (at `882fa87`): `cargo test --workspace` 229 passed / 0 failed / 1 ignored (`dump_parsed_fixtures`). Python first failed 4 tests in `test_solute_benchmark_bridge` with a `solute.rs` hash mismatch. Re-pinned under D11 in `882fa87` (bed1cd17… → 63f83901…); justification: the non-test `solute.rs` diff is five visibility/`#[cfg(test)]` lines and `tests/solute_*.rs` passes 53/0. Then Python 291 OK; fmt, clippy and diff-check clean.
 - Wave 4 (at `658e5be`): `cargo test --workspace` 236 passed / 0 failed / 1 ignored (229 + 7 `adapter::transport::tests`); Python 291 OK; fmt, clippy and diff-check clean.
 - Wave 5 (at `65aea53`): `cargo test --workspace` 264 passed / 0 failed / 1 ignored (236 + 5 from 19.5.1 + 23 from 19.5.2); `--lib solute_fortran_compat` 116 + 1 ignored. The merged `dump_parsed_fixtures` snapshot is identical to the pre-Wave-5 one (kept at `.development/19-snap/baseline.txt`). Python 291 OK; fmt, clippy and diff-check clean.
+- Wave 6 (at `7d4b71b`): `cargo test --workspace` 274 passed / 0 failed / 1 ignored (264 + 3 from 19.6.1 + 7 `water_solute_coupling`). `solute.rs` was re-pinned under D11 in `7d4b71b` (63f83901… → ab9fcca3…); justification: the `solute.rs` diff is the removal of the `AcceptedWaterSnapshot` definition plus one `pub use`, and `tests/solute_*.rs` passes 53/0. Snapshot identical to baseline; Python 291 OK; fmt, clippy and diff-check clean.
 
 ## Task reports
 
@@ -140,3 +142,16 @@ Plan: [EXECUTION_PLAN_19.md](EXECUTION_PLAN_19.md). Worker template: [PROMPT_TEM
 - `Flux` merges the row flux and balance flux into one `flux`. The worker checked that every `Neumann` site had identical values (all `0.0`, only in rejection tests).
 - `UpperBoundary::fixes_head()` is true for `Atmospheric`, as before.
 - Orchestrator literal audit: non-zero literals are identical and no assertion or tolerance changed. There are 12 more `0.0` from rows moved into variants.
+
+### 19.6.1 — done (`f465316`)
+- One `pub(super) fn require_object` is now in `fields.rs`; the five identical local copies are deleted. `transport.rs` has a `guard_wrapper_object` before `decode_unit_value` in `maybe_endpoint_state` and `maybe_transport_switches`; the orientation enum stays unguarded.
+- Three new tests: `rejects_array_as_endpoint_struct` (full 36-element tuple), `rejects_array_as_switches_struct` and `rejects_empty_array_as_switches_struct`. The orchestrator reproduced them failing with the guards disabled and passing with them restored. D12 is closed.
+- Deleted helpers: `as_u8` only. `mod.rs` has no group mappers, so nothing was inlined. `decode_object` and `legacy_text` were not hoisted (their bodies differ).
+- `--lib solute_fortran_compat` 116 → 119. Snapshot identical.
+
+### 19.6.2 — done (`30f9134`)
+- `AcceptedWaterSnapshot` moved verbatim into `water_state.rs` (the doc now says positive means toward the upper boundary, i.e. the last node). `WaterWorkspace.face_fluxes` is sized `node_count + 1` at construction and filled by `fill_face_fluxes` only after `balance` succeeds on the accepted trial.
+- Interior faces: `q = -K_face*(dh/dx + inclination_cosine)`. `K_face` uses the same arithmetic/geometric match as `stencil::face_conductivity` (checked identical) over `evaluated_conductivity` (the final assemble's K) and `trial_heads`.
+- Endpoints: `face_fluxes[0]` is the balance lower flux; `face_fluxes[n]` is the negated soil upper flux (soil flux on atmospheric steps). Both match the balance bitwise.
+- `tests/water_solute_coupling.rs` has 7 tests. They cover endpoints (bitwise), Σflux·dt vs storage, a water step followed by `advance_solute_step`, both public paths, and a per-cell balance at 1e-9 on a sloped non-uniform mesh with sinks (arithmetic, geometric, and atmospheric evaporation and ponding). The per-cell balance closed first time.
+- Gotcha for 18.10.1: in `Head`/`Flux` modes the caller-owned upper row defines the last cell's equation, so that cell balances only if the row is a true half-cell balance.
