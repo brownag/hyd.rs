@@ -1,5 +1,7 @@
 //! Scalar and unit-value field helpers.
 use super::super::types::*;
+use serde::de::{DeserializeOwned, IgnoredAny};
+use serde::{Deserialize, Deserializer};
 use serde_json::{Map, Value};
 
 pub(super) fn unit(v: &Value) -> Result<&str, String> {
@@ -161,4 +163,93 @@ pub(super) fn maybe_number_vec(
     units: &str,
 ) -> Result<Option<UnitValue<Vec<DefaultReal>>>, String> {
     unit_value(fields, name, units, |x| number_vec(x, name))
+}
+
+// Serde decoding. A mapper calls `decode_unit_value::<Dto>(fields, name, units)`
+// (units are checked first, as `unit_value` does), then `map_available` to convert
+// the DTO. In a DTO, mark every optional field `#[serde(default, deserialize_with =
+// "present")]` so an explicit `null` is rejected rather than read as absent, and
+// give required-with-default fields `#[serde(default = ...)]` on a non-Option type.
+
+/// Deserializes a field only when its key exists, so `null` is never "absent".
+pub(super) fn present<'de, T: Deserialize<'de>, D: Deserializer<'de>>(
+    d: D,
+) -> Result<Option<T>, D::Error> {
+    T::deserialize(d).map(Some)
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields, bound(deserialize = "T: Deserialize<'de>"))]
+struct Wire<T> {
+    units: String,
+    #[serde(default = "no_value", deserialize_with = "present")]
+    value: Option<T>,
+    availability: Option<String>,
+    reason: Option<String>,
+    #[allow(dead_code)]
+    provenance: Option<IgnoredAny>,
+}
+
+fn no_value<T>() -> Option<T> {
+    None
+}
+
+impl<'de, T: Deserialize<'de>> Deserialize<'de> for UnitValue<T> {
+    fn deserialize<D: Deserializer<'de>>(d: D) -> Result<Self, D::Error> {
+        use serde::de::Error;
+        let w = Wire::<T>::deserialize(d)?;
+        let value = match (w.value, w.availability, w.reason) {
+            (Some(v), _, _) => Explicit::Available(v),
+            (None, Some(availability), Some(reason)) => Explicit::Unavailable(UnavailableValue {
+                availability,
+                reason,
+            }),
+            _ => {
+                return Err(D::Error::custom(
+                    "unavailable field requires availability and reason",
+                ))
+            }
+        };
+        Ok(UnitValue {
+            units: w.units,
+            value,
+        })
+    }
+}
+
+pub(super) fn decode_unit_value<T: DeserializeOwned>(
+    fields: &Map<String, Value>,
+    name: &str,
+    units: &str,
+) -> Result<Option<UnitValue<T>>, String> {
+    let Some(v) = field_value(fields, name, units)? else {
+        return Ok(None);
+    };
+    serde_json::from_value(v.clone()).map(Some).map_err(|e| {
+        let text = e.to_string();
+        // Keep the pre-serde wording for unknown keys (`validate_object_keys`).
+        match text
+            .strip_prefix("unknown field `")
+            .and_then(|t| t.split_once('`'))
+        {
+            Some((key, _)) => format!("field {name}: unknown nested key {key}"),
+            None => format!("field {name}: {text}"),
+        }
+    })
+}
+
+pub(super) fn map_available<A, B>(
+    v: Option<UnitValue<A>>,
+    f: impl FnOnce(A) -> Result<B, String>,
+) -> Result<Option<UnitValue<B>>, String> {
+    v.map(|u| {
+        Ok(UnitValue {
+            units: u.units,
+            value: match u.value {
+                Explicit::Available(a) => Explicit::Available(f(a)?),
+                Explicit::Unavailable(x) => Explicit::Unavailable(x),
+            },
+        })
+    })
+    .transpose()
 }

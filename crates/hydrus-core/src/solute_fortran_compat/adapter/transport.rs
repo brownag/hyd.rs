@@ -1,217 +1,184 @@
 //! Transport record mappers and cross-field checks.
 use super::fields::*;
-use super::json_guard::validate_object_keys;
+use super::reactions::chpar_records;
 use super::*;
+use serde::de::IgnoredAny;
+use serde::Deserialize;
 use serde_json::{Map, Value};
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct EndpointDto {
+    coordinates: Vec<f64>,
+    old_water: Vec<f64>,
+    new_water: Vec<f64>,
+    old_velocity: Vec<f64>,
+    new_velocity: Vec<f64>,
+    old_dispersion: Vec<f64>,
+    new_dispersion: Vec<f64>,
+    old_retardation: Vec<f64>,
+    new_retardation: Vec<f64>,
+    old_concentration: Vec<f64>,
+    material_immobile_water: Vec<f64>,
+    source_g0: Vec<f64>,
+    source_g1: Vec<f64>,
+    upwind_weight: Vec<f64>,
+    epsi: f64,
+    dt: f64,
+    alf: f64,
+    #[serde(default, deserialize_with = "present")]
+    top_atmospheric_concentration: Option<f64>,
+    #[serde(default, deserialize_with = "present")]
+    top_surface_distance: Option<f64>,
+    #[serde(default, deserialize_with = "present")]
+    old_temperature: Option<f64>,
+    #[serde(default, deserialize_with = "present")]
+    new_temperature: Option<f64>,
+    #[serde(default, deserialize_with = "present")]
+    source_chpar: Option<Value>,
+    #[serde(default, deserialize_with = "present")]
+    source_tdep: Option<Vec<f64>>,
+    material_ids: Vec<usize>,
+    old_matrix_velocity: Vec<f64>,
+    new_matrix_velocity: Vec<f64>,
+    mobile_immobile: Vec<bool>,
+    #[serde(default = "one")]
+    source_species: usize,
+    #[serde(default)]
+    bacteria: bool,
+    #[serde(default)]
+    dual_porosity: u8,
+    bottom_resistance: f64,
+    bottom_prescribed: f64,
+    top_prescribed: f64,
+    new_accepted_concentration: Vec<f64>,
+    #[serde(default)]
+    t_level: i32,
+    #[serde(default)]
+    vapor: bool,
+    r_min: f64,
+}
+
+fn one() -> usize {
+    1
+}
+
+fn reals(v: Vec<f64>) -> Vec<DefaultReal> {
+    v.into_iter().map(DefaultReal::from_input).collect()
+}
+
+impl TryFrom<EndpointDto> for EndpointPrimitiveState {
+    type Error = String;
+    fn try_from(d: EndpointDto) -> Result<Self, String> {
+        let real = DefaultReal::from_input;
+        Ok(EndpointPrimitiveState {
+            coordinates: reals(d.coordinates),
+            old_water: reals(d.old_water),
+            new_water: reals(d.new_water),
+            old_velocity: reals(d.old_velocity),
+            new_velocity: reals(d.new_velocity),
+            old_dispersion: reals(d.old_dispersion),
+            new_dispersion: reals(d.new_dispersion),
+            old_retardation: reals(d.old_retardation),
+            new_retardation: reals(d.new_retardation),
+            old_concentration: reals(d.old_concentration),
+            material_immobile_water: reals(d.material_immobile_water),
+            source_g0: reals(d.source_g0),
+            source_g1: reals(d.source_g1),
+            upwind_weight: reals(d.upwind_weight),
+            epsi: real(d.epsi),
+            dt: real(d.dt),
+            alf: real(d.alf),
+            top_atmospheric_concentration: d.top_atmospheric_concentration.map(real),
+            top_surface_distance: d.top_surface_distance.map(real),
+            old_temperature: d.old_temperature.map(real),
+            new_temperature: d.new_temperature.map(real),
+            source_chpar: d
+                .source_chpar
+                .as_ref()
+                .map(|v| chpar_records(v, "endpoint_primitives.source_chpar"))
+                .transpose()?,
+            source_tdep: d.source_tdep.map(reals),
+            material_ids: d.material_ids,
+            mobile_immobile: d.mobile_immobile,
+            source_species: d.source_species,
+            bacteria: d.bacteria,
+            dual_porosity: d.dual_porosity,
+            bottom_resistance: real(d.bottom_resistance),
+            bottom_prescribed: real(d.bottom_prescribed),
+            top_prescribed: real(d.top_prescribed),
+            new_accepted_concentration: reals(d.new_accepted_concentration),
+            old_matrix_velocity: reals(d.old_matrix_velocity),
+            new_matrix_velocity: reals(d.new_matrix_velocity),
+            t_level: d.t_level,
+            vapor: d.vapor,
+            r_min: real(d.r_min),
+        })
+    }
+}
 
 pub(super) fn maybe_endpoint_state(
     fields: &Map<String, Value>,
 ) -> Result<Option<UnitValue<EndpointPrimitiveState>>, String> {
-    unit_value(
+    let dto = decode_unit_value::<EndpointDto>(
         fields,
         "endpoint_primitives",
         "source primitive endpoint state",
-        |x| {
-            let o = x
-                .as_object()
-                .ok_or("endpoint_primitives value must be an object")?;
-            let array = |name: &str| -> Result<Vec<DefaultReal>, String> {
-                number_vec(
-                    o.get(name)
-                        .ok_or_else(|| format!("endpoint_primitives.{name} missing"))?,
-                    name,
-                )
-            };
-            let scalar = |name: &str| -> Result<DefaultReal, String> {
-                Ok(DefaultReal::from_input(as_f64(
-                    o.get(name)
-                        .ok_or_else(|| format!("endpoint_primitives.{name} missing"))?,
-                    name,
-                )?))
-            };
-            validate_object_keys(
-                "endpoint_primitives",
-                o,
-                &[
-                    "coordinates",
-                    "old_water",
-                    "new_water",
-                    "old_velocity",
-                    "new_velocity",
-                    "old_dispersion",
-                    "new_dispersion",
-                    "old_retardation",
-                    "new_retardation",
-                    "old_concentration",
-                    "material_immobile_water",
-                    "source_g0",
-                    "source_g1",
-                    "upwind_weight",
-                    "epsi",
-                    "dt",
-                    "alf",
-                    "top_atmospheric_concentration",
-                    "top_surface_distance",
-                    "old_temperature",
-                    "new_temperature",
-                    "source_chpar",
-                    "source_tdep",
-                    "material_ids",
-                    "old_matrix_velocity",
-                    "new_matrix_velocity",
-                    "mobile_immobile",
-                    "source_species",
-                    "bacteria",
-                    "dual_porosity",
-                    "bottom_resistance",
-                    "bottom_prescribed",
-                    "top_prescribed",
-                    "new_accepted_concentration",
-                    "t_level",
-                    "vapor",
-                    "r_min",
-                ],
-            )?;
-            let opt_real = |name: &str| -> Result<Option<DefaultReal>, String> {
-                o.get(name)
-                    .map(|v| as_f64(v, name).map(DefaultReal::from_input))
-                    .transpose()
-            };
-            let source_chpar = o
-                .get("source_chpar")
-                .map(|v| chpar_records(v, "endpoint_primitives.source_chpar"))
-                .transpose()?;
-            let opt_vec = |name: &str| -> Result<Option<Vec<DefaultReal>>, String> {
-                o.get(name).map(|v| number_vec(v, name)).transpose()
-            };
-            let usize_vec = |name: &str| -> Result<Vec<usize>, String> {
-                o.get(name)
-                    .ok_or_else(|| format!("endpoint_primitives.{name} missing"))?
-                    .as_array()
-                    .ok_or_else(|| format!("endpoint_primitives.{name} must be an array"))?
-                    .iter()
-                    .map(|v| as_usize(v, name))
-                    .collect()
-            };
-            let bool_vec = |name: &str| -> Result<Vec<bool>, String> {
-                o.get(name)
-                    .ok_or_else(|| format!("endpoint_primitives.{name} missing"))?
-                    .as_array()
-                    .ok_or_else(|| format!("endpoint_primitives.{name} must be an array"))?
-                    .iter()
-                    .map(|v| as_bool(v, name))
-                    .collect()
-            };
-            Ok(EndpointPrimitiveState {
-                coordinates: array("coordinates")?,
-                old_water: array("old_water")?,
-                new_water: array("new_water")?,
-                old_velocity: array("old_velocity")?,
-                new_velocity: array("new_velocity")?,
-                old_dispersion: array("old_dispersion")?,
-                new_dispersion: array("new_dispersion")?,
-                old_retardation: array("old_retardation")?,
-                new_retardation: array("new_retardation")?,
-                old_concentration: array("old_concentration")?,
-                material_immobile_water: array("material_immobile_water")?,
-                source_g0: array("source_g0")?,
-                source_g1: array("source_g1")?,
-                upwind_weight: array("upwind_weight")?,
-                epsi: scalar("epsi")?,
-                dt: scalar("dt")?,
-                alf: scalar("alf")?,
-                top_atmospheric_concentration: opt_real("top_atmospheric_concentration")?,
-                top_surface_distance: opt_real("top_surface_distance")?,
-                old_temperature: opt_real("old_temperature")?,
-                new_temperature: opt_real("new_temperature")?,
-                source_chpar,
-                source_tdep: opt_vec("source_tdep")?,
-                material_ids: usize_vec("material_ids")?,
-                mobile_immobile: bool_vec("mobile_immobile")?,
-                source_species: o
-                    .get("source_species")
-                    .map(|v| as_usize(v, "source_species"))
-                    .transpose()?
-                    .unwrap_or(1),
-                bacteria: o
-                    .get("bacteria")
-                    .map(|v| as_bool(v, "bacteria"))
-                    .transpose()?
-                    .unwrap_or(false),
-                dual_porosity: o
-                    .get("dual_porosity")
-                    .map(|v| as_u8(v, "dual_porosity"))
-                    .transpose()?
-                    .unwrap_or(0),
-                bottom_resistance: scalar("bottom_resistance")?,
-                bottom_prescribed: scalar("bottom_prescribed")?,
-                top_prescribed: scalar("top_prescribed")?,
-                new_accepted_concentration: array("new_accepted_concentration")?,
-                old_matrix_velocity: array("old_matrix_velocity")?,
-                new_matrix_velocity: array("new_matrix_velocity")?,
-                t_level: o
-                    .get("t_level")
-                    .map(|v| as_i32(v, "t_level"))
-                    .transpose()?
-                    .unwrap_or(0),
-                vapor: o
-                    .get("vapor")
-                    .map(|v| as_bool(v, "endpoint_primitives.vapor"))
-                    .transpose()?
-                    .unwrap_or(false),
-                r_min: scalar("r_min")?,
-            })
-        },
-    )
+    )?;
+    map_available(dto, EndpointPrimitiveState::try_from)
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "kebab-case")]
+enum OrientationDto {
+    PositiveNative,
+    NegativeNative,
 }
 
 pub(super) fn maybe_orientation(
     fields: &Map<String, Value>,
     name: &str,
 ) -> Result<Option<UnitValue<FlowOrientation>>, String> {
-    unit_value(fields, name, "orientation", |x| {
-        match as_string(x, name)?.as_str() {
-            "positive-native" => Ok(FlowOrientation::PositiveNative),
-            "negative-native" => Ok(FlowOrientation::NegativeNative),
-            _ => Err("boundary.flow_orientation must be positive-native or negative-native".into()),
-        }
+    let dto = decode_unit_value::<OrientationDto>(fields, name, "orientation")?;
+    map_available(dto, |o| {
+        Ok(match o {
+            OrientationDto::PositiveNative => FlowOrientation::PositiveNative,
+            OrientationDto::NegativeNative => FlowOrientation::NegativeNative,
+        })
     })
+}
+
+#[derive(Deserialize, Default)]
+#[serde(deny_unknown_fields, default)]
+struct SwitchesDto {
+    #[serde(rename = "lArtD")]
+    art_d: bool,
+    #[serde(rename = "lTort")]
+    tort: bool,
+    // Accepted for compatibility; the value is not read.
+    #[serde(rename = "iTort")]
+    _i_tort: Option<IgnoredAny>,
+    #[serde(rename = "lTDep")]
+    t_dep: bool,
+    #[serde(rename = "lVapor")]
+    vapor: bool,
+    gas_terms: bool,
+    #[serde(rename = "lUpW")]
+    up_w: bool,
 }
 
 pub(super) fn maybe_transport_switches(
     fields: &Map<String, Value>,
 ) -> Result<Option<UnitValue<SourceSwitches>>, String> {
-    unit_value(fields, "transport_switches", "source flags", |x| {
-        let obj = x
-            .as_object()
-            .ok_or("transport_switches value must be an object")?;
-        validate_object_keys(
-            "transport_switches",
-            obj,
-            &[
-                "lArtD",
-                "lTort",
-                "iTort",
-                "lTDep",
-                "lVapor",
-                "gas_terms",
-                "lUpW",
-            ],
-        )?;
-        let flag = |n: &str| -> Result<bool, String> {
-            Ok(obj
-                .get(n)
-                .map(|v| as_bool(v, n))
-                .transpose()?
-                .unwrap_or(false))
-        };
+    let dto = decode_unit_value::<SwitchesDto>(fields, "transport_switches", "source flags")?;
+    map_available(dto, |d| {
         Ok(SourceSwitches {
-            upstream: flag("lUpW")?,
-            artificial_dispersion: flag("lArtD")?,
-            tortuosity: flag("lTort")?,
-            temperature: flag("lTDep")?,
-            vapor: flag("lVapor")?,
-            gas_terms: flag("gas_terms")?,
+            upstream: d.up_w,
+            artificial_dispersion: d.art_d,
+            tortuosity: d.tort,
+            temperature: d.t_dep,
+            vapor: d.vapor,
+            gas_terms: d.gas_terms,
             ..SourceSwitches::default()
         })
     })
@@ -310,4 +277,140 @@ pub(super) fn validate_endpoint_state(fields: &RequestFields) -> Result<(), Stri
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    fn endpoint(patch: Value) -> Map<String, Value> {
+        let a = json!([1.0, 2.0]);
+        let mut v = json!({
+            "coordinates": a, "old_water": a, "new_water": a, "old_velocity": a,
+            "new_velocity": a, "old_dispersion": a, "new_dispersion": a,
+            "old_retardation": a, "new_retardation": a, "old_concentration": a,
+            "material_immobile_water": a, "source_g0": a, "source_g1": a,
+            "upwind_weight": a, "epsi": 0.5, "dt": 1.0, "alf": 0.0,
+            "material_ids": [1, 1], "mobile_immobile": [false],
+            "bottom_resistance": 0.0, "bottom_prescribed": 0.0, "top_prescribed": 0.0,
+            "new_accepted_concentration": a, "old_matrix_velocity": a,
+            "new_matrix_velocity": a, "r_min": 1.0
+        });
+        for (k, x) in patch.as_object().unwrap() {
+            v[k] = x.clone();
+        }
+        let mut m = Map::new();
+        m.insert(
+            "endpoint_primitives".into(),
+            json!({"units": "source primitive endpoint state", "value": v}),
+        );
+        m
+    }
+
+    fn switches(value: Value) -> Map<String, Value> {
+        let mut m = Map::new();
+        m.insert(
+            "transport_switches".into(),
+            json!({"units": "source flags", "value": value}),
+        );
+        m
+    }
+
+    // `a|b` passes on either: old bodies named the nested key, serde names the request field.
+    fn err_has(r: Result<impl std::fmt::Debug, String>, needle: &str) {
+        let e = r.expect_err("must reject");
+        assert!(
+            needle.split('|').any(|n| e.contains(n)),
+            "{e:?} should name {needle}"
+        );
+    }
+
+    #[test]
+    fn accepts_valid_and_ignored_forms() {
+        let m = endpoint(json!({}));
+        assert!(maybe_endpoint_state(&m).unwrap().is_some());
+        let m = endpoint(json!({"source_species": 2, "t_level": -1}));
+        assert!(maybe_endpoint_state(&m).unwrap().is_some());
+        let mut m = switches(json!({"lUpW": true, "iTort": "anything"}));
+        m.get_mut("transport_switches").unwrap()["provenance"] = json!("x");
+        assert!(maybe_transport_switches(&m).unwrap().is_some());
+        let mut o = Map::new();
+        o.insert(
+            "o".into(),
+            json!({"units": "orientation", "value": "negative-native"}),
+        );
+        assert!(maybe_orientation(&o, "o").unwrap().is_some());
+    }
+
+    #[test]
+    fn rejects_explicit_null() {
+        err_has(
+            maybe_transport_switches(&switches(json!({"lUpW": null}))),
+            "lUpW|transport_switches",
+        );
+        err_has(
+            maybe_endpoint_state(&endpoint(json!({"t_level": null}))),
+            "t_level|endpoint_primitives",
+        );
+        let mut o = Map::new();
+        o.insert("o".into(), json!({"units": "orientation", "value": null}));
+        err_has(maybe_orientation(&o, "o"), "o");
+    }
+
+    #[test]
+    fn rejects_wrong_json_type() {
+        err_has(
+            maybe_transport_switches(&switches(json!({"lArtD": "yes"}))),
+            "lArtD|transport_switches",
+        );
+        err_has(
+            maybe_endpoint_state(&endpoint(json!({"epsi": "1"}))),
+            "epsi|endpoint_primitives",
+        );
+    }
+
+    #[test]
+    fn rejects_float_for_integer() {
+        err_has(
+            maybe_endpoint_state(&endpoint(json!({"source_species": 3.0}))),
+            "source_species|endpoint_primitives",
+        );
+        err_has(
+            maybe_endpoint_state(&endpoint(json!({"t_level": 1.5}))),
+            "t_level|endpoint_primitives",
+        );
+    }
+
+    #[test]
+    fn rejects_missing_units() {
+        let mut m = Map::new();
+        m.insert("transport_switches".into(), json!({"value": {}}));
+        err_has(maybe_transport_switches(&m), "units");
+    }
+
+    #[test]
+    fn rejects_unknown_nested_key() {
+        err_has(
+            maybe_transport_switches(&switches(json!({"bogus": true}))),
+            "bogus",
+        );
+        err_has(
+            maybe_endpoint_state(&endpoint(json!({"bogus": 1}))),
+            "bogus",
+        );
+    }
+
+    #[test]
+    fn rejects_missing_required_and_bad_orientation() {
+        let mut m = endpoint(json!({}));
+        m.get_mut("endpoint_primitives").unwrap()["value"]
+            .as_object_mut()
+            .unwrap()
+            .remove("epsi");
+        err_has(maybe_endpoint_state(&m), "epsi");
+        let mut o = Map::new();
+        o.insert("o".into(), json!({"units": "orientation", "value": ""}));
+        err_has(maybe_orientation(&o, "o"), "field o");
+    }
 }
