@@ -1,0 +1,143 @@
+{
+  "cases": {
+    "lflux_off": {
+      "input_sha256": {
+        "LEVEL_01.DIR": "eb4bd64f7014f7d42e9d358035802242741b974e8dfcd37c59f9c21ce29d781e",
+        "PROFILE.DAT": "f6f5e145d9ff03ed7e50bb1f72cae5943a03a0daaf634b6398f03256c3074703",
+        "SELECTOR.IN": "0d8d12648d66661b1d5ea423da48fc51fbbdfb8bf96400a3711af93ec6fe49ad"
+      },
+      "output_sha256_as_run": {
+        "BALANCE.OUT": "8ea85ca247ba6e125051949082ab331f9fa0df432e29429182e16a9703b6ecc7",
+        "I_CHECK.OUT": "03db151bbd350f040b3ca262084c646ac9b025ed52106592d82e263d8f5cd35b",
+        "NOD_INF.OUT": "4e062270efd3f5a3fb415df3b1952fd592b6cc5bcca11880eb666edce0510c2a",
+        "OBS_NODE.OUT": "f50f1334b40dc20ac52a2feb4e62f4f6d85896beef7e53ba1ec469d0581a0538",
+        "PROFILE.OUT": "ac2f8281d2a78c45f3ba7da67f544ad87e9c9ed03c593a014cd0626636ba50c6",
+        "RUN_INF.OUT": "8a0ba322e139bd7c968113f0e92c44e9e0e870c84cd7d6043cf8ea21dae67efa",
+        "T_LEVEL.OUT": "12120dfa7ea33df9a7f4a36245b337bf469cac270fcd8eae6387bebd390beb07",
+        "solute1.out": "898762a3e69bc3ed2d039aab246c527cc6ceb1c24caf535fb68aa56486fe1405"
+      },
+      "output_sha256_without_clock_line": {
+        "BALANCE.OUT": "3ecd2ff22d6e234c018444225f7788c70cb19aae8722bb788d8d9491120633bf",
+        "I_CHECK.OUT": "2a02d1970cf0c16c99725bb19b697088c88b1cb71c428fa6ce22f7f18853b93b",
+        "NOD_INF.OUT": "c2f3dffad133ec4b2016fd93e8dbe5ad647e1844cc16c8524f2c319bc470511b",
+        "OBS_NODE.OUT": "ae5b57b5ba09e30ceb56e285489fa732d330da04c17c3370df68ff93310fefc7",
+        "PROFILE.OUT": "6385ed5a8eb993584af466a61f73d782452d72785d9b30f6f3630437a8556356",
+        "RUN_INF.OUT": "ae3a1ae17ce56930b36467f039ca20b85a81adb1946d340a07c76f13fe35f9e5",
+        "T_LEVEL.OUT": "c8a2dedd3950daa2760287908bb52acad17a5ea5df4ea671f55757915a7365cc",
+        "solute1.out": "898762a3e69bc3ed2d039aab246c527cc6ceb1c24caf535fb68aa56486fe1405"
+      },
+      "request_sha256": "5f839a3fb38de58e97d5d470dbbcca89372e169a03fa29168bca8064d069bace",
+      "runner": {
+        "command": [
+          "hydrus-reference",
+          "flux_concentration_lflux_off"
+        ],
+        "compiler": "GNU Fortran (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0",
+        "executable_sha256": "e8b87a7eee6ef068082a1d9cdd88253921e2f31d6502df95b47138a657087e5b",
+        "flags": [
+          "-std=legacy",
+          "-ffixed-line-length-none"
+        ],
+        "host_architecture": "x86_64",
+        "host_os": "Linux-7.0.0-38-generic-x86_64-with-glibc2.39",
+        "patch_sha256": "622d1ea68285257e98a169f94dec83f3df1c671a9366f651e845806cb8c00d7e",
+        "source_and_archive_sha256": {
+          "planning/H1D_Src.zip": "d0c47cbcb7a298ab16c6e08010bd7ca048d5527ce2f989a749390c0c55e848cf",
+          "src_reference/HYDRUS.FOR": "fca01114a773b0ec9d614d17ed493a008bac82f23d22a187a10a4d4f48fbf3a9",
+          "src_reference/HYSTER.FOR": "29e4818a3b8c58a6698257a4ac4fa9df439ed43e983271423c7877a9cd9d8a67",
+          "src_reference/INPUT.FOR": "d29d073ac40611b9991f77416edcdbcf8d0affe01330675e5a08f66db1f52411",
+          "src_reference/MATERIAL.FOR": "a2a2beb4cd986946c6a0b61e31d92de9e776d9d4d9e3ee9bf9ccee1cbcb698ca",
+          "src_reference/OUTPUT.FOR": "66bed77a0375f2561c39e2d93d6e9765980dae8abdb48cd0a68c163e6a031f80",
+          "src_reference/SINK.FOR": "95afb5f6ae99e03478a08641e9bea77451f7beda7f0c3460fd12af3a36e7901f",
+          "src_reference/SOLUTE.FOR": "81fed6adbbd18aabe53385151166ab36d0df504a7939b54e10460c2254488910",
+          "src_reference/TEMPER.FOR": "ac7ff3fb20283b50265af65445413da0dd7d3dad814679c147c9acd0a8fc2ad3",
+          "src_reference/TIME.FOR": "8b6af595a1ccb3952cfa7b1eb56c0e37a1cfc6b8d55e26d8907288c41f08b92f",
+          "src_reference/WATFLOW.FOR": "e5591cebae4cbb44e8fe07520e08fc98c1522531c67753c0cc03fe2e164b5ef9"
+        }
+      }
+    },
+    "lflux_on": {
+      "input_sha256": {
+        "LEVEL_01.DIR": "eb4bd64f7014f7d42e9d358035802242741b974e8dfcd37c59f9c21ce29d781e",
+        "PROFILE.DAT": "f6f5e145d9ff03ed7e50bb1f72cae5943a03a0daaf634b6398f03256c3074703",
+        "SELECTOR.IN": "f86d65600808891671988685d745fe566c1ed08dabedb584fb661e474078b296"
+      },
+      "output_sha256_as_run": {
+        "BALANCE.OUT": "e67845f846870916edac3d2538896cdc09ac5b1517fdee6757bc089fb70f5d0a",
+        "I_CHECK.OUT": "325df6c168c67ffe8ad852ace1b5417edffe9b5773d34b218f8bba6865b27386",
+        "NOD_INF.OUT": "0f4c4bd5f83fab52e7b2b98cdf3ed3977782e9424573f594ec39485250089728",
+        "OBS_NODE.OUT": "fa9544510c18d36adb7db585133233dede5d80f946e040a62c21079e2ffd47f8",
+        "PROFILE.OUT": "69ccadd4c858a708efa8773ce7774a85ba43d2b2842e527b53f6b95a89f75271",
+        "RUN_INF.OUT": "207dbdac77e397f831c94aa162eaf09243f47fe2111c44c23d45038ad3c65577",
+        "T_LEVEL.OUT": "5be54773b771eb648a20cb63a2f2d2d8428b1267ac6e4ae85ec70fa59b4782bc",
+        "solute1.out": "f1afbc065364ff6ef30bd6cb152f1cc5a1d2b24b50a31b02ddeaee96979c2b0e"
+      },
+      "output_sha256_without_clock_line": {
+        "BALANCE.OUT": "3ecd2ff22d6e234c018444225f7788c70cb19aae8722bb788d8d9491120633bf",
+        "I_CHECK.OUT": "2a02d1970cf0c16c99725bb19b697088c88b1cb71c428fa6ce22f7f18853b93b",
+        "NOD_INF.OUT": "c2f3dffad133ec4b2016fd93e8dbe5ad647e1844cc16c8524f2c319bc470511b",
+        "OBS_NODE.OUT": "ea1504d01a47697d977b53bda4c1225364ca9a8eb75ab85ae079eb1b0fbc5e71",
+        "PROFILE.OUT": "6385ed5a8eb993584af466a61f73d782452d72785d9b30f6f3630437a8556356",
+        "RUN_INF.OUT": "ae3a1ae17ce56930b36467f039ca20b85a81adb1946d340a07c76f13fe35f9e5",
+        "T_LEVEL.OUT": "c8a2dedd3950daa2760287908bb52acad17a5ea5df4ea671f55757915a7365cc",
+        "solute1.out": "f1afbc065364ff6ef30bd6cb152f1cc5a1d2b24b50a31b02ddeaee96979c2b0e"
+      },
+      "request_sha256": "246c192ea767383a037500e9f36a19aaa32857c2b7eab5581623a7cb09f140cf",
+      "runner": {
+        "command": [
+          "hydrus-reference",
+          "flux_concentration_lflux_on"
+        ],
+        "compiler": "GNU Fortran (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0",
+        "executable_sha256": "47dce9a8f25fe9f9a9f4765071e6824e2a4ae8e0a9d17b42faa0a4bb97706f8e",
+        "flags": [
+          "-std=legacy",
+          "-ffixed-line-length-none"
+        ],
+        "host_architecture": "x86_64",
+        "host_os": "Linux-7.0.0-38-generic-x86_64-with-glibc2.39",
+        "patch_sha256": "622d1ea68285257e98a169f94dec83f3df1c671a9366f651e845806cb8c00d7e",
+        "source_and_archive_sha256": {
+          "planning/H1D_Src.zip": "d0c47cbcb7a298ab16c6e08010bd7ca048d5527ce2f989a749390c0c55e848cf",
+          "src_reference/HYDRUS.FOR": "fca01114a773b0ec9d614d17ed493a008bac82f23d22a187a10a4d4f48fbf3a9",
+          "src_reference/HYSTER.FOR": "29e4818a3b8c58a6698257a4ac4fa9df439ed43e983271423c7877a9cd9d8a67",
+          "src_reference/INPUT.FOR": "d29d073ac40611b9991f77416edcdbcf8d0affe01330675e5a08f66db1f52411",
+          "src_reference/MATERIAL.FOR": "a2a2beb4cd986946c6a0b61e31d92de9e776d9d4d9e3ee9bf9ccee1cbcb698ca",
+          "src_reference/OUTPUT.FOR": "66bed77a0375f2561c39e2d93d6e9765980dae8abdb48cd0a68c163e6a031f80",
+          "src_reference/SINK.FOR": "95afb5f6ae99e03478a08641e9bea77451f7beda7f0c3460fd12af3a36e7901f",
+          "src_reference/SOLUTE.FOR": "81fed6adbbd18aabe53385151166ab36d0df504a7939b54e10460c2254488910",
+          "src_reference/TEMPER.FOR": "ac7ff3fb20283b50265af65445413da0dd7d3dad814679c147c9acd0a8fc2ad3",
+          "src_reference/TIME.FOR": "8b6af595a1ccb3952cfa7b1eb56c0e37a1cfc6b8d55e26d8907288c41f08b92f",
+          "src_reference/WATFLOW.FOR": "e5591cebae4cbb44e8fe07520e08fc98c1522531c67753c0cc03fe2e164b5ef9"
+        }
+      }
+    }
+  },
+  "claim": "reference-only; no parity claim",
+  "schema_version": "flux-concentration-evidence-v1",
+  "selector_reach": {
+    "OBS_NODE_out_differing_columns_1based": [
+      4,
+      8,
+      12
+    ],
+    "deck_difference": "SELECTOR.IN line 12 only (lFluxes t vs f)",
+    "interpretation": "Cumulative columns 19/21/23 accumulate vNew*cNew*dt; cNew is set only by FluxConc (SOLUTE.FOR:1501), reached via iConcType=2. Their per-step increments differ from the printed resident vNew*Conc, so the FluxConc result is live; with lFlux off none of the added columns exist.",
+    "limitation": "FluxConc result itself is not printed per node/time; only these cumulative integrals depend on it. Direct cNew comparison is unavailable (blocker for any parity claim).",
+    "max_abs_diff_cumulative_flux_increment_vs_resident_flux": 0.04626,
+    "other_outputs_identical_except_clock_line": {
+      "BALANCE.OUT": true,
+      "I_CHECK.OUT": true,
+      "NOD_INF.OUT": true,
+      "PROFILE.OUT": true,
+      "RUN_INF.OUT": true,
+      "T_LEVEL.OUT": true
+    },
+    "solute1_out_columns": {
+      "added_columns_when_on": "18-23",
+      "first_17_columns_identical": true,
+      "lflux_off": 17,
+      "lflux_on": 23
+    }
+  }
+}

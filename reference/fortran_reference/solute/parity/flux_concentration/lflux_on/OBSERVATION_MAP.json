@@ -1,0 +1,185 @@
+{
+  "case_id": "lflux_on",
+  "differs_from_sibling": {
+    "OBS_NODE.OUT": "columns 4, 8 and 12 (temperature slot) hold water flux instead of 20.000",
+    "others": "BALANCE/I_CHECK/NOD_INF/PROFILE/RUN_INF/T_LEVEL identical apart from the clock line (line 3)",
+    "solute1.out": "lflux_on has 23 columns (cols 18-23 added); first 17 columns identical to lflux_off"
+  },
+  "observations": [
+    {
+      "field": "obs1_resident_flux",
+      "field_identity": "obs1_resident_flux",
+      "location_identity": {
+        "node": 3,
+        "species_name": "S1",
+        "species_position": 1,
+        "time_hour": "each solute1.out record"
+      },
+      "note": "vNew(Node(1))*Conc(1,Node(1)): printed with RESIDENT concentration, not flux concentration; present only when lFlux and NObs>=1",
+      "pool": "dissolved",
+      "raw_file": "solute1.out",
+      "source_column": 18,
+      "source_format": "OUTPUT.FOR format 190 (f14.4, 12e13.5, i8, e13.5, 8e13.5)",
+      "species_name": "S1",
+      "species_position": 1,
+      "units": "C_ref cm/hour"
+    },
+    {
+      "field": "obs1_cumulative_flux_conc_flux",
+      "field_identity": "obs1_cumulative_flux_conc_flux",
+      "location_identity": {
+        "node": 3,
+        "species_name": "S1",
+        "species_position": 1,
+        "time_hour": "each solute1.out record"
+      },
+      "note": "CumCh(7,1)+=vNew*cNew*dt with cNew the FluxConc result; time-integral, the only printed trace of flux concentration; present only when lFlux and NObs>=1",
+      "pool": "dissolved",
+      "raw_file": "solute1.out",
+      "source_column": 19,
+      "source_format": "OUTPUT.FOR format 190 (f14.4, 12e13.5, i8, e13.5, 8e13.5)",
+      "species_name": "S1",
+      "species_position": 1,
+      "units": "C_ref cm/hour*hour"
+    },
+    {
+      "field": "obs2_resident_flux",
+      "field_identity": "obs2_resident_flux",
+      "location_identity": {
+        "node": 5,
+        "species_name": "S1",
+        "species_position": 1,
+        "time_hour": "each solute1.out record"
+      },
+      "note": "vNew(Node(2))*Conc(1,Node(2)): printed with RESIDENT concentration, not flux concentration; present only when lFlux and NObs>=2",
+      "pool": "dissolved",
+      "raw_file": "solute1.out",
+      "source_column": 20,
+      "source_format": "OUTPUT.FOR format 190 (f14.4, 12e13.5, i8, e13.5, 8e13.5)",
+      "species_name": "S1",
+      "species_position": 1,
+      "units": "C_ref cm/hour"
+    },
+    {
+      "field": "obs2_cumulative_flux_conc_flux",
+      "field_identity": "obs2_cumulative_flux_conc_flux",
+      "location_identity": {
+        "node": 5,
+        "species_name": "S1",
+        "species_position": 1,
+        "time_hour": "each solute1.out record"
+      },
+      "note": "CumCh(8,1)+=vNew*cNew*dt with cNew the FluxConc result; time-integral, the only printed trace of flux concentration; present only when lFlux and NObs>=2",
+      "pool": "dissolved",
+      "raw_file": "solute1.out",
+      "source_column": 21,
+      "source_format": "OUTPUT.FOR format 190 (f14.4, 12e13.5, i8, e13.5, 8e13.5)",
+      "species_name": "S1",
+      "species_position": 1,
+      "units": "C_ref cm/hour*hour"
+    },
+    {
+      "field": "obs3_resident_flux",
+      "field_identity": "obs3_resident_flux",
+      "location_identity": {
+        "node": 7,
+        "species_name": "S1",
+        "species_position": 1,
+        "time_hour": "each solute1.out record"
+      },
+      "note": "vNew(Node(3))*Conc(1,Node(3)): printed with RESIDENT concentration, not flux concentration; present only when lFlux and NObs>=3",
+      "pool": "dissolved",
+      "raw_file": "solute1.out",
+      "source_column": 22,
+      "source_format": "OUTPUT.FOR format 190 (f14.4, 12e13.5, i8, e13.5, 8e13.5)",
+      "species_name": "S1",
+      "species_position": 1,
+      "units": "C_ref cm/hour"
+    },
+    {
+      "field": "obs3_cumulative_flux_conc_flux",
+      "field_identity": "obs3_cumulative_flux_conc_flux",
+      "location_identity": {
+        "node": 7,
+        "species_name": "S1",
+        "species_position": 1,
+        "time_hour": "each solute1.out record"
+      },
+      "note": "CumCh(9,1)+=vNew*cNew*dt with cNew the FluxConc result; time-integral, the only printed trace of flux concentration; present only when lFlux and NObs>=3",
+      "pool": "dissolved",
+      "raw_file": "solute1.out",
+      "source_column": 23,
+      "source_format": "OUTPUT.FOR format 190 (f14.4, 12e13.5, i8, e13.5, 8e13.5)",
+      "species_name": "S1",
+      "species_position": 1,
+      "units": "C_ref cm/hour*hour"
+    },
+    {
+      "field": "obs1_water_flux",
+      "field_identity": "obs1_water_flux",
+      "location_identity": {
+        "node": 3,
+        "time_hour": "each OBS_NODE.OUT row"
+      },
+      "note": "lFlux replaces the temperature slot with the water flux vNew (E-format); raw header text still reads \"Temp\"",
+      "pool": "hydraulic_or_thermal",
+      "raw_file": "OBS_NODE.OUT",
+      "source_column": 4,
+      "source_format": "OBS_NODE.OUT format (3f / e columns); confirm from raw output",
+      "species_name": "S1",
+      "species_position": 1,
+      "units": "cm/hour"
+    },
+    {
+      "field": "obs2_water_flux",
+      "field_identity": "obs2_water_flux",
+      "location_identity": {
+        "node": 5,
+        "time_hour": "each OBS_NODE.OUT row"
+      },
+      "note": "lFlux replaces the temperature slot with the water flux vNew (E-format); raw header text still reads \"Temp\"",
+      "pool": "hydraulic_or_thermal",
+      "raw_file": "OBS_NODE.OUT",
+      "source_column": 8,
+      "source_format": "OBS_NODE.OUT format (3f / e columns); confirm from raw output",
+      "species_name": "S1",
+      "species_position": 1,
+      "units": "cm/hour"
+    },
+    {
+      "field": "obs3_water_flux",
+      "field_identity": "obs3_water_flux",
+      "location_identity": {
+        "node": 7,
+        "time_hour": "each OBS_NODE.OUT row"
+      },
+      "note": "lFlux replaces the temperature slot with the water flux vNew (E-format); raw header text still reads \"Temp\"",
+      "pool": "hydraulic_or_thermal",
+      "raw_file": "OBS_NODE.OUT",
+      "source_column": 12,
+      "source_format": "OBS_NODE.OUT format (3f / e columns); confirm from raw output",
+      "species_name": "S1",
+      "species_position": 1,
+      "units": "cm/hour"
+    },
+    {
+      "availability": "unavailable",
+      "field": "flux_concentration_cNew_profile",
+      "field_identity": "flux_concentration_cNew_profile",
+      "location_identity": {
+        "node": "all",
+        "time_hour": "all"
+      },
+      "note": "",
+      "pool": "dissolved",
+      "raw_file": "none",
+      "reason": "FluxConc result (cNew/ConcF) is never written directly by the pinned OUTPUT.FOR; only the cumulative flux integrals of solute1.out columns 19/21/23 depend on it. No per-node, per-time flux concentration observation exists.",
+      "source_column": null,
+      "source_format": "OUTPUT.FOR format 190 (f14.4, 12e13.5, i8, e13.5, 8e13.5)",
+      "species_name": "S1",
+      "species_position": 1,
+      "units": "C_ref"
+    }
+  ],
+  "schema_version": "solute-observation-map-v1"
+}

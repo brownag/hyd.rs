@@ -1,0 +1,74 @@
+{
+  "case_id": "lflux_off",
+  "differs_from_sibling": {
+    "OBS_NODE.OUT": "columns 4, 8 and 12 (temperature slot) hold water flux instead of 20.000",
+    "others": "BALANCE/I_CHECK/NOD_INF/PROFILE/RUN_INF/T_LEVEL identical apart from the clock line (line 3)",
+    "solute1.out": "lflux_on has 23 columns (cols 18-23 added); first 17 columns identical to lflux_off"
+  },
+  "observations": [
+    {
+      "field": "obs1_temperature",
+      "field_identity": "obs1_temperature",
+      "location_identity": {
+        "node": 3,
+        "time_hour": "each OBS_NODE.OUT row"
+      },
+      "note": "temperature slot (lFlux off)",
+      "pool": "hydraulic_or_thermal",
+      "raw_file": "OBS_NODE.OUT",
+      "source_column": 4,
+      "source_format": "OBS_NODE.OUT format (3f / e columns); confirm from raw output",
+      "species_name": "S1",
+      "species_position": 1,
+      "units": "degC"
+    },
+    {
+      "field": "obs2_temperature",
+      "field_identity": "obs2_temperature",
+      "location_identity": {
+        "node": 5,
+        "time_hour": "each OBS_NODE.OUT row"
+      },
+      "note": "temperature slot (lFlux off)",
+      "pool": "hydraulic_or_thermal",
+      "raw_file": "OBS_NODE.OUT",
+      "source_column": 8,
+      "source_format": "OBS_NODE.OUT format (3f / e columns); confirm from raw output",
+      "species_name": "S1",
+      "species_position": 1,
+      "units": "degC"
+    },
+    {
+      "field": "obs3_temperature",
+      "field_identity": "obs3_temperature",
+      "location_identity": {
+        "node": 7,
+        "time_hour": "each OBS_NODE.OUT row"
+      },
+      "note": "temperature slot (lFlux off)",
+      "pool": "hydraulic_or_thermal",
+      "raw_file": "OBS_NODE.OUT",
+      "source_column": 12,
+      "source_format": "OBS_NODE.OUT format (3f / e columns); confirm from raw output",
+      "species_name": "S1",
+      "species_position": 1,
+      "units": "degC"
+    },
+    {
+      "availability": "unavailable",
+      "field": "obs_flux_columns",
+      "field_identity": "obs_flux_columns",
+      "location_identity": {},
+      "note": "",
+      "pool": "dissolved",
+      "raw_file": "solute1.out",
+      "reason": "mObs=0 when lFlux is false, so solute1.out columns 18-23 are not printed",
+      "source_column": null,
+      "source_format": "OUTPUT.FOR format 190 (f14.4, 12e13.5, i8, e13.5, 8e13.5)",
+      "species_name": "S1",
+      "species_position": 1,
+      "units": ""
+    }
+  ],
+  "schema_version": "solute-observation-map-v1"
+}
