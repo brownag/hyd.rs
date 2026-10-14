@@ -72,6 +72,18 @@ pub struct SourceSwitches {
     pub moisture_selector: u8,
     pub mass_initialization: bool,
     pub equilibrium_initialization: bool,
+    /// `SinkF`, the root-uptake selector of the `Site.dat` control record read at
+    /// `INPUT.FOR:31` (`read(30,*,err=901) lWat,lChem,lTemp,SinkF,lRoot,ShortO,
+    /// lWDep,` with `lScreen,AtmBC,lEquil` on the column-6 continuation `32`).
+    /// `SinkF` is assigned nowhere else in `src_reference`, so this is its single
+    /// home: it is the `SOLUTE.FOR:94` `if(SinkF)` call guard that the `SetSSnk`
+    /// continuation of `95-96` hangs from.
+    pub root_sink: bool,
+    /// `lWat`, the same control record's water-flow selector (`INPUT.FOR:31`) and
+    /// likewise assigned nowhere else. This is the single home of the second term
+    /// of the `HYDRUS.FOR:390` guard `if(lBact.and..not.lWat)`, so the `Exclusion`
+    /// call of the column-6 continuation `391` can only run when this is false.
+    pub water_flow: bool,
 }
 
 impl Default for SourceSwitches {
@@ -94,6 +106,8 @@ impl Default for SourceSwitches {
             moisture_selector: 0,
             mass_initialization: false,
             equilibrium_initialization: false,
+            root_sink: false,
+            water_flow: false,
         }
     }
 }
@@ -408,6 +422,117 @@ pub struct NonequilibriumInputs {
     pub initial_water_content: Option<UnitValue<Vec<DefaultReal>>>,
 }
 
+/// The primitive state `SetSSnk` receives (`SOLUTE.FOR:94-96` call, dummy list
+/// `SINK.FOR:138-139`). Field order is the dummy-argument order, and every field
+/// is a value the routine reads: the one array it writes, `SinkS` (`Solute`'s
+/// `sSink`), is an output of the port and is deliberately absent here.
+///
+/// Nothing here is derived. `Sink`, `Beta` and `x` come from the water-flow and
+/// root producers (`SetSnk` - `HYDRUS.FOR:352-355` and `482-487`, `SetRG`, the
+/// `Beta.in` reader), `Conc(jS,·)` is `Solute`'s own state, and `OmegaW`, `SPot`,
+/// `rKM`, `cMin`, `OmegaS` and `cRootMax` are `SinkIn` state read at
+/// `INPUT.FOR:1083-1085` and `1122-1126`. `INPUT.FOR:1696-1697` defaults `SPot=0.`
+/// and `OmegaW=1.` and `INPUT.FOR:1695` defaults `OmegaS=1.`, but `rKM` and `cMin`
+/// are never defaulted anywhere in `src_reference`; the port therefore requires all
+/// five explicitly instead of reusing a reader default as a substitute.
+#[derive(Clone, Debug, PartialEq)]
+pub struct RootUptakePrimitiveState {
+    /// `jS`, the species index `Solute` passes from its `do 18 jS=1,NS` loop
+    /// (`SOLUTE.FOR:51`); it selects `Conc(jS,·)` and guards the unit-78 record.
+    pub species: usize,
+    /// `NS`, the species count of the same loop.
+    pub species_count: usize,
+    /// `t` (`141`: `double precision t`), the only double-precision dummy. The
+    /// routine reads it once, in the `write(78,100)` of the column-6 continuation
+    /// `SINK.FOR:217`.
+    pub time: DoubleReal,
+    /// `x` (`138`), native node coordinates in source node order.
+    pub coordinates: Vec<DefaultReal>,
+    /// `Beta` (`138`), the root-length distribution; `Beta(i)<=0.` selects the
+    /// `212-214` branch that zeroes `SinkS(i)`.
+    pub root_distribution: Vec<DefaultReal>,
+    /// `Sink` (`138`), the root water uptake rate density produced by `SetSnk`.
+    pub root_water_sink: Vec<DefaultReal>,
+    /// `Conc(jS,·)` (`138`) as `Solute` holds it at `SOLUTE.FOR:95`, i.e. before
+    /// the isotherm iteration of `99` starts.
+    pub species_concentration: Vec<DefaultReal>,
+    /// `OmegaW` (`139`), the actual-to-potential transpiration ratio `SetSnk`
+    /// computes at `SINK.FOR:130`.
+    pub omega_water: DefaultReal,
+    /// `cRootMax` (`139`). The call passes the element `cRootMax(jS)`
+    /// (`SOLUTE.FOR:96`) into a scalar dummy, so this is one species' ceiling,
+    /// not the `NS` array - the same element-versus-array distinction as `FH`'s
+    /// `real Par(10)` in 18.7.3.
+    pub species_root_max_concentration: DefaultReal,
+    /// `lActRSU` (`139`), active root solute uptake. Read from the `Site.dat`
+    /// control record only for a version-4 deck (`INPUT.FOR:36-38`) and forced
+    /// false for a species chain (`INPUT.FOR:1122`); default false
+    /// (`INPUT.FOR:1680`). It selects `nStep` at `SINK.FOR:165-166`.
+    pub active_uptake: bool,
+    /// `OmegaS` (`139`), the solute stress index of `SINK.FOR:166`, `205-206`.
+    pub solute_stress_index: DefaultReal,
+    /// `SPot` (`139`), the potential root solute uptake of `SINK.FOR:194`.
+    pub potential_uptake: DefaultReal,
+    /// `rKM` (`139`), the Michaelis-Menten constant of `SINK.FOR:196`, `207-208`.
+    pub michaelis_constant: DefaultReal,
+    /// `cMin` (`139`), the concentration floor of `SINK.FOR:189`.
+    pub minimum_concentration: DefaultReal,
+}
+
+/// The primitive state `Exclusion` receives (`HYDRUS.FOR:390-391` call, dummy list
+/// `SOLUTE.FOR:1713-1714`), restricted to the values the routine actually reads.
+///
+/// Three omissions are deliberate and must not be "restored":
+/// * `ThOld`/`vOld` and `ThNew(i>1)`/`vNew(i>1)` are write-only (`1772-1777`);
+///   the routine reads only `ThNew(1)` (`1742`, `1744`) and `vNew(1)` (`1759`,
+///   `1762`), so carrying the other node values would be dead input.
+/// * `Par(3,1)` is read into `alpha` at `1729` but its only reader is `1766`, and
+///   `1765-1769` is dead because its sole consumer, `1770`, carries `c` in column 1.
+///   A dead store gets no input field.
+/// * `ChPar(4,1)` is both read (`1722`) and zeroed (`1724`); the value after the
+///   call is an output of the port, so only the incoming value is here.
+///
+/// `M=1` is hard-coded at `1721`, so the routine is single-material: `Par(·,1)` and
+/// `ChPar(·,1)` are the only columns it can reach.
+#[derive(Clone, Debug, PartialEq)]
+pub struct SizeExclusionPrimitiveState {
+    /// `NumNP` (`1713`), the loop bound of the `1772-1777` write loop.
+    pub nodes: usize,
+    /// `Par(1,1)`, `thr` (`1725`).
+    pub mobile_residual_water: DefaultReal,
+    /// `Par(2,1)`, `ths` (`1726`).
+    pub mobile_saturated_water: DefaultReal,
+    /// `Par(4,1)`, `vgn1` (`1730`) and the base of `vgn2`/`vgm1`/`vgm2`
+    /// (`1732-1734`).
+    pub mobile_n: DefaultReal,
+    /// `Par(6,1)`, `xL` (`1731`), the Mualem `l` path-length exponent of `1758`.
+    /// Every analytic water model fills `Par(6,M)` (`INPUT.FOR:611-629`,
+    /// `NPar>=6`), so this is always deck-supplied state.
+    pub mobile_tortuosity: DefaultReal,
+    /// `ChPar(4,1)`, `th_c` (`1722`): the water content from which colloids are
+    /// excluded. Same `ChPar` slot `MatSet` subtracts from both waters.
+    pub colloid_exclusion_water_content: DefaultReal,
+    /// `ThNew(1)` (`1742`, `1744`). `HYDRUS.FOR:384-389` copies `ThOld` into
+    /// `ThNew` immediately before the call, so this is the old-level water content.
+    pub first_node_new_water: DefaultReal,
+    /// `vNew(1)` (`1759`, `1762`), likewise just copied from `vOld` at `385`.
+    pub first_node_new_velocity: DefaultReal,
+}
+
+/// Selector and primitive-state group for the two source-coupling consumers.
+/// `control_switches` carries the two `Site.dat` guard logicals once (merged into
+/// `SourceSwitches` by the adapter), so a request cannot assert a guard value in a
+/// bundle that contradicts the control record and reach a call the source forbids.
+#[derive(Clone, Debug, PartialEq)]
+pub struct SourceCouplingInputs {
+    /// `lWat` and `SinkF` only, i.e. the subset of the `INPUT.FOR:31` control read
+    /// that guards `Exclusion` and `SetSSnk`. Parsed into the shared
+    /// `SourceSwitches` type so each flag keeps exactly one home.
+    pub control_switches: Option<UnitValue<SourceSwitches>>,
+    pub root_uptake_state: Option<UnitValue<RootUptakePrimitiveState>>,
+    pub size_exclusion_state: Option<UnitValue<SizeExclusionPrimitiveState>>,
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct BiologyModeRequest {
     pub i_bact: u8,
@@ -436,6 +561,7 @@ pub struct RequestFields {
     pub transport_properties: TransportPropertyInputs,
     pub nonequilibrium: NonequilibriumInputs,
     pub biology: BiologyInputs,
+    pub source_coupling: SourceCouplingInputs,
 }
 
 impl Default for RequestFields {
@@ -496,6 +622,11 @@ impl Default for RequestFields {
             biology: BiologyInputs {
                 mode: None,
                 parameters: None,
+            },
+            source_coupling: SourceCouplingInputs {
+                control_switches: None,
+                root_uptake_state: None,
+                size_exclusion_state: None,
             },
         }
     }

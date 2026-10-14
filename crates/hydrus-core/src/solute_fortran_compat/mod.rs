@@ -13,4 +13,5 @@ mod dual_domain;
 mod iteration;
 mod nonequilibrium;
 mod processes;
+mod source_coupling;
 mod transport;
