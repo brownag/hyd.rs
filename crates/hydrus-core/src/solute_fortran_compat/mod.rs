@@ -16,7 +16,9 @@ mod driver;
 #[allow(dead_code)] // wired by 18.10.1
 mod dual_domain;
 mod iteration;
+#[allow(dead_code)] // wired by 18.10.1
 mod nonequilibrium;
+#[allow(dead_code)] // wired by 18.10.1
 mod processes;
 #[allow(dead_code)] // wired by 18.10.1
 mod source_coupling;
