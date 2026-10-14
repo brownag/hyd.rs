@@ -65,10 +65,62 @@ pub struct WaterStepInput<'a> {
     pub face_averaging: FaceAveraging,
     /// Lower endpoint selection; fixed-head carries its row and measured exchange.
     pub lower: LowerBoundaryMode,
-    pub upper_row: BoundaryRow,
-    pub upper_condition: BoundaryCondition,
-    /// Signed water entering the domain through the upper endpoint.
-    pub upper_boundary_flux: f64,
+    /// Upper endpoint selection; each mode carries only the data it reads.
+    pub upper: UpperBoundary,
+}
+
+/// Physical upper-boundary selections supported by the transactional water solver.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum UpperBoundary {
+    /// Prescribe the top-node pressure head. `row` is the caller-supplied
+    /// upper row and `flux` the measured signed exchange, positive into the domain.
+    Head {
+        head: f64,
+        row: BoundaryRow,
+        flux: f64,
+    },
+    /// Prescribe signed water flux, positive into the domain, with the
+    /// caller-supplied upper row.
+    Flux { flux: f64, row: BoundaryRow },
+    /// Atmospheric flux/head switch; the row and exchange are derived each
+    /// trial and `critical_head` (`hCritA`) bounds the surface head.
+    Atmospheric { critical_head: f64 },
+}
+
+impl UpperBoundary {
+    /// Atmospheric mode counts as prescribed head, as its former Dirichlet critical head did.
+    pub(crate) fn fixes_head(self) -> bool {
+        matches!(self, Self::Head { .. } | Self::Atmospheric { .. })
+    }
+
+    /// Signed measured exchange that must be finite before a step starts.
+    pub(crate) fn measured_flux(self) -> Option<f64> {
+        match self {
+            Self::Head { flux, .. } | Self::Flux { flux, .. } => Some(flux),
+            Self::Atmospheric { .. } => None,
+        }
+    }
+
+    /// Condition and caller row for a non-atmospheric step.
+    fn caller_row(self) -> Result<(BoundaryCondition, BoundaryRow), WaterStepError> {
+        match self {
+            Self::Head { head, row, .. } => Ok((BoundaryCondition::Dirichlet { value: head }, row)),
+            Self::Flux { flux, row } => Ok((BoundaryCondition::Neumann { flux }, row)),
+            Self::Atmospheric { .. } => Err(WaterStepError::InvalidUpperBoundary {
+                name: "atmospheric upper boundary requires advance_atmospheric_step",
+            }),
+        }
+    }
+
+    /// The atmospheric critical head, required by the atmospheric step.
+    pub(crate) fn critical_head(self) -> Result<f64, WaterStepError> {
+        match self {
+            Self::Atmospheric { critical_head } => Ok(critical_head),
+            _ => Err(WaterStepError::InvalidUpperBoundary {
+                name: "advance_atmospheric_step requires UpperBoundary::Atmospheric",
+            }),
+        }
+    }
 }
 
 /// Accepted-step water-balance diagnostic, with all quantities per unit
@@ -292,8 +344,7 @@ fn solve_trial(
             }
             let next_water = next_evaluation.theta;
             let prescribed_head = (index == 0 && input.lower.fixes_head())
-                || (index == workspace.node_count() - 1
-                    && matches!(input.upper_condition, BoundaryCondition::Dirichlet { .. }));
+                || (index == workspace.node_count() - 1 && input.upper.fixes_head());
             if !prescribed_head {
                 head_residual = head_residual.max((next_head - previous_head).abs());
             }
@@ -389,21 +440,18 @@ fn assemble(
         prepared_lower.condition,
         minimum_pivot,
     )?;
-    let (upper_condition, upper_row, upper_mode) = if let Some(assembly) = atmospheric {
+    let (condition, row, upper_mode) = if let Some(assembly) = atmospheric {
         let plan = assembly.prepare_step(workspace, state, input, timestep)?;
         (plan.condition, plan.row, plan.mode)
     } else {
-        (
-            input.upper_condition,
-            input.upper_row,
-            state.atmospheric.upper_mode,
-        )
+        let (condition, row) = input.upper.caller_row()?;
+        (condition, row, state.atmospheric.upper_mode)
     };
     let upper = transform_boundary_row(
         count,
         BoundaryRowLocation::Upper,
-        upper_row,
-        upper_condition,
+        row,
+        condition,
         minimum_pivot,
     )?;
     workspace.lower[0] = lower.lower;
@@ -471,11 +519,11 @@ fn balance(
         soil_storage_change += (workspace.trial_water[node] - state.water_contents[node]) * width;
         sink_integral += workspace.trial_sink[node] * width;
     }
-    let upper_flux = atmospheric_flux.unwrap_or(input.upper_boundary_flux);
+    let upper_boundary_flux = input.upper.measured_flux().unwrap_or(0.0);
+    let upper_flux = atmospheric_flux.unwrap_or(upper_boundary_flux);
     let boundary_flux = (lower_boundary_flux + upper_flux) * timestep;
-    let soil_boundary_flux = (lower_boundary_flux
-        + soil_atmospheric_flux.unwrap_or(input.upper_boundary_flux))
-        * timestep;
+    let soil_boundary_flux =
+        (lower_boundary_flux + soil_atmospheric_flux.unwrap_or(upper_boundary_flux)) * timestep;
     let atmospheric_exchange = upper_flux * timestep;
     let sink = sink_integral * timestep;
     let storage_change = soil_storage_change + surface_storage_change;
@@ -544,11 +592,13 @@ fn validate(
     if let Some(root_uptake) = input.root_uptake {
         root_uptake.validate(count)?;
     }
-    match input.lower.measured_flux() {
-        Some(lower_flux) => {
-            validate_finite("boundary_fluxes", &[lower_flux, input.upper_boundary_flux])?
+    match (input.lower.measured_flux(), input.upper.measured_flux()) {
+        (Some(lower_flux), Some(upper_flux)) => {
+            validate_finite("boundary_fluxes", &[lower_flux, upper_flux])?
         }
-        None => validate_finite("boundary_fluxes", &[input.upper_boundary_flux])?,
+        (Some(lower_flux), None) => validate_finite("boundary_fluxes", &[lower_flux])?,
+        (None, Some(upper_flux)) => validate_finite("boundary_fluxes", &[upper_flux])?,
+        (None, None) => {}
     }
     for (name, value) in [
         ("timestep", input.timestep),
@@ -571,12 +621,15 @@ fn validate(
         });
     }
     input.lower.prepare(count, policy.minimum_pivot)?;
-    transform_boundary_row(
-        count,
-        BoundaryRowLocation::Upper,
-        input.upper_row,
-        input.upper_condition,
-        policy.minimum_pivot,
-    )?;
+    // Atmospheric rows are derived per trial, so only caller rows are checked.
+    if let Ok((condition, row)) = input.upper.caller_row() {
+        transform_boundary_row(
+            count,
+            BoundaryRowLocation::Upper,
+            row,
+            condition,
+            policy.minimum_pivot,
+        )?;
+    }
     Ok(())
 }

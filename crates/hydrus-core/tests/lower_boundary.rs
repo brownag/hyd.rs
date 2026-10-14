@@ -1,10 +1,9 @@
 use hydrus_core::hydraulics::{
-    BoundaryCondition, BoundaryRow, Evaluation, FaceAveraging, HydraulicDerivatives,
-    HydraulicModel, Mesh1D,
+    BoundaryRow, Evaluation, FaceAveraging, HydraulicDerivatives, HydraulicModel, Mesh1D,
 };
 use hydrus_core::{
     advance_water_step, HydraulicError, LowerBoundaryMode, UnsupportedLowerBoundaryMode,
-    WaterState, WaterStepError, WaterStepInput, WaterStepPolicy, WaterWorkspace,
+    UpperBoundary, WaterState, WaterStepError, WaterStepInput, WaterStepPolicy, WaterWorkspace,
 };
 
 mod common;
@@ -45,14 +44,16 @@ fn input<'a>(
         target_time: 0.25,
         face_averaging: FaceAveraging::Arithmetic,
         lower: mode,
-        upper_row: BoundaryRow {
-            lower: 0.0,
-            diagonal: 0.0,
-            upper: 0.0,
-            rhs: 0.0,
+        upper: UpperBoundary::Head {
+            head: 0.0,
+            row: BoundaryRow {
+                lower: 0.0,
+                diagonal: 0.0,
+                upper: 0.0,
+                rhs: 0.0,
+            },
+            flux: 0.0,
         },
-        upper_condition: BoundaryCondition::Dirichlet { value: 0.0 },
-        upper_boundary_flux: 0.0,
     }
 }
 

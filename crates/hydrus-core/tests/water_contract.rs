@@ -1,9 +1,9 @@
 use hydrus_core::hydraulics::{
-    BoundaryCondition, BoundaryRow, Evaluation, FaceAveraging, HydraulicDerivatives, Mesh1D,
+    BoundaryRow, Evaluation, FaceAveraging, HydraulicDerivatives, Mesh1D,
 };
 use hydrus_core::{
     advance_water_step, HydraulicError, HydraulicModel, HydraulicModelSelector, LowerBoundaryMode,
-    WaterProductConfig, WaterState, WaterStepError, WaterStepInput, WaterStepPolicy,
+    UpperBoundary, WaterProductConfig, WaterState, WaterStepError, WaterStepInput, WaterStepPolicy,
     WaterWorkspace,
 };
 
@@ -77,14 +77,16 @@ fn invalid_dimensions_do_not_mutate_accepted_state() {
             },
             flux: 0.0,
         },
-        upper_row: BoundaryRow {
-            lower: 0.0,
-            diagonal: 0.0,
-            upper: 0.0,
-            rhs: 0.0,
+        upper: UpperBoundary::Head {
+            head: 2.0,
+            row: BoundaryRow {
+                lower: 0.0,
+                diagonal: 0.0,
+                upper: 0.0,
+                rhs: 0.0,
+            },
+            flux: 0.0,
         },
-        upper_condition: BoundaryCondition::Dirichlet { value: 2.0 },
-        upper_boundary_flux: 0.0,
     };
     let policy = WaterStepPolicy {
         max_iterations: 2,

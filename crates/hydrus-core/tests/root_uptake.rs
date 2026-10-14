@@ -1,9 +1,7 @@
-use hydrus_core::hydraulics::{
-    BoundaryCondition, Evaluation, HydraulicDerivatives, HydraulicModel, Mesh1D,
-};
+use hydrus_core::hydraulics::{Evaluation, HydraulicDerivatives, HydraulicModel, Mesh1D};
 use hydrus_core::{
     advance_water_step, feddes_reduction, LowerBoundaryMode, RootUptakeInput, RootUptakeModel,
-    WaterState, WaterStepError, WaterStepInput, WaterStepPolicy, WaterWorkspace,
+    UpperBoundary, WaterState, WaterStepError, WaterStepInput, WaterStepPolicy, WaterWorkspace,
 };
 
 struct LinearModel {
@@ -69,14 +67,16 @@ fn step_input<'a>(
             },
             flux: 0.0,
         },
-        upper_row: hydrus_core::hydraulics::BoundaryRow {
-            lower: 0.0,
-            diagonal: 0.0,
-            upper: 0.0,
-            rhs: 0.0,
+        upper: UpperBoundary::Head {
+            head: 0.0,
+            row: hydrus_core::hydraulics::BoundaryRow {
+                lower: 0.0,
+                diagonal: 0.0,
+                upper: 0.0,
+                rhs: 0.0,
+            },
+            flux: 0.0,
         },
-        upper_condition: BoundaryCondition::Dirichlet { value: 0.0 },
-        upper_boundary_flux: 0.0,
     }
 }
 

@@ -1,11 +1,10 @@
 use hydrus_core::hydraulics::{
-    BoundaryCondition, BoundaryRow, Evaluation, FaceAveraging, HydraulicDerivatives,
-    HydraulicModel, Mesh1D,
+    BoundaryRow, Evaluation, FaceAveraging, HydraulicDerivatives, HydraulicModel, Mesh1D,
 };
 use hydrus_core::{
     advance_atmospheric_step, AtmosphericRates, ForcingEvent, ForcingSchedule, ForcingUnits,
-    HydraulicError, LowerBoundaryMode, UpperBoundaryMode, WaterState, WaterStepError,
-    WaterStepInput, WaterStepPolicy, WaterWorkspace,
+    HydraulicError, LowerBoundaryMode, UpperBoundary, UpperBoundaryMode, WaterState,
+    WaterStepError, WaterStepInput, WaterStepPolicy, WaterWorkspace,
 };
 
 mod common;
@@ -54,14 +53,7 @@ fn setup<'a>(
             },
             flux: 0.0,
         },
-        upper_row: BoundaryRow {
-            lower: 0.0,
-            diagonal: 1.0,
-            upper: 0.0,
-            rhs: 0.0,
-        },
-        upper_condition: BoundaryCondition::Dirichlet { value: 0.0 },
-        upper_boundary_flux: 0.0,
+        upper: UpperBoundary::Atmospheric { critical_head: 0.0 },
     }
 }
 
@@ -122,7 +114,7 @@ fn isolated_atmospheric_flux_row_accepts_demand_limited_flux() {
     no_flow_lower(&mut input);
     input.timestep = 1.0;
     input.target_time = 1.0;
-    input.upper_condition = BoundaryCondition::Dirichlet { value: 0.1 };
+    input.upper = UpperBoundary::Atmospheric { critical_head: 0.1 };
     let mut state = WaterState::new(0.0, vec![0.0; 3], vec![0.2; 3]).unwrap();
     let mut workspace =
         WaterWorkspace::with_transition_capacity(3, policy().max_iterations).unwrap();
@@ -159,7 +151,7 @@ fn isolated_ponded_head_row_matches_discrete_top_flux_and_balance() {
     no_flow_lower(&mut input);
     input.timestep = 1.0;
     input.target_time = 1.0;
-    input.upper_condition = BoundaryCondition::Dirichlet { value: 0.1 };
+    input.upper = UpperBoundary::Atmospheric { critical_head: 0.1 };
     let mut state = WaterState::new(0.0, vec![0.0; 3], vec![0.2; 3]).unwrap();
     let old_top_water = state.water_contents()[2];
     let mut workspace =
@@ -221,7 +213,7 @@ fn accepted_rain_infiltrates_then_excess_builds_ponded_storage() {
     no_flow_lower(&mut input);
     input.timestep = 1.0;
     input.target_time = 1.0;
-    input.upper_condition = BoundaryCondition::Dirichlet { value: 0.1 };
+    input.upper = UpperBoundary::Atmospheric { critical_head: 0.1 };
     let mut state = WaterState::new(0.0, vec![0.0; 3], vec![0.2; 3]).unwrap();
     let mut workspace =
         WaterWorkspace::with_transition_capacity(3, policy().max_iterations).unwrap();
@@ -298,7 +290,9 @@ fn accepted_evaporation_is_limited_by_soil_supply_and_balanced() {
     no_flow_lower(&mut input);
     input.timestep = 1.0;
     input.target_time = 1.0;
-    input.upper_condition = BoundaryCondition::Dirichlet { value: -0.01 };
+    input.upper = UpperBoundary::Atmospheric {
+        critical_head: -0.01,
+    };
     let mut state = WaterState::new(0.0, vec![0.0; 3], vec![0.2; 3]).unwrap();
     let mut workspace =
         WaterWorkspace::with_transition_capacity(3, policy().max_iterations).unwrap();
@@ -357,7 +351,9 @@ fn clips_to_event_then_advances_cursor_only_after_acceptance() {
     assert_eq!(state.atmospheric().event_cursor, 1);
     input.target_time = 2.0;
     input.timestep = 1.0;
-    input.upper_condition = BoundaryCondition::Dirichlet { value: 1000.0 };
+    input.upper = UpperBoundary::Atmospheric {
+        critical_head: 1000.0,
+    };
     let second =
         advance_atmospheric_step(&mut state, &mut workspace, input, policy(), &schedule()).unwrap();
     assert_eq!(second.accepted_time, 2.0);
@@ -376,7 +372,9 @@ fn dry_surface_keeps_evaporative_demand_as_a_negative_flux() {
     let materials: [&dyn HydraulicModel; 1] = [&model];
     let sink = [0.0; 3];
     let mut input = setup(&mesh, &materials, &sink);
-    input.upper_condition = BoundaryCondition::Dirichlet { value: -1000.0 };
+    input.upper = UpperBoundary::Atmospheric {
+        critical_head: -1000.0,
+    };
     let schedule = ForcingSchedule::new(
         AtmosphericRates {
             precipitation: 0.0,
@@ -444,13 +442,21 @@ fn unsupported_upper_boundary_kind_is_rejected() {
     let materials: [&dyn HydraulicModel; 1] = [&model];
     let sink = [0.0; 3];
     let mut input = setup(&mesh, &materials, &sink);
-    input.upper_condition = BoundaryCondition::Neumann { flux: 0.0 };
+    input.upper = UpperBoundary::Flux {
+        flux: 0.0,
+        row: BoundaryRow {
+            lower: 0.0,
+            diagonal: 1.0,
+            upper: 0.0,
+            rhs: 0.0,
+        },
+    };
     let mut state = WaterState::new(0.0, vec![0.0; 3], vec![0.2; 3]).unwrap();
     let mut workspace =
         WaterWorkspace::with_transition_capacity(3, policy().max_iterations).unwrap();
     assert!(matches!(
         advance_atmospheric_step(&mut state, &mut workspace, input, policy(), &schedule()),
-        Err(WaterStepError::UnsupportedAtmosphericInput { .. })
+        Err(WaterStepError::InvalidUpperBoundary { .. })
     ));
 }
 
@@ -536,7 +542,7 @@ fn rejected_evaporation_trial_does_not_promote_mode_or_storage() {
     let materials: [&dyn HydraulicModel; 1] = [&model];
     let sink = [0.0; 3];
     let mut input = setup(&mesh, &materials, &sink);
-    input.upper_condition = BoundaryCondition::Dirichlet { value: 1.0 };
+    input.upper = UpperBoundary::Atmospheric { critical_head: 1.0 };
     let schedule = ForcingSchedule::new(
         AtmosphericRates {
             precipitation: 0.0,

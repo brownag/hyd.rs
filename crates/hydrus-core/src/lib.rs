@@ -27,7 +27,7 @@ pub use solute::{
     SoluteWorkspace,
 };
 pub use water_solver::{
-    advance_water_step, WaterBalance, WaterProductConfig, WaterStepInput, WaterStepPolicy,
-    WaterStepReport,
+    advance_water_step, UpperBoundary, WaterBalance, WaterProductConfig, WaterStepInput,
+    WaterStepPolicy, WaterStepReport,
 };
 pub use water_state::{WaterAccounting, WaterState, WaterWorkspace};

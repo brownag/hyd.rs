@@ -11,14 +11,13 @@
 //! positive sink is extraction. No calibrated trajectory, universal tolerance,
 //! or executable parity is asserted.
 use hydrus_core::hydraulics::{
-    BoundaryCondition, BoundaryRow, Evaluation, FaceAveraging, HydraulicDerivatives,
-    HydraulicModel, Mesh1D,
+    BoundaryRow, Evaluation, FaceAveraging, HydraulicDerivatives, HydraulicModel, Mesh1D,
 };
 use hydrus_core::{
     advance_atmospheric_step, advance_water_step, feddes_reduction, AtmosphericRates, ForcingEvent,
     ForcingSchedule, ForcingUnits, HydraulicError, LowerBoundaryMode, RootUptakeInput,
-    RootUptakeModel, UnsupportedLowerBoundaryMode, UpperBoundaryMode, WaterState, WaterStepError,
-    WaterStepInput, WaterStepPolicy, WaterWorkspace,
+    RootUptakeModel, UnsupportedLowerBoundaryMode, UpperBoundary, UpperBoundaryMode, WaterState,
+    WaterStepError, WaterStepInput, WaterStepPolicy, WaterWorkspace,
 };
 
 mod common;
@@ -72,14 +71,7 @@ fn input<'a>(
         target_time,
         face_averaging: FaceAveraging::Arithmetic,
         lower: LowerBoundaryMode::PrescribedFlux { flux: 0.0 },
-        upper_row: BoundaryRow {
-            lower: 0.0,
-            diagonal: 0.0,
-            upper: 0.0,
-            rhs: 0.0,
-        },
-        upper_condition: BoundaryCondition::Dirichlet { value: 0.1 },
-        upper_boundary_flux: 0.0,
+        upper: UpperBoundary::Atmospheric { critical_head: 0.1 },
     }
 }
 
@@ -111,7 +103,7 @@ fn dry_column_infiltration_has_bounded_state_and_closes_balance() {
     let materials: [&dyn HydraulicModel; 1] = [&model];
     let sink = [0.0; 3];
     let mut request = input(&mesh, &materials, &sink, 1.0, None);
-    request.upper_condition = BoundaryCondition::Dirichlet { value: 0.1 };
+    request.upper = UpperBoundary::Atmospheric { critical_head: 0.1 };
     let mut state = WaterState::new(0.0, vec![-1.0; 3], vec![0.9; 3]).unwrap();
     let mut workspace =
         WaterWorkspace::with_transition_capacity(3, policy().max_iterations).unwrap();
@@ -159,7 +151,16 @@ fn capillary_rise_moves_water_up_from_a_fixed_head_lower_boundary() {
         },
         flux: 0.8333333333333331,
     };
-    request.upper_condition = BoundaryCondition::Dirichlet { value: -1.0 };
+    request.upper = UpperBoundary::Head {
+        head: -1.0,
+        row: BoundaryRow {
+            lower: 0.0,
+            diagonal: 0.0,
+            upper: 0.0,
+            rhs: 0.0,
+        },
+        flux: 0.0,
+    };
     let mut state = WaterState::new(0.0, vec![-1.0; 3], vec![0.9; 3]).unwrap();
     let mut workspace = WaterWorkspace::new(3).unwrap();
 
@@ -184,7 +185,7 @@ fn cyclic_atmosphere_clips_events_switches_modes_and_rolls_back_rejected_trial()
     let sink = [0.0; 3];
     let mut request = input(&mesh, &materials, &sink, 1.0, None);
     request.timestep = 1.0;
-    request.upper_condition = BoundaryCondition::Dirichlet { value: 0.1 };
+    request.upper = UpperBoundary::Atmospheric { critical_head: 0.1 };
     let mut state = WaterState::new(0.0, vec![0.0; 3], vec![1.0; 3]).unwrap();
     let mut workspace =
         WaterWorkspace::with_transition_capacity(3, policy().max_iterations).unwrap();
@@ -227,20 +228,19 @@ fn cyclic_atmosphere_clips_events_switches_modes_and_rolls_back_rejected_trial()
     let accepted = state.clone();
     request.timestep = 1.0;
     request.target_time = 2.0;
-    request.upper_condition = BoundaryCondition::Neumann { flux: 0.0 };
-    request.upper_row = BoundaryRow {
-        lower: 0.0,
-        diagonal: 1.0,
-        upper: 0.0,
-        rhs: 0.0,
+    request.upper = UpperBoundary::Flux {
+        flux: 0.0,
+        row: BoundaryRow {
+            lower: 0.0,
+            diagonal: 1.0,
+            upper: 0.0,
+            rhs: 0.0,
+        },
     };
     let rejected =
         advance_atmospheric_step(&mut state, &mut workspace, request, policy(), &forcing);
     assert!(
-        matches!(
-            rejected,
-            Err(WaterStepError::UnsupportedAtmosphericInput { .. })
-        ),
+        matches!(rejected, Err(WaterStepError::InvalidUpperBoundary { .. })),
         "{rejected:?}"
     );
     assert_eq!(state, accepted);
@@ -269,7 +269,7 @@ fn cyclic_atmosphere_with_feddes_compensation_has_positive_sink_and_closes_balan
         root_weights: &weights,
     };
     let mut request = input(&mesh, &materials, &sink, 0.5, Some(&roots));
-    request.upper_condition = BoundaryCondition::Dirichlet { value: 0.1 };
+    request.upper = UpperBoundary::Atmospheric { critical_head: 0.1 };
     let mut state = WaterState::new(0.0, vec![-2.0; 3], vec![0.8; 3]).unwrap();
     let mut workspace =
         WaterWorkspace::with_transition_capacity(3, policy().max_iterations).unwrap();

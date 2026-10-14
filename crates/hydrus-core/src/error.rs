@@ -106,8 +106,8 @@ pub enum WaterStepError {
     UnsupportedLowerBoundary {
         mode: &'static str,
     },
-    /// Atmospheric APIs currently require a caller-declared Dirichlet critical head.
-    UnsupportedAtmosphericInput {
+    /// The upper boundary variant does not match the step entry point.
+    InvalidUpperBoundary {
         name: &'static str,
     },
     InvalidRootUptake {
@@ -181,8 +181,8 @@ impl fmt::Display for WaterStepError {
             Self::UnsupportedLowerBoundary { mode } => {
                 write!(formatter, "unsupported lower boundary mode: {mode}")
             }
-            Self::UnsupportedAtmosphericInput { name } => {
-                write!(formatter, "unsupported atmospheric input: {name}")
+            Self::InvalidUpperBoundary { name } => {
+                write!(formatter, "invalid upper boundary parameter: {name}")
             }
             Self::InvalidRootUptake { name } => {
                 write!(formatter, "invalid root-uptake input: {name}")

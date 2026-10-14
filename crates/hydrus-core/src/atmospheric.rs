@@ -48,8 +48,8 @@ impl Default for AtmosphericState {
 
 /// Advances to the earlier of the requested target and next forcing event.
 /// The schedule uses caller-declared time and depth-rate units without conversion.
-/// `input.upper_condition` must be `Dirichlet`; its value is the caller-declared
-/// critical head used by the upper flux/head switch. Its
+/// `input.upper` must be `UpperBoundary::Atmospheric`; its `critical_head` is the
+/// caller-declared critical head used by the upper flux/head switch. Its
 /// physical interpretation for evaporation remains unresolved by available
 /// source evidence.
 pub fn advance_atmospheric_step<'a>(
@@ -137,7 +137,7 @@ impl AtmosphericAssembly {
         let head = workspace.trial_heads[count - 1];
         let demand = net_flux(rates);
         let flux = top_flux(workspace, state, input, timestep);
-        let critical_head = critical_head(input.upper_condition)?;
+        let critical_head = input.upper.critical_head()?;
         let mode = select_mode(
             current_upper_mode,
             demand,
@@ -181,7 +181,7 @@ pub(crate) fn decide_transition(
     let ponded_depth = (state.atmospheric.ponded_depth + (demand - soil_flux) * timestep).max(0.0);
     let atmospheric_exchange =
         soil_flux + (ponded_depth - state.atmospheric.ponded_depth) / timestep;
-    let critical_head = critical_head(input.upper_condition)?;
+    let critical_head = input.upper.critical_head()?;
     let next_mode = select_mode(
         upper_mode,
         demand,
@@ -212,16 +212,6 @@ pub(crate) fn decide_transition(
         atmospheric_exchange,
         stable,
     })
-}
-
-/// The caller-declared critical head (`hCritA`) is carried by a Dirichlet upper condition.
-fn critical_head(condition: BoundaryCondition) -> Result<f64, WaterStepError> {
-    match condition {
-        BoundaryCondition::Dirichlet { value } => Ok(value),
-        _ => Err(WaterStepError::UnsupportedAtmosphericInput {
-            name: "upper_condition must declare the atmospheric critical head with Dirichlet",
-        }),
-    }
 }
 
 fn top_flux(
@@ -330,7 +320,7 @@ mod tests {
     use crate::hydraulics::{
         Evaluation, FaceAveraging, HydraulicDerivatives, HydraulicModel, Mesh1D,
     };
-    use crate::{HydraulicError, LowerBoundaryMode};
+    use crate::{HydraulicError, LowerBoundaryMode, UpperBoundary};
 
     struct LinearModel;
 
@@ -362,7 +352,7 @@ mod tests {
         mesh: &'a Mesh1D,
         materials: &'a [&'a dyn HydraulicModel],
         sink: &'a [f64],
-        upper_condition: BoundaryCondition,
+        upper: UpperBoundary,
     ) -> WaterStepInput<'a> {
         WaterStepInput {
             mesh,
@@ -377,9 +367,7 @@ mod tests {
                 row: ROW,
                 flux: 0.0,
             },
-            upper_row: ROW,
-            upper_condition,
-            upper_boundary_flux: 0.0,
+            upper,
         }
     }
 
@@ -422,7 +410,7 @@ mod tests {
             &mesh,
             &materials,
             &sink,
-            BoundaryCondition::Dirichlet { value: 0.0 },
+            UpperBoundary::Atmospheric { critical_head: 0.0 },
         );
         // Onset: top head above critical under infiltration leaves flux mode.
         let state = WaterState::new(0.0, vec![0.0; 3], vec![0.2; 3]).unwrap();
@@ -462,7 +450,7 @@ mod tests {
     }
 
     #[test]
-    fn prepare_step_requires_dirichlet_and_picks_condition() {
+    fn prepare_step_requires_atmospheric_and_picks_condition() {
         use UpperBoundaryMode::{AtmosphericFlux as Flux, PondedHead as Head};
         let mesh = mesh();
         let model = LinearModel;
@@ -483,19 +471,24 @@ mod tests {
             &mesh,
             &materials,
             &sink,
-            BoundaryCondition::Neumann { flux: 0.0 },
+            UpperBoundary::Flux {
+                flux: 0.0,
+                row: ROW,
+            },
         );
         let result = assembly(Flux).prepare_step(&workspace, &state, neumann, 2.0);
         assert!(matches!(
             result,
-            Err(WaterStepError::UnsupportedAtmosphericInput { .. })
+            Err(WaterStepError::InvalidUpperBoundary { .. })
         ));
 
         let dirichlet = input(
             &mesh,
             &materials,
             &sink,
-            BoundaryCondition::Dirichlet { value: -3.0 },
+            UpperBoundary::Atmospheric {
+                critical_head: -3.0,
+            },
         );
         workspace.trial_heads.copy_from_slice(&[0.0, 0.0, -4.0]);
         let plan = assembly(Flux)

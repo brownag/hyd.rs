@@ -2,11 +2,11 @@ use std::alloc::{GlobalAlloc, Layout, System};
 use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 
 use hydrus_core::hydraulics::{
-    BoundaryCondition, BoundaryRow, Evaluation, FaceAveraging, HydraulicDerivatives, Mesh1D,
+    BoundaryRow, Evaluation, FaceAveraging, HydraulicDerivatives, Mesh1D,
 };
 use hydrus_core::{
-    advance_water_step, HydraulicError, HydraulicModel, LowerBoundaryMode, WaterState,
-    WaterStepInput, WaterStepPolicy, WaterWorkspace,
+    advance_water_step, HydraulicError, HydraulicModel, LowerBoundaryMode, UpperBoundary,
+    WaterState, WaterStepInput, WaterStepPolicy, WaterWorkspace,
 };
 
 mod common;
@@ -78,14 +78,16 @@ fn input<'a>(
             },
             flux: 0.0,
         },
-        upper_row: BoundaryRow {
-            lower: 0.0,
-            diagonal: 0.0,
-            upper: 0.0,
-            rhs: 0.0,
+        upper: UpperBoundary::Head {
+            head: 2.0,
+            row: BoundaryRow {
+                lower: 0.0,
+                diagonal: 0.0,
+                upper: 0.0,
+                rhs: 0.0,
+            },
+            flux: 0.0,
         },
-        upper_condition: BoundaryCondition::Dirichlet { value: 2.0 },
-        upper_boundary_flux: 0.0,
     }
 }
 
@@ -100,7 +102,16 @@ fn fixed_size_steps_allocate_nothing_after_setup() {
     let mut state = WaterState::new(0.0, vec![0.0; 3], vec![0.0; 3]).unwrap();
     let mut workspace = WaterWorkspace::new(3).unwrap();
     let stationary = WaterStepInput {
-        upper_condition: BoundaryCondition::Dirichlet { value: 0.0 },
+        upper: UpperBoundary::Head {
+            head: 0.0,
+            row: BoundaryRow {
+                lower: 0.0,
+                diagonal: 0.0,
+                upper: 0.0,
+                rhs: 0.0,
+            },
+            flux: 0.0,
+        },
         ..input(&mesh, &materials, 1.0)
     };
     let strict = WaterStepPolicy {

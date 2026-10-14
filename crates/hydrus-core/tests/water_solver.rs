@@ -1,10 +1,10 @@
 use hydrus_core::hydraulics::{
-    assemble_reset_stencil, BoundaryCondition, BoundaryRow, Evaluation, FaceAveraging,
-    HydraulicDerivatives, Mesh1D, ResetStencilInput,
+    assemble_reset_stencil, BoundaryRow, Evaluation, FaceAveraging, HydraulicDerivatives, Mesh1D,
+    ResetStencilInput,
 };
 use hydrus_core::{
-    advance_water_step, HydraulicError, HydraulicModel, LowerBoundaryMode, WaterState,
-    WaterStepError, WaterStepInput, WaterStepPolicy, WaterWorkspace,
+    advance_water_step, HydraulicError, HydraulicModel, LowerBoundaryMode, UpperBoundary,
+    WaterState, WaterStepError, WaterStepInput, WaterStepPolicy, WaterWorkspace,
 };
 
 mod common;
@@ -71,14 +71,16 @@ fn input<'a>(
             },
             flux: boundary_flux,
         },
-        upper_row: BoundaryRow {
-            lower: 0.0,
-            diagonal: 0.0,
-            upper: 0.0,
-            rhs: 0.0,
+        upper: UpperBoundary::Head {
+            head: 2.0,
+            row: BoundaryRow {
+                lower: 0.0,
+                diagonal: 0.0,
+                upper: 0.0,
+                rhs: 0.0,
+            },
+            flux: 0.0,
         },
-        upper_condition: BoundaryCondition::Dirichlet { value: 2.0 },
-        upper_boundary_flux: 0.0,
     }
 }
 
@@ -172,8 +174,16 @@ fn nonuniform_mesh_balance_uses_control_volumes() {
     let mut state = WaterState::new(0.0, vec![0.0; 4], vec![0.0; 4]).unwrap();
     let mut workspace = WaterWorkspace::new(4).unwrap();
     let request = WaterStepInput {
-        upper_condition: BoundaryCondition::Dirichlet { value: 0.0 },
-        upper_boundary_flux: -0.5,
+        upper: UpperBoundary::Head {
+            head: 0.0,
+            row: BoundaryRow {
+                lower: 0.0,
+                diagonal: 0.0,
+                upper: 0.0,
+                rhs: 0.0,
+            },
+            flux: -0.5,
+        },
         ..input(&mesh, &materials, &sink, 2.0, 2.0)
     };
     let report = advance_water_step(&mut state, &mut workspace, request, policy()).unwrap();
@@ -203,7 +213,16 @@ fn zero_balance_denominator_normalizes_to_the_absolute_residual() {
     let mut zero = policy();
     zero.max_iterations = 1;
     let stationary = WaterStepInput {
-        upper_condition: BoundaryCondition::Dirichlet { value: 0.0 },
+        upper: UpperBoundary::Head {
+            head: 0.0,
+            row: BoundaryRow {
+                lower: 0.0,
+                diagonal: 0.0,
+                upper: 0.0,
+                rhs: 0.0,
+            },
+            flux: 0.0,
+        },
         ..input(&mesh, &materials, &sink, 1.0, 0.0)
     };
     let report = advance_water_step(&mut state, &mut workspace, stationary, zero).unwrap();
