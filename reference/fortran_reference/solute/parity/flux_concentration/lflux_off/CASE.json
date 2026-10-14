@@ -17,25 +17,10 @@
   "purpose": "matched control with lFlux disabled (iConcType=0)",
   "request": {
     "fields": {
-      "flux_concentration_selector": {
-        "units": "source iConcType selector (HYDRUS lFlux -> iKod)",
-        "value": {
-          "iConcType": 0,
-          "lFlux": false
-        }
-      },
       "initial_dissolved_concentration": {
         "units": "C_ref",
         "value": [
           1.0
-        ]
-      },
-      "observation_nodes": {
-        "units": "user node index (NumNP-Node+1 internal)",
-        "value": [
-          3,
-          5,
-          7
         ]
       },
       "observation_times": {
@@ -47,15 +32,31 @@
         ]
       },
       "ordered_species": {
-        "units": "species position",
+        "units": "ordered species records",
         "value": [
-          "S1"
+          {
+            "chain_rate_per_hour": 0.2,
+            "initial_concentration_C_ref": 1.0,
+            "linear_equilibrium_kd_cm3_per_g": 0.5375,
+            "name": "S1",
+            "position": 1
+          }
         ]
+      },
+      "solute.flux_concentration": {
+        "units": "boolean",
+        "value": false,
+        "provenance": "HYDRUS lFlux (SELECTOR.IN line 12) -> iKod=iConcType=2 when true. Observation nodes 3, 5, 7 are deck inputs in PROFILE.DAT."
+      },
+      "time.interval": {
+        "availability": "unavailable",
+        "reason": "SELECTOR.IN gives only the initial step dt=0.1 hour with dtMin 0.01, dtMax 0.5, DMul 1.2; the adaptive per-step interval is a run result, not a deck input",
+        "units": "hour"
       }
     },
     "schema_version": "solute-request-v1"
   },
-  "request_sha256": "5f839a3fb38de58e97d5d470dbbcca89372e169a03fa29168bca8064d069bace",
+  "request_sha256": "4d8c2855c8931fc40bb20fb26bc0a7fff194fd63d78a76cc3560fa488e40fa00",
   "runner": {
     "aliases": {
       "PROFILE.DAT": "Profile.dat",

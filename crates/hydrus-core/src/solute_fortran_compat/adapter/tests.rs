@@ -433,7 +433,7 @@ fn pinned_requests_cannot_supply_the_source_coupling_state() {
         assert!(!parsed.input.switches.root_sink);
         cases += 1;
     }
-    assert_eq!(cases, 38);
+    assert_eq!(cases, 44);
 }
 
 #[test]
@@ -453,7 +453,7 @@ fn all_wave3_case_requests_match_python_canonical_hash_and_map_to_typed_input() 
         assert!(parsed.input.validate_dimensions().is_ok());
         count += 1;
     }
-    assert_eq!(count, 38);
+    assert_eq!(count, 44);
 }
 fn walkdir(path: &Path) -> Vec<std::path::PathBuf> {
     let mut out = Vec::new();

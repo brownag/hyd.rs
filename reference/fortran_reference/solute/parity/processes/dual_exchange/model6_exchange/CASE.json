@@ -34,7 +34,7 @@
       },
       "dynamic_exchange_sink": {
         "availability": "unavailable",
-        "reason": "SinkIm is internal and not printed; only W-volumeI[L] and Conc/Sorb are printed",
+        "reason": "SinkIm is internal and not printed; only W-volumeI[L] and Conc/Sorb are printed; SELECTOR.IN line 27 final-column dual-porosity transfer coefficient = 0.1 (no typed request field carries it)",
         "units": "water content/time"
       },
       "equilibrium_mode": {
@@ -64,10 +64,6 @@
         "availability": "derived as equilibrium state / no explicit input column",
         "reason": "initial dissolved profile and active linear equilibrium coefficients specify the source equilibrium state",
         "units": "source Sorb units"
-      },
-      "initial_pressure_head": {
-        "units": "cm",
-        "value": -100
       },
       "initial_water_content": {
         "availability": "computed by pinned primary retention model",
@@ -107,14 +103,25 @@
         "reason": "Sorb2 process is excluded; dual-nonequilibrium selector is false",
         "units": "source Sorb2 units"
       },
-      "top_pressure_head": {
+      "initial_pressure_head_profile": {
         "units": "cm",
-        "value": 0.0
+        "value": [
+          0.0,
+          -100.0,
+          -100.0,
+          -100.0,
+          -100.0,
+          -100.0,
+          -100.0,
+          -100.0,
+          -100.0
+        ],
+        "provenance": "User node order as in PROFILE.DAT: node 1 (surface) 0 cm, nodes 2-9 -100 cm (wetting transient)."
       }
     },
     "schema_version": "solute-request-v1"
   },
-  "request_sha256": "a1a64c062dbccd664a80c04d71c20c6eec05e7ac367b7fc93253005c7f214e28",
+  "request_sha256": "e299a10f9efd479bf524c257f7521d6e00762d2a338947eddc0570641fd104db",
   "runner": {
     "aliases": {
       "PROFILE.DAT": "Profile.dat",
