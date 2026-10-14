@@ -454,7 +454,7 @@ pub(crate) fn size_exclusion(
 /// bounds - `182-183` reads `x(i-1)` under `i.eq.N`, so `N=1` reads `x(0)` - and the
 /// non-finite rejection keeps a NaN from reaching `SinkS`, the only array the routine
 /// writes. They are contract rejections, not source statements.
-fn validate_uptake(state: &RootUptakePrimitiveState) -> Result<(), &'static str> {
+pub(super) fn validate_uptake(state: &RootUptakePrimitiveState) -> Result<(), &'static str> {
     let nodes = state.coordinates.len();
     if nodes < 2 {
         return Err("root solute uptake needs at least two nodes (SINK.FOR:182-183)");
@@ -495,7 +495,7 @@ fn validate_uptake(state: &RootUptakePrimitiveState) -> Result<(), &'static str>
 /// rejection guards the `swr` division of `1727` and the `1.0-swr` divisions of
 /// `1745-1746`, which the source leaves as infinities that then reach every node.
 /// Contract rejections, not source statements.
-fn validate_exclusion(state: &SizeExclusionPrimitiveState) -> Result<(), &'static str> {
+pub(super) fn validate_exclusion(state: &SizeExclusionPrimitiveState) -> Result<(), &'static str> {
     if state.nodes == 0 {
         return Err("size exclusion needs at least one node (SOLUTE.FOR:1772)");
     }

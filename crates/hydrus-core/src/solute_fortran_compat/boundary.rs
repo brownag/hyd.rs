@@ -113,7 +113,7 @@ pub(crate) fn assemble_endpoints(
     })
 }
 
-fn validate(
+pub(super) fn validate(
     state: &EndpointPrimitiveState,
     lower_code: i32,
     upper_code: i32,
@@ -147,7 +147,7 @@ fn validate(
         return Err("endpoint primitives need one material id per node");
     }
     if state.upwind_weight.len() != n - 1 {
-        return Err("endpoint upwind weights need one value per element");
+        return Err("endpoint upwind_weight needs one value per element");
     }
     if state.mobile_immobile.is_empty()
         || state.material_immobile_water.len() != state.mobile_immobile.len()
@@ -159,7 +159,7 @@ fn validate(
         .iter()
         .any(|m| *m == 0 || *m > state.mobile_immobile.len())
     {
-        return Err("endpoint material ids must index the mobility records");
+        return Err("endpoint material_ids must index the mobility records");
     }
     if state.coordinates.iter().any(|x| !x.0.is_finite())
         || state.coordinates.windows(2).any(|w| w[1].0 <= w[0].0)
@@ -167,13 +167,19 @@ fn validate(
         return Err("endpoint coordinates must be finite and increase in native node order");
     }
     if state.source_species == 0 || !matches!(state.t_level, 1 | 2) || state.dual_porosity > 2 {
-        return Err("endpoint source selectors are invalid");
+        return Err("endpoint source_species and dual_porosity/TLevel selectors are invalid");
     }
     if !matches!(lower_code, -1..=1) || !matches!(upper_code, -2..=1) {
         return Err("unsupported source endpoint boundary code");
     }
     if state.dt.0 <= 0.0 || state.r_min.0 < 0.0 {
         return Err("endpoint dt must be positive and rMin non-negative");
+    }
+    if !(0.0..=1.0).contains(&state.epsi.0)
+        || (state.alf.0 - (1.0 - state.epsi.0)).abs() > 1.0e-6
+        || state.bottom_resistance.0 < 0.0
+    {
+        return Err("endpoint epsi must lie in [0, 1], alf must equal 1 - epsi, and bottom resistance must be non-negative");
     }
     let mut reals: Vec<&DefaultReal> = state
         .material_immobile_water

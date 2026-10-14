@@ -305,7 +305,7 @@ fn conductivity(head: DefaultReal, par: &ImmobilePar) -> f32 {
 /// otherwise carry into `SinkIm`, and they mirror the predicates
 /// `hydraulics::HydraulicModel::validate` already applies to the mobile-domain
 /// pair.
-fn validate(state: &DualPorPrimitiveState) -> Result<(), &'static str> {
+pub(super) fn validate(state: &DualPorPrimitiveState) -> Result<(), &'static str> {
     let nodes = state.coordinates.len();
     if nodes == 0 {
         return Err("dual-porosity exchange needs at least one node");

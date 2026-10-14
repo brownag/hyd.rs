@@ -1,5 +1,6 @@
 //! Strict serialized fixture request parsing and canonical hash verification.
 use super::types::*;
+use super::{boundary, dual_domain, source_coupling};
 use serde_json::{Map, Value};
 use sha2::{Digest, Sha256};
 use std::collections::HashSet;
@@ -599,30 +600,6 @@ fn validate_cross_field_dimensions(fields: &RequestFields) -> Result<(), String>
     }
     if let Some(exchange) = &fields.nonequilibrium.dual_porosity_exchange_state {
         if let Explicit::Available(state) = &exchange.value {
-            let nodes = state.coordinates.len();
-            for (name, len) in [
-                ("old_water", state.old_water.len()),
-                ("new_pressure_head", state.new_pressure_head.len()),
-                ("old_immobile_water", state.old_immobile_water.len()),
-                ("material_ids", state.material_ids.len()),
-            ] {
-                if len != nodes {
-                    return Err(format!(
-                        "dual_porosity_exchange_state.{name} length {len} does not match coordinates {nodes}"
-                    ));
-                }
-            }
-            let materials = state.materials.len();
-            if materials == 0 {
-                return Err("dual_porosity_exchange_state.materials must not be empty".into());
-            }
-            for (index, material_id) in state.material_ids.iter().enumerate() {
-                if *material_id == 0 || *material_id > materials {
-                    return Err(format!(
-                        "dual_porosity_exchange_state.material_ids[{index}] must index materials"
-                    ));
-                }
-            }
             if let Some(dual) = &fields.nonequilibrium.dual_domain {
                 if let Explicit::Available(dual) = &dual.value {
                     // One source variable, two spellings: the `iDualPor` of the
@@ -655,6 +632,10 @@ fn validate_cross_field_dimensions(fields: &RequestFields) -> Result<(), String>
                     }
                 }
             }
+            // The kernel owns the shape and range checks. It runs after the
+            // cross-field checks above, which name the request-level cause first.
+            dual_domain::validate(state)
+                .map_err(|e| format!("dual_porosity_exchange_state: {e}"))?;
         }
     }
     if let Some(chpar) = &fields.reactions.material_species_chpar {
@@ -675,59 +656,19 @@ fn validate_cross_field_dimensions(fields: &RequestFields) -> Result<(), String>
     }
     if let Some(state) = &fields.transport.endpoint_state {
         if let Explicit::Available(s) = &state.value {
-            let n = s.coordinates.len();
-            if n < 2 {
-                return Err("endpoint_primitives requires at least two nodes".into());
-            }
-            for (name, values) in [
-                ("coordinates", &s.coordinates),
-                ("old_water", &s.old_water),
-                ("new_water", &s.new_water),
-                ("old_velocity", &s.old_velocity),
-                ("new_velocity", &s.new_velocity),
-                ("old_dispersion", &s.old_dispersion),
-                ("new_dispersion", &s.new_dispersion),
-                ("old_retardation", &s.old_retardation),
-                ("new_retardation", &s.new_retardation),
-                ("old_concentration", &s.old_concentration),
-                ("source_g0", &s.source_g0),
-                ("source_g1", &s.source_g1),
-                ("new_accepted_concentration", &s.new_accepted_concentration),
-                ("old_matrix_velocity", &s.old_matrix_velocity),
-                ("new_matrix_velocity", &s.new_matrix_velocity),
-            ] {
-                if values.len() != n {
-                    return Err(format!(
-                        "endpoint_primitives.{name} length must match coordinates"
-                    ));
-                }
-            }
-            if s.upwind_weight.len() != n - 1 {
-                return Err(
-                    "endpoint_primitives.upwind_weight must have one value per element".into(),
-                );
-            }
-            if s.material_ids.len() != n || s.mobile_immobile.is_empty() {
-                return Err("endpoint_primitives material and mobility maps are incomplete".into());
-            }
-            // ChPar(4,M) (765, 771) is one value per material, so it is checked
-            // against the material count and not against the node count.
-            if s.material_immobile_water.len() != s.mobile_immobile.len() {
-                return Err(
-                    "endpoint_primitives material_immobile_water must match material count".into(),
-                );
-            }
-            if s.material_ids
-                .iter()
-                .any(|&m| m == 0 || m > s.mobile_immobile.len())
-            {
-                return Err("endpoint_primitives material_ids must index mobile_immobile".into());
-            }
-            if s.source_species == 0 {
-                return Err(
-                    "endpoint_primitives.source_species must be a source species index".into(),
-                );
-            }
+            // Shape, range and finiteness live in the kernel. The codes are only
+            // read when both are available; `validate_required_mode_inputs` rejects
+            // a missing code, so the placeholder 0 only keeps the shape checks on.
+            let code = |c: &Option<UnitValue<i32>>| match c.as_ref().map(|c| &c.value) {
+                Some(Explicit::Available(code)) => *code,
+                _ => 0,
+            };
+            boundary::validate(
+                s,
+                code(&fields.transport.lower_boundary_code),
+                code(&fields.transport.upper_boundary_code),
+            )
+            .map_err(|e| format!("endpoint_primitives: {e}"))?;
             // TDep is one-dimensional with a 16-entry stride per species
             // (INPUT.FOR:1379-1390); the atmospheric code reads slots 6, 9, 10.
             let species_base = (s.source_species - 1) * 16;
@@ -769,20 +710,6 @@ fn validate_cross_field_dimensions(fields: &RequestFields) -> Result<(), String>
                         return Err("atmospheric endpoint requires a source ChPar record for the species at the top node material".into());
                     }
                 }
-            }
-            if s.dual_porosity > 2 || !matches!(s.t_level, 1 | 2) {
-                return Err("endpoint_primitives dual_por/TLevel selector is invalid".into());
-            }
-            if s.dt.0 <= 0.0
-                || !(0.0..=1.0).contains(&s.epsi.0)
-                || (s.alf.0 - (1.0 - s.epsi.0)).abs() > 1.0e-6
-                || s.r_min.0 < 0.0
-                || s.bottom_resistance.0 < 0.0
-                || s.coordinates.windows(2).any(|w| w[1].0 <= w[0].0)
-            {
-                return Err(
-                    "endpoint_primitives requires positive dt and consistent epsi/alf".into(),
-                );
             }
         }
     }
@@ -834,9 +761,10 @@ fn validate_required_mode_inputs(
                 "lActRSU requires species_count 1, INPUT.FOR:1122 disables it above that".into(),
             );
         }
+        source_coupling::validate_uptake(state).map_err(|e| format!("root_uptake_state: {e}"))?;
     }
     if let Some(UnitValue {
-        value: Explicit::Available(_),
+        value: Explicit::Available(state),
         ..
     }) = &fields.source_coupling.size_exclusion_state
     {
@@ -858,6 +786,8 @@ fn validate_required_mode_inputs(
                     .into(),
             );
         }
+        source_coupling::validate_exclusion(state)
+            .map_err(|e| format!("size_exclusion_state: {e}"))?;
     }
     Ok(())
 }
@@ -3084,7 +3014,7 @@ pub(crate) mod tests {
         });
         assert!(
             dual_porosity_rejection(&ragged_request.to_string()).contains(
-                "dual_porosity_exchange_state.old_water length 2 does not match coordinates 3"
+                "dual_porosity_exchange_state: dual-porosity exchange node arrays must all be the same length"
             )
         );
 
@@ -3092,7 +3022,7 @@ pub(crate) mod tests {
         empty_materials["materials"] = serde_json::json!([]);
         assert!(
             dual_porosity_rejection(&dual_porosity_request(empty_materials, selector.clone()))
-                .contains("materials must not be empty")
+                .contains("dual_porosity_exchange_state: dual-porosity exchange needs at least one ParD column")
         );
 
         for id in [0, 2] {
@@ -3100,7 +3030,7 @@ pub(crate) mod tests {
             bad_ids["material_ids"] = serde_json::json!([1, 1, id]);
             assert!(
                 dual_porosity_rejection(&dual_porosity_request(bad_ids, selector.clone()))
-                    .contains("material_ids[2] must index materials")
+                    .contains("dual_porosity_exchange_state: MatNum must index the ParD columns")
             );
         }
 
