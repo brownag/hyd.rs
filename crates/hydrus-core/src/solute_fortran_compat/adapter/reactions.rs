@@ -1,8 +1,54 @@
 //! Reaction and species record mappers and cross-field checks.
 use super::fields::*;
-use super::json_guard::validate_object_keys;
 use super::*;
+use serde::de::DeserializeOwned;
+use serde::Deserialize;
 use serde_json::{Map, Value};
+
+/// Rejects a non-object before a struct DTO sees it: serde would read a JSON
+/// array as a tuple struct, where the old decoders required an object.
+fn require_object(value: &Value, name: &str) -> Result<(), String> {
+    if value.is_object() {
+        Ok(())
+    } else {
+        Err(format!("field {name}: value must be an object"))
+    }
+}
+
+fn decode_object<T: DeserializeOwned>(value: &Value, name: &str) -> Result<T, String> {
+    require_object(value, name)?;
+    serde_json::from_value(value.clone()).map_err(|e| {
+        let text = e.to_string();
+        // Keep the pre-serde wording for unknown keys (`validate_object_keys`).
+        match text
+            .strip_prefix("unknown field `")
+            .and_then(|t| t.split_once('`'))
+        {
+            Some((key, _)) => format!("field {name}: unknown nested key {key}"),
+            None => format!("field {name}: {text}"),
+        }
+    })
+}
+
+fn reals(name: &str, v: Vec<f64>) -> Result<Vec<DefaultReal>, String> {
+    v.into_iter().map(|x| real(name, x)).collect()
+}
+
+fn real(name: &str, x: f64) -> Result<DefaultReal, String> {
+    if x.is_finite() {
+        Ok(DefaultReal::from_input(x))
+    } else {
+        Err(format!("field {name}: expected finite number"))
+    }
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct ChparDto {
+    species: usize,
+    material: usize,
+    slots: Vec<f64>,
+}
 
 /// `ChPar((jS-1)*16+slot, M)` records: the source reads four material slots and
 /// 16 slots per species, indexing the material in the second array dimension
@@ -17,31 +63,14 @@ pub(super) fn chpar_records(
     entries
         .iter()
         .map(|entry| {
-            let o = entry
-                .as_object()
-                .ok_or_else(|| format!("{name} entries must be objects"))?;
-            validate_object_keys(name, o, &["species", "material", "slots"])?;
-            let species = o
-                .get("species")
-                .map(|v| as_usize(v, &format!("{name}.species")))
-                .transpose()?
-                .ok_or_else(|| format!("{name}.species missing"))?;
-            let material = o
-                .get("material")
-                .map(|v| as_usize(v, &format!("{name}.material")))
-                .transpose()?
-                .ok_or_else(|| format!("{name}.material missing"))?;
-            let slots = number_vec(
-                o.get("slots")
-                    .ok_or_else(|| format!("{name}.slots missing"))?,
-                &format!("{name}.slots"),
-            )?;
+            let d = decode_object::<ChparDto>(entry, name)?;
+            let slots = reals(&format!("{name}.slots"), d.slots)?;
             if slots.len() != 20 {
                 return Err(format!("{name} slots must have length 20"));
             }
             Ok(MaterialSpeciesParameters {
-                species,
-                material,
+                species: d.species,
+                material: d.material,
                 slots,
             })
         })
@@ -59,87 +88,78 @@ pub(super) fn maybe_chpar(
     )
 }
 
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct MoistureDto {
+    selector: u8,
+    #[serde(default)]
+    table: Vec<f64>,
+}
+
 pub(super) fn maybe_moisture_dependency(
     fields: &Map<String, Value>,
 ) -> Result<Option<UnitValue<MoistureDependencyRequest>>, String> {
-    unit_value(
+    let raw = decode_unit_value::<Value>(
         fields,
         "moisture_dependency",
         "source selector and WDep table",
-        |x| {
-            let o = x
-                .as_object()
-                .ok_or("moisture_dependency value must be an object")?;
-            validate_object_keys("moisture_dependency", o, &["selector", "table"])?;
-            let selector = o
-                .get("selector")
-                .map(|v| as_u8(v, "moisture_dependency.selector"))
-                .transpose()?
-                .ok_or("moisture_dependency.selector missing")?;
-            if selector > 2 {
-                return Err("moisture_dependency.selector must be 0, 1, or 2".into());
-            }
-            let table = o
-                .get("table")
-                .map(|v| number_vec(v, "moisture_dependency.table"))
-                .transpose()?
-                .unwrap_or_default();
-            if selector == 1 && table.is_empty() {
-                return Err("selector 1 requires a WDep table".into());
-            }
-            Ok(MoistureDependencyRequest { selector, table })
-        },
-    )
+    )?;
+    map_available(raw, |v| {
+        let d = decode_object::<MoistureDto>(&v, "moisture_dependency")?;
+        if d.selector > 2 {
+            return Err("moisture_dependency.selector must be 0, 1, or 2".into());
+        }
+        let table = reals("moisture_dependency.table", d.table)?;
+        if d.selector == 1 && table.is_empty() {
+            return Err("selector 1 requires a WDep table".into());
+        }
+        Ok(MoistureDependencyRequest {
+            selector: d.selector,
+            table,
+        })
+    })
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct SpeciesDto {
+    name: String,
+    position: usize,
+    chain_rate_per_hour: f64,
+    #[serde(rename = "initial_concentration_C_ref")]
+    initial_concentration: f64,
+    #[serde(rename = "linear_equilibrium_kd_cm3_per_g")]
+    linear_equilibrium_kd: f64,
 }
 
 pub(super) fn maybe_species(
     fields: &Map<String, Value>,
 ) -> Result<Option<UnitValue<Vec<SpeciesRecord>>>, String> {
-    unit_value(fields, "ordered_species", "ordered species records", |x| {
-        x.as_array()
-            .ok_or("ordered_species value must be an array")?
+    let raw =
+        decode_unit_value::<Vec<Value>>(fields, "ordered_species", "ordered species records")?;
+    map_available(raw, |entries| {
+        entries
             .iter()
             .map(|entry| {
-                let o = entry
-                    .as_object()
-                    .ok_or("ordered_species entries must be objects")?;
-                validate_object_keys(
-                    "ordered_species",
-                    o,
-                    &[
-                        "name",
-                        "position",
-                        "chain_rate_per_hour",
-                        "initial_concentration_C_ref",
-                        "linear_equilibrium_kd_cm3_per_g",
-                    ],
-                )?;
+                let d = decode_object::<SpeciesDto>(entry, "ordered_species")?;
+                if d.name.is_empty() {
+                    return Err("field ordered_species.name: expected nonempty string".into());
+                }
                 Ok(SpeciesRecord {
-                    name: o
-                        .get("name")
-                        .map(|v| as_string(v, "ordered_species.name"))
-                        .transpose()?
-                        .ok_or("ordered_species.name missing")?,
-                    position: o
-                        .get("position")
-                        .map(|v| as_usize(v, "ordered_species.position"))
-                        .transpose()?
-                        .ok_or("ordered_species.position missing")?,
-                    chain_rate_per_hour: DefaultReal::from_input(as_f64(
-                        o.get("chain_rate_per_hour")
-                            .ok_or("ordered_species.chain_rate_per_hour missing")?,
+                    name: d.name,
+                    position: d.position,
+                    chain_rate_per_hour: real(
                         "ordered_species.chain_rate_per_hour",
-                    )?),
-                    initial_concentration: DefaultReal::from_input(as_f64(
-                        o.get("initial_concentration_C_ref")
-                            .ok_or("ordered_species.initial_concentration_C_ref missing")?,
+                        d.chain_rate_per_hour,
+                    )?,
+                    initial_concentration: real(
                         "ordered_species.initial_concentration_C_ref",
-                    )?),
-                    linear_equilibrium_kd: DefaultReal::from_input(as_f64(
-                        o.get("linear_equilibrium_kd_cm3_per_g")
-                            .ok_or("ordered_species.linear_equilibrium_kd_cm3_per_g missing")?,
+                        d.initial_concentration,
+                    )?,
+                    linear_equilibrium_kd: real(
                         "ordered_species.linear_equilibrium_kd_cm3_per_g",
-                    )?),
+                        d.linear_equilibrium_kd,
+                    )?,
                 })
             })
             .collect()
@@ -196,4 +216,194 @@ pub(super) fn validate_material_species_chpar(fields: &RequestFields) -> Result<
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    fn one(name: &str, units: &str, value: Value) -> Map<String, Value> {
+        let mut m = Map::new();
+        m.insert(name.into(), json!({"units": units, "value": value}));
+        m
+    }
+
+    fn species(value: Value) -> Result<Option<UnitValue<Vec<SpeciesRecord>>>, String> {
+        maybe_species(&one("ordered_species", "ordered species records", value))
+    }
+
+    fn chpar(value: Value) -> Result<Option<UnitValue<Vec<MaterialSpeciesParameters>>>, String> {
+        maybe_chpar(&one(
+            "material_species_chpar",
+            "source ChPar slots by species/material",
+            value,
+        ))
+    }
+
+    fn moisture(value: Value) -> Result<Option<UnitValue<MoistureDependencyRequest>>, String> {
+        maybe_moisture_dependency(&one(
+            "moisture_dependency",
+            "source selector and WDep table",
+            value,
+        ))
+    }
+
+    // `a|b` passes on either: old bodies named the nested key, serde names the request field.
+    fn err_has(r: Result<impl std::fmt::Debug, String>, needle: &str) {
+        let e = r.expect_err("must reject");
+        assert!(
+            needle.split('|').any(|n| e.contains(n)),
+            "{e:?} should name {needle}"
+        );
+    }
+
+    fn sp(patch: Value) -> Value {
+        let mut v = json!({
+            "name": "a", "position": 1, "chain_rate_per_hour": 0.0,
+            "initial_concentration_C_ref": 1, "linear_equilibrium_kd_cm3_per_g": 0.5
+        });
+        for (k, x) in patch.as_object().unwrap() {
+            v[k] = x.clone();
+        }
+        v
+    }
+
+    fn ch(patch: Value) -> Value {
+        let mut v = json!({"species": 1, "material": 1, "slots": vec![0.0; 20]});
+        for (k, x) in patch.as_object().unwrap() {
+            v[k] = x.clone();
+        }
+        v
+    }
+
+    #[test]
+    fn species_accepts_valid_and_rejects_bad_records() {
+        assert!(species(json!([sp(json!({}))])).unwrap().is_some());
+        err_has(species(json!(null)), "ordered_species");
+        err_has(species(json!({"a": 1})), "ordered_species");
+        err_has(species(json!([[1, 2]])), "ordered_species");
+        err_has(
+            species(json!([sp(json!({"position": 1.0}))])),
+            "position|ordered_species",
+        );
+        err_has(
+            species(json!([sp(json!({"name": ""}))])),
+            "name|ordered_species",
+        );
+        err_has(
+            species(json!([sp(json!({"name": 7}))])),
+            "name|ordered_species",
+        );
+        err_has(
+            species(json!([sp(json!({"extra": 1}))])),
+            "extra|ordered_species",
+        );
+        err_has(
+            species(json!([sp(json!({"chain_rate_per_hour": null}))])),
+            "chain_rate_per_hour|ordered_species",
+        );
+        err_has(
+            species(json!([{"name": "a", "position": 1}])),
+            "chain_rate_per_hour|ordered_species",
+        );
+        let mut m = Map::new();
+        m.insert("ordered_species".into(), json!({"value": [sp(json!({}))]}));
+        err_has(maybe_species(&m), "units");
+    }
+
+    #[test]
+    fn chpar_accepts_valid_and_rejects_bad_records() {
+        assert!(chpar(json!([ch(json!({}))])).unwrap().is_some());
+        err_has(chpar(json!(null)), "material_species_chpar");
+        err_has(chpar(json!({"a": 1})), "material_species_chpar");
+        err_has(chpar(json!([[1, 1, 2]])), "material_species_chpar");
+        err_has(
+            chpar(json!([ch(json!({"species": 1.0}))])),
+            "species|material_species_chpar",
+        );
+        err_has(
+            chpar(json!([ch(json!({"material": null}))])),
+            "material|material_species_chpar",
+        );
+        err_has(
+            chpar(json!([ch(json!({"slots": vec![0.0; 19]}))])),
+            "slots|material_species_chpar",
+        );
+        err_has(
+            chpar(json!([ch(json!({"slots": "x"}))])),
+            "slots|material_species_chpar",
+        );
+        err_has(
+            chpar(json!([ch(json!({"extra": 1}))])),
+            "extra|material_species_chpar",
+        );
+        let mut m = Map::new();
+        m.insert("material_species_chpar".into(), json!({"value": []}));
+        err_has(maybe_chpar(&m), "units");
+    }
+
+    #[test]
+    fn chpar_records_names_the_given_path() {
+        let name = "endpoint_primitives.source_chpar";
+        assert_eq!(
+            chpar_records(&json!([ch(json!({}))]), name).unwrap().len(),
+            1
+        );
+        err_has(chpar_records(&json!([[1]]), name), name);
+        err_has(
+            chpar_records(&json!([ch(json!({"species": 1.5}))]), name),
+            name,
+        );
+        err_has(
+            chpar_records(&json!([ch(json!({"extra": 1}))]), name),
+            "extra",
+        );
+        err_has(chpar_records(&json!(null), name), name);
+    }
+
+    #[test]
+    fn moisture_accepts_valid_and_rejects_bad_values() {
+        assert!(moisture(json!({"selector": 0})).unwrap().is_some());
+        assert!(moisture(json!({"selector": 1, "table": [1, 2.5]}))
+            .unwrap()
+            .is_some());
+        err_has(moisture(json!(null)), "moisture_dependency");
+        err_has(moisture(json!([1, []])), "moisture_dependency");
+        err_has(
+            moisture(json!({"selector": 1.0})),
+            "selector|moisture_dependency",
+        );
+        err_has(
+            moisture(json!({"selector": null})),
+            "selector|moisture_dependency",
+        );
+        err_has(
+            moisture(json!({"selector": 3})),
+            "selector|moisture_dependency",
+        );
+        err_has(
+            moisture(json!({"table": []})),
+            "selector|moisture_dependency",
+        );
+        err_has(
+            moisture(json!({"selector": 0, "table": null})),
+            "table|moisture_dependency",
+        );
+        err_has(
+            moisture(json!({"selector": 0, "table": ["x"]})),
+            "table|moisture_dependency",
+        );
+        err_has(moisture(json!({"selector": 1})), "WDep|moisture_dependency");
+        err_has(
+            moisture(json!({"selector": 0, "extra": 1})),
+            "extra|moisture_dependency",
+        );
+        let mut m = Map::new();
+        m.insert(
+            "moisture_dependency".into(),
+            json!({"value": {"selector": 0}}),
+        );
+        err_has(maybe_moisture_dependency(&m), "units");
+    }
 }

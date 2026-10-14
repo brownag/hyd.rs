@@ -1,37 +1,57 @@
 //! Transport-property mappers and cross-field checks.
 use super::fields::*;
-use super::json_guard::validate_object_keys;
 use super::*;
+use serde::Deserialize;
 use serde_json::{Map, Value};
+
+/// Rejects a non-object before a struct DTO sees it: serde would read a JSON
+/// array as a tuple struct, where the old decoders required an object.
+fn require_object(value: &Value, name: &str) -> Result<(), String> {
+    if value.is_object() {
+        Ok(())
+    } else {
+        Err(format!("field {name}: value must be an object"))
+    }
+}
+
+#[derive(Deserialize)]
+#[serde(deny_unknown_fields)]
+struct CoordinatesDto {
+    native: String,
+    canonical: String,
+    nodes: usize,
+}
 
 pub(super) fn maybe_coordinates(
     fields: &Map<String, Value>,
 ) -> Result<Option<UnitValue<CoordinatesSpec>>, String> {
-    unit_value(fields, "coordinates", "cm", |x| {
-        let o = x.as_object().ok_or("coordinates value must be an object")?;
-        validate_object_keys("coordinates", o, &["native", "canonical", "nodes"])?;
-        let native = o
-            .get("native")
-            .map(|v| as_string(v, "coordinates.native"))
-            .transpose()?
-            .ok_or("coordinates.native missing")?;
-        let canonical = o
-            .get("canonical")
-            .map(|v| as_string(v, "coordinates.canonical"))
-            .transpose()?
-            .ok_or("coordinates.canonical missing")?;
-        let nodes = o
-            .get("nodes")
-            .map(|v| as_usize(v, "coordinates.nodes"))
-            .transpose()?
-            .ok_or("coordinates.nodes missing")?;
-        if nodes == 0 {
+    let raw = decode_unit_value::<Value>(fields, "coordinates", "cm")?;
+    map_available(raw, |v| {
+        require_object(&v, "coordinates")?;
+        let d: CoordinatesDto = serde_json::from_value(v).map_err(|e| {
+            let text = e.to_string();
+            // Keep the pre-serde wording for unknown keys (`validate_object_keys`).
+            match text
+                .strip_prefix("unknown field `")
+                .and_then(|t| t.split_once('`'))
+            {
+                Some((key, _)) => format!("field coordinates: unknown nested key {key}"),
+                None => format!("field coordinates: {text}"),
+            }
+        })?;
+        if d.native.is_empty() {
+            return Err("field coordinates.native: expected nonempty string".into());
+        }
+        if d.canonical.is_empty() {
+            return Err("field coordinates.canonical: expected nonempty string".into());
+        }
+        if d.nodes == 0 {
             return Err("coordinates.nodes must be positive".into());
         }
         Ok(CoordinatesSpec {
-            native,
-            canonical,
-            nodes,
+            native: d.native,
+            canonical: d.canonical,
+            nodes: d.nodes,
         })
     })
 }
@@ -91,4 +111,67 @@ pub(super) fn validate_dimensions(fields: &RequestFields) -> Result<(), String> 
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    fn coords(value: Value) -> Result<Option<UnitValue<CoordinatesSpec>>, String> {
+        let mut m = Map::new();
+        m.insert("coordinates".into(), json!({"units": "cm", "value": value}));
+        maybe_coordinates(&m)
+    }
+
+    // `a|b` passes on either: old bodies named the nested key, serde names the request field.
+    fn err_has(r: Result<impl std::fmt::Debug, String>, needle: &str) {
+        let e = r.expect_err("must reject");
+        assert!(
+            needle.split('|').any(|n| e.contains(n)),
+            "{e:?} should name {needle}"
+        );
+    }
+
+    #[test]
+    fn coordinates_accepts_valid_and_rejects_bad_values() {
+        let ok = json!({"native": "z", "canonical": "z", "nodes": 3});
+        assert!(coords(ok).unwrap().is_some());
+        err_has(coords(json!(null)), "coordinates");
+        err_has(coords(json!(["z", "z", 3])), "coordinates");
+        err_has(
+            coords(json!({"native": "z", "canonical": "z", "nodes": 3.0})),
+            "nodes|coordinates",
+        );
+        err_has(
+            coords(json!({"native": "z", "canonical": "z", "nodes": 0})),
+            "nodes|coordinates",
+        );
+        err_has(
+            coords(json!({"native": "z", "canonical": "z", "nodes": null})),
+            "nodes|coordinates",
+        );
+        err_has(
+            coords(json!({"native": 7, "canonical": "z", "nodes": 3})),
+            "native|coordinates",
+        );
+        err_has(
+            coords(json!({"native": "", "canonical": "z", "nodes": 3})),
+            "native|coordinates",
+        );
+        err_has(
+            coords(json!({"native": "z", "nodes": 3})),
+            "canonical|coordinates",
+        );
+        err_has(
+            coords(json!({"native": "z", "canonical": "z", "nodes": 3, "extra": 1})),
+            "extra|coordinates",
+        );
+        let mut m = Map::new();
+        m.insert(
+            "coordinates".into(),
+            json!({"value": {"native": "z", "canonical": "z", "nodes": 3}}),
+        );
+        err_has(maybe_coordinates(&m), "units");
+    }
 }
