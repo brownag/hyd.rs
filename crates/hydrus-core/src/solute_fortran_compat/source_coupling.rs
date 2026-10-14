@@ -82,8 +82,8 @@ pub(crate) struct RootSoluteUptake {
 /// `if(lLast.and.jS.lt.NS) nStep=1` of `171` is dead and no species-reduction branch
 /// exists here. Do not "restore" it.
 // Preserve the source's accumulation expressions and loop shape for fidelity: the `x = x
-// + ...` sums are the Fortran running totals of `181`/`199`/`207`, and the index loop is
-// the source's `do 181 i=1,N`, whose `i` also drives the `182-188` neighbour reads.
+// + ...` sums are the Fortran running totals of `192`/`197`/`210`, and the index loop is
+// the source's `do 11 i=1,N` (`180`), whose `i` also drives the `182-188` neighbour reads.
 #[allow(clippy::assign_op_pattern, clippy::needless_range_loop)]
 pub(crate) fn root_solute_uptake(
     state: &RootUptakePrimitiveState,
@@ -100,21 +100,21 @@ pub(crate) fn root_solute_uptake(
     let water_stress = state.omega_water.0;
     let solute_stress = state.solute_stress_index.0;
     let maximum_concentration = state.species_root_max_concentration.0;
-    // The clear lives *inside* the step loop: `10 continue` is at `176`, i.e. the
-    // `do 10 i=1,N / SinkS(i)=0. / 10 continue` triple sits between `nStep=` (`161`)
-    // and `do 12 iStep=1,nStep` (`178`), and the label `12` closes at `197`. `SinkS` is
-    // therefore re-zeroed at the top of every step, which is what makes `198`
+    // The clear runs once per call, not once per step: `do 10 i=1,N / SinkS(i)=0. /
+    // 10 continue` is at `174-176`, *before* `do 12 iStep=1,nStep` (`178`), and the
+    // label `12` closes at `218`. The `vec![0.0; nodes]` below is that single clear, and
+    // nothing re-zeroes the array inside the step loop. `198`
     // (`if(nStep.eq.2) SinkS(i)=SinkS(i)+AUptakeA`) and `209`
-    // (`SinkS(i)=SinkS(i)+AUptakeA`) add to the step-1 passive value rather than
-    // accumulate across steps: step 2 and step 3 each start from a clean array and add
-    // their own active term. A caller-owned `SinkS` that carried a previous species'
-    // values is likewise discarded, and `N` is `NumN` at the call (`SOLUTE.FOR:95`).
+    // (`SinkS(i)=SinkS(i)+AUptakeA`) therefore add onto the step-1 passive value of
+    // `191`; only the `Beta(i).le.0.` arm (`213`) zeroes a node, and it does so on every
+    // step. A caller-owned `SinkS` that carried a previous species' values is likewise
+    // discarded, and `N` is `NumN` at the call (`SOLUTE.FOR:95`).
     let mut solute_sink = vec![DefaultReal(0.0); nodes];
 
-    // `Compen=1.` (`158`) and the `nStep` ladder of `159-161`.
+    // `Compen=1.` (`163`) and the `nStep` ladder of `164-166`.
     //
-    // `lLast=.false.` (`169`) is a hard-coded constant, so the `nStep=1` downgrade of
-    // `170` can never fire and multi-species chains are *not* truncated to the passive
+    // `lLast=.false.` (`170`) is a hard-coded constant, so the `nStep=1` downgrade of
+    // `171` can never fire and multi-species chains are *not* truncated to the passive
     // step. The literal Rust spelling of a condition that cannot hold is
     // `false && jS < NS`, which clippy rightly flags; the dead branch is kept as a
     // comment rather than as an always-false `if` that would one day look live.
@@ -129,7 +129,7 @@ pub(crate) fn root_solute_uptake(
     if state.active_uptake && solute_stress < 1.0 {
         steps = 3;
     }
-    // Routine locals (`163`, `172-174`) carried across both loops exactly as Fortran
+    // Routine locals (`163`, `172-173`) carried across both loops exactly as Fortran
     // would. The four `Option`s are the values whose assignments are conditional, so
     // `None` means "Fortran has not assigned this yet" and never `0.`: `SAUptakeP`
     // (`194`), `Omega1` (`202`), `AUptakeA` (`196`/`207-208`) and `SAUptakeAN` (`201`).
@@ -149,7 +149,6 @@ pub(crate) fn root_solute_uptake(
     let mut profile_record = None;
 
     for step in 1..=steps {
-        solute_sink.iter_mut().for_each(|v| *v = DefaultReal(0.0)); // `175-176`.
         actual_uptake = 0.0; // `SAUptakeA=0.` (`179`), once per step.
         for i in 0..nodes {
             let beta = state.root_distribution[i].0;
@@ -180,10 +179,10 @@ pub(crate) fn root_solute_uptake(
                     potential_active =
                         Some((potential_root * water_stress - passive_uptake).max(0.0));
                 } else if step == 2 {
-                    // `195 else` is the `Beta(i).gt.0.` test of `189`, not a step test: a
-                    // node whose `Beta` vanished in step 1 never reaches here. The read
-                    // is guarded by the same predicate that guarded its assignment
-                    // (`194`), so it is defined on every node that does.
+                    // `195 else if(iStep.eq.2)` sits inside the `Beta(i).gt.0.` test of
+                    // `181`, and a node whose `Beta` vanished in step 1 never reaches
+                    // here. The read is guarded by the same predicate that guarded its
+                    // assignment (`194`), so it is defined on every node that does.
                     let potential = potential_active.ok_or(
                         "SINK.FOR:196 reads SAUptakeP, which SINK.FOR:194 assigns only \
                          for a node with Beta(i)>0 during step 1",
@@ -326,7 +325,7 @@ impl SizeExclusion {
 /// assigned at `1729`) is a dead store for the same reason, so it has no input field
 /// either. A later task must not resurrect these quantities.
 // Preserve the source's guard expressions: `1735`'s `sw_c.lt.0.or.sw_c.gt.1.` is a
-// negated range with the source's own NaN behaviour, and `1719`'s guard is written as a
+// negated range with the source's own NaN behaviour, and `HYDRUS.FOR:390`'s guard is written as a
 // conjunction of a negation.
 #[allow(clippy::nonminimal_bool, clippy::manual_range_contains)]
 pub(crate) fn size_exclusion(
@@ -363,14 +362,14 @@ pub(crate) fn size_exclusion(
     // the applied variant and never as an error. `1723` is the early return.
     let zeroed_exclusion_content = DefaultReal(0.0);
     // `1725-1734`. `th_c` widens into `sw_c`; `xL` stays default REAL.
-    // `thr`/`ths` are declared double (`1715-1716`) but assigned from
+    // `thr`/`ths` are declared double (`1716-1717`) but assigned from
     // `Par(1,M)`/`Par(2,M)` (`1725-1726`), which are default REAL, so each is a
     // single-to-double widening of the value the deck actually stored. `DefaultReal` holds
     // that single-precision value, and `f64::from` reproduces the widening exactly.
     let residual = f64::from(state.mobile_residual_water.0);
     let saturated = f64::from(state.mobile_saturated_water.0);
     // `swr` (`1727`) and `sw_c` (`1728`) are both *double* quotients. `thr`, `ths`, `swr`
-    // and `sw_c` are in the `double precision` list of `1715-1716`, so each division runs at
+    // and `sw_c` are in the `double precision` list of `1716-1717`, so each division runs at
     // double precision on values widened from the single-precision card, and each result is
     // consumed by the double expressions of `1742` and `1745-1746`. Narrowing either
     // quotient to f32 here would put `sw_eff`, `sw_c_eff` and the `1749`/`1756` guards a
@@ -389,11 +388,14 @@ pub(crate) fn size_exclusion(
     let size_exclusion_warning = sw_c < 0.0 || sw_c > 1.0;
     // `ThC=ThNew(1)-ths*sw_c` (`1742`) multiplies `ths` by the *double* `sw_c` (`1728`),
     // subtracts in double, and narrows once into the default REAL `ThC`. The algebraically
-    // identical `ThNew(1)-th_c` is not the source text, and the two disagree here:
-    // `0.6f32 - 0.2f32` in single precision is 0.40000004, whereas
-    // `f64(0.6f32) - f64(1.0) * f64(0.2f32/1.0)` is 0.40000002086, which narrows to exactly
-    // `f32(0.4)`. `ThC` is what `1765-1766` broadcast to every node of `ThNew` *and*
-    // `ThOld`, so that ULP is the water content of the entire profile.
+    // identical single-precision `ThNew(1)-th_c` is not the source text, but on this deck
+    // the two agree: `0.6f32 - 0.2f32` is 0.40000004, and
+    // `f64(0.6f32) - f64(1.0) * f64(0.2f32/1.0)` is 0.40000002086162567, exactly halfway
+    // between the f32 neighbours 0.40000000596 (odd mantissa) and 0.40000003576 (even
+    // mantissa), so round-half-to-even narrows it to 0.40000004. Both differ from
+    // `f32(0.4)` = 0.4000000059604645, and this fixture cannot tell the two forms apart;
+    // the port keeps the source's double form. `ThC` is what `1772-1774` broadcast to every
+    // node of `ThNew` *and* `ThOld`, so that ULP is the water content of the entire profile.
     let new_water_first = f64::from(state.first_node_new_water.0);
     let accessible_water = DefaultReal((new_water_first - saturated * sw_c) as f32);
     // `1744-1746`.
@@ -403,14 +405,14 @@ pub(crate) fn size_exclusion(
     // The colloid relative permeability of `1749-1753`. Record `1751` continues `1750` at
     // column 6, so *both* terms of the difference are live - a port that dropped the second
     // as a continuation comment would keep `kr_c` positive everywhere. Both exponents are
-    // positive, so a `sw_c_eff` of zero is finite; it is `1764`'s `Pc_c`, which this port
+    // positive, so a `sw_c_eff` of zero is finite; it is `1766`'s `Pc_c`, which this port
     // does not model, that carries the routine's only negative exponent.
     let kr_c = if sw_eff > sw_c_eff {
         let c_term = (1.0 - sw_c_eff.powf(1.0 / vgm_2)).powf(vgm_2);
         let w_term = (1.0 - sw_eff.powf(1.0 / vgm_2)).powf(vgm_2);
         square(sw_eff) * (c_term - w_term)
     } else {
-        // `1755`.
+        // `1753`.
         0.0
     };
     // `1756-1763`. This one is a genuine `if`/`else` on `sw_eff.gt.0.0`, and the `else`
@@ -609,10 +611,9 @@ mod tests {
         state.species_concentration[2] = DefaultReal(9.0); // above cRootMax=1.5
         state.minimum_concentration = DefaultReal(0.0);
         let got = root_solute_uptake(&state, true).unwrap().unwrap();
-        // Step 2 overwrites both step-1 values: `175-176` re-clears `SinkS` at the top
-        // of every step and `198` then adds `AUptakeA` to that zero. Node 2 is zero
-        // because `Beta(2)=0` takes the `212-214` branch, not because its active term
-        // vanished; nodes 1 and 3 hold the `cc/(rKM+cc)*Beta*SAUptakeP` product below.
+        // `lActRSU=false` gives `nStep=1`, so only step 1 runs and `SinkS` is the `191`
+        // passive product. Node 1 is zero because `Sink(1)=0`; node 2 is zero because
+        // `Beta(2)=0` takes the `212-214` branch; node 3 is `-20*min(9,1.5)=-30`.
         assert_eq!(
             got.solute_sink,
             vec![DefaultReal(0.0), DefaultReal(0.0), DefaultReal(-30.0)]
@@ -651,19 +652,17 @@ mod tests {
         let got = root_solute_uptake(&state, true).unwrap().unwrap();
         // Passive still uses clamp(Conc,0..1.5)=1.5 against Sink=[0,-10,-20], i.e.
         // [0,-15,-30]. Active uses cc=amax1(Conc-10,0)=0 for every node, so the step-2
-        // term is zero — and because `175-176` re-clears the array at the top of step 2,
-        // what `198` stores is 0 + 0, not the passive value. The clamped passive term is
-        // thus discarded rather than preserved, which is the behaviour a "clean" port
-        // that shared one clamped value between the two branches would silently lose.
-        assert_eq!(
-            got.solute_sink,
-            vec![DefaultReal(0.0), DefaultReal(0.0), DefaultReal(0.0)]
-        );
+        // term is zero. `SinkS` is cleared only once (`174-176`), so `198` stores
+        // passive + 0 and the clamped passive term survives. A "clean" port that shared
+        // one clamped value between the two branches would change the active term.
+        let passive = [0.0_f32, -10.0 * 1.5, -20.0 * 1.5];
+        let expected: Vec<DefaultReal> = passive.iter().map(|p| DefaultReal(p + 0.0)).collect();
+        assert_eq!(got.solute_sink, expected);
     }
 
     /// Active uptake without compensation (`lActRSU=true`, `OmegaS=1.` so `nStep=2`):
     /// `SAUptakeP` comes from the step-1 running integral, `198` adds `AUptakeA`, and
-    /// `203-204` report the same accumulated `Omega`.
+    /// `200-201` report the same accumulated `Omega`.
     #[test]
     fn two_step_active_uptake_adds_the_michaelis_term_to_the_passive_sink() {
         let mut state = uptake();
@@ -699,13 +698,10 @@ mod tests {
         let sa = (50.0_f32 * 0.8 - spu).max(0.0);
         assert_eq!(spu, 300.0);
         assert_eq!(sa, 0.0, "fixture must keep the documented collapse");
-        // `198` adds `AUptakeA` to the array the `175-176` clear just zeroed, and the
-        // term itself is zero, so step 2 reports a clean zero and deliberately *not* the
-        // step-1 passive values.
-        assert_eq!(
-            got.solute_sink,
-            vec![DefaultReal(0.0), DefaultReal(0.0), DefaultReal(0.0)]
-        );
+        // `198` adds `AUptakeA` onto the step-1 passive values (the only clear is
+        // `174-176`), and the term itself is zero, so the sink is the passive product.
+        let expected: Vec<DefaultReal> = passive.iter().map(|p| DefaultReal(p + 0.0)).collect();
+        assert_eq!(got.solute_sink, expected);
         let row = got.profile_record.unwrap();
         assert_eq!(row.passive_uptake, DefaultReal(spu));
         assert_eq!(row.potential_active_uptake, Some(DefaultReal(sa)));
@@ -723,23 +719,55 @@ mod tests {
             .fold(0.0_f32, |acc, (s, w)| acc + s * w);
         let sa = (50.0_f32 * 0.8 - spu).max(0.0);
         assert!(sa > 0.0, "fixture must leave a positive potential");
-        // `196` is one `*`/`/` chain, left to right, and `198` stores it over the zero
-        // the clear left behind — so a two-step run reports the active term *alone*,
-        // with the passive value it conceptually adds to already gone. `199`-`202`
-        // accumulate the same term into a running integral, which `203-204` report.
+        // `196` is one `*`/`/` chain, left to right, and `198` adds it onto the step-1
+        // passive value, so a two-step run reports passive + active. `197`-`202`
+        // accumulate the same term into a running integral, which `200-201` report.
         let cc = [2.0_f32, 3.0, 4.0];
         let mut omega = 0.0_f32;
         let mut expected = Vec::new();
         for i in 0..3 {
             let active = cc[i] / (1.0 + cc[i]) * 1.0 * sa;
             omega += active * dx[i];
-            expected.push(DefaultReal(active));
+            expected.push(DefaultReal(passive[i] + active));
         }
         assert_eq!(got.solute_sink, expected);
         let row = got.profile_record.unwrap();
         assert_eq!(row.potential_active_uptake, Some(DefaultReal(sa)));
         assert_eq!(row.actual_active_uptake, DefaultReal(omega));
         assert_eq!(row.uncompensated_active_uptake, Some(DefaultReal(omega)));
+    }
+
+    /// Discriminates the once-per-call clear: after a two-step run on nodes with
+    /// `Beta>0` and nonzero passive uptake, `SinkS` is passive + active (`191` then
+    /// `198`), neither the active term alone nor the passive term alone.
+    #[test]
+    fn two_step_run_final_sink_is_passive_plus_active_not_active_alone() {
+        let mut state = uptake();
+        state.active_uptake = true;
+        state.solute_stress_index = DefaultReal(1.0);
+        state.potential_uptake = DefaultReal(50.0);
+        state.minimum_concentration = DefaultReal(0.0);
+        state.michaelis_constant = DefaultReal(1.0);
+        state.root_water_sink = vec![DefaultReal(-400.0), DefaultReal(-10.0), DefaultReal(-20.0)];
+        let dx = dx_m(&[0.0, -10.0, -20.0]);
+        let passive = [-400.0_f32 * 1.5, -10.0 * 1.5, -20.0 * 1.5];
+        let spu = passive
+            .iter()
+            .zip(&dx)
+            .fold(0.0_f32, |acc, (s, w)| acc + s * w);
+        let sa = (50.0_f32 * 0.8 - spu).max(0.0);
+        assert!(sa > 0.0, "fixture must leave a positive potential");
+        let cc = [2.0_f32, 3.0, 4.0];
+        let active: Vec<f32> = cc.iter().map(|c| c / (1.0 + c) * 1.0 * sa).collect();
+        let got = root_solute_uptake(&state, true).unwrap().unwrap();
+        let expected: Vec<DefaultReal> = (0..3)
+            .map(|i| DefaultReal(passive[i] + active[i]))
+            .collect();
+        assert_eq!(got.solute_sink, expected);
+        for i in 0..3 {
+            assert_ne!(got.solute_sink[i].0, active[i], "node {i}: active alone");
+            assert_ne!(got.solute_sink[i].0, passive[i], "node {i}: passive alone");
+        }
     }
 
     /// A three-step run (`lActRSU` with `OmegaS.lt.1.`, so `nStep=3`) deliberately skips
@@ -759,7 +787,8 @@ mod tests {
         // without one the step-3 loop reads an undefined value (see the next test).
         state.root_water_sink = vec![DefaultReal(-400.0), DefaultReal(-10.0), DefaultReal(-20.0)];
         let dx = dx_m(&[0.0, -10.0, -20.0]);
-        let spu = [-400.0_f32 * 1.5, -10.0 * 1.5, -20.0 * 1.5]
+        let passive = [-400.0_f32 * 1.5, -10.0 * 1.5, -20.0 * 1.5];
+        let spu = passive
             .iter()
             .zip(&dx)
             .fold(0.0_f32, |acc, (s, w)| acc + s * w);
@@ -768,7 +797,7 @@ mod tests {
         let omega_s = 0.5_f32;
 
         // Step 2, replayed exactly: `196` per node, `199` accumulates, `202` stores the
-        // running ratio. `198` is guarded off, so the array keeps its `175-176` zeros.
+        // running ratio. `198` is guarded off, so step 2 leaves the step-1 passive values untouched.
         let mut running = 0.0_f32;
         let mut omega1 = Vec::new();
         for i in 0..3 {
@@ -780,7 +809,7 @@ mod tests {
         // Step 3, replayed exactly. `205`/`206` run per node against the `Omega1` left
         // over from step 2 *as it stood when this node was reached* — Fortran reads the
         // same scalar every iteration, so the value is the final one from step 2 for
-        // every node of step 3 — and `Compen` is a `1.`-initialised local (`158`) that
+        // every node of step 3 — and `Compen` is a `1.`-initialised local (`163`) that
         // is never reset between nodes.
         let omega1_final = *omega1.last().unwrap();
         let mut compen = 1.0_f32;
@@ -794,8 +823,8 @@ mod tests {
         let mut compensated = 0.0_f32;
         for i in 0..3 {
             let active = cc[i] / (1.0 + cc[i]) * 1.0 * sa / compen;
-            // `209` adds to the step-3 zero, so the passive value is gone here too.
-            expected.push(DefaultReal(active));
+            // `209` adds onto the step-1 passive value; step 2 added nothing.
+            expected.push(DefaultReal(passive[i] + active));
             compensated += active * dx[i];
         }
         let got = root_solute_uptake(&state, true).unwrap().unwrap();
@@ -827,7 +856,7 @@ mod tests {
         assert!(err.contains("Omega1"), "{err}");
     }
 
-    /// A profile with no roots at all never reaches `196`, `199`-`202` or `207-210`:
+    /// A profile with no roots at all never reaches `196`, `197`-`202` or `207-210`:
     /// `181`/`212-214` sends every node to `SinkS(i)=0.` on every step, so the undefined
     /// reads of `SAUptakeP` and `Omega1` are *guarded* and the run is legal. This is the
     /// case a defensive port gets wrong in the other direction, by rejecting a profile
@@ -846,8 +875,8 @@ mod tests {
                 got.solute_sink,
                 vec![DefaultReal(0.0), DefaultReal(0.0), DefaultReal(0.0)]
             );
-            // The `190` guard never fires, so `191`-`194` never run: `SPUptake` keeps its
-            // `167` zero and `SAUptakeP` is never assigned, yet the profile row is still
+            // The `181` guard never fires, so `191`-`194` never run: `SPUptake` keeps its
+            // `173` zero and `SAUptakeP` is never assigned, yet the profile row is still
             // written because `216` only tests `iStep.eq.nStep.and.jS.eq.NS`.
             let row = got.profile_record.unwrap();
             assert_eq!(row.passive_uptake, DefaultReal(0.0));
@@ -858,10 +887,10 @@ mod tests {
     }
 
     /// `194` assigns `SAUptakeP` inside the `Beta(i).gt.0.` branch, so it is defined for
-    /// every node step 2 or step 3 reaches: the `195`/`218` `else if` arms sit in the
-    /// *same* `Beta` guard as the `190` arm that assigns it. A "node that skipped step 1"
+    /// every node step 2 or step 3 reaches: the `195`/`203` `else if` arms sit in the
+    /// *same* `Beta` guard (`181`) as the `190` arm that assigns it. A "node that skipped step 1"
     /// therefore cannot occur, and a port that only reaches step 2 when `SAUptakeP` is
-    /// positive (the `201` guard is the sole assignment of `Omega1`) cannot reach an
+    /// positive (the `202` guard is the sole assignment of `Omega1`) cannot reach an
     /// undefined `205` read either. This test pins that down as a positive result: the
     /// profiles that look like undefined reads are simply defined.
     #[test]
@@ -881,7 +910,16 @@ mod tests {
         state.solute_stress_index = DefaultReal(0.5);
         state.root_water_sink = vec![DefaultReal(-400.0), DefaultReal(-10.0), DefaultReal(-20.0)];
         let got = root_solute_uptake(&state, true).unwrap().unwrap();
-        assert!(got.solute_sink[0].0 > 0.0);
+        // Node 1 only: `SinkS(1)` is the `191` passive product plus the `209` compensated
+        // active term (`SinkS` is cleared once, `174-176`), evaluated in source order.
+        let passive = -400.0_f32 * 1.5;
+        let spu = passive * 5.0;
+        let sa = (0.0_f32 * 0.8 - spu).max(0.0);
+        let omega = 2.0_f32 / (1.0 + 2.0) * 1.0 * sa * 5.0;
+        let omega1 = omega / sa;
+        let compen = if omega1 >= 0.5 { omega1 } else { 0.5 };
+        let active = 2.0_f32 / (1.0 + 2.0) * 1.0 * sa / compen;
+        assert_eq!(got.solute_sink[0], DefaultReal(passive + active));
         assert_eq!(got.solute_sink[1], DefaultReal(0.0));
     }
 
@@ -1007,28 +1045,28 @@ mod tests {
         else {
             unreachable!()
         };
-        // `ThC` (`1742`) is `ThNew(1) - th_c`: one subtraction of the two card values,
-        // narrowed once into the default REAL `ThC` and then broadcast unchanged to every
-        // node by `1765-1766`. Two plausible rewrites of that line are wrong: the
-        // algebraically identical `ThNew(1) - swr*ths` (`1727`/`1728`) is not the source
-        // text, and a fully single-precision evaluation lands one ULP elsewhere.
+        // `ThC` (`1742`) is `ThNew(1)-ths*sw_c`, evaluated in double and narrowed once
+        // into the default REAL `ThC`, then broadcast unchanged to every node by
+        // `1772-1777`. The algebraically identical `ThNew(1) - swr*ths` (`1727`/`1728`)
+        // is not the source text. A fully single-precision `ThNew(1) - th_c` happens to
+        // give the same value on this deck, so this fixture does not separate the forms.
         let th_c = DefaultReal({
             let (th_new, ths, card) = (0.6_f32, 1.0_f32, 0.2_f32);
             let sw_c = f64::from(card) / f64::from(ths); // `1728`, a true double
             (f64::from(th_new) - f64::from(ths) * sw_c) as f32 // `1742`, narrowed once
         });
-        // One ULP above the decimal 0.4, and one below the single-precision rewrite
-        // `0.6f32 - 0.2f32`. The double subtraction `f64(0.6f32) - f64(0.2f32)` lands on
-        // 0.40000002086162566, exactly halfway between the two neighbouring f32 values, so
-        // the narrowing breaks the tie to even and picks the upper one. An expectation
-        // written from the decimal literal, or from the "obvious" single-precision
-        // subtraction, is wrong either way.
+        // One ULP above the decimal 0.4, and equal to the single-precision rewrite
+        // `0.6f32 - 0.2f32` (0.40000004). The double subtraction
+        // `f64(0.6f32) - f64(0.2f32)` lands on 0.40000002086162567, exactly halfway
+        // between the two neighbouring f32 values, so the narrowing breaks the tie to even
+        // and picks the upper one. An expectation written from the decimal literal 0.4 is
+        // wrong.
         assert_ne!(th_c, DefaultReal(0.4f32));
         assert_eq!(new_water, &vec![th_c; 3]);
         assert_eq!(old_water, new_water);
         // `1744-1746`. `sw_eff` is positive here (0.555555580...), which the `1756` guard
         // needs, and `sw_eff > sw_c_eff`, which the `1749` guard needs, so `kr_c` takes
-        // the `1750-1751` expression rather than the `1755` zero. Both `/2.` exponents are
+        // the `1750-1751` expression rather than the `1753` zero. Both `/2.` exponents are
         // integer and `1751` runs on from `1750`, so both differences are live.
         let sw_r = f64::from(0.1_f32) / f64::from(1.0_f32);
         let sw_c = f64::from(0.2_f32) / f64::from(1.0_f32);
@@ -1060,7 +1098,7 @@ mod tests {
     /// `1751`'s fractional powers of a negative base are NaN on every Fortran runtime
     /// this side of a complex extension: a negative `th_c` gives `sw_c_eff < 0`, and a
     /// `th_c` above `thr` gives `kr_c == 0.0` from the `1749` guard times `1/0.0` from
-    /// `1752`'s `(1-1)^-1.5`, i.e. `0 * inf`. The port rejects both as non-finite rather
+    /// `1751`'s `(1-1)^-1.5`, i.e. `0 * inf`. The port rejects both as non-finite rather
     /// than broadcasting the NaN, which is exactly the difference between a simulation
     /// that stops here and one that loses `ThNew`, `ThOld`, `vNew` and `vOld` to NaN.
     #[test]
@@ -1072,7 +1110,7 @@ mod tests {
         let err = size_exclusion(&state, true, false).unwrap_err();
         assert!(err.contains("1742/1759"), "{err}");
         // Above the saturated value: sw_c > 1 trips the same warning, `1749`'s guard
-        // *fails* so `kr_c` takes the `1755` zero, and `1759` is then
+        // *fails* so `kr_c` takes the `1753` zero, and `1759` is then
         // `vNew(1) * 0.0 / 0.0211...` - zero, not NaN. The exclusion therefore "works"
         // and broadcasts a water content of `ThNew(1) - th_c = -0.6`, i.e. a negative
         // water profile into `ThNew` and `ThOld`, with a zero velocity. That is the shape
