@@ -14,6 +14,10 @@
 | [0010](0010-preserve-source-operation-order-and-precision.md) | Preserve source operation order and precision | Accepted | 2026-10-08 | - | - | Orch 18 |
 | [0011](0011-add-dependencies-only-by-approved-plan-amendment.md) | Add dependencies only by approved plan amendment | Accepted | 2026-10-09 | - | - | Orch 13; Orch 18 amendment |
 | [0012](0012-keep-reference-build-array-capacity-and-output-formats.md) | Keep the reference build's array capacity and output formats | Accepted | 2026-09-26 | - | - | Orch 13 |
+| [0013](0013-select-solute-backend-with-a-closed-enum.md) | Select the solute backend with a closed enum | Accepted | 2026-10-14 | - | - | Orch 19 |
+| [0014](0014-validate-kernel-primitive-state-in-the-kernel.md) | Validate kernel primitive state in the kernel | Accepted | 2026-10-14 | - | - | Orch 19 |
+| [0015](0015-keep-precision-faithful-hydraulic-ports-in-compat-kernels.md) | Keep precision-faithful hydraulic ports in compat kernels | Accepted | 2026-10-14 | - | - | Orch 19 |
+| [0016](0016-add-serde-derive-for-request-decoding.md) | Add serde derive for request decoding | Accepted | 2026-10-14 | - | - | Orch 19 |
 
 ## Scope and Status Notes
 
