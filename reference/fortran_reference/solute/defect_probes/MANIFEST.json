@@ -1,0 +1,218 @@
+{
+  "schema_version": "hydrus-defect-probe-manifest-v1",
+  "description": "Input decks and expected comparison results for source defects SD-001 and SD-002 against pinned HYDRUS Fortran reference",
+  "entries": [
+    {
+      "sd_id": "SD-001",
+      "title": "MassInit scales Henry constant by sorption temperature coefficient",
+      "description": "In MassInit (SOLUTE.FOR:1933), Par(6)=ChPar(jjj+10,M)*exp(TDep(jjj+7)*TT). Correct code would use TDep(jjj+10), but pinned code uses TDep(jjj+7).",
+      "pairs": {
+        "defect": {
+          "deck_a": "sd001_defect_a",
+          "deck_b": "sd001_defect_b",
+          "varied_input": {
+            "file": "SELECTOR.IN",
+            "line_description": "Block D Temperature coefficient records for species 1 (line 60, token 4)",
+            "parameter": "TDep(jjj+10) (Henry constant temperature factor)",
+            "value_a": 0.0,
+            "value_b": 5000.0
+          },
+          "compared_output": {
+            "file": "NOD_INF.OUT",
+            "time": 0.0,
+            "variable": "Conc(1)",
+            "nodes": "all (1..9)",
+            "description": "Initial liquid concentration from total mass initialization at t=0"
+          },
+          "expected_pinned_result": "identical"
+        },
+        "control": {
+          "deck_a": "sd001_control_a",
+          "deck_b": "sd001_control_b",
+          "varied_input": {
+            "file": "SELECTOR.IN",
+            "line_description": "Block D Temperature coefficient records for species 1 (line 60, token 1)",
+            "parameter": "TDep(jjj+7) (Sorption coefficient temperature factor)",
+            "value_a": 500.0,
+            "value_b": 5000.0
+          },
+          "compared_output": {
+            "file": "NOD_INF.OUT",
+            "time": 0.0,
+            "variable": "Conc(1)",
+            "nodes": "all (1..9)",
+            "description": "Initial liquid concentration from total mass initialization at t=0"
+          },
+          "expected_pinned_result": "different"
+        }
+      }
+    },
+    {
+      "sd_id": "SD-002",
+      "title": "Bacteria second-site sorption uses first site rates",
+      "description": "In NonEqInit (SOLUTE.FOR:1698) and MassInit (SOLUTE.FOR:1942), xKs2=Theta(i)*rKa1/ro/rKd1 reuses site 1 attachment/detachment rates instead of rKa2/rKd2.",
+      "pairs": {
+        "defect": {
+          "deck_a": "sd002_defect_a",
+          "deck_b": "sd002_defect_b",
+          "varied_input": {
+            "file": "SELECTOR.IN",
+            "line_description": "Block D Species 1 ChPar line 47 (token 10)",
+            "parameter": "rKa2 (second site attachment rate)",
+            "value_a": 2.0,
+            "value_b": 8.0
+          },
+          "compared_output": {
+            "file": "NOD_INF.OUT",
+            "time": 0.0,
+            "variable": "Sorb2(1)",
+            "nodes": "all (1..9)",
+            "description": "Initial nonequilibrium second-site sorbed concentration at t=0"
+          },
+          "expected_pinned_result": "identical"
+        },
+        "control": {
+          "deck_a": "sd002_control_a",
+          "deck_b": "sd002_control_b",
+          "varied_input": {
+            "file": "SELECTOR.IN",
+            "line_description": "Block D Species 1 ChPar line 47 (token 13)",
+            "parameter": "rKa1 (first site attachment rate)",
+            "value_a": 0.5,
+            "value_b": 2.5
+          },
+          "compared_output": {
+            "file": "NOD_INF.OUT",
+            "time": 0.0,
+            "variable": "Sorb(1) and Sorb2(1)",
+            "nodes": "all (1..9)",
+            "description": "Initial nonequilibrium sorbed concentrations at t=0"
+          },
+          "expected_pinned_result": "different"
+        }
+      }
+    }
+  ],
+  "decks": {
+    "sd001_defect_a": {
+      "relative_path": "reference/fortran_reference/solute/defect_probes/sd001_defect_a",
+      "inputs": {
+        "SELECTOR.IN": "da01da67f10a0ef31cefd3e51da72e52d5494cf1c1201eb974efa8d465282ece",
+        "PROFILE.DAT": "72e0d827c8b3fda92cbed8489ea957f044cd981ce71d791dbf4c06568dc2371f"
+      },
+      "authenticated_outputs": {
+        "I_CHECK.OUT": "25bea64c9e8a4c04e11d03c06dbbb2e9322a192190707b5cb61d5f60881fb652",
+        "RUN_INF.OUT": "45a4c0b3907cb20d58f3efcb376468b70711d5612fc0fef2e7402c3920656e99",
+        "T_LEVEL.OUT": "19f2a41bc94d5a930ca64a0f3d3914a671f5091ef76cabbc1ae66c11b662be33",
+        "NOD_INF.OUT": "7463afed88c8f72f1605ec1cd1100ef0483d1674ab07d03167b92b28d5dd79df",
+        "BALANCE.OUT": "50d3c8f187b47dedfc65a7edbb7490838dba100c705dcb454411dbd3aa705974",
+        "solute1.out": "3594eb768399d9f9993ba8c83f2ae5eaab52b630215cf1b14172233ddfe7e396"
+      }
+    },
+    "sd001_defect_b": {
+      "relative_path": "reference/fortran_reference/solute/defect_probes/sd001_defect_b",
+      "inputs": {
+        "SELECTOR.IN": "7f655b2dd8a58f69c9639c47d40ac0ad90b66797b15a2946e97c01709454ade8",
+        "PROFILE.DAT": "72e0d827c8b3fda92cbed8489ea957f044cd981ce71d791dbf4c06568dc2371f"
+      },
+      "authenticated_outputs": {
+        "I_CHECK.OUT": "25bea64c9e8a4c04e11d03c06dbbb2e9322a192190707b5cb61d5f60881fb652",
+        "RUN_INF.OUT": "45a4c0b3907cb20d58f3efcb376468b70711d5612fc0fef2e7402c3920656e99",
+        "T_LEVEL.OUT": "19f2a41bc94d5a930ca64a0f3d3914a671f5091ef76cabbc1ae66c11b662be33",
+        "NOD_INF.OUT": "7463afed88c8f72f1605ec1cd1100ef0483d1674ab07d03167b92b28d5dd79df",
+        "BALANCE.OUT": "50d3c8f187b47dedfc65a7edbb7490838dba100c705dcb454411dbd3aa705974",
+        "solute1.out": "3594eb768399d9f9993ba8c83f2ae5eaab52b630215cf1b14172233ddfe7e396"
+      }
+    },
+    "sd001_control_a": {
+      "relative_path": "reference/fortran_reference/solute/defect_probes/sd001_control_a",
+      "inputs": {
+        "SELECTOR.IN": "da01da67f10a0ef31cefd3e51da72e52d5494cf1c1201eb974efa8d465282ece",
+        "PROFILE.DAT": "72e0d827c8b3fda92cbed8489ea957f044cd981ce71d791dbf4c06568dc2371f"
+      },
+      "authenticated_outputs": {
+        "I_CHECK.OUT": "fe18b2d64429d742c3d6ee831324542214696e8e6d525b984a40673e72d6370b",
+        "RUN_INF.OUT": "38cefd64c74ce9db4f51b698ce5120aaee44bcb3536584ffffc34f93923199be",
+        "T_LEVEL.OUT": "cebde97ce1cca686609b500bbf146d384f9967ea9d8ca74d03b0f18812ffd163",
+        "NOD_INF.OUT": "95f297962ac20b21faf5b067a847a4f60d8d2a7d4a9a2e3d8baaed878a5947a6",
+        "BALANCE.OUT": "bc16824502a452d900ba320fdd238edd94ad8245c1806764fde4708d8cf94ec3",
+        "solute1.out": "3594eb768399d9f9993ba8c83f2ae5eaab52b630215cf1b14172233ddfe7e396"
+      }
+    },
+    "sd001_control_b": {
+      "relative_path": "reference/fortran_reference/solute/defect_probes/sd001_control_b",
+      "inputs": {
+        "SELECTOR.IN": "89ca86e516cb0d01dc34c0f3feb5dff855259fef3509f97bc310dde3603a8a04",
+        "PROFILE.DAT": "72e0d827c8b3fda92cbed8489ea957f044cd981ce71d791dbf4c06568dc2371f"
+      },
+      "authenticated_outputs": {
+        "I_CHECK.OUT": "b1ceb0d26d9f5bdf760f2db9928548340ca4805b17b2746f369a83ee9a1b0797",
+        "RUN_INF.OUT": "7481f0cb9308b7e86c0730e2d8d125483be6fec59df7fdba18d0a2a60e1238bc",
+        "T_LEVEL.OUT": "96fdf88d0f88d11bf8e550a834789e72e4bd304a269a3673e48e81eac6442bf7",
+        "NOD_INF.OUT": "1d09aa4b4ade7e73fbe5c4604c6fbcbcbf2b9691c2fd921cfb20bea531ff33bb",
+        "BALANCE.OUT": "8d5ca85cd006ace5593269ac43246ececf1d19177e7c8ece6e46a37b41d496d4",
+        "solute1.out": "a8a37c95d9154440fc8a74b2eae2bb6fcc592361c4d69b54e931d0479dea666d"
+      }
+    },
+    "sd002_defect_a": {
+      "relative_path": "reference/fortran_reference/solute/defect_probes/sd002_defect_a",
+      "inputs": {
+        "SELECTOR.IN": "bfa44266171d8960136c92985a3b2c81f8b8749be980dd3d6d5ec843dd481804",
+        "PROFILE.DAT": "f7cbd0bc8a6a91d823f83f4137954914329cad0b00c4bb40f77850dc4b84c390"
+      },
+      "authenticated_outputs": {
+        "I_CHECK.OUT": "f0aa2e1d420975feee1b37076c558075ecc877a1b2b282e6f6b97e90e6ed4d6e",
+        "RUN_INF.OUT": "0e31d179c7efea57aaa3d02cd3b455a8161b04281ea74cd7b9d7cf8e121b4088",
+        "T_LEVEL.OUT": "2cf5bfa8ff96c0c58bc0a5bc585e68970414a5d8026efa977eab196f2a0440d1",
+        "NOD_INF.OUT": "fba2a0d57d6a180ba76eb7b1b9e933ed385ffca20db2a5f0609d922976d9ceaa",
+        "BALANCE.OUT": "9659f35e348d12f739327370b39627b4289a08290f9deaa714068aa5178e4fc1",
+        "solute1.out": "438dca3e2770e5ce21ca286bcce39b435c571d88d34eff4ef2fbef525a759574"
+      }
+    },
+    "sd002_defect_b": {
+      "relative_path": "reference/fortran_reference/solute/defect_probes/sd002_defect_b",
+      "inputs": {
+        "SELECTOR.IN": "7c74a8b4330c9c5f1166c7e7f624b4d049be6de966f3f5eef0b4aea9a374c737",
+        "PROFILE.DAT": "f7cbd0bc8a6a91d823f83f4137954914329cad0b00c4bb40f77850dc4b84c390"
+      },
+      "authenticated_outputs": {
+        "I_CHECK.OUT": "b4415fccd0c1a9047b74ca4d7894ed6c12978c3ebe7a120c4a2bae31c42a4bc8",
+        "RUN_INF.OUT": "a40730c51abe27ff048d8f0671c74416dd12c73a891b36089a028cc063b71b64",
+        "T_LEVEL.OUT": "4c28cab1b43a48533d740659fe1b6dfe851e374f6a1b2d1cd9a76a25107f991d",
+        "NOD_INF.OUT": "7555b97a56cb3833aabf9adcaab768334013d58e206f21262ec9628d4896d12a",
+        "BALANCE.OUT": "b37601c4431f9ed5ae0549ea0fbc94f6ca92b79975893cb2960a97006d40fe1a",
+        "solute1.out": "438dca3e2770e5ce21ca286bcce39b435c571d88d34eff4ef2fbef525a759574"
+      }
+    },
+    "sd002_control_a": {
+      "relative_path": "reference/fortran_reference/solute/defect_probes/sd002_control_a",
+      "inputs": {
+        "SELECTOR.IN": "bfa44266171d8960136c92985a3b2c81f8b8749be980dd3d6d5ec843dd481804",
+        "PROFILE.DAT": "f7cbd0bc8a6a91d823f83f4137954914329cad0b00c4bb40f77850dc4b84c390"
+      },
+      "authenticated_outputs": {
+        "I_CHECK.OUT": "b81af0bebad543aa3b5575df706f1634ebe26de5726ebc1150dacc5ecff3c4bc",
+        "RUN_INF.OUT": "b514c69c35b764a48788464bfe4dc34bf0da2286d38abfb0e530f8b529b171b8",
+        "T_LEVEL.OUT": "a0665074ec1e1f31e6e8f511b436ed5fca92d0398d370f414166f3a3f399044e",
+        "NOD_INF.OUT": "27398353a9fa613b84be420b27b774b4657570f74bbc363c2d799c4cc37e5a5c",
+        "BALANCE.OUT": "90404266b2aa438196879ecb6b47aa0f28af1eff169726648cb1c97081b865fb",
+        "solute1.out": "438dca3e2770e5ce21ca286bcce39b435c571d88d34eff4ef2fbef525a759574"
+      }
+    },
+    "sd002_control_b": {
+      "relative_path": "reference/fortran_reference/solute/defect_probes/sd002_control_b",
+      "inputs": {
+        "SELECTOR.IN": "194e023818490dcdc224d6ffe266206ac11cb32416222990b28be6cb7ceb0835",
+        "PROFILE.DAT": "f7cbd0bc8a6a91d823f83f4137954914329cad0b00c4bb40f77850dc4b84c390"
+      },
+      "authenticated_outputs": {
+        "I_CHECK.OUT": "8440939cf2e9c4643c2d6e3499f77e8c9fa8a0e0468544b7312689696fe46caa",
+        "RUN_INF.OUT": "b514c69c35b764a48788464bfe4dc34bf0da2286d38abfb0e530f8b529b171b8",
+        "T_LEVEL.OUT": "a0665074ec1e1f31e6e8f511b436ed5fca92d0398d370f414166f3a3f399044e",
+        "NOD_INF.OUT": "58c6e099784f0c51672dec9da1db623f1c26da1558323efcf44a3345243a93f3",
+        "BALANCE.OUT": "b783b84919461be0e6dc59deabb0ace57cff07e188342689e4470e756a12648b",
+        "solute1.out": "054e8daed090e496dd90759e26e397d98f22fe6cd86f3573d78ac58e8ec48575"
+      }
+    }
+  }
+}
