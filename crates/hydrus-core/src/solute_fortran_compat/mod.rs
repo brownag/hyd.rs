@@ -11,6 +11,7 @@ mod assembly;
 mod biology;
 #[allow(dead_code)] // wired by 18.10.1
 mod boundary;
+#[allow(dead_code)] // wired by 18.10.1
 mod deposition;
 mod driver;
 #[allow(dead_code)] // wired by 18.10.1
