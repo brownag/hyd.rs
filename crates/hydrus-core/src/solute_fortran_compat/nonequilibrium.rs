@@ -320,6 +320,135 @@ pub(crate) fn nequil(
     })
 }
 
+/// Inputs of the mobile/immobile water selection, `SOLUTE.FOR:277-318`.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) struct ImmobileWaterSpec {
+    /// `Level.eq.NLevel` (`ThN`/`ThImobO` branch) versus the old-level branch.
+    pub final_level: bool,
+    /// `lMobIm(M)`.
+    pub mobile_immobile: bool,
+    /// `iDualPor`; positive values are 18.9.3's `ThNIm`/`ThOIm` path and are rejected.
+    pub dual_porosity: u8,
+    /// `lBact`; the caller supplies the flag, the zeroing itself is 18.9.4's.
+    pub bacteria: bool,
+    /// `ThN(i)` at the final level, `ThO(i)` otherwise.
+    pub theta: f32,
+    pub theta_sat: f32,
+    /// `ChPar(4,M)`.
+    pub chpar_th_imob: f32,
+    /// `ThN(j)`/`ThO(j)`; `None` for the last node (`i.eq.NumNP`).
+    pub theta_next: Option<f32>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) struct ImmobileWater {
+    /// `ThW`, reduced to `max(ThW-ThImob, 0.001)` when the guard holds.
+    pub th_w: f32,
+    /// `ThG=max(0,thSat-ThW)` evaluated *before* the reduction (source order).
+    pub th_g: f32,
+    /// `ThImob`; `None` when the guard fails and the source leaves it unassigned.
+    pub th_imob: Option<f32>,
+    /// `ThImobO=ThImob` is assigned only at `Level.eq.NLevel` (`SOLUTE.FOR:283`). The
+    /// old-level branch (303-305) never assigns it, so it keeps a stale value: `None`.
+    pub th_imob_o: Option<f32>,
+    /// `Thj`, reduced under the same guard.
+    pub th_next: Option<f32>,
+}
+
+/// `ThW`/`ThImob` selection for the mobile-immobile model (`iDualPor.eq.0` or `lBact`).
+pub(crate) fn immobile_water(spec: &ImmobileWaterSpec) -> Result<ImmobileWater, KernelError> {
+    if spec.dual_porosity > 0 {
+        return Err("iDualPor>0 ThImob selection belongs to the dual-domain kernel");
+    }
+    let finite = spec.theta.is_finite()
+        && spec.theta_sat.is_finite()
+        && spec.chpar_th_imob.is_finite()
+        && spec.theta_next.is_none_or(f32::is_finite);
+    if !finite {
+        return Err("non-finite water content input");
+    }
+    let th_g = (spec.theta_sat - spec.theta).max(0.0);
+    if !(spec.mobile_immobile || spec.bacteria) {
+        return Ok(ImmobileWater {
+            th_w: spec.theta,
+            th_g,
+            th_imob: None,
+            th_imob_o: None,
+            th_next: spec.theta_next,
+        });
+    }
+    let im = spec.chpar_th_imob;
+    Ok(ImmobileWater {
+        th_w: (spec.theta - im).max(0.001),
+        th_g,
+        th_imob: Some(im),
+        th_imob_o: spec.final_level.then_some(im),
+        th_next: spec.theta_next.map(|t| (t - im).max(0.001)),
+    })
+}
+
+/// Raw parameters of the `Omega`/`OmegaS`/`f_em` assignments (`SOLUTE.FOR:370-373`, `494`).
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) struct OmegaSpec {
+    pub final_level: bool,
+    pub dual_neq: bool,
+    /// `ChPar(jjj+20,M)`, `TDep(jjj+20)`.
+    pub chpar_omega: f32,
+    pub tdep_omega: f32,
+    /// `ChPar(jjj+16,M)`, `TDep(jjj+16)` (read only when `lDualNEq`).
+    pub chpar_omega_s: f32,
+    pub tdep_omega_s: f32,
+    /// `ChPar(jjj+13,M)`, `TDep(jjj+13)` (read only when `lDualNEq`).
+    pub chpar_f_em: f32,
+    pub tdep_f_em: f32,
+    /// Temperature factors `TT` (new/current level) and `TTO` (old level).
+    pub tt: f32,
+    pub tto: f32,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) struct OmegaTerms {
+    pub omega: f32,
+    /// Assigned only at `Level.eq.NLevel` (`SOLUTE.FOR:494`); otherwise `None`.
+    pub omega_o: Option<f32>,
+    /// `None` unless `lDualNEq` (the source leaves `OmegaS` unassigned).
+    pub omega_s: Option<f32>,
+    /// `1.` unless `lDualNEq`.
+    pub f_em: f32,
+}
+
+/// Source values of `Omega`, `OmegaO`, `OmegaS`, `f_em`. No `lBact` handling: the caller
+/// applies the 18.9.4 zeroing of `Omega`/`OmegaO` afterwards.
+pub(crate) fn omega_terms(spec: &OmegaSpec) -> Result<OmegaTerms, KernelError> {
+    let all = [
+        spec.chpar_omega,
+        spec.tdep_omega,
+        spec.chpar_omega_s,
+        spec.tdep_omega_s,
+        spec.chpar_f_em,
+        spec.tdep_f_em,
+        spec.tt,
+        spec.tto,
+    ];
+    if all.iter().any(|v| !v.is_finite()) {
+        return Err("non-finite Omega input");
+    }
+    Ok(OmegaTerms {
+        omega: spec.chpar_omega * (spec.tdep_omega * spec.tt).exp(),
+        omega_o: spec
+            .final_level
+            .then(|| spec.chpar_omega * (spec.tdep_omega * spec.tto).exp()),
+        omega_s: spec
+            .dual_neq
+            .then(|| spec.chpar_omega_s * (spec.tdep_omega_s * spec.tt).exp()),
+        f_em: if spec.dual_neq {
+            spec.chpar_f_em * (spec.tdep_f_em * spec.tt).exp()
+        } else {
+            1.0
+        },
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -600,5 +729,103 @@ mod tests {
         assert!(call(&mut f, 2, flags()).is_err());
         f.sorb_n.clear();
         assert!(call(&mut f, 0, flags()).is_err());
+    }
+
+    fn water_spec() -> ImmobileWaterSpec {
+        ImmobileWaterSpec {
+            final_level: true,
+            mobile_immobile: true,
+            dual_porosity: 0,
+            bacteria: false,
+            theta: 0.30,
+            theta_sat: 0.45,
+            chpar_th_imob: 0.12,
+            theta_next: Some(0.10),
+        }
+    }
+
+    #[test]
+    fn immobile_water_reduction_and_floor() {
+        let w = immobile_water(&water_spec()).unwrap();
+        close(w.th_w, 0.18);
+        close(w.th_g, 0.15);
+        assert_eq!(w.th_imob, Some(0.12));
+        assert_eq!(w.th_imob_o, Some(0.12));
+        assert_eq!(w.th_next, Some(0.001)); // 0.10-0.12 floored
+    }
+
+    #[test]
+    fn immobile_water_old_level_leaves_th_imob_o_stale() {
+        let mut s = water_spec();
+        s.final_level = false;
+        let w = immobile_water(&s).unwrap();
+        assert_eq!(w.th_imob, Some(0.12));
+        assert_eq!(w.th_imob_o, None);
+    }
+
+    #[test]
+    fn immobile_water_guard_off_and_bact_and_dual() {
+        let mut s = water_spec();
+        s.mobile_immobile = false;
+        let w = immobile_water(&s).unwrap();
+        assert_eq!((w.th_w, w.th_imob, w.th_imob_o), (0.30, None, None));
+        assert_eq!(w.th_next, Some(0.10));
+        s.bacteria = true;
+        assert_eq!(immobile_water(&s).unwrap().th_imob, Some(0.12));
+        s.dual_porosity = 1;
+        assert!(immobile_water(&s).is_err());
+        let mut n = water_spec();
+        n.theta = f32::NAN;
+        assert!(immobile_water(&n).is_err());
+    }
+
+    fn omega_spec() -> OmegaSpec {
+        OmegaSpec {
+            final_level: true,
+            dual_neq: true,
+            chpar_omega: 0.2,
+            tdep_omega: 3.0,
+            chpar_omega_s: 0.05,
+            tdep_omega_s: 2.0,
+            chpar_f_em: 0.7,
+            tdep_f_em: 1.0,
+            tt: 0.01,
+            tto: 0.02,
+        }
+    }
+
+    #[test]
+    fn omega_terms_temperature_scaling() {
+        let o = omega_terms(&omega_spec()).unwrap();
+        close(o.omega, 0.2 * (3.0_f64 * 0.01).exp());
+        close(o.omega_o.unwrap(), 0.2 * (3.0_f64 * 0.02).exp());
+        close(o.omega_s.unwrap(), 0.05 * (2.0_f64 * 0.01).exp());
+        close(o.f_em, 0.7 * (1.0_f64 * 0.01).exp());
+    }
+
+    #[test]
+    fn omega_terms_availability() {
+        let mut s = omega_spec();
+        s.dual_neq = false;
+        s.final_level = false;
+        let o = omega_terms(&s).unwrap();
+        assert_eq!((o.omega_o, o.omega_s, o.f_em), (None, None, 1.0));
+        s.tt = f32::INFINITY;
+        assert!(omega_terms(&s).is_err());
+    }
+
+    #[test]
+    fn th_imob_and_omega_feed_nequil_input() {
+        let w = immobile_water(&water_spec()).unwrap();
+        let o = omega_terms(&omega_spec()).unwrap();
+        let mut i = input();
+        i.th_imob = w.th_imob.unwrap();
+        i.th_imob_o = w.th_imob_o.unwrap();
+        i.omega = o.omega;
+        i.omega_o = o.omega_o.unwrap();
+        i.omega_s = o.omega_s.unwrap();
+        i.f_em = o.f_em;
+        assert_eq!(i.th_imob, 0.12);
+        assert_eq!(i.omega_s, o.omega_s.unwrap());
     }
 }
