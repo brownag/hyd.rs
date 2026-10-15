@@ -340,12 +340,15 @@ def evaluate_entry(
         result["error"] = "manifest entry missing defect or control pair declaration"
         return result
 
+    def_output_spec = defect_pair_info.get("compared_output") or output_spec
+    ctrl_output_spec = control_pair_info.get("compared_output") or output_spec
+
     # Resolve paths for defect pair decks
     try:
         deck_a_path = outputs_dir / defect_pair_info["deck_a"]
         deck_b_path = outputs_dir / defect_pair_info["deck_b"]
-        vals_def_a = extract_output_values(deck_a_path, output_spec)
-        vals_def_b = extract_output_values(deck_b_path, output_spec)
+        vals_def_a = extract_output_values(deck_a_path, def_output_spec)
+        vals_def_b = extract_output_values(deck_b_path, def_output_spec)
         def_class, def_details = classify_pair(
             vals_def_a, vals_def_b, is_defect_pair=True, relative_threshold=relative_threshold
         )
@@ -364,8 +367,8 @@ def evaluate_entry(
     try:
         ctrl_a_path = outputs_dir / control_pair_info["deck_a"]
         ctrl_b_path = outputs_dir / control_pair_info["deck_b"]
-        vals_ctrl_a = extract_output_values(ctrl_a_path, output_spec)
-        vals_ctrl_b = extract_output_values(ctrl_b_path, output_spec)
+        vals_ctrl_a = extract_output_values(ctrl_a_path, ctrl_output_spec)
+        vals_ctrl_b = extract_output_values(ctrl_b_path, ctrl_output_spec)
         ctrl_class, ctrl_details = classify_pair(
             vals_ctrl_a, vals_ctrl_b, is_defect_pair=False, relative_threshold=relative_threshold
         )
