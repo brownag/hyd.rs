@@ -64,10 +64,12 @@ Plan: [EXECUTION_PLAN_18.md](EXECUTION_PLAN_18.md). Worker template: [PROMPT_TEM
 | 13 | 18.13.1 | Normalize raw Fortran outputs from fixture maps | done |
 | 14 | 18.14.1 | Wire paired Fortran/Rust execution and comparison | done |
 | 15 | 18.15.1 | Verify all-mode parity and publish compatibility evidence | done |
+| 16 | 18.16.1 | Switch default after accepted parity; retain FV/BE | done |
+| 17 | 18.17.1–18.17.2 | Source-defect probes for modern HYDRUS-1D (added 2026-10-14) | pending |
 
 ## Active tasks
 
-- Wave 15 is complete. Wave 16 (18.16.1) is next.
+- Wave 16 is complete. Wave 17 (18.17.1–18.17.2) is next.
 - Wave 7 has no open tasks. The old note that 18.7.7/18.7.5 were the root-uptake producer and fixture had mislabelled them: in `EXECUTION_PLAN_18.md` they are the FluxConc fixture and the start-of-step MassTran call, both done. No plan task ports the `SINK.FOR` root-uptake producer. 18.7.8 takes its state as primitive inputs, and it remains a gap to decide on before the 18.10.1 driver.
 - No task may add a second `DualPor` state type: `DualPorPrimitiveState` and
   `DualPorMaterial` (added by 18.7.3) are the accepted shape.
@@ -186,10 +188,10 @@ Plan: [EXECUTION_PLAN_18.md](EXECUTION_PLAN_18.md). Worker template: [PROMPT_TEM
 | 10 | 18.10.1 | Source-ordered solute step driver | done 2026-10-14 |
 | 11 | 18.11.1 | Nonlinear iteration and convergence | done 2026-10-14 |
 | 12 | 18.12.1 | Expose compatibility candidate; keep current default | done 2026-10-15 |
-| 13 | 18.13.1 | Normalize raw Fortran outputs using fixture observation maps | pending |
-| 14 | 18.14.1 | Wire paired Fortran/Rust execution and comparison | pending |
-| 15 | 18.15.1 | All-mode parity report and acceptance | pending |
-| 16 | 18.16.1 | Switch default after accepted parity; retain FV/BE | pending |
+| 13 | 18.13.1 | Normalize raw Fortran outputs using fixture observation maps | done |
+| 14 | 18.14.1 | Wire paired Fortran/Rust execution and comparison | done |
+| 15 | 18.15.1 | All-mode parity report and acceptance | done |
+| 16 | 18.16.1 | Switch default after accepted parity; retain FV/BE | done |
 | 17 | 18.17.1–18.17.2 | Source-defect probes for modern HYDRUS-1D (added 2026-10-14) | pending |
 
 ## Verification — Wave 7 in progress
@@ -404,3 +406,12 @@ kernels supply only the scalars that composition consumes.
   - The caller applies the 18.9.4 lBact zeroing to the 18.9.2 Omega values.
 - lBact with iDualPor>0 is unsupported in both 18.9.2 and 18.9.3 until it is
   mapped.
+
+## 18.16.1 — Switch default to verified compatibility backend
+
+- **Status:** done (commit `a22cb2a`).
+- `SoluteConfig` default backend switched to `SoluteBackend::FortranCompatible` based on accepted all-mode parity evidence (`SOLUTE_FORTRAN_PARITY_18.md`); public docs updated.
+- `SoluteBackend::FiniteVolumeBackwardEuler` remains explicitly selectable via `.with_backend()`; existing integration suites updated to preserve opt-in FV/BE test coverage under Amendment 2026-10-15.
+- `tools/solute_benchmark_bridge.py`: `POLICY_HASHES["crates/hydrus-core/src/solute.rs"]` re-pinned under D11.
+- Tests: `cargo test -p hydrus-core --test solute_solver_selection` (5 passed), `cargo test -p hydrus-core --tests` (95+ integration tests passed), `PYTHONPATH=. python3 tools/solute_benchmark_bridge.py --self-test` (passed), `python3 -m unittest tools.test_solute_benchmark_bridge` (23 passed). Clean diff, fmt, and clippy.
+
