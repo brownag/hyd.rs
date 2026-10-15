@@ -38,6 +38,23 @@
 //! which the reader remaps to `iModel=0`, and `0 < nTabMod` (`INPUT.FOR:1685`,
 //! `nTabMod=10`).
 
+//!
+//! # Solute-side dual-domain provenance (task 18.9.3)
+//!
+//! `Coeff` (`SOLUTE.FOR:286-289`, `306-308`) takes the immobile water from the
+//! node arrays `ThNIm`/`ThOIm` when `iDualPor>0`, not from `ChPar(4,M)`, and the
+//! neighbour `Thj` is not reduced by `ThImob` (`294-295`, `313-314` need
+//! `iDualPor.eq.0`). [`dual_domain_th_imob`], [`dual_material_selection`] and
+//! [`dual_neighbor_theta`] carry exactly that. The g/q gating on `SinkIm`/`FlMacro`
+//! lives in `processes::source_terms`, `FlMacro` in `nonequilibrium` and `processes`,
+//! and the `Disper` `ThS` rule in `transport::coefficients`; none is repeated here.
+//!
+//! External-state gap (for 18.10.1): the old-level `ThOIm` is `Update`'s copy
+//! `ThOldIm=ThNewIm` (`WATFLOW.FOR:1112`) and `SinkIm` is written by `DualPor`
+//! during the water step; the solute step reads both, so the driver must carry them
+//! between the water and solute steps. [`super::types::DualPorPrimitiveState`] holds
+//! neither as a persisted per-node history.
+
 use super::types::{DefaultReal, DualPorPrimitiveState, KernelError};
 
 /// `FH`'s and `FK`'s `Par` actual argument, i.e. one `ParD` column.
@@ -434,6 +451,92 @@ pub(super) fn validate(state: &DualPorPrimitiveState) -> Result<(), KernelError>
                 return Err("ParD(6,M) must be non-negative when iDualPor=2");
             }
         }
+    }
+    Ok(())
+}
+
+/// Immobile water used by `Coeff` at one node (`SOLUTE.FOR:286-289`, `306-308`).
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) struct DualThImob {
+    /// `ThImob`.
+    pub th_imob: f32,
+    /// `ThImobO`; assigned only at the new level (`288`), so `None` at the old one.
+    pub th_imob_o: Option<f32>,
+}
+
+/// `ThImob`/`ThImobO` for `iDualPor>0`; `None` for `iDualPor=0`, which 18.9.2 owns.
+pub(crate) fn dual_domain_th_imob(
+    new_level: bool,
+    i_dual_por: u8,
+    bacteria: bool,
+    th_new_im: f32,
+    th_old_im: f32,
+) -> Result<Option<DualThImob>, KernelError> {
+    validate_dual_por(i_dual_por)?;
+    reject_bacteria_dual(i_dual_por, bacteria)?;
+    if i_dual_por == 0 {
+        return Ok(None);
+    }
+    if !th_new_im.is_finite() || !th_old_im.is_finite() {
+        return Err("immobile water contents must be finite");
+    }
+    Ok(Some(if new_level {
+        DualThImob {
+            th_imob: th_new_im,
+            th_imob_o: Some(th_old_im),
+        }
+    } else {
+        DualThImob {
+            th_imob: th_old_im,
+            th_imob_o: None,
+        }
+    }))
+}
+
+/// `Thj` of the neighbour node (`SOLUTE.FOR:295`, `314`): unchanged for
+/// `iDualPor>0`; `None` for `iDualPor=0`, where 18.9.2 may reduce it.
+pub(crate) fn dual_neighbor_theta(
+    i_dual_por: u8,
+    bacteria: bool,
+    th_j: f32,
+) -> Result<Option<f32>, KernelError> {
+    validate_dual_por(i_dual_por)?;
+    reject_bacteria_dual(i_dual_por, bacteria)?;
+    Ok((i_dual_por > 0).then_some(th_j))
+}
+
+/// Zero-based material index per node from one-based `MatNum(i)`.
+pub(crate) fn dual_material_selection(
+    material_ids: &[usize],
+    material_count: usize,
+) -> Result<Vec<usize>, KernelError> {
+    material_ids
+        .iter()
+        .map(|&id| {
+            if id == 0 || id > material_count {
+                Err("MatNum must be one-based and within the material count")
+            } else {
+                Ok(id - 1)
+            }
+        })
+        .collect()
+}
+
+/// The guard at `SOLUTE.FOR:281/295/302/314` is `lMobIm.and.iDualPor.eq.0.or.lBact`,
+/// i.e. `(lMobIm && iDualPor==0) || lBact`. With `lBact` and `iDualPor>0` the
+/// source first reduces `ThW`/`Thj` by `ChPar(4,M)` and then overwrites `ThImob`
+/// with `ThNIm`/`ThOIm`. That combination is explicitly unsupported (18.9.2's
+/// immobile-water rule rejects it too), never silently approximated.
+fn reject_bacteria_dual(i_dual_por: u8, bacteria: bool) -> Result<(), KernelError> {
+    if bacteria && i_dual_por > 0 {
+        return Err("lBact with iDualPor>0 is unsupported");
+    }
+    Ok(())
+}
+
+fn validate_dual_por(i_dual_por: u8) -> Result<(), KernelError> {
+    if i_dual_por > 2 {
+        return Err("iDualPor must be 0, 1 or 2");
     }
     Ok(())
 }
@@ -896,5 +999,55 @@ mod tests {
         let mut smeared = model7_state();
         smeared.materials[0].immobile_n = Some(DefaultReal(f32::NAN));
         assert!(reject(smeared).contains("ParD columns must be finite"));
+    }
+
+    #[test]
+    fn th_imob_selects_the_level_and_leaves_non_dual_to_18_9_2() {
+        let new = dual_domain_th_imob(true, 1, false, 0.12, 0.1)
+            .unwrap()
+            .unwrap();
+        assert_eq!((new.th_imob, new.th_imob_o), (0.12, Some(0.1)));
+        let old = dual_domain_th_imob(false, 2, false, 0.12, 0.1)
+            .unwrap()
+            .unwrap();
+        assert_eq!((old.th_imob, old.th_imob_o), (0.1, None));
+        assert_eq!(dual_domain_th_imob(true, 0, false, 0.12, 0.1), Ok(None));
+        assert!(dual_domain_th_imob(true, 3, false, 0.1, 0.1).is_err());
+        assert!(dual_domain_th_imob(true, 1, false, f32::NAN, 0.1).is_err());
+    }
+
+    #[test]
+    fn exchange_immobile_water_feeds_the_new_level_th_imob() {
+        let exchange = dual_porosity_exchange(&water_content_exchange()).unwrap();
+        let old = [0.125_f32, 0.3, 0.2, 0.2];
+        for (new, old) in exchange.new_immobile_water.iter().zip(old) {
+            let t = dual_domain_th_imob(true, 1, false, new.0, old)
+                .unwrap()
+                .unwrap();
+            assert_eq!(t.th_imob, new.0);
+            assert_eq!(t.th_imob_o, Some(old));
+        }
+    }
+
+    #[test]
+    fn neighbour_theta_is_not_reduced_for_dual_porosity() {
+        assert_eq!(dual_neighbor_theta(1, false, 0.31), Ok(Some(0.31)));
+        assert_eq!(dual_neighbor_theta(0, false, 0.31), Ok(None));
+        assert!(dual_neighbor_theta(9, false, 0.31).is_err());
+    }
+
+    #[test]
+    fn bacteria_with_dual_porosity_is_unsupported() {
+        assert!(dual_domain_th_imob(true, 1, true, 0.1, 0.1).is_err());
+        assert!(dual_neighbor_theta(2, true, 0.3).is_err());
+        // lBact alone is the 18.9.4/18.9.2 path, not rejected here.
+        assert_eq!(dual_neighbor_theta(0, true, 0.3), Ok(None));
+    }
+
+    #[test]
+    fn material_selection_is_zero_based_and_range_checked() {
+        assert_eq!(dual_material_selection(&[3, 1, 2], 3), Ok(vec![2, 0, 1]));
+        assert!(dual_material_selection(&[0], 3).is_err());
+        assert!(dual_material_selection(&[4], 3).is_err());
     }
 }
