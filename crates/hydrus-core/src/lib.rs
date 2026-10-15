@@ -1,4 +1,8 @@
 //! Filesystem-free numerical contracts for HYDRUS hydraulic models.
+//!
+//! Solute transport defaults to [`SoluteBackend::FortranCompatible`] based on all-mode
+//! parity verification against the pinned Fortran reference (see `planning/master/SOLUTE_FORTRAN_PARITY_18.md`).
+//! The [`SoluteBackend::FiniteVolumeBackwardEuler`] backend remains explicitly selectable.
 
 pub mod atmospheric;
 pub mod error;

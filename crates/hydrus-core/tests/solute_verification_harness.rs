@@ -13,8 +13,9 @@ use std::{
 use hydrus_core::hydraulics::Mesh1D;
 use hydrus_core::solute::{advance_solute_step_with_processes, SoluteProcessInput};
 use hydrus_core::{
-    AcceptedWaterSnapshot, EquilibriumSorption, SoluteBoundaries, SoluteBoundaryMode as Boundary,
-    SoluteConfig, SoluteSpecies, SoluteState, SoluteTransportInput, SoluteUnits, SoluteWorkspace,
+    AcceptedWaterSnapshot, EquilibriumSorption, SoluteBackend, SoluteBoundaries,
+    SoluteBoundaryMode as Boundary, SoluteConfig, SoluteSpecies, SoluteState, SoluteTransportInput,
+    SoluteUnits, SoluteWorkspace,
 };
 
 type Result<T> = std::result::Result<T, String>;
@@ -533,7 +534,8 @@ fn simulate(request: &Request) -> Result<Observation> {
         1,
         &[],
     )
-    .map_err(|e| e.to_string())?;
+    .map_err(|e| e.to_string())?
+    .with_backend(SoluteBackend::FiniteVolumeBackwardEuler);
     let count = request.species.len();
     let mut state = SoluteState::new(
         &config,

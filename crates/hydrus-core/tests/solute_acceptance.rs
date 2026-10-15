@@ -7,9 +7,9 @@ use hydrus_core::hydraulics::Mesh1D;
 use hydrus_core::solute::{advance_solute_step_with_processes, SoluteProcessInput};
 use hydrus_core::{
     AcceptedWaterSnapshot, DeferredSoluteFeature, EquilibriumSorption, KineticSorption,
-    SoluteBoundaries, SoluteBoundaryMode as Boundary, SoluteConfig, SoluteConfigError,
-    SoluteSpecies, SoluteState, SoluteStepError, SoluteTransportInput, SoluteUnits,
-    SoluteWorkspace,
+    SoluteBackend, SoluteBoundaries, SoluteBoundaryMode as Boundary, SoluteConfig,
+    SoluteConfigError, SoluteSpecies, SoluteState, SoluteStepError, SoluteTransportInput,
+    SoluteUnits, SoluteWorkspace,
 };
 
 fn mesh() -> Mesh1D {
@@ -42,6 +42,7 @@ fn config(species: Vec<SoluteSpecies>, lower: Boundary, upper: Boundary) -> Solu
         &[],
     )
     .unwrap()
+    .with_backend(SoluteBackend::FiniteVolumeBackwardEuler)
 }
 
 fn input<'a>(

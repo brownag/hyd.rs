@@ -1,8 +1,8 @@
 use hydrus_core::hydraulics::{Mesh1D, TridiagonalError};
 use hydrus_core::{
-    advance_solute_step, AcceptedWaterSnapshot, EquilibriumSorption, SoluteBoundaries,
-    SoluteBoundaryMode as Boundary, SoluteConfig, SoluteSpecies, SoluteState, SoluteStepError,
-    SoluteTransportInput, SoluteUnits, SoluteWorkspace,
+    advance_solute_step, AcceptedWaterSnapshot, EquilibriumSorption, SoluteBackend,
+    SoluteBoundaries, SoluteBoundaryMode as Boundary, SoluteConfig, SoluteSpecies, SoluteState,
+    SoluteStepError, SoluteTransportInput, SoluteUnits, SoluteWorkspace,
 };
 
 fn mesh() -> Mesh1D {
@@ -26,6 +26,7 @@ fn config(lower: Boundary, upper: Boundary) -> SoluteConfig {
         &[],
     )
     .unwrap()
+    .with_backend(SoluteBackend::FiniteVolumeBackwardEuler)
 }
 
 fn state(c: [f64; 3]) -> SoluteState {

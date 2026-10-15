@@ -1,7 +1,7 @@
 use hydrus_core::hydraulics::Mesh1D;
 use hydrus_core::solute::{advance_solute_step_with_processes, SoluteProcessInput};
 use hydrus_core::{
-    AcceptedWaterSnapshot, EquilibriumSorption, KineticSorption, SoluteBoundaries,
+    AcceptedWaterSnapshot, EquilibriumSorption, KineticSorption, SoluteBackend, SoluteBoundaries,
     SoluteBoundaryMode as Mode, SoluteConfig, SoluteEndpoint, SoluteSpecies, SoluteState,
     SoluteStepError, SoluteTransportInput, SoluteUnits, SoluteWorkspace,
 };
@@ -36,6 +36,7 @@ fn config(lower: Mode, upper: Mode, decay: f64, sorption: EquilibriumSorption) -
         &[],
     )
     .unwrap()
+    .with_backend(SoluteBackend::FiniteVolumeBackwardEuler)
 }
 
 fn mesh(coords: Vec<f64>) -> Mesh1D {
@@ -275,7 +276,8 @@ fn later_species_reversal_and_nonfinite_water_flux_preserve_all_accepted_state()
         1,
         &[],
     )
-    .unwrap();
+    .unwrap()
+    .with_backend(SoluteBackend::FiniteVolumeBackwardEuler);
     let mut state = SoluteState::new(
         &later_config,
         &mesh,
@@ -369,7 +371,8 @@ fn later_species_process_failure_rolls_back_earlier_outlet_trial_and_workspace()
         1,
         &[],
     )
-    .unwrap();
+    .unwrap()
+    .with_backend(SoluteBackend::FiniteVolumeBackwardEuler);
     let mut state = SoluteState::new(
         &config,
         &mesh,
@@ -474,7 +477,8 @@ fn each_chain_species_exports_its_own_solved_mass_and_mixed_concentration_remain
         1,
         &[],
     )
-    .unwrap();
+    .unwrap()
+    .with_backend(SoluteBackend::FiniteVolumeBackwardEuler);
     let old = vec![2.0, 0.0, 0.0, 0.0, 0.0, 0.0];
     let mut state = SoluteState::new(&chain_config, &mesh, 0.0, old.clone(), vec![0.0; 6]).unwrap();
     advance(
@@ -563,9 +567,13 @@ fn shared_outlet_broadcast_matches_explicit_species_pairs() {
         concentration: "mg/L".into(),
         sorbed_mass: "mg/kg".into(),
     };
-    let broadcast = SoluteConfig::new(units.clone(), species.clone(), outlet, 1, &[]).unwrap();
+    let broadcast = SoluteConfig::new(units.clone(), species.clone(), outlet, 1, &[])
+        .unwrap()
+        .with_backend(SoluteBackend::FiniteVolumeBackwardEuler);
     let explicit =
-        SoluteConfig::new_with_species_boundaries(units, species, vec![outlet; 2], 1, &[]).unwrap();
+        SoluteConfig::new_with_species_boundaries(units, species, vec![outlet; 2], 1, &[])
+            .unwrap()
+            .with_backend(SoluteBackend::FiniteVolumeBackwardEuler);
     for process in [false, true] {
         let mut broadcast_state = SoluteState::new(
             &broadcast,

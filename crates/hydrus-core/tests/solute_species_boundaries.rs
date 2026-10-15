@@ -1,8 +1,9 @@
 use hydrus_core::hydraulics::Mesh1D;
 use hydrus_core::solute::{advance_solute_step_with_processes, SoluteProcessInput};
 use hydrus_core::{
-    AcceptedWaterSnapshot, EquilibriumSorption, SoluteBoundaries, SoluteBoundaryMode as Boundary,
-    SoluteConfig, SoluteSpecies, SoluteState, SoluteTransportInput, SoluteUnits, SoluteWorkspace,
+    AcceptedWaterSnapshot, EquilibriumSorption, SoluteBackend, SoluteBoundaries,
+    SoluteBoundaryMode as Boundary, SoluteConfig, SoluteSpecies, SoluteState, SoluteTransportInput,
+    SoluteUnits, SoluteWorkspace,
 };
 
 fn mesh() -> Mesh1D {
@@ -34,6 +35,7 @@ fn config(species: Vec<SoluteSpecies>, boundaries: Vec<SoluteBoundaries>) -> Sol
         &[],
     )
     .unwrap()
+    .with_backend(SoluteBackend::FiniteVolumeBackwardEuler)
 }
 
 fn input<'a>(
@@ -168,7 +170,8 @@ fn broadcast_and_repeated_explicit_pairs_produce_identical_steps() {
         1,
         &[],
     )
-    .unwrap();
+    .unwrap()
+    .with_backend(SoluteBackend::FiniteVolumeBackwardEuler);
     let explicit = config(species, vec![shared, shared]);
     let mut broadcast_state =
         SoluteState::new(&broadcast, &mesh(), 0.0, vec![1.0; 6], vec![0.0; 6]).unwrap();

@@ -114,12 +114,16 @@ impl DeferredSoluteFeature {
 
 /// Closed set of solute transport backends. Every step is dispatched by an
 /// exhaustive `match`, so adding a variant requires handling it everywhere.
+///
+/// `FortranCompatible` is the default backend based on completed all-mode parity
+/// verification against the pinned Fortran reference (see `planning/master/SOLUTE_FORTRAN_PARITY_18.md`).
+/// `FiniteVolumeBackwardEuler` remains fully supported and explicitly selectable.
 #[non_exhaustive]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SoluteBackend {
     /// Conservative finite-volume discretization with backward-Euler time stepping.
     FiniteVolumeBackwardEuler,
-    /// Pinned-Fortran-compatible solute transport solver.
+    /// Pinned-Fortran-compatible solute transport solver (default).
     FortranCompatible,
 }
 
@@ -132,6 +136,10 @@ impl SoluteBackend {
 }
 
 /// Validated selected-M5 capabilities. This type defines configuration only; it does not step.
+///
+/// Defaults to [`SoluteBackend::FortranCompatible`], verified across all active solute modes
+/// in `planning/master/SOLUTE_FORTRAN_PARITY_18.md`. Callers may explicitly select
+/// [`SoluteBackend::FiniteVolumeBackwardEuler`] via [`with_backend`](Self::with_backend).
 #[derive(Clone, Debug, PartialEq)]
 pub struct SoluteConfig {
     units: SoluteUnits,
@@ -271,11 +279,11 @@ impl SoluteConfig {
             units,
             species,
             boundaries,
-            backend: SoluteBackend::FiniteVolumeBackwardEuler,
+            backend: SoluteBackend::FortranCompatible,
         })
     }
 
-    /// Select the transport backend; the default is finite-volume backward Euler.
+    /// Select the transport backend; the default is [`SoluteBackend::FortranCompatible`].
     pub fn with_backend(mut self, backend: SoluteBackend) -> Self {
         self.backend = backend;
         self

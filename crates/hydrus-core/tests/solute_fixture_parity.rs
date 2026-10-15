@@ -3,8 +3,9 @@ use std::{env, fs, path::PathBuf};
 use hydrus_core::hydraulics::Mesh1D;
 use hydrus_core::solute::{advance_solute_step_with_processes, SoluteProcessInput};
 use hydrus_core::{
-    AcceptedWaterSnapshot, EquilibriumSorption, SoluteBoundaries, SoluteBoundaryMode as Boundary,
-    SoluteConfig, SoluteSpecies, SoluteState, SoluteTransportInput, SoluteUnits, SoluteWorkspace,
+    AcceptedWaterSnapshot, EquilibriumSorption, SoluteBackend, SoluteBoundaries,
+    SoluteBoundaryMode as Boundary, SoluteConfig, SoluteSpecies, SoluteState, SoluteTransportInput,
+    SoluteUnits, SoluteWorkspace,
 };
 
 const NODE_COUNT: usize = 1001;
@@ -230,7 +231,8 @@ fn source_mapped_example3_runs_and_emits_independently_balanced_observations() {
         1,
         &[],
     )
-    .unwrap();
+    .unwrap()
+    .with_backend(SoluteBackend::FiniteVolumeBackwardEuler);
     let mut state = SoluteState::new(
         &config,
         &mesh,
