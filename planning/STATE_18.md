@@ -65,11 +65,11 @@ Plan: [EXECUTION_PLAN_18.md](EXECUTION_PLAN_18.md). Worker template: [PROMPT_TEM
 | 14 | 18.14.1 | Wire paired Fortran/Rust execution and comparison | done |
 | 15 | 18.15.1 | Verify all-mode parity and publish compatibility evidence | done |
 | 16 | 18.16.1 | Switch default after accepted parity; retain FV/BE | done |
-| 17 | 18.17.1–18.17.2 | Source-defect probes for modern HYDRUS-1D (added 2026-10-14) | pending |
+| 17 | 18.17.1–18.17.2 | Source-defect probes for modern HYDRUS-1D (added 2026-10-14) | done |
 
 ## Active tasks
 
-- Wave 16 is complete. Wave 17 (18.17.1–18.17.2) is next.
+- All waves (1–17) in plan 18 are complete! Next phase is user execution of defect probe decks on modern HYDRUS-1D per plan 18 handoff.
 - Wave 7 has no open tasks. The old note that 18.7.7/18.7.5 were the root-uptake producer and fixture had mislabelled them: in `EXECUTION_PLAN_18.md` they are the FluxConc fixture and the start-of-step MassTran call, both done. No plan task ports the `SINK.FOR` root-uptake producer. 18.7.8 takes its state as primitive inputs, and it remains a gap to decide on before the 18.10.1 driver.
 - No task may add a second `DualPor` state type: `DualPorPrimitiveState` and
   `DualPorMaterial` (added by 18.7.3) are the accepted shape.
@@ -192,7 +192,7 @@ Plan: [EXECUTION_PLAN_18.md](EXECUTION_PLAN_18.md). Worker template: [PROMPT_TEM
 | 14 | 18.14.1 | Wire paired Fortran/Rust execution and comparison | done |
 | 15 | 18.15.1 | All-mode parity report and acceptance | done |
 | 16 | 18.16.1 | Switch default after accepted parity; retain FV/BE | done |
-| 17 | 18.17.1–18.17.2 | Source-defect probes for modern HYDRUS-1D (added 2026-10-14) | pending |
+| 17 | 18.17.1–18.17.2 | Source-defect probes for modern HYDRUS-1D (added 2026-10-14) | done |
 
 ## Verification — Wave 7 in progress
 
@@ -414,4 +414,19 @@ kernels supply only the scalars that composition consumes.
 - `SoluteBackend::FiniteVolumeBackwardEuler` remains explicitly selectable via `.with_backend()`; existing integration suites updated to preserve opt-in FV/BE test coverage under Amendment 2026-10-15.
 - `tools/solute_benchmark_bridge.py`: `POLICY_HASHES["crates/hydrus-core/src/solute.rs"]` re-pinned under D11.
 - Tests: `cargo test -p hydrus-core --test solute_solver_selection` (5 passed), `cargo test -p hydrus-core --tests` (95+ integration tests passed), `PYTHONPATH=. python3 tools/solute_benchmark_bridge.py --self-test` (passed), `python3 -m unittest tools.test_solute_benchmark_bridge` (23 passed). Clean diff, fmt, and clippy.
+
+## 18.17.1 — Build source-defect probe decks
+
+- **Status:** done (commit `eb567cf`).
+- Generated 8 input decks in `reference/fortran_reference/solute/defect_probes/` covering defect and control pairs for SD-001 and SD-002, with user instructions in `README.md` and complete manifest in `MANIFEST.json`.
+- Pinned Fortran reference execution confirms expected behavior: defect pairs yield byte-identical compared outputs at t=0 (`identical`), while control pairs produce distinct outputs (`different`).
+- Verified adapter deck-walk tests pass (`cargo test -p hydrus-core adapter::tests`, 17 passed) with zero new `CASE.json` parity cases.
+
+## 18.17.2 — Add probe-pair comparison tool and register field
+
+- **Status:** done (commits `0e6d355` and merge).
+- Implemented `tools/compare_defect_probe.py` supporting CLI and JSON reporting of defect probe pair verdicts (`defect present`, `defect fixed`, `inconclusive`).
+- Added Modern HYDRUS tracking sub-fields to `docs/FORTRAN_SOURCE_DEFECTS.md` for SD-001 and SD-002 alongside probe procedure documentation.
+- End-to-end verified with `python3 tools/compare_defect_probe.py --manifest reference/fortran_reference/solute/defect_probes/MANIFEST.json --outputs reference/fortran_reference/solute/defect_probes` (both report `defect present` on pinned Fortran as expected). Full Python discovery (313 passed) clean.
+
 
