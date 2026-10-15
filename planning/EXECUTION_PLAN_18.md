@@ -69,6 +69,7 @@ Status: **Approved by user on 2026-10-08, with amendments through 2026-10-12.** 
 | 14 | 18.14.1 | 18.12.1, 18.13.1 | Wire paired Fortran/Rust execution and field-wise comparison |
 | 15 | 18.15.1 | accepted 18.14.1 | Run/accept all-mode parity and publish evidence |
 | 16 | 18.16.1 | accepted 18.15.1 | Switch default to compatibility backend; keep FV/BE selectable |
+| 17 | 18.17.1 ∥ 18.17.2 | Wave 16 (scheduling choice; needs only the Wave 2 runner) | **Added 2026-10-14:** black-box probes of `docs/FORTRAN_SOURCE_DEFECTS.md` entries for running on modern closed-source HYDRUS-1D, plus a pair-comparison tool. The modern runs themselves are a user step, recorded by the orchestrator. |
 
 Tasks within each wave own disjoint files. Waves are sequential because the normalized contract, adapters, fixtures, and shared types gate implementation. Use worktree isolation when parallel tasks in a wave share the repository; all task scratch/build/run roots must be unique.
 
@@ -482,6 +483,29 @@ Tasks within each wave own disjoint files. Waves are sequential because the norm
 - **Anchors:** accepted `SOLUTE_FORTRAN_PARITY_18.md`; solver-selection code/tests from 18.12.1; public solute entry points.
 - **Acceptance:** default-selection test proves `advance_solute_step` uses the verified Fortran-compatible backend; opt-in FV/BE tests remain unchanged and pass. Run `cargo test -p hydrus-core --test solute_solver_selection`, `cargo test -p hydrus-core --tests`, and `git diff --check`.
 - **Amendment 2026-10-14 (Orchestration 19):** "Switch the default" means changing `SoluteConfig`'s default backend. D11: this task edits `solute.rs`, so it also re-pins `POLICY_HASHES["crates/hydrus-core/src/solute.rs"]` in `tools/solute_benchmark_bridge.py`, with a bitwise-preservation justification for the FV/BE path. Add `tools/solute_benchmark_bridge.py` to Must edit for that one line.
+
+### 18.17.1 — Build source-defect probe decks
+
+- **Repo:** `/home/andrew/AI/hyd.rs`.
+- **Must edit:** none.
+- **Can create:** `reference/fortran_reference/solute/defect_probes/**` and `planning/tasks/18.17.1.todo.md`. Scratch under `.development/18.17.1/`.
+- **Depends on:** the Wave 2 runner; every `SD-NNN` entry in `docs/FORTRAN_SOURCE_DEFECTS.md` at task start.
+- **Spec:** For each register entry, build HYDRUS-1D input decks in two pairs, derived from existing parity fixtures. Each pair differs in exactly one input value. (a) **Defect pair:** vary only the parameter that correct code would read and the defect ignores (SD-001: `TDep` of Henry's constant; SD-002: `rKa2`/`rKd2`). (b) **Control pair:** vary a parameter that every version reads at the same site (SD-001: `TDep` of the sorption coefficient; SD-002: `rKa1`). Set magnitudes so a fixed code changes the compared output by far more than rounding. Compare outputs at t=0, or the first printed time, so later transport does not mask an initialization defect. Write `defect_probes/MANIFEST.json`: per entry, the `sd_id`, the pairs (`defect`/`control`), the deck paths, the varied input (file, line and token), the compared output (file, variable, node(s), time), and the expected pinned-Fortran result (`identical` for the defect pair, `different` for the control pair). Run every deck on the pinned Fortran with `tools/run_fortran_reference.py`, store the authenticated outputs and hashes next to the decks, and confirm the expected results. Add a `README.md` for the user: how to run each deck on modern HYDRUS-1D and which output files to return.
+- **Do not touch:** parity fixtures and `CASE.json` cases (the probes are not parity cases and must not live under `parity/`), kernels, adapter, runner code, register, or pinned source.
+- **Anchors:** `docs/FORTRAN_SOURCE_DEFECTS.md`; `SOLUTE.FOR` `MassInit:1912–1975` and `NonEqInit:1661–1706`; the `lMassIni`/`lEqInit` reader lines in `INPUT.FOR`; existing biology and nonequilibrium fixture decks.
+- **Acceptance:** every defect pair gives byte-identical compared output on the pinned Fortran, and every control pair differs, shown by a recorded diff in `.development/18.17.1/`. Every manifest path and hash validates. `python3 -m unittest discover -s tools -p 'test_*.py'` and the adapter deck-walk tests stay green (no new `CASE.json`).
+
+### 18.17.2 — Add probe-pair comparison tool and register field
+
+- **Repo:** `/home/andrew/AI/hyd.rs`.
+- **Must edit:** `docs/FORTRAN_SOURCE_DEFECTS.md`.
+- **Can create:** `tools/compare_defect_probe.py`, `tools/test_compare_defect_probe.py`, `planning/tasks/18.17.2.todo.md`.
+- **Depends on:** the `MANIFEST.json` schema in 18.17.1's spec. Tests use synthetic fixtures, so the task can run in parallel with 18.17.1.
+- **Spec:** CLI `compare_defect_probe.py --manifest <path> --outputs <dir> [--sd SD-NNN]`. `<dir>` holds output files from any HYDRUS build, arranged by deck. For each pair it extracts the manifest's compared values and classifies the pair as `identical` or `different` (exact for the defect pair; a stated relative threshold for the control pair). It then states a verdict per entry: `defect present` (defect pair identical and control pair different), `defect fixed` (both differ), or `inconclusive` (control identical, or values missing or unparsable). It prints a table and writes JSON. Version-dependent output headers or columns go in the manifest, not the code. Add to every register entry a **Modern HYDRUS** field (`untested` for now), with a sub-format: version, date, verdict, evidence path. Add a short register section on the probe procedure.
+- **Do not touch:** probe decks, runner, parity tools, kernels, or pinned source.
+- **Anchors:** the 18.17.1 manifest schema; the `NOD_INF.OUT` / `OBS_NODE.OUT` parsers already in `tools/`; `docs/FORTRAN_SOURCE_DEFECTS.md`.
+- **Acceptance:** `python3 -m unittest tools.test_compare_defect_probe` covers each verdict, a missing file, and a header/column offset set in the manifest. Full Python suite green; `git diff --check` clean.
+- **After the wave (user step):** the user runs the decks on modern HYDRUS-1D. The orchestrator runs the tool on the returned outputs and records the verdict, version and evidence in each register entry. No Rust or parity claim follows from these results.
 
 ## Approval and handoff
 

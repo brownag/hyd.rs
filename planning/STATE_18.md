@@ -180,6 +180,7 @@ Plan: [EXECUTION_PLAN_18.md](EXECUTION_PLAN_18.md). Worker template: [PROMPT_TEM
 | 14 | 18.14.1 | Wire paired Fortran/Rust execution and comparison | pending |
 | 15 | 18.15.1 | All-mode parity report and acceptance | pending |
 | 16 | 18.16.1 | Switch default after accepted parity; retain FV/BE | pending |
+| 17 | 18.17.1–18.17.2 | Source-defect probes for modern HYDRUS-1D (added 2026-10-14) | pending |
 
 ## Verification — Wave 7 in progress
 
