@@ -8,6 +8,7 @@ mod types;
 mod accounting;
 #[allow(dead_code)] // wired by 18.10.1
 mod assembly;
+#[allow(dead_code)] // wired by 18.10.1
 mod biology;
 #[allow(dead_code)] // wired by 18.10.1
 mod boundary;
