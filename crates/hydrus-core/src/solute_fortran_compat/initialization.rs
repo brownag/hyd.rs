@@ -293,7 +293,8 @@ fn mass_init(cfg: &InitConfig, st: &InitState, conc: &mut [Vec<f32>]) -> Result<
                 par[2] = cp[jjj + 6] * (td[jjj + 6] * tt).exp();
                 par[3] = cp[jjj + 7] * (td[jjj + 7] * tt).exp();
                 par[4] = cp[jjj + 8];
-                // Source quirk: xKH uses TDep(jjj+7), the xKs factor.
+                // Source defect SD-001 (docs/FORTRAN_SOURCE_DEFECTS.md): xKH uses
+                // TDep(jjj+7), the xKs factor. Kept for parity.
                 par[5] = cp[jjj + 9] * (td[jjj + 6] * tt).exp();
                 par[6] = theta[i] + theta_im[i];
                 par[7] = th_sat[m] - par[6];
@@ -301,7 +302,8 @@ fn mass_init(cfg: &InitConfig, st: &InitState, conc: &mut [Vec<f32>]) -> Result<
                     let rka1 = cp[jjj + 18] * (td[jjj + 18] * tt).exp();
                     let rkd1 = cp[jjj + 19] * (td[jjj + 19] * tt).exp();
                     let xks1 = theta[i] * rka1 / par[0] / rkd1;
-                    // Source quirk: xKs2 reuses rKa1/rKd1 (rKa2/rKd2 are unused).
+                    // Source defect SD-002 (docs/FORTRAN_SOURCE_DEFECTS.md): xKs2
+                    // reuses rKa1/rKd1; rKa2/rKd2 are unused. Kept for parity.
                     let xks2 = theta[i] * rka1 / par[0] / rkd1;
                     par[2] = xks1 + xks2;
                 }
@@ -354,7 +356,8 @@ fn non_eq_init(
                     let rkd1 = cp[jjj + 19] * (td[jjj + 19] * tt).exp();
                     let xks1 = theta[i] * rka1 / ro / rkd1;
                     sorb[js][i] = xks1 * conc[js][i];
-                    // Source quirk: xKs2 reuses rKa1/rKd1.
+                    // Source defect SD-002 (docs/FORTRAN_SOURCE_DEFECTS.md): xKs2
+                    // reuses rKa1/rKd1. Kept for parity.
                     let xks2 = theta[i] * rka1 / ro / rkd1;
                     sorb2.as_mut().unwrap()[js][i] = xks2 * conc[js][i];
                 }
@@ -551,8 +554,24 @@ mod tests {
         near(sorb[0][2], 0.75 * 2.0 * 10.0);
     }
 
+    /// Pins source defect SD-001 (docs/FORTRAN_SOURCE_DEFECTS.md): `MassInit`
+    /// scales xKH by TDep(jjj+7), not TDep(jjj+10). Must fail if "fixed".
     #[test]
-    fn bacteria_branch_sets_both_pools_with_shared_rate_quirk() {
+    fn source_defect_sd001_mass_init_xkh_uses_xks_temperature_factor() {
+        let (mut cfg, mut st) = fixture(1, 1);
+        cfg.ch_par[0][9] = 0.8; // xKH
+        cfg.t_dep[6] = 0.05; // xKs temperature coefficient
+        cfg.t_dep[9] = 1.0e3; // xKH's own coefficient: ignored by the source
+        st.temp_new = Some(vec![30.0]);
+        initialize_sources(&cfg, &mut st, fl(true, false, true)).unwrap();
+        let f = (0.05 * tt_factor(30.0)).exp();
+        near(st.conc[0][0], 10.0 / (0.4 + 1.5 * 2.0 * f + 0.1 * 0.8 * f));
+    }
+
+    /// Pins source defect SD-002 (docs/FORTRAN_SOURCE_DEFECTS.md): `NonEqInit`
+    /// computes xKs2 from rKa1/rKd1, ignoring rKa2/rKd2. Must fail if "fixed".
+    #[test]
+    fn source_defect_sd002_bacteria_xks2_reuses_first_site_rates() {
         let (mut cfg, mut st) = fixture(1, 1);
         cfg.bacteria = true;
         cfg.ch_par[0][18] = 2.0; // rKa1
@@ -564,6 +583,22 @@ mod tests {
         let xks = 0.3 * 2.0 / 1.5 / 0.5;
         near(st.sorb.as_ref().unwrap()[0][0], xks * 10.0);
         near(st.sorb2.as_ref().unwrap()[0][0], xks * 10.0);
+    }
+
+    /// Pins source defect SD-002 (docs/FORTRAN_SOURCE_DEFECTS.md) in `MassInit`:
+    /// Par(3)=xKs1+xKs2 with both from rKa1/rKd1. Must fail if "fixed".
+    #[test]
+    fn source_defect_sd002_mass_init_xks2_reuses_first_site_rates() {
+        let (mut cfg, mut st) = fixture(1, 1);
+        cfg.bacteria = true;
+        cfg.ch_par[0][18] = 2.0; // rKa1
+        cfg.ch_par[0][19] = 0.5; // rKd1
+        cfg.ch_par[0][15] = 9.0; // rKa2 (unused by the source formula)
+        cfg.ch_par[0][16] = 9.0; // rKd2
+        st.sorb2 = Some(vec![vec![-1.0]]);
+        initialize_sources(&cfg, &mut st, fl(true, false, true)).unwrap();
+        let xks1 = 0.3 * 2.0 / 1.5 / 0.5;
+        near(st.conc[0][0], 10.0 / (0.4 + 1.5 * (xks1 + xks1)));
     }
 
     #[test]
