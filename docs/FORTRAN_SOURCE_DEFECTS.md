@@ -32,6 +32,11 @@ reproduces on purpose, so its output matches the reference program.
 - **Port:** `solute_fortran_compat/initialization.rs` (`mass_init`).
 - **Pinning test:** `initialization::tests::source_defect_sd001_mass_init_xkh_uses_xks_temperature_factor`.
 - **Status:** reproduced; not reported upstream.
+- **Modern HYDRUS:**
+  - **Version:** untested
+  - **Date:** untested
+  - **Verdict:** untested
+  - **Evidence:** untested
 
 ### SD-002 — Bacteria second-site sorption uses the first site's rates
 
@@ -47,6 +52,28 @@ reproduces on purpose, so its output matches the reference program.
   `initialization::tests::source_defect_sd002_mass_init_xks2_reuses_first_site_rates`,
   `initialization::tests::source_defect_sd002_bacteria_xks2_reuses_first_site_rates`.
 - **Status:** reproduced; not reported upstream.
+- **Modern HYDRUS:**
+  - **Version:** untested
+  - **Date:** untested
+  - **Verdict:** untested
+  - **Evidence:** untested
+
+## Probe procedure
+
+To determine whether a source defect persists or has been resolved in modern or closed-source HYDRUS builds:
+
+1. **Paired probe decks:** Each register entry is probed using two input deck pairs:
+   - **Defect pair:** Varies only the parameter that correct code would read and the defect ignores. On pinned Fortran (defect present), both runs yield identical output.
+   - **Control pair:** Varies a parameter that every version reads at the same site, verifying that the output file and variable respond to changes. On any working solver, runs yield different outputs.
+2. **Execution:** Run the probe decks on the target HYDRUS build and collect output files (e.g. `NOD_INF.OUT` or `OBS_NODE.OUT`).
+3. **Automated comparison:** Run `python3 tools/compare_defect_probe.py --manifest <path> --outputs <dir>`:
+   - Defect pair values are compared for exact match (`identical`).
+   - Control pair values are compared against a relative threshold (`different`).
+4. **Verdicts:**
+   - `defect present`: Defect pair is identical and control pair differs.
+   - `defect fixed`: Both defect pair and control pair differ.
+   - `inconclusive`: Control pair is identical (test lacked sensitivity), or outputs are missing/unparsable.
+5. **Register update:** Record the build version, date, verdict, and evidence path in the entry's **Modern HYDRUS** field.
 
 ## Not defects
 
