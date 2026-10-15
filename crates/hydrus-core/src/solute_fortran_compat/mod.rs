@@ -4,27 +4,21 @@ mod adapter;
 #[allow(dead_code)] // wired by 18.12.1
 mod types;
 
-#[allow(dead_code)] // wired by 18.10.1
 mod accounting;
-#[allow(dead_code)] // wired by 18.10.1
 mod assembly;
-#[allow(dead_code)] // wired by 18.10.1
 mod biology;
-#[allow(dead_code)] // wired by 18.10.1
+#[allow(dead_code)] // canonical_endpoint is wired by 18.12.1
 mod boundary;
-#[allow(dead_code)] // wired by 18.10.1
+#[allow(dead_code)] // deposit_nodes is wired by 18.12.1
 mod deposition;
+#[allow(dead_code)] // wired by 18.12.1
 mod driver;
-#[allow(dead_code)] // wired by 18.10.1
+#[allow(dead_code)] // DualPor (WATFLOW) and dual_material_selection are wired by 18.12.1
 mod dual_domain;
-#[allow(dead_code)] // wired by 18.10.1
+#[allow(dead_code)] // HYDRUS.FOR:279-288 initializers, wired by 18.12.1
 mod initialization;
 mod iteration;
-#[allow(dead_code)] // wired by 18.10.1
 mod nonequilibrium;
-#[allow(dead_code)] // wired by 18.10.1
 mod processes;
-#[allow(dead_code)] // wired by 18.10.1
 mod source_coupling;
-#[allow(dead_code)] // wired by 18.10.1
 mod transport;

@@ -244,9 +244,14 @@ pub(crate) struct EndpointPrimitiveState {
     pub new_accepted_concentration: Vec<DefaultReal>,
     /// `ChPar(4,M)`, subtracted from both waters by `MatSet` (`771`, `932`).
     pub material_immobile_water: Vec<DefaultReal>,
-    /// `g0` and `g1` at `Level=1`/`Level=2` (`764`, `112-118`).
-    pub source_g0: Vec<DefaultReal>,
-    pub source_g1: Vec<DefaultReal>,
+    /// `g0` and `g1` as the `Level=1` `Coeff` call left them (`112-118`); the
+    /// `Level=1` `MatSet` call reads these (`781-789`, `869-877`).
+    pub old_source_g0: Vec<DefaultReal>,
+    pub old_source_g1: Vec<DefaultReal>,
+    /// `g0` and `g1` as the `Level=2` `Coeff` call left them; the `Level=2`
+    /// `MatSet` call reads these (`794-799`, `895-901`).
+    pub new_source_g0: Vec<DefaultReal>,
+    pub new_source_g1: Vec<DefaultReal>,
     /// `wc` (`764`).
     pub upwind_weight: Vec<DefaultReal>,
     /// `epsi`, `alf`, `dt` (`755`).

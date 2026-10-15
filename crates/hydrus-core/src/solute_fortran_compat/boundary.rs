@@ -136,8 +136,10 @@ pub(super) fn validate(
         &state.new_retardation,
         &state.old_concentration,
         &state.new_accepted_concentration,
-        &state.source_g0,
-        &state.source_g1,
+        &state.old_source_g0,
+        &state.old_source_g1,
+        &state.new_source_g0,
+        &state.new_source_g1,
     ] {
         if values.len() != n {
             return Err("endpoint primitives need one value per node");
@@ -215,8 +217,10 @@ pub(super) fn validate(
         &state.new_retardation,
         &state.old_concentration,
         &state.new_accepted_concentration,
-        &state.source_g0,
-        &state.source_g1,
+        &state.old_source_g0,
+        &state.old_source_g1,
+        &state.new_source_g0,
+        &state.new_source_g1,
     ] {
         reals.extend(array.iter());
     }
@@ -304,17 +308,20 @@ fn natural_lower(state: &EndpointPrimitiveState) -> NaturalLower {
         state.new_matrix_velocity[i].0,
         state.new_matrix_velocity[j].0,
     );
-    let (g0_i, g0_j) = (state.source_g0[i].0, state.source_g0[j].0);
-    let (g1_i, g1_j) = (state.source_g1[i].0, state.source_g1[j].0);
+    // `Level=1` `MatSet` saw the old `Coeff` pair, `Level=2` the new one (`124-128`).
+    let (g0o_i, g0o_j) = (state.old_source_g0[i].0, state.old_source_g0[j].0);
+    let (g1o_i, g1o_j) = (state.old_source_g1[i].0, state.old_source_g1[j].0);
+    let (g0_i, g0_j) = (state.new_source_g0[i].0, state.new_source_g0[j].0);
+    let (g1_i, g1_j) = (state.new_source_g1[i].0, state.new_source_g1[j].0);
     let f1 = state.old_concentration[i].0
         * (b1 / 2.0 / state.dt.0 * th_o_i * state.old_retardation[i].0
             + state.alf.0
                 * (-old_face - ((2.0 + 3.0 * wc) * vo_i + vo_j) / 6.0
-                    + b1 / 12.0 * (3.0 * g1_i + g1_j)))
+                    + b1 / 12.0 * (3.0 * g1o_i + g1o_j)))
         + state.old_concentration[j].0
             * state.alf.0
-            * (old_face - (vo_i + (2.0 - 3.0 * wc) * vo_j) / 6.0 + b1 / 12.0 * (g1_i + g1_j))
-        + state.alf.0 * b1 / 6.0 * (2.0 * g0_i + g0_j);
+            * (old_face - (vo_i + (2.0 - 3.0 * wc) * vo_j) / 6.0 + b1 / 12.0 * (g1o_i + g1o_j))
+        + state.alf.0 * b1 / 6.0 * (2.0 * g0o_i + g0o_j);
     let e1 = state.epsi.0
         * (-new_face + (vn_i + (2.0 - 3.0 * wc) * vn_j) / 6.0 - b1 / 12.0 * (g1_i + g1_j));
     let d1 = b1 / 2.0 / state.dt.0 * th_n_i * state.new_retardation[i].0
@@ -351,18 +358,21 @@ fn natural_upper(state: &EndpointPrimitiveState) -> NaturalUpper {
         state.new_matrix_velocity[i].0,
         state.new_matrix_velocity[j].0,
     );
-    let (g0_i, g0_j) = (state.source_g0[i].0, state.source_g0[j].0);
-    let (g1_i, g1_j) = (state.source_g1[i].0, state.source_g1[j].0);
+    // `Level=1` `MatSet` saw the old `Coeff` pair, `Level=2` the new one (`124-128`).
+    let (g0o_i, g0o_j) = (state.old_source_g0[i].0, state.old_source_g0[j].0);
+    let (g1o_i, g1o_j) = (state.old_source_g1[i].0, state.old_source_g1[j].0);
+    let (g0_i, g0_j) = (state.new_source_g0[i].0, state.new_source_g0[j].0);
+    let (g1_i, g1_j) = (state.new_source_g1[i].0, state.new_source_g1[j].0);
     let f_n = state.old_concentration[i].0
         * state.alf.0
-        * (old_face + ((2.0 + 3.0 * wc) * vo_i + vo_j) / 6.0 + b1 / 12.0 * (g1_i + g1_j))
+        * (old_face + ((2.0 + 3.0 * wc) * vo_i + vo_j) / 6.0 + b1 / 12.0 * (g1o_i + g1o_j))
         + state.old_concentration[j].0
             * (b1 / 2.0 / state.dt.0 * th_o_j * state.old_retardation[j].0
                 + state.alf.0
                     * (-old_face
                         + (vo_i + (2.0 - 3.0 * wc) * vo_j) / 6.0
-                        + b1 / 12.0 * (g1_i + 3.0 * g1_j)))
-        + state.alf.0 * b1 / 6.0 * (g0_i + 2.0 * g0_j);
+                        + b1 / 12.0 * (g1o_i + 3.0 * g1o_j)))
+        + state.alf.0 * b1 / 6.0 * (g0o_i + 2.0 * g0o_j);
     let b_n = state.epsi.0
         * (-new_face - ((2.0 + 3.0 * wc) * vn_i + vn_j) / 6.0 - b1 / 12.0 * (g1_i + g1_j));
     let d_n = b1 / 2.0 / state.dt.0 * th_n_j * state.new_retardation[j].0
@@ -783,8 +793,10 @@ mod tests {
             old_concentration: r(&[1.0, 2.0, 3.0]),
             new_accepted_concentration: r(&[1.5, 2.5, 3.5]),
             material_immobile_water: r(&[0.05, 0.0]),
-            source_g0: r(&[0.01, 0.02, 0.03]),
-            source_g1: r(&[0.04, 0.05, 0.06]),
+            old_source_g0: r(&[0.01, 0.02, 0.03]),
+            old_source_g1: r(&[0.04, 0.05, 0.06]),
+            new_source_g0: r(&[0.01, 0.02, 0.03]),
+            new_source_g1: r(&[0.04, 0.05, 0.06]),
             upwind_weight: r(&[0.2, 0.3]),
             epsi: R(0.6),
             dt: R(2.0),
@@ -1194,8 +1206,10 @@ mod tests {
         s.new_matrix_velocity = r(&[0.0, 0.0, 0.0]);
         s.old_concentration = r(&[0.0, 0.0, 0.0]);
         s.new_accepted_concentration = r(&[0.0, 0.0, 0.0]);
-        s.source_g0 = r(&[0.0, 0.0, 0.0]);
-        s.source_g1 = r(&[0.0, 0.0, 0.0]);
+        s.old_source_g0 = r(&[0.0, 0.0, 0.0]);
+        s.old_source_g1 = r(&[0.0, 0.0, 0.0]);
+        s.new_source_g0 = r(&[0.0, 0.0, 0.0]);
+        s.new_source_g1 = r(&[0.0, 0.0, 0.0]);
         s.old_dispersion = r(&[0.0, 0.0, 0.0]);
         s.new_dispersion = r(&[0.0, 0.0, 0.0]);
         let flux = step_flux(&s, -1, -1);
@@ -1228,6 +1242,46 @@ mod tests {
     }
 
     #[test]
+    fn level_one_parts_read_the_old_pair_and_level_two_parts_the_new_pair() {
+        let base = fixture();
+        let a = assemble_endpoints(&base, 1, 1).unwrap();
+        // Changing only the new pair moves E1/D1/F2 and BN/DN/FE, never F1/FN.
+        let mut new_only = fixture();
+        new_only.new_source_g0 = r(&[0.5, 0.6, 0.7]);
+        new_only.new_source_g1 = r(&[0.8, 0.9, 1.0]);
+        let b = assemble_endpoints(&new_only, -1, -1).unwrap();
+        let a1 = assemble_endpoints(&base, -1, -1).unwrap();
+        assert_eq!(a1.lower.level_old, b.lower.level_old);
+        assert_eq!(a1.upper.level_old, b.upper.level_old);
+        assert_ne!(a1.lower.level_new, b.lower.level_new);
+        assert_ne!(a1.upper.level_new, b.upper.level_new);
+        // Changing only the old pair moves F1/FN and leaves the level-two rows.
+        let mut old_only = fixture();
+        old_only.old_source_g0 = r(&[0.5, 0.6, 0.7]);
+        old_only.old_source_g1 = r(&[0.8, 0.9, 1.0]);
+        let c = assemble_endpoints(&old_only, -1, -1).unwrap();
+        assert_eq!(a1.lower.level_new, c.lower.level_new);
+        assert_eq!(a1.upper.level_new, c.upper.level_new);
+        assert_ne!(a1.lower.level_old, c.lower.level_old);
+        assert_ne!(a1.upper.level_old, c.upper.level_old);
+        let _ = a;
+    }
+
+    #[test]
+    fn kernel_rejects_a_pair_of_the_wrong_length() {
+        for which in 0..4 {
+            let mut s = fixture();
+            match which {
+                0 => s.old_source_g0.pop(),
+                1 => s.old_source_g1.pop(),
+                2 => s.new_source_g0.pop(),
+                _ => s.new_source_g1.pop(),
+            };
+            assert!(assemble_endpoints(&s, 1, 1).is_err());
+        }
+    }
+
+    #[test]
     fn kernel_rejects_inputs_the_source_could_not_consume() {
         let s = fixture();
         assert!(assemble_endpoints(&s, -1, -2).is_ok());
@@ -1248,7 +1302,7 @@ mod tests {
         ordered.coordinates[1] = R(5.0);
         assert!(assemble_endpoints(&ordered, 1, 1).is_err());
         let mut finite = fixture();
-        finite.source_g1[1] = R(f32::NAN);
+        finite.new_source_g1[1] = R(f32::NAN);
         assert!(assemble_endpoints(&finite, 1, 1).is_err());
         let mut dt = fixture();
         dt.dt = R(0.0);

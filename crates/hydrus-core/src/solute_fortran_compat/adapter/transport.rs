@@ -20,8 +20,10 @@ struct EndpointDto {
     new_retardation: Vec<f64>,
     old_concentration: Vec<f64>,
     material_immobile_water: Vec<f64>,
-    source_g0: Vec<f64>,
-    source_g1: Vec<f64>,
+    old_source_g0: Vec<f64>,
+    old_source_g1: Vec<f64>,
+    new_source_g0: Vec<f64>,
+    new_source_g1: Vec<f64>,
     upwind_weight: Vec<f64>,
     epsi: f64,
     dt: f64,
@@ -83,8 +85,10 @@ impl TryFrom<EndpointDto> for EndpointPrimitiveState {
             new_retardation: reals(d.new_retardation),
             old_concentration: reals(d.old_concentration),
             material_immobile_water: reals(d.material_immobile_water),
-            source_g0: reals(d.source_g0),
-            source_g1: reals(d.source_g1),
+            old_source_g0: reals(d.old_source_g0),
+            old_source_g1: reals(d.old_source_g1),
+            new_source_g0: reals(d.new_source_g0),
+            new_source_g1: reals(d.new_source_g1),
             upwind_weight: reals(d.upwind_weight),
             epsi: real(d.epsi),
             dt: real(d.dt),
@@ -309,7 +313,8 @@ mod tests {
             "coordinates": a, "old_water": a, "new_water": a, "old_velocity": a,
             "new_velocity": a, "old_dispersion": a, "new_dispersion": a,
             "old_retardation": a, "new_retardation": a, "old_concentration": a,
-            "material_immobile_water": a, "source_g0": a, "source_g1": a,
+            "material_immobile_water": a, "old_source_g0": a, "old_source_g1": a,
+            "new_source_g0": a, "new_source_g1": a,
             "upwind_weight": a, "epsi": 0.5, "dt": 1.0, "alf": 0.0,
             "material_ids": [1, 1], "mobile_immobile": [false],
             "bottom_resistance": 0.0, "bottom_prescribed": 0.0, "top_prescribed": 0.0,
@@ -431,6 +436,26 @@ mod tests {
         let mut o = Map::new();
         o.insert("o".into(), json!({"units": "orientation", "value": ""}));
         err_has(maybe_orientation(&o, "o"), "field o");
+    }
+
+    #[test]
+    fn rejects_each_missing_level_g_pair_member() {
+        for key in [
+            "old_source_g0",
+            "old_source_g1",
+            "new_source_g0",
+            "new_source_g1",
+        ] {
+            let mut m = endpoint(json!({}));
+            m.get_mut("endpoint_primitives").unwrap()["value"]
+                .as_object_mut()
+                .unwrap()
+                .remove(key);
+            err_has(maybe_endpoint_state(&m), key);
+        }
+        // The pre-split single pair is no longer a known key.
+        let m = endpoint(json!({"source_g0": [1.0, 2.0]}));
+        assert!(maybe_endpoint_state(&m).is_err());
     }
 
     #[test]

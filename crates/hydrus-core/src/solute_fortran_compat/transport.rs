@@ -16,6 +16,9 @@ pub(crate) struct TransportNode {
     pub henry: f32,
     pub bulk_density: f32,
     pub equilibrium_fraction: f32,
+    /// `f_em` (`SOLUTE.FOR:371`): `1.` unless `lDualNEq`. Kept separate from `Frac`
+    /// so `Retard` keeps the source grouping `ro*Frac*f_em*xKs*dConc` (580).
+    pub f_em: f32,
     pub sorption_coefficient: f32,
     pub exponent: f32,
     pub sorption_nu: f32,
@@ -78,6 +81,7 @@ pub(crate) fn coefficients(
     // division by water; preserve the default-REAL grouping.
     let retardation = (node.bulk_density
         * node.equilibrium_fraction
+        * node.f_em
         * node.sorption_coefficient
         * node.concentration_derivative
         + node.gas_water * node.henry)
@@ -241,6 +245,9 @@ pub(crate) fn pecour(input: PecletInputs) -> PecletResult {
 mod tests {
     use super::*;
 
+    /// 2.0675669, bits from the reference script.
+    const RETARD_F_EM: f32 = f32::from_bits(0x40045304);
+
     fn node() -> TransportNode {
         TransportNode {
             water: 0.3,
@@ -254,6 +261,7 @@ mod tests {
             henry: 0.5,
             bulk_density: 1.2,
             equilibrium_fraction: 1.0,
+            f_em: 1.0,
             sorption_coefficient: 0.5,
             exponent: 1.0,
             sorption_nu: 0.0,
@@ -307,6 +315,36 @@ mod tests {
         let new = coefficients(input, 0.1, true, false, false, 0.1);
         assert!(old.dispersion > new.dispersion);
         assert!(new.dispersion >= (0.01 * 0.2 / 0.3 + 0.02 + 0.1 / 0.3 * 0.03 * 0.5) / 2.0);
+    }
+
+    #[test]
+    fn f_em_keeps_the_source_product_grouping() {
+        // Expected values: `.development/18.10.1/ref_retard.py` (independent f32
+        // transcription of `Retard=(ro*Frac*f_em*xKs*dConc+ThG*Henry)/ThW+1.`).
+        let mut n = node();
+        n.bulk_density = 1.3;
+        n.equilibrium_fraction = 0.7;
+        n.f_em = 0.3;
+        n.sorption_coefficient = 0.9;
+        n.concentration_derivative = 1.1;
+        let r = coefficients(n, 1.0, true, false, false, 0.0).retardation;
+        assert_eq!(r.to_bits(), RETARD_F_EM.to_bits());
+        // f_em = 1 is bit-identical to the pre-f_em product.
+        let mut one = node();
+        one.f_em = 1.0;
+        let base = (one.bulk_density
+            * one.equilibrium_fraction
+            * one.sorption_coefficient
+            * one.concentration_derivative
+            + one.gas_water * one.henry)
+            / one.water
+            + 1.0;
+        assert_eq!(
+            coefficients(one, 1.0, true, false, false, 0.0)
+                .retardation
+                .to_bits(),
+            base.to_bits()
+        );
     }
 
     #[test]
