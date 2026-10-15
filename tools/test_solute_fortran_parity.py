@@ -74,6 +74,41 @@ class ParityTests(unittest.TestCase):
         result.update(changes)
         return result
 
+    def candidate_result(self, task_root, observations=None, **changes):
+        output_data = b"rust candidate output artifact"
+        output_path = task_root / "outputs" / "candidate.out"
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+        output_path.write_bytes(output_data)
+        if observations is None:
+            observations = [
+                {
+                    "field": "concentration",
+                    "location": self.location,
+                    "units": "C_ref",
+                    "value": 0.25,
+                    "availability": "available",
+                },
+                {
+                    "field": "status",
+                    "location": self.location,
+                    "units": "state",
+                    "value": 1,
+                    "availability": "available",
+                },
+            ]
+        result = {
+            "complete": True,
+            "backend": "fortran-compatible",
+            "fixture_id": self.fixture["fixture_id"],
+            "request_sha256": self.fixture["request_sha256"],
+            "task_root": str(task_root),
+            "output_paths": {"candidate-output": "outputs/candidate.out"},
+            "output_sha256": {"candidate-output": digest(output_data)},
+            "observations": observations,
+        }
+        result.update(changes)
+        return result
+
     def call_reference_only(self, output):
         called = []
 
@@ -89,12 +124,33 @@ class ParityTests(unittest.TestCase):
             result = parity.run_reference_only(self.manifest_path, self.root / f"task-{self.calls}")
         return result, called
 
-    def write_group_fixture(self, directory, fixture_id):
+    def write_group_fixture(self, directory, fixture_id, with_map=False):
         directory.mkdir(parents=True, exist_ok=True)
         (directory / "input.json").write_bytes((self.fixture_dir / "input.json").read_bytes())
         fixture = {**self.fixture, "fixture_id": fixture_id}
         path = directory / "CASE.json"
         path.write_text(json.dumps(fixture), encoding="utf-8")
+        if with_map:
+            obs_map = {
+                "schema_version": "solute-observation-map-v1",
+                "observations": [
+                    {
+                        "field": "concentration",
+                        "location": self.location,
+                        "units": "C_ref",
+                        "raw_file": "solute1.out",
+                        "source_column": 1,
+                    },
+                    {
+                        "field": "status",
+                        "location": self.location,
+                        "units": "state",
+                        "raw_file": "solute1.out",
+                        "source_column": 2,
+                    },
+                ],
+            }
+            (directory / "OBSERVATION_MAP.json").write_text(json.dumps(obs_map), encoding="utf-8")
         return path
 
     def test_group_discovery_is_recursive_and_sorted(self):
@@ -214,6 +270,50 @@ class ParityTests(unittest.TestCase):
         self.assertEqual(overlap["status"], "pass")
         self.assertEqual(disjoint["status"], "fail")
 
+    def test_null_availability_and_reason_equality_and_mismatch(self):
+        ref_null = [{
+            "field": "Sorb2",
+            "location": self.location,
+            "units": "C_ref",
+            "value": None,
+            "availability": "unavailable",
+            "reason": "dual-nonequilibrium path excluded",
+        }]
+        cand_null_same = json.loads(json.dumps(ref_null))
+        cand_null_diff_reason = [
+            {**ref_null[0], "reason": "different reason altogether"}
+        ]
+        cand_available = [
+            {**ref_null[0], "availability": "available", "reason": None, "value": 0.0}
+        ]
+
+        # Same reason passes
+        res_same = parity.compare_observations(ref_null, cand_null_same, {})
+        self.assertEqual(res_same["status"], "pass")
+
+        # Different reason fails
+        res_diff = parity.compare_observations(ref_null, cand_null_diff_reason, {})
+        self.assertEqual(res_diff["status"], "fail")
+        self.assertEqual(res_diff["first_divergence"]["field"], "Sorb2")
+
+        # Availability mismatch fails
+        res_avail = parity.compare_observations(ref_null, cand_available, {})
+        self.assertEqual(res_avail["status"], "fail")
+        self.assertEqual(res_avail["first_divergence"]["field"], "Sorb2")
+
+    def test_exact_discrete_equality(self):
+        ref = [
+            {"field": "flag", "location": self.location, "units": "boolean", "value": True},
+            {"field": "tag", "location": self.location, "units": "string", "value": "boundary_a"},
+        ]
+        same = json.loads(json.dumps(ref))
+        diff_flag = [{"field": "flag", "location": self.location, "units": "boolean", "value": False}, ref[1]]
+        diff_tag = [ref[0], {"field": "tag", "location": self.location, "units": "string", "value": "boundary_b"}]
+
+        self.assertEqual(parity.compare_observations(ref, same, {})["status"], "pass")
+        self.assertEqual(parity.compare_observations(ref, diff_flag, {})["status"], "fail")
+        self.assertEqual(parity.compare_observations(ref, diff_tag, {})["status"], "fail")
+
     def test_runner_hashes_completion_and_output_containment(self):
         task_root = self.root / "raw-run"
         good = self.runner_result(task_root)
@@ -304,6 +404,285 @@ class ParityTests(unittest.TestCase):
         (task_root / "outputs/solute1.out").write_bytes(b"tampered output bytes")
         with self.assertRaisesRegex(ValueError, "output hash mismatch"):
             parity._validate_raw_result(good, task_root, self.fixture)
+
+    def test_paired_parity_workflow_with_mocked_adapters(self):
+        obs_map = {
+            "schema_version": "solute-observation-map-v1",
+            "observations": [
+                {
+                    "field": "concentration",
+                    "location": self.location,
+                    "units": "C_ref",
+                    "raw_file": "solute1.out",
+                    "source_column": 1,
+                },
+                {
+                    "field": "status",
+                    "location": self.location,
+                    "units": "state",
+                    "raw_file": "solute1.out",
+                    "source_column": 2,
+                },
+            ],
+        }
+        (self.fixture_dir / "OBSERVATION_MAP.json").write_text(json.dumps(obs_map), encoding="utf-8")
+
+        ref_called = []
+        cand_called = []
+
+        def run_fixture(path, task_root, timeout_seconds=None):
+            ref_called.append((path, task_root))
+            return self.runner_result(task_root)
+
+        def normalize_outputs(map_path, manifest_path, task_root, fixture_manifest_path=None):
+            return [
+                {
+                    "field": "concentration",
+                    "location": self.location,
+                    "units": "C_ref",
+                    "value": 0.25,
+                    "availability": "available",
+                },
+                {
+                    "field": "status",
+                    "location": self.location,
+                    "units": "state",
+                    "value": 1,
+                    "availability": "available",
+                },
+            ]
+
+        def run_candidate(fixture_path, task_root):
+            cand_called.append((fixture_path, task_root))
+            return self.candidate_result(task_root)
+
+        runner_mod = types.ModuleType("tools.run_fortran_reference")
+        runner_mod.run_fixture = run_fixture
+
+        normalizer_mod = types.ModuleType("tools.solute_parity_normalizers")
+        normalizer_mod.normalize_fortran_outputs = normalize_outputs
+
+        cand_mod = types.ModuleType("tools.solute_rust_candidate_adapter")
+        cand_mod.run_candidate = run_candidate
+
+        task_root = self.root / "paired-task"
+        with patch.dict(
+            "sys.modules",
+            {
+                "tools.run_fortran_reference": runner_mod,
+                "tools.solute_parity_normalizers": normalizer_mod,
+                "tools.solute_rust_candidate_adapter": cand_mod,
+            },
+        ):
+            result = parity.run_paired_parity(self.manifest_path, task_root, backend="fortran-compatible")
+
+        self.assertEqual(len(ref_called), 1)
+        self.assertEqual(len(cand_called), 1)
+        # Ensure candidate received the exact fixture manifest, not Fortran outputs
+        self.assertEqual(ref_called[0][0], self.manifest_path)
+        self.assertEqual(cand_called[0][0], self.manifest_path)
+        self.assertEqual(ref_called[0][1], task_root / "reference-run")
+        self.assertEqual(cand_called[0][1], task_root / "candidate-run")
+
+        self.assertEqual(result["status"], "pass")
+        self.assertEqual(result["mode"], "paired")
+        self.assertEqual(result["backend"], "fortran-compatible")
+        self.assertTrue(result["normalized_parity"])
+        self.assertEqual(result["result_kind"], "paired-normalized-parity")
+        self.assertIsNotNone(result["comparison"])
+        self.assertEqual(result["comparison"]["status"], "pass")
+        self.assertIsNone(result["comparison"]["first_divergence"])
+
+    def test_candidate_output_hash_and_manifest_validation(self):
+        task_root = self.root / "candidate-validation"
+        cand = self.candidate_result(task_root)
+        self.assertIs(parity._validate_candidate_result(cand, task_root, self.fixture), cand)
+
+        # Incomplete candidate
+        bad = json.loads(json.dumps(cand))
+        bad["complete"] = False
+        with self.assertRaisesRegex(ValueError, "candidate run is incomplete"):
+            parity._validate_candidate_result(bad, task_root, self.fixture)
+
+        # Wrong backend
+        bad = json.loads(json.dumps(cand))
+        bad["backend"] = "fv-be"
+        with self.assertRaisesRegex(ValueError, "candidate backend must be fortran-compatible"):
+            parity._validate_candidate_result(bad, task_root, self.fixture)
+
+        # Request hash mismatch
+        bad = json.loads(json.dumps(cand))
+        bad["request_sha256"] = "0" * 64
+        with self.assertRaisesRegex(ValueError, "candidate request hash mismatch"):
+            parity._validate_candidate_result(bad, task_root, self.fixture)
+
+        # Output artifact missing
+        bad = json.loads(json.dumps(cand))
+        bad["output_paths"]["missing"] = "outputs/missing.out"
+        bad["output_sha256"]["missing"] = "0" * 64
+        with self.assertRaisesRegex(ValueError, "declared candidate output missing"):
+            parity._validate_candidate_result(bad, task_root, self.fixture)
+
+        # Output artifact tampered
+        (task_root / "outputs" / "candidate.out").write_bytes(b"tampered candidate bytes")
+        with self.assertRaisesRegex(ValueError, "candidate output hash mismatch"):
+            parity._validate_candidate_result(cand, task_root, self.fixture)
+
+    def test_paired_group_discovery_and_execution(self):
+        fixture_root = self.root / "parity"
+        first = self.write_group_fixture(fixture_root / "transport" / "case1", "case1", with_map=True)
+        second = self.write_group_fixture(fixture_root / "transport" / "case2", "case2", with_map=True)
+
+        ref_calls = []
+        cand_calls = []
+
+        def run_fixture(path, task_root, timeout_seconds=None):
+            ref_calls.append((path, task_root))
+            return self.runner_result(task_root)
+
+        def normalize_outputs(map_path, manifest_path, task_root, fixture_manifest_path=None):
+            return [
+                {
+                    "field": "concentration",
+                    "location": self.location,
+                    "units": "C_ref",
+                    "value": 0.25,
+                    "availability": "available",
+                },
+                {
+                    "field": "status",
+                    "location": self.location,
+                    "units": "state",
+                    "value": 1,
+                    "availability": "available",
+                },
+            ]
+
+        def run_candidate(fixture_path, task_root):
+            cand_calls.append((fixture_path, task_root))
+            fixture_id = json.loads(fixture_path.read_text(encoding="utf-8"))["fixture_id"]
+            return self.candidate_result(task_root, fixture_id=fixture_id)
+
+        runner_mod = types.ModuleType("tools.run_fortran_reference")
+        runner_mod.run_fixture = run_fixture
+
+        normalizer_mod = types.ModuleType("tools.solute_parity_normalizers")
+        normalizer_mod.normalize_fortran_outputs = normalize_outputs
+
+        cand_mod = types.ModuleType("tools.solute_rust_candidate_adapter")
+        cand_mod.run_candidate = run_candidate
+
+        task_root = self.root / "paired-group-task"
+        with patch.dict(
+            "sys.modules",
+            {
+                "tools.run_fortran_reference": runner_mod,
+                "tools.solute_parity_normalizers": normalizer_mod,
+                "tools.solute_rust_candidate_adapter": cand_mod,
+            },
+        ):
+            group_res = parity.run_fixture_group(
+                "transport", task_root, fixture_root=fixture_root, backend="fortran-compatible"
+            )
+
+        self.assertEqual(len(ref_calls), 2)
+        self.assertEqual(len(cand_calls), 2)
+        self.assertEqual(group_res["status"], "pass")
+        self.assertEqual(group_res["mode"], "paired")
+        self.assertEqual(group_res["backend"], "fortran-compatible")
+        self.assertTrue(group_res["normalized_parity"])
+        self.assertEqual(group_res["result_kind"], "paired-normalized-parity")
+        self.assertEqual(len(group_res["results"]), 2)
+        self.assertTrue(all(r["status"] == "pass" for r in group_res["results"]))
+
+    def test_cli_parsing_and_dispatch(self):
+        obs_map = {
+            "schema_version": "solute-observation-map-v1",
+            "observations": [
+                {
+                    "field": "concentration",
+                    "location": self.location,
+                    "units": "C_ref",
+                    "raw_file": "solute1.out",
+                    "source_column": 1,
+                },
+                {
+                    "field": "status",
+                    "location": self.location,
+                    "units": "state",
+                    "raw_file": "solute1.out",
+                    "source_column": 2,
+                },
+            ],
+        }
+        (self.fixture_dir / "OBSERVATION_MAP.json").write_text(json.dumps(obs_map), encoding="utf-8")
+
+        def run_fixture(path, task_root, timeout_seconds=None):
+            return self.runner_result(task_root)
+
+        def normalize_outputs(map_path, manifest_path, task_root, fixture_manifest_path=None):
+            return [
+                {
+                    "field": "concentration",
+                    "location": self.location,
+                    "units": "C_ref",
+                    "value": 0.25,
+                    "availability": "available",
+                },
+                {
+                    "field": "status",
+                    "location": self.location,
+                    "units": "state",
+                    "value": 1,
+                    "availability": "available",
+                },
+            ]
+
+        def run_candidate(fixture_path, task_root):
+            return self.candidate_result(task_root)
+
+        runner_mod = types.ModuleType("tools.run_fortran_reference")
+        runner_mod.run_fixture = run_fixture
+
+        normalizer_mod = types.ModuleType("tools.solute_parity_normalizers")
+        normalizer_mod.normalize_fortran_outputs = normalize_outputs
+
+        cand_mod = types.ModuleType("tools.solute_rust_candidate_adapter")
+        cand_mod.run_candidate = run_candidate
+
+        task_root = self.root / "cli-task"
+        with patch.dict(
+            "sys.modules",
+            {
+                "tools.run_fortran_reference": runner_mod,
+                "tools.solute_parity_normalizers": normalizer_mod,
+                "tools.solute_rust_candidate_adapter": cand_mod,
+            },
+        ):
+            # Test manifest with --backend fortran-compatible
+            code = parity.main([
+                "--backend", "fortran-compatible",
+                "--fixture-manifest", str(self.manifest_path),
+                "--task-root", str(task_root / "manifest-run"),
+            ])
+            self.assertEqual(code, 0)
+
+            # Test manifest with --reference-only
+            code = parity.main([
+                "--reference-only",
+                "--fixture-manifest", str(self.manifest_path),
+                "--task-root", str(task_root / "ref-run"),
+            ])
+            self.assertEqual(code, 0)
+
+            # Reject mutually exclusive flags
+            with self.assertRaises(SystemExit):
+                parity.main([
+                    "--reference-only",
+                    "--backend", "fortran-compatible",
+                    "--fixture-manifest", str(self.manifest_path),
+                    "--task-root", str(task_root / "err-run"),
+                ])
 
 
 if __name__ == "__main__":

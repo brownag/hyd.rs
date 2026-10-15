@@ -6,9 +6,11 @@ import argparse
 import hashlib
 import json
 import math
+import os
 import re
 import sys
 from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple
 
 ROOT = Path(__file__).resolve().parents[1]
 PARITY_FIXTURE_ROOT = ROOT / "reference/fortran_reference/solute/parity"
@@ -18,6 +20,7 @@ FIXTURE_GROUPS = {
     "transport_properties": "transport_properties",
     "nonequilibrium": "processes/nonequilibrium",
     "biology": "processes/biology",
+    "flux_concentration": "flux_concentration",
 }
 PINNED_PATCH_SHA256 = "622d1ea68285257e98a169f94dec83f3df1c671a9366f651e845806cb8c00d7e"
 if __package__ in (None, ""):
@@ -149,6 +152,34 @@ def _validate_raw_result(result: dict, task_root: Path, fixture: dict) -> dict:
     return result
 
 
+def _compare_numeric(left, right, rule: dict) -> bool:
+    if isinstance(left, list) and isinstance(right, list):
+        if len(left) != len(right):
+            return False
+        return all(_compare_numeric(l, r, rule) for l, r in zip(left, right))
+    if isinstance(left, (int, float)) and isinstance(right, (int, float)) and not isinstance(left, bool) and not isinstance(right, bool):
+        if "intervals" in rule:
+            low_a, high_a = rule["intervals"][0]
+            low_b, high_b = rule["intervals"][1]
+            return max(low_a, low_b) <= min(high_a, high_b)
+        atol, rtol = rule.get("atol"), rule.get("rtol")
+        _require(isinstance(atol, (int, float)) and isinstance(rtol, (int, float)) and atol >= 0 and rtol >= 0,
+                 "invalid acceptance rule tolerances")
+        return abs(right - left) <= atol + rtol * max(abs(left), abs(right))
+    return left == right
+
+
+def _compute_difference(left, right):
+    if isinstance(left, (int, float)) and isinstance(right, (int, float)) and not isinstance(left, bool) and not isinstance(right, bool):
+        return right - left
+    if isinstance(left, list) and isinstance(right, list) and len(left) == len(right):
+        try:
+            return [_compute_difference(l, r) for l, r in zip(left, right)]
+        except Exception:
+            return None
+    return None
+
+
 def compare_observations(reference: list[dict], candidate: list[dict], rules: dict) -> dict:
     """Compare paired backends only after exact field/location identity checks."""
     ref = {(item["field"], canonical_hash(item["location"])): item for item in reference}
@@ -160,10 +191,33 @@ def compare_observations(reference: list[dict], candidate: list[dict], rules: di
         item = got[key]
         field_name = original["field"]
         _require(original.get("units") == item.get("units"), f"field identity mismatch: {field_name} units")
-        rule = rules.get(field_name)
+
+        ref_avail = original.get("availability", "available")
+        cand_avail = item.get("availability", "available")
+        ref_reason = original.get("reason")
+        cand_reason = item.get("reason")
+
+        if ref_avail == "unavailable" or cand_avail == "unavailable":
+            same_avail = ref_avail == cand_avail
+            same_reason = ref_reason == cand_reason
+            passed = same_avail and same_reason
+            record = {
+                "field": field_name,
+                "location": original["location"],
+                "status": "pass" if passed else "fail",
+                "reference": {"availability": ref_avail, "reason": ref_reason, "value": original.get("value")},
+                "candidate": {"availability": cand_avail, "reason": cand_reason, "value": item.get("value")},
+            }
+            records.append(record)
+            if not passed:
+                return {"status": "fail", "first_divergence": records[-1], "records": records}
+            continue
+
+        rule = rules.get(field_name, {"atol": 0.0, "rtol": 0.0})
         _require(isinstance(rule, dict), f"missing acceptance rule: {field_name}")
         left, right = original.get("value"), item.get("value")
         _require(type(left) is type(right), f"field identity mismatch: {field_name} value type")
+
         if isinstance(left, (int, float)) and not isinstance(left, bool):
             if "intervals" in rule:
                 low_a, high_a = rule["intervals"][0]
@@ -178,6 +232,16 @@ def compare_observations(reference: list[dict], candidate: list[dict], rules: di
                             "reference": left, "candidate": right, "difference": right - left})
             if not passed:
                 return {"status": "fail", "first_divergence": records[-1], "records": records}
+        elif isinstance(left, list):
+            passed = _compare_numeric(left, right, rule)
+            diff = _compute_difference(left, right)
+            record = {"field": field_name, "location": original["location"], "status": "pass" if passed else "fail",
+                      "reference": left, "candidate": right}
+            if diff is not None:
+                record["difference"] = diff
+            records.append(record)
+            if not passed:
+                return {"status": "fail", "first_divergence": records[-1], "records": records}
         else:
             passed = left == right
             records.append({"field": field_name, "location": original["location"], "status": "pass" if passed else "fail",
@@ -185,6 +249,131 @@ def compare_observations(reference: list[dict], candidate: list[dict], rules: di
             if not passed:
                 return {"status": "fail", "first_divergence": records[-1], "records": records}
     return {"status": "pass", "first_divergence": None, "records": records}
+
+
+def _validate_candidate_result(result: dict, task_root: Path, fixture: dict) -> dict:
+    _require(isinstance(result, dict), "candidate runner must return a result manifest")
+    _require(result.get("complete") is True, "candidate run is incomplete")
+    _require(result.get("backend") == "fortran-compatible", "candidate backend must be fortran-compatible")
+    _require(result.get("request_sha256") == fixture["request_sha256"], "candidate request hash mismatch")
+    _require(result.get("fixture_id") == fixture["fixture_id"], "candidate fixture_id mismatch")
+
+    root = task_root.resolve()
+    cand_root = Path(result.get("task_root", "")).resolve()
+    _require(cand_root == root, "candidate task_root differs from requested task root")
+
+    paths = result.get("output_paths")
+    outputs = result.get("output_sha256")
+    _require(isinstance(paths, dict) and paths, "candidate runner has no declared output paths")
+    _require(isinstance(outputs, dict) and outputs, "candidate runner has no declared output hashes")
+    _require(paths.keys() == outputs.keys(), "candidate output path/hash keys differ")
+
+    resolved_outputs = set()
+    for logical_name, relative in paths.items():
+        _require(isinstance(logical_name, str) and logical_name, "invalid candidate output logical name")
+        _require(isinstance(relative, str) and relative, f"invalid candidate output path for {logical_name}")
+        expected = outputs[logical_name]
+        _hash_string(expected, f"candidate output {logical_name}")
+        artifact = (root / relative).resolve()
+        _require(artifact.is_relative_to(root), f"candidate output path escapes task root: {relative}")
+        _require(artifact not in resolved_outputs, f"duplicate candidate output path: {relative}")
+        resolved_outputs.add(artifact)
+        _require(artifact.is_file(), f"declared candidate output missing: {relative}")
+        _require(sha256(artifact) == expected, f"candidate output hash mismatch: {logical_name}")
+
+    observations = result.get("observations")
+    _require(isinstance(observations, list), "candidate result observations must be a list")
+    for obs in observations:
+        _require(isinstance(obs, dict), "candidate observation must be an object")
+        _require(isinstance(obs.get("field"), str) and obs["field"], "candidate observation missing field")
+        _require(isinstance(obs.get("location"), dict), "candidate observation missing location object")
+        _require(isinstance(obs.get("units"), str) and obs["units"], "candidate observation missing units")
+        avail = obs.get("availability", "available")
+        _require(avail in ("available", "unavailable"), f"invalid candidate observation availability: {avail}")
+        if avail == "unavailable":
+            _require(isinstance(obs.get("reason"), str) and obs["reason"].strip(),
+                     f"unavailable candidate observation {obs['field']} missing reason")
+        else:
+            _require("value" in obs, f"available candidate observation {obs['field']} missing value")
+    return result
+
+
+def invoke_rust_candidate(fixture_manifest_path: Path, task_root: Path) -> dict:
+    """Invoke the Rust compatibility candidate adapter/harness with the fixture request."""
+    from tools import solute_rust_candidate_adapter
+
+    return solute_rust_candidate_adapter.run_candidate(fixture_manifest_path, task_root)
+
+
+def run_paired_parity(
+    fixture_manifest_path: Path,
+    task_root: Path,
+    backend: str = "fortran-compatible",
+    rules: Optional[dict] = None,
+) -> dict:
+    _require(backend == "fortran-compatible", f"unsupported parity backend: {backend}")
+    fixture, request = validate_fixture(fixture_manifest_path)
+    obs_map_path = fixture_manifest_path.parent / "OBSERVATION_MAP.json"
+    _require(obs_map_path.is_file(), f"missing OBSERVATION_MAP.json for fixture: {fixture_manifest_path.parent}")
+
+    from tools.run_fortran_reference import run_fixture
+    from tools.solute_parity_normalizers import normalize_fortran_outputs
+
+    task_root.mkdir(parents=True, exist_ok=False)
+
+    # 1. Run reference
+    ref_task_root = task_root / "reference-run"
+    ref_result_raw = run_fixture(fixture_manifest_path, ref_task_root, timeout_seconds=None)
+    raw_result = _validate_raw_result(ref_result_raw, ref_task_root, fixture)
+
+    # 2. Normalize raw Fortran outputs
+    ref_runner_manifest_path = ref_task_root / "MANIFEST.json"
+    if not ref_runner_manifest_path.is_file():
+        ref_runner_manifest_path = ref_task_root / "run" / "MANIFEST.json"
+    if not ref_runner_manifest_path.is_file():
+        ref_runner_manifest_path = ref_task_root / "runner_manifest.json"
+        ref_runner_manifest_path.write_text(json.dumps(raw_result, indent=2), encoding="utf-8")
+
+    normalized_reference = normalize_fortran_outputs(
+        obs_map_path,
+        ref_runner_manifest_path,
+        ref_task_root,
+        fixture_manifest_path=fixture_manifest_path,
+    )
+
+    # 3. Run candidate with exact normalized fixture request (never Fortran outputs)
+    cand_task_root = task_root / "candidate-run"
+    cand_result_raw = invoke_rust_candidate(fixture_manifest_path, cand_task_root)
+    cand_result = _validate_candidate_result(cand_result_raw, cand_task_root, fixture)
+    normalized_candidate = cand_result["observations"]
+
+    # 4. Compare observations
+    comparison_rules = rules if rules is not None else {}
+    comparison = compare_observations(normalized_reference, normalized_candidate, comparison_rules)
+
+    return {
+        "schema_version": "solute-parity-result-v1",
+        "mode": "paired",
+        "backend": backend,
+        "fixture_id": fixture["fixture_id"],
+        "request_sha256": fixture["request_sha256"],
+        "task_root": str(task_root),
+        "run_root": raw_result["run_root"],
+        "runner_manifest_sha256": canonical_hash(raw_result),
+        "candidate_manifest_sha256": canonical_hash(cand_result),
+        "status": "pass" if comparison["status"] == "pass" else "fail",
+        "result_kind": "paired-normalized-parity",
+        "normalized_parity": True,
+        "reference_output_paths": raw_result["output_paths"],
+        "reference_output_sha256": raw_result["output_sha256"],
+        "candidate_output_paths": cand_result["output_paths"],
+        "candidate_output_sha256": cand_result["output_sha256"],
+        "input_sha256": raw_result["input_sha256"],
+        "source_and_archive_sha256": raw_result["source_and_archive_sha256"],
+        "patch_sha256": raw_result["patch_sha256"],
+        "executable_sha256": raw_result["executable_sha256"],
+        "comparison": comparison,
+    }
 
 
 def run_reference_only(fixture_manifest_path: Path, task_root: Path) -> dict:
@@ -205,7 +394,7 @@ def run_reference_only(fixture_manifest_path: Path, task_root: Path) -> dict:
             "source_and_archive_sha256": raw_result["source_and_archive_sha256"],
             "patch_sha256": raw_result["patch_sha256"],
             "executable_sha256": raw_result["executable_sha256"],
-             "comparison": None}
+            "comparison": None}
 
 
 def discover_fixture_manifests(group: str, fixture_root: Path = PARITY_FIXTURE_ROOT) -> list[Path]:
@@ -214,7 +403,13 @@ def discover_fixture_manifests(group: str, fixture_root: Path = PARITY_FIXTURE_R
     return sorted(root.rglob("CASE.json")) if root.is_dir() else []
 
 
-def run_fixture_group(group: str, task_root: Path, fixture_root: Path = PARITY_FIXTURE_ROOT) -> dict:
+def run_fixture_group(
+    group: str,
+    task_root: Path,
+    fixture_root: Path = PARITY_FIXTURE_ROOT,
+    backend: Optional[str] = None,
+    rules: Optional[dict] = None,
+) -> dict:
     manifests = discover_fixture_manifests(group, fixture_root)
     _require(manifests, f"fixture group has no CASE.json manifests: {group}")
     fixtures = [validate_fixture(path)[0] for path in manifests]
@@ -229,26 +424,55 @@ def run_fixture_group(group: str, task_root: Path, fixture_root: Path = PARITY_F
     results = []
     for index, manifest in enumerate(manifests):
         child_root = task_root / f"{index:04d}-{fixtures[index]['fixture_id']}"
-        results.append(run_reference_only(manifest, child_root))
-    return {"schema_version": "solute-parity-group-result-v1", "mode": "reference-only",
-            "group": group, "status": "authenticated", "result_kind": "raw-fortran-outputs",
-            "normalized_parity": False, "task_root": str(task_root), "results": results}
+        if backend == "fortran-compatible":
+            results.append(run_paired_parity(manifest, child_root, backend=backend, rules=rules))
+        else:
+            results.append(run_reference_only(manifest, child_root))
+
+    all_passed = all(r.get("status") in ("authenticated", "pass") for r in results)
+    status = "pass" if backend == "fortran-compatible" and all_passed else ("fail" if backend == "fortran-compatible" else "authenticated")
+
+    return {
+        "schema_version": "solute-parity-group-result-v1",
+        "mode": "paired" if backend == "fortran-compatible" else "reference-only",
+        "backend": backend,
+        "group": group,
+        "status": status,
+        "result_kind": "paired-normalized-parity" if backend == "fortran-compatible" else "raw-fortran-outputs",
+        "normalized_parity": backend == "fortran-compatible",
+        "task_root": str(task_root),
+        "results": results,
+    }
 
 
 def main(argv=None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--reference-only", action="store_true", required=True)
+    mode_group = parser.add_mutually_exclusive_group(required=True)
+    mode_group.add_argument("--reference-only", action="store_true")
+    mode_group.add_argument("--backend", choices=["fortran-compatible"])
+
     selection = parser.add_mutually_exclusive_group(required=True)
     selection.add_argument("--fixture-manifest")
     selection.add_argument("--fixture-group", choices=[*FIXTURE_GROUPS, "all"])
     parser.add_argument("--task-root", required=True)
     args = parser.parse_args(argv)
-    if args.fixture_manifest:
-        output = run_reference_only(Path(args.fixture_manifest).resolve(), Path(args.task_root).resolve())
+
+    task_root = Path(args.task_root).resolve()
+    if args.backend == "fortran-compatible":
+        if args.fixture_manifest:
+            output = run_paired_parity(Path(args.fixture_manifest).resolve(), task_root, backend=args.backend)
+        else:
+            output = run_fixture_group(args.fixture_group, task_root, backend=args.backend)
     else:
-        output = run_fixture_group(args.fixture_group, Path(args.task_root).resolve())
+        if args.fixture_manifest:
+            output = run_reference_only(Path(args.fixture_manifest).resolve(), task_root)
+        else:
+            output = run_fixture_group(args.fixture_group, task_root)
+
     print(json.dumps(output, indent=2, sort_keys=True))
-    return 0
+    if output.get("status") in ("authenticated", "pass"):
+        return 0
+    return 1
 
 
 if __name__ == "__main__":
