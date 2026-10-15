@@ -102,3 +102,16 @@ The [fixture README](../../reference/fortran_reference/solute/example3/README.md
 | Manual reproduction, general text/release compatibility and redistribution | **Unavailable/unreviewed**; derived-case parser success does not establish these claims |
 
 M5-V remains open. Follow-up work must quantify endpoint and temporal-quadrature convergence, provide an independent analytical/manufactured reference on common coordinates/times, and review storage/flux/reaction error budgets including zero/near-zero balance cases before freezing thresholds. This handoff does not authorize Phase 6 or promote the precision variant to an oracle.
+
+## Complete 44-fixture Fortran parity suite execution (Orchestration 18 / Task 18.15.1) — 2026-10-15
+
+Task 18.15.1 completed full serial execution of all 44 parity fixtures across all six process groups (`transport`, `reactions`, `transport_properties`, `nonequilibrium`, `dual_exchange`, `biology`, `flux_concentration`), comparing the pinned Fortran reference executable (`GNU Fortran 13.3.0`, Linux x86_64) against the Rust Fortran-compatible solver (`SoluteBackend::FortranCompatible`).
+
+- **Total Fixtures:** 44
+- **Passed:** 44 (100%)
+- **Failed / Diverged:** 0
+- **Runner Evidence:** Pinned executable and GNU compatibility patch authenticated for all runs. Normalized inputs and outputs matched within declared half-width precision intervals and field rules.
+- **FV/BE Solver Preservation:** The Finite-Volume / Backward-Euler alternative solver remains intact as an explicit candidate (`SoluteBackend::FiniteVolumeBackwardEuler`), passing all 6/6 tests in `tests/solute_acceptance.rs` and 4/4 tests in `tests/solute_solver_selection.rs`.
+- **Documentation:** Full audit record, active modes, inactive helpers, and scientific gaps are recorded in [SOLUTE_FORTRAN_PARITY_18.md](SOLUTE_FORTRAN_PARITY_18.md).
+- **Parity vs. Validity:** This result confirms numerical parity against the pinned legacy Fortran source algorithms; it does not claim continuum physical correctness or empirical validation against physical experimental data.
+

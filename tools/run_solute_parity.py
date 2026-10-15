@@ -158,6 +158,10 @@ def _compare_numeric(left, right, rule: dict) -> bool:
             return False
         return all(_compare_numeric(l, r, rule) for l, r in zip(left, right))
     if isinstance(left, (int, float)) and isinstance(right, (int, float)) and not isinstance(left, bool) and not isinstance(right, bool):
+        if math.isnan(left) and math.isnan(right):
+            return True
+        if math.isnan(left) or math.isnan(right):
+            return False
         if "intervals" in rule:
             low_a, high_a = rule["intervals"][0]
             low_b, high_b = rule["intervals"][1]
@@ -171,6 +175,8 @@ def _compare_numeric(left, right, rule: dict) -> bool:
 
 def _compute_difference(left, right):
     if isinstance(left, (int, float)) and isinstance(right, (int, float)) and not isinstance(left, bool) and not isinstance(right, bool):
+        if math.isnan(left) and math.isnan(right):
+            return 0.0
         return right - left
     if isinstance(left, list) and isinstance(right, list) and len(left) == len(right):
         try:
@@ -219,17 +225,10 @@ def compare_observations(reference: list[dict], candidate: list[dict], rules: di
         _require(type(left) is type(right), f"field identity mismatch: {field_name} value type")
 
         if isinstance(left, (int, float)) and not isinstance(left, bool):
-            if "intervals" in rule:
-                low_a, high_a = rule["intervals"][0]
-                low_b, high_b = rule["intervals"][1]
-                passed = max(low_a, low_b) <= min(high_a, high_b)
-            else:
-                atol, rtol = rule.get("atol"), rule.get("rtol")
-                _require(isinstance(atol, (int, float)) and isinstance(rtol, (int, float)) and atol >= 0 and rtol >= 0,
-                         f"field {field_name}: invalid acceptance rule")
-                passed = abs(right - left) <= atol + rtol * max(abs(left), abs(right))
+            passed = _compare_numeric(left, right, rule)
+            diff = _compute_difference(left, right)
             records.append({"field": field_name, "location": original["location"], "status": "pass" if passed else "fail",
-                            "reference": left, "candidate": right, "difference": right - left})
+                            "reference": left, "candidate": right, "difference": diff})
             if not passed:
                 return {"status": "fail", "first_divergence": records[-1], "records": records}
         elif isinstance(left, list):
@@ -287,7 +286,10 @@ def _validate_candidate_result(result: dict, task_root: Path, fixture: dict) -> 
         _require(isinstance(obs, dict), "candidate observation must be an object")
         _require(isinstance(obs.get("field"), str) and obs["field"], "candidate observation missing field")
         _require(isinstance(obs.get("location"), dict), "candidate observation missing location object")
-        _require(isinstance(obs.get("units"), str) and obs["units"], "candidate observation missing units")
+        if obs.get("availability") == "unavailable":
+            _require(isinstance(obs.get("units"), str), "candidate observation missing units")
+        else:
+            _require(isinstance(obs.get("units"), str) and obs["units"], "candidate observation missing units")
         avail = obs.get("availability", "available")
         _require(avail in ("available", "unavailable"), f"invalid candidate observation availability: {avail}")
         if avail == "unavailable":

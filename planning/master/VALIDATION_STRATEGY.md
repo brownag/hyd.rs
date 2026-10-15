@@ -91,6 +91,7 @@ Recommendations become implementation commitments only after the corresponding g
 - `HYDRUS_RESEARCH.md` §§4 and 8 identify manual Chapter 11 candidates, missing machine-readable decks, per-field tolerance recommendations, host tests, and performance separation.
 - Direct anchors inspected: `OUTPUT.FOR:TLInf/NodOut/SubReg`, `WATFLOW.FOR:Gauss`, `SOLUTE.FOR:BanSol`, `MATERIAL.FOR:FK/FC/FQ`, and `SINK.FOR:FAlfa`.
 - The local manual is evidence for documented cases; no golden output, passing numerical comparison, universal tolerance, or benchmark speedup is claimed.
+- `SOLUTE_FORTRAN_PARITY_18.md` records complete empirical numerical parity across 44 fixtures in all 6 process groups comparing pinned Fortran (`GNU Fortran 13.3.0`, Linux x86_64) against `SoluteBackend::FortranCompatible` using declared precision intervals and strict input/output authentication. Explicit FV/BE regressions remain preserved. Physical/continuum validity claims remain strictly disclaimed.
 
 ## Open decisions
 

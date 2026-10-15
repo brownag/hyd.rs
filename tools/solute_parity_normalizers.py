@@ -172,7 +172,7 @@ class RawFortranOutputBundle:
         self._parsed_balance: Optional[List[Dict[str, Any]]] = None
 
     def read_file_lines(self, filename: str) -> List[str]:
-        # Try both case variations (solute1.out, PROFILE.OUT, etc.)
+        # Try direct file and case variations (solute1.out, PROFILE.OUT, etc.)
         candidates = [self.run_root / filename, self.run_root / filename.upper(), self.run_root / filename.lower()]
         target = None
         for c in candidates:
@@ -180,11 +180,19 @@ class RawFortranOutputBundle:
                 target = c
                 break
         if target is None:
+            fn_lower = filename.lower()
+            for f in self.run_root.iterdir():
+                if f.is_file():
+                    name_lower = f.name.lower()
+                    if name_lower == fn_lower or name_lower.endswith("\\" + fn_lower) or name_lower.endswith("/" + fn_lower):
+                        target = f
+                        break
+        if target is None:
             raise ValueError(f"raw output file not found in run directory: {filename}")
         return target.read_text(encoding="utf-8", errors="strict").splitlines()
 
     def get_profile_blocks(self) -> List[Dict[str, Any]]:
-        """Parse PROFILE.OUT blocks."""
+        """Parse PROFILE.OUT blocks, falling back to NOD_INF.OUT if PROFILE.OUT contains only mesh data."""
         if self._parsed_profiles is not None:
             return self._parsed_profiles
         lines = self.read_file_lines("PROFILE.OUT")
@@ -201,14 +209,19 @@ class RawFortranOutputBundle:
                 # Check that first token is integer node index
                 if tokens and tokens[0].isdigit():
                     current_block["rows"].append(tokens)
+        if not blocks:
+            # Pinned Fortran outputs nodal time histories to NOD_INF.OUT (unit 75)
+            # while PROFILE.OUT (unit 78) writes the static material/grid profile.
+            blocks = self.get_nod_inf_blocks()
         self._parsed_profiles = blocks
         return blocks
 
-    def get_nod_inf_blocks(self) -> List[Dict[str, Any]]:
-        """Parse NOD_INF.OUT blocks."""
-        if self._parsed_nod_inf is not None:
+    def get_nod_inf_blocks(self, filename: str = "NOD_INF.OUT") -> List[Dict[str, Any]]:
+        """Parse NOD_INF.OUT / NOD_INF_V.OUT blocks."""
+        fn_key = filename.upper()
+        if fn_key == "NOD_INF.OUT" and self._parsed_nod_inf is not None:
             return self._parsed_nod_inf
-        lines = self.read_file_lines("NOD_INF.OUT")
+        lines = self.read_file_lines(filename)
         blocks = []
         current_block: Optional[Dict[str, Any]] = None
         for line in lines:
@@ -221,7 +234,8 @@ class RawFortranOutputBundle:
                 tokens = stripped.split()
                 if tokens and tokens[0].isdigit():
                     current_block["rows"].append(tokens)
-        self._parsed_nod_inf = blocks
+        if fn_key == "NOD_INF.OUT":
+            self._parsed_nod_inf = blocks
         return blocks
 
     def get_solute_rows(self, filename: str) -> List[List[str]]:
@@ -395,33 +409,45 @@ def normalize_fortran_outputs(
                 value = profile_values
                 precision_interval = interval_widths
 
-        elif rf_upper == "NOD_INF.OUT":
-            blocks = bundle.get_nod_inf_blocks()
-            _require(len(blocks) > 0, "NOD_INF.OUT has no time blocks")
-            _require(source_col is not None, f"field {field} in NOD_INF.OUT missing source_column")
-            col_idx = int(source_col) - 1
-
-            profile_values = []
-            interval_widths = []
-            for block in blocks:
-                step_values = []
-                step_intervals = []
-                for row in block["rows"]:
-                    _require(col_idx < len(row), f"column {source_col} out of range in NOD_INF.OUT row")
-                    tok = row[col_idx]
+        elif rf_upper in ("NOD_INF.OUT", "NOD_INF_V.OUT"):
+            blocks = bundle.get_nod_inf_blocks(raw_file)
+            _require(len(blocks) > 0, f"{raw_file} has no time blocks")
+            if source_col is None and (selector_kind == "Time header records" or field == "time"):
+                profile_values = []
+                interval_widths = []
+                for block in blocks:
+                    tok = block["time_token"]
                     dec = parse_decimal_token(tok)
                     half_w = compute_half_width(tok, source_format)
-                    step_values.append(float(dec))
-                    step_intervals.append(float(half_w))
-                profile_values.append(step_values)
-                interval_widths.append(step_intervals)
-
-            if len(profile_values) == 1:
-                value = profile_values[0]
-                precision_interval = interval_widths[0]
-            else:
+                    profile_values.append(float(dec))
+                    interval_widths.append(float(half_w))
                 value = profile_values
                 precision_interval = interval_widths
+            else:
+                _require(source_col is not None, f"field {field} in {raw_file} missing source_column")
+                col_idx = int(source_col) - 1
+
+                profile_values = []
+                interval_widths = []
+                for block in blocks:
+                    step_values = []
+                    step_intervals = []
+                    for row in block["rows"]:
+                        _require(col_idx < len(row), f"column {source_col} out of range in {raw_file} row")
+                        tok = row[col_idx]
+                        dec = parse_decimal_token(tok)
+                        half_w = compute_half_width(tok, source_format)
+                        step_values.append(float(dec))
+                        step_intervals.append(float(half_w))
+                    profile_values.append(step_values)
+                    interval_widths.append(step_intervals)
+
+                if len(profile_values) == 1:
+                    value = profile_values[0]
+                    precision_interval = interval_widths[0]
+                else:
+                    value = profile_values
+                    precision_interval = interval_widths
 
         elif rf_upper.startswith("SOLUTE") and rf_upper.endswith(".OUT"):
             rows = bundle.get_solute_rows(raw_file)
@@ -482,8 +508,11 @@ def normalize_fortran_outputs(
                 entries = rec["entries"].get(label)
                 if entries is None:
                     continue
-                _require(col_idx < len(entries), f"column {source_col} out of range in BALANCE.OUT label {label}")
-                tok = entries[col_idx]
+                if col_idx >= len(entries) and len(entries) == 1:
+                    tok = entries[0]
+                else:
+                    _require(col_idx < len(entries), f"column {source_col} out of range in BALANCE.OUT label {label}")
+                    tok = entries[col_idx]
                 dec = parse_decimal_token(tok)
                 half_w = compute_half_width(tok, source_format)
                 rec_values.append(float(dec))
