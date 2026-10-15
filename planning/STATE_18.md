@@ -172,7 +172,7 @@ Plan: [EXECUTION_PLAN_18.md](EXECUTION_PLAN_18.md). Worker template: [PROMPT_TEM
   instead of per material is fixed and tested. Boundary 9 -> 14 tests, adapter
   5 -> 7 tests.
 | 8 | 18.8.1–18.8.2 | Conditional initialization and selector-2 audit resolution | done |
-| 9 | 18.9.1–18.9.5 | Source-faithful process kernels | pending |
+| 9 | 18.9.1–18.9.5 | Source-faithful process kernels | done |
 | 10 | 18.10.1 | Source-ordered solute step driver | pending |
 | 11 | 18.11.1 | Nonlinear iteration and convergence | pending |
 | 12 | 18.12.1 | Expose compatibility candidate; keep current default | pending |
@@ -345,3 +345,52 @@ The orchestrator owns wave verification and state updates. Preserve all pre-exis
 ## Wave 8 closed — 2026-10-14
 
 - Gate at a727cae: Rust 313 passed / 0 failed / 1 ignored; Python 291 OK; fmt, clippy -D warnings, diff-check clean.
+
+## Wave 9 — Source-faithful process kernels (closed 2026-10-14)
+
+Ownership ruling: 18.9.1 owns the complete `Coeff` g0/q0/g1/q1 composition
+(SOLUTE.FOR 643-730, all branches) and all isotherm factors (560-622). The other
+kernels supply only the scalars that composition consumes.
+
+- 18.9.5 `f752466`: `deposition.rs` holds the canonical `blocking`, `deposit` and
+  `deposit_nodes` (7 tests). Integer exponents (`**5`, `**6`, `Dp**2`) use `powi`.
+  iPsi=3 is ACTIVE: SOLUTE.FOR 1576-1579 are column-6 continuations.
+- 18.9.1 `8248486`: `processes.rs` adds `isotherm_factors`,
+  `prev_species_isotherm`, `chain_source` and `source_terms` (19 tests). lBact
+  with a chain is a `KernelError`, standing in for the source `stop`.
+- 18.9.4 `d3a8e72`: `biology.rs` does the lBact/lFiltr selection (9 tests). It
+  returns Blocking/Deposit requests, `BacteriaScalars` and zeroed-rate sets. TT
+  comes from TempN at the final level and TempO otherwise (297/316). Deposit
+  always gets TempN. The old-level Dc uses the new TT.
+- 18.9.2 `49bcc20`: `nonequilibrium.rs` adds `immobile_water` and `omega_terms`
+  (16 tests). ThImobO, OmegaO and OmegaS are `None` where the source leaves them
+  unassigned.
+- 18.9.3 `6e81780`: `dual_domain.rs` adds `dual_domain_th_imob`,
+  `dual_neighbor_theta` and `dual_material_selection` (16 tests). lBact with
+  iDualPor>0 is rejected explicitly. The guard is
+  `(lMobIm.and.iDualPor.eq.0).or.lBact`.
+- Verification at `6e81780`:
+  - `cargo test --workspace`: 352 passed, 0 failed.
+  - `cargo clippy --workspace --all-targets -D warnings`: clean.
+  - `cargo fmt --check` and `git diff --check`: clean.
+  - Python unittest (`.venv/bin/python`): 291 OK. The repo `.venv` restores the
+    Python gate.
+
+### Follow-ups routed from Wave 9
+- **Audit correction:** `SOLUTE_FORTRAN_COMPATIBILITY_18.md:37` and
+  `types.rs::BlockingMode::SourceNoOp3` wrongly say the iPsi=3 assignments are
+  commented out. They are active. Fix both in a scoped amendment.
+- **SD candidate:** `cMid` is assigned only in the nonlinear branch (573), yet
+  it is read at 687 and in Disper at 1053. A linear species therefore reads a
+  stale or uninitialised value. `source_terms` takes it as `c_mid_carried`, so
+  18.10.1 must decide the carry. Probe it before registering it as an SD.
+- **Duplication:** `accounting.rs` keeps private copies of blocking/deposit.
+  Point it at `deposition.rs`, and check its `deposit` for `powf` on integer
+  exponents. Also check `accumulate_bacteria`'s iPsi material index (`mj` vs
+  `mi`).
+- **18.10.1 inputs:**
+  - Carry the old-level `ThOIm`, which comes after `Update` (WATFLOW 1112).
+  - Carry `SinkIm` persistence, the `CarriedLocals` Dc/aa, and the `cMid` carry.
+  - The caller applies the 18.9.4 lBact zeroing to the 18.9.2 Omega values.
+- lBact with iDualPor>0 is unsupported in both 18.9.2 and 18.9.3 until it is
+  mapped.
