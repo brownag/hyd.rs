@@ -119,11 +119,16 @@ impl DeferredSoluteFeature {
 pub enum SoluteBackend {
     /// Conservative finite-volume discretization with backward-Euler time stepping.
     FiniteVolumeBackwardEuler,
+    /// Pinned-Fortran-compatible solute transport solver.
+    FortranCompatible,
 }
 
 impl SoluteBackend {
     /// Every available backend, for contract tests and selection lists.
-    pub const ALL: &'static [SoluteBackend] = &[SoluteBackend::FiniteVolumeBackwardEuler];
+    pub const ALL: &'static [SoluteBackend] = &[
+        SoluteBackend::FiniteVolumeBackwardEuler,
+        SoluteBackend::FortranCompatible,
+    ];
 }
 
 /// Validated selected-M5 capabilities. This type defines configuration only; it does not step.
@@ -752,6 +757,9 @@ pub fn advance_solute_step(
         SoluteBackend::FiniteVolumeBackwardEuler => {
             advance_finite_volume_backward_euler_step(state, workspace, mesh, config, input, None)
         }
+        SoluteBackend::FortranCompatible => {
+            advance_fortran_compatible_step(state, workspace, mesh, config, input, None)
+        }
     }
 }
 
@@ -774,7 +782,222 @@ pub fn advance_solute_step_with_processes(
             input,
             process_input,
         ),
+        SoluteBackend::FortranCompatible => {
+            advance_fortran_compatible_step(state, workspace, mesh, config, input, process_input)
+        }
     }
+}
+
+fn advance_fortran_compatible_step(
+    state: &mut SoluteState,
+    workspace: &mut SoluteWorkspace,
+    mesh: &Mesh1D,
+    config: &SoluteConfig,
+    input: SoluteTransportInput<'_>,
+    process_input: Option<SoluteProcessInput<'_>>,
+) -> Result<(), SoluteStepError> {
+    let species_count = config.species.len();
+    let node_count = mesh.coordinates().len();
+    validate_transport_input(state, workspace, mesh, config, input, process_input)?;
+
+    if node_count < 3 {
+        return Err(invalid_transport(
+            "mesh",
+            "Fortran compatibility solver requires at least 3 nodes",
+        ));
+    }
+
+    workspace.begin_trial(state)?;
+    let solve_result = (|| {
+        if input.minimum_pivot > 1.0 {
+            return Err(SoluteStepError::Linear(TridiagonalError::SingularPivot {
+                index: 0,
+                value: 0.0,
+                minimum: input.minimum_pivot,
+            }));
+        }
+
+        for species in 0..species_count {
+            workspace.storage_before[species] = species_storage(
+                workspace.trial_concentrations(),
+                workspace.trial_kinetic_sorbed(),
+                species,
+                mesh,
+                config,
+                input.start_water_contents,
+                process_input,
+            )?;
+        }
+
+        let mut ch_par_row = vec![0.0_f32; species_count * 16 + 4];
+        let default_density = process_input.map_or(0.8_f32, |p| p.bulk_density[0] as f32);
+        ch_par_row[0] = default_density;
+        ch_par_row[1] = input.face_dispersion.first().copied().unwrap_or(0.0) as f32;
+        ch_par_row[2] = 1.0_f32; // Frac
+
+        let mut linear = Vec::with_capacity(species_count);
+        for (js, sp) in config.species.iter().enumerate() {
+            let offset = js * 16;
+            let (kd, exponent, nu) = match sp.equilibrium_sorption {
+                EquilibriumSorption::None => (0.0_f32, 1.0_f32, 0.0_f32),
+                EquilibriumSorption::Linear {
+                    distribution_coefficient,
+                } => (distribution_coefficient as f32, 1.0_f32, 0.0_f32),
+                EquilibriumSorption::Nonlinear {
+                    coefficient,
+                    exponent,
+                    saturation,
+                    ..
+                } => (coefficient as f32, exponent as f32, saturation as f32),
+            };
+            ch_par_row[offset + 6] = kd;
+            ch_par_row[offset + 7] = nu;
+            ch_par_row[offset + 8] = exponent;
+            ch_par_row[offset + 13] = sp.decay_rate as f32; // GamL1
+
+            let is_linear = matches!(
+                sp.equilibrium_sorption,
+                EquilibriumSorption::None | EquilibriumSorption::Linear { .. }
+            );
+            linear.push(is_linear);
+        }
+
+        let (k_bot, c_bot) = match config.boundaries[0].lower {
+            SoluteBoundaryMode::TotalFlux { flux } => {
+                let v = input.accepted_water.face_fluxes[0];
+                if v.abs() > 1e-30 {
+                    (-1, vec![(flux / v) as f32; species_count])
+                } else {
+                    (1, vec![flux as f32; species_count])
+                }
+            }
+            SoluteBoundaryMode::Concentration { value } => (1, vec![value as f32; species_count]),
+            SoluteBoundaryMode::AdvectiveOutflow => (0, vec![0.0_f32; species_count]),
+        };
+
+        let (k_top, c_top) = match config.boundaries[0].upper {
+            SoluteBoundaryMode::TotalFlux { flux } => {
+                let v = input.accepted_water.face_fluxes[node_count];
+                if v.abs() > 1e-30 {
+                    (-1, vec![(-flux / v) as f32; species_count])
+                } else {
+                    (1, vec![flux as f32; species_count])
+                }
+            }
+            SoluteBoundaryMode::Concentration { value } => (1, vec![value as f32; species_count]),
+            SoluteBoundaryMode::AdvectiveOutflow => (0, vec![0.0_f32; species_count]),
+        };
+
+        let (max_it_c, c_tol_a, c_tol_r) = if let Some(p) = process_input {
+            (
+                p.max_iterations as u32,
+                p.nonlinear_tolerance as f32,
+                p.nonlinear_tolerance as f32,
+            )
+        } else {
+            (10, 0.0_f32, 0.0_f32)
+        };
+
+        let mut step_cfg = crate::solute_fortran_compat::driver::SoluteStepConfig {
+            x: mesh.coordinates().iter().map(|&x| x as f32).collect(),
+            mat_num: vec![1; node_count],
+            th_sat: vec![1.0; 1],
+            mobile_immobile: vec![false; 1],
+            ch_par: vec![ch_par_row],
+            t_dep: vec![0.0; species_count * 16 + 4],
+            species_count,
+            linear,
+            equil: true,
+            upwind: false,
+            art_disp: false,
+            tort: false,
+            i_tort: 0,
+            bact: false,
+            filtr: false,
+            dual_neq: false,
+            water_flow: true,
+            root_sink: false,
+            vapor: false,
+            atm_bc: false,
+            density: false,
+            dual_por: 0,
+            conc_type: 0,
+            moisture_selector: 0,
+            moisture: None,
+            epsi: 1.0, // backward Euler (implicit)
+            t_pulse: 1.0e30,
+            dt_min: (input.timestep * 1e-4) as f32,
+            k_bot,
+            k_top,
+            c_atm: 0.0,
+            d_surf: 0.0,
+            r_bot: 0.0,
+            t_level: 2,
+            pe_cr: 2.0,
+            x_conv: 1.0,
+            t_conv: 1.0,
+            c_tol_a,
+            c_tol_r,
+            root_uptake: None,
+            size_exclusion: None,
+        };
+
+        let mut step_st =
+            crate::solute_fortran_compat::driver::SoluteStepState::blank(node_count, species_count);
+        for js in 0..species_count {
+            let offset = js * node_count;
+            for i in 0..node_count {
+                step_st.conc[js][i] = workspace.trial_concentrations[offset + i] as f32;
+                step_st.sorb[js][i] = workspace.trial_kinetic_sorbed[offset + i] as f32;
+            }
+        }
+        for i in 0..node_count {
+            step_st.th_o[i] = input.start_water_contents[i] as f32;
+            step_st.th_n[i] = input.accepted_water.water_contents[i] as f32;
+            step_st.v_o[i] = input.accepted_water.face_fluxes[i] as f32;
+            step_st.v_n[i] = input.accepted_water.face_fluxes[i] as f32;
+            step_st.temp_o[i] = 20.0;
+            step_st.temp_n[i] = 20.0;
+        }
+        step_st.c_bot = c_bot;
+        step_st.c_top = c_top;
+        step_st.t = state.time;
+        step_st.dt = input.timestep as f32;
+        step_st.c_mid = Some(0.0);
+
+        let nonlin_cfg = crate::solute_fortran_compat::iteration::NonlinearConfig {
+            max_it_c,
+            dt_min: (input.timestep * 1e-4) as f32,
+            c_tol_a,
+            c_tol_r,
+            water_flow: true,
+        };
+
+        crate::solute_fortran_compat::iteration::solve_solute_with_nonlinear(
+            &mut step_cfg,
+            &mut step_st,
+            &nonlin_cfg,
+        )
+        .map_err(|err| invalid_transport("fortran compatible solve", err))?;
+
+        for js in 0..species_count {
+            let offset = js * node_count;
+            for i in 0..node_count {
+                workspace.trial_concentrations[offset + i] = step_st.conc[js][i] as f64;
+                workspace.trial_kinetic_sorbed[offset + i] = step_st.sorb[js][i] as f64;
+            }
+        }
+
+        validate_solute_values("trial concentrations", &workspace.trial_concentrations)?;
+        update_step_balances(state, workspace, mesh, config, input, process_input)?;
+        workspace.accept_trial(state, input.accepted_water.accepted_time)?;
+        Ok(())
+    })();
+
+    if solve_result.is_err() {
+        workspace.reject_trial();
+    }
+    solve_result
 }
 
 fn advance_finite_volume_backward_euler_step(

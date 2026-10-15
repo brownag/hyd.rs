@@ -12,13 +12,14 @@ mod boundary;
 #[allow(dead_code)] // deposit_nodes is wired by 18.12.1
 mod deposition;
 #[allow(dead_code)] // wired by 18.12.1
-mod driver;
+pub(crate) mod driver;
 #[allow(dead_code)] // DualPor (WATFLOW) and dual_material_selection are wired by 18.12.1
 mod dual_domain;
 #[allow(dead_code)] // HYDRUS.FOR:279-288 initializers, wired by 18.12.1
 mod initialization;
-mod iteration;
+pub(crate) mod iteration;
 mod nonequilibrium;
 mod processes;
+#[allow(dead_code)] // wired by 18.12.1
 mod source_coupling;
 mod transport;
