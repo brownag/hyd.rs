@@ -158,8 +158,29 @@ class ParityTests(unittest.TestCase):
         first = self.write_group_fixture(fixture_root / "transport" / "z-case", "z-case")
         second = self.write_group_fixture(fixture_root / "transport" / "a-case", "a-case")
         other = self.write_group_fixture(fixture_root / "reactions" / "only", "other")
+        dual = self.write_group_fixture(fixture_root / "processes" / "dual_exchange" / "case-d", "case-d")
         self.assertEqual(parity.discover_fixture_manifests("transport", fixture_root), [second, first])
-        self.assertEqual(parity.discover_fixture_manifests("all", fixture_root), [other, second, first])
+        self.assertEqual(parity.discover_fixture_manifests("dual_exchange", fixture_root), [dual])
+        self.assertEqual(parity.discover_fixture_manifests("all", fixture_root), [dual, other, second, first])
+
+    def test_dual_exchange_group_discovers_fixtures_and_named_groups_union_equals_all(self):
+        dual_manifests = parity.discover_fixture_manifests("dual_exchange")
+        self.assertEqual(len(dual_manifests), 4)
+        for manifest_path in dual_manifests:
+            self.assertTrue(manifest_path.is_file())
+            self.assertEqual(manifest_path.name, "CASE.json")
+            self.assertIn("processes/dual_exchange", str(manifest_path))
+
+        all_manifests = parity.discover_fixture_manifests("all")
+        self.assertEqual(len(all_manifests), 44)
+
+        union_manifests = set()
+        for group in parity.FIXTURE_GROUPS:
+            group_manifests = parity.discover_fixture_manifests(group)
+            union_manifests.update(group_manifests)
+
+        self.assertEqual(union_manifests, set(all_manifests))
+        self.assertEqual(len(union_manifests), 44)
 
     def test_group_runs_serially_into_unique_safe_child_roots_and_aggregates_authenticated_results(self):
         fixture_root = self.root / "parity"
