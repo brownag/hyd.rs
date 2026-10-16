@@ -21,6 +21,6 @@
 
 ## Scope and Status Notes
 
-These records distill decisions the user made or approved in the planning documents. An accepted ADR doesn't mean its implementation or acceptance gate is complete. The all-mode solute parity gate and the default backend switch are still pending.
+These records distill decisions the user made or approved in the planning documents. An accepted ADR doesn't mean its implementation or acceptance gate is complete. Regarding ADR 0002, `FiniteVolumeBackwardEuler` remains the default backend until the 44-fixture genuine Rust-vs-Fortran parity gate passes in Wave 6/7. The all-mode solute parity gate and the default backend switch are still pending.
 
 Non-solute architecture proposals stay as recommendations or user gates in the planning documents, not ADRs. They cover API hosts and formats, memory and solver policy, optional feature scope, and licensing review.

@@ -115,15 +115,15 @@ impl DeferredSoluteFeature {
 /// Closed set of solute transport backends. Every step is dispatched by an
 /// exhaustive `match`, so adding a variant requires handling it everywhere.
 ///
-/// `FortranCompatible` is the default backend based on completed all-mode parity
-/// verification against the pinned Fortran reference (see `planning/master/SOLUTE_FORTRAN_PARITY_18.md`).
-/// `FiniteVolumeBackwardEuler` remains fully supported and explicitly selectable.
+/// `FiniteVolumeBackwardEuler` is the default backend until genuine Rust-vs-Fortran
+/// parity passes across all 44 fixtures (see ADR 0002 and `planning/master/SOLUTE_FORTRAN_PARITY_18.md`).
+/// `FortranCompatible` is explicitly selectable via [`SoluteConfig::with_backend`].
 #[non_exhaustive]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum SoluteBackend {
-    /// Conservative finite-volume discretization with backward-Euler time stepping.
+    /// Conservative finite-volume discretization with backward-Euler time stepping (default).
     FiniteVolumeBackwardEuler,
-    /// Pinned-Fortran-compatible solute transport solver (default).
+    /// Pinned-Fortran-compatible solute transport solver.
     FortranCompatible,
 }
 
@@ -137,9 +137,8 @@ impl SoluteBackend {
 
 /// Validated selected-M5 capabilities. This type defines configuration only; it does not step.
 ///
-/// Defaults to [`SoluteBackend::FortranCompatible`], verified across all active solute modes
-/// in `planning/master/SOLUTE_FORTRAN_PARITY_18.md`. Callers may explicitly select
-/// [`SoluteBackend::FiniteVolumeBackwardEuler`] via [`with_backend`](Self::with_backend).
+/// Defaults to [`SoluteBackend::FiniteVolumeBackwardEuler`]. Callers may explicitly select
+/// [`SoluteBackend::FortranCompatible`] via [`with_backend`](Self::with_backend).
 #[derive(Clone, Debug, PartialEq)]
 pub struct SoluteConfig {
     units: SoluteUnits,
@@ -279,11 +278,11 @@ impl SoluteConfig {
             units,
             species,
             boundaries,
-            backend: SoluteBackend::FortranCompatible,
+            backend: SoluteBackend::FiniteVolumeBackwardEuler,
         })
     }
 
-    /// Select the transport backend; the default is [`SoluteBackend::FortranCompatible`].
+    /// Select the transport backend; the default is [`SoluteBackend::FiniteVolumeBackwardEuler`].
     pub fn with_backend(mut self, backend: SoluteBackend) -> Self {
         self.backend = backend;
         self

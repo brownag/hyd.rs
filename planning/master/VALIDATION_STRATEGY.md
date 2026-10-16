@@ -1,5 +1,11 @@
 # Validation and performance strategy
 
+> [!WARNING]
+> **Orchestration 20 Correction Banner:**
+> The `18.15.1` parity run invoked the Fortran reference runner inside `tools/solute_rust_candidate_adapter.py` rather than the Rust compatibility solver (`crates/hydrus-core/src/solute_fortran_compat/**`).
+> Consequently, the default solute backend has been reset to `FiniteVolumeBackwardEuler` until genuine Rust-vs-Fortran parity passes across all 44 fixtures in Orchestration 20.
+> Additionally, `iPsi=3` (`SOLUTE.FOR:1570-1579`) is an active column-6 continuation formula rather than a commented-out no-op.
+
 ## Fortran reference harness
 
 The Fortran reference executable is a separately identified copy of the pinned ten-file snapshot. Phase 0 preserves the originals, applies a reviewable GNU Fortran/Linux portability patch for the known `MSFLIB` and `iMetHour` blockers, and records source/archive, patch, compiler, flags, executable, host, and date. It does not silently promote precision or rewrite solute algorithms. The patched executable passed the explicitly noncanonical water smoke, so the runner/build path works; no canonical scientific solute run or expected output exists yet. See [Phase 0 evidence](PHASE_0_REFERENCE_EVIDENCE.md).
