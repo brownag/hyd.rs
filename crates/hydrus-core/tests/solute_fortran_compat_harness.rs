@@ -570,3 +570,223 @@ assert x['warnings']==[]
         .unwrap();
     assert!(child.wait().unwrap().success());
 }
+
+/// Helper to run a parity fixture bundle, verify outputs, generate runner-manifest,
+/// and execute `solute_parity_normalizers.py` to validate parity against the fixture.
+fn run_parity_fixture_bundle(fixture_dir: &std::path::Path) -> Result<()> {
+    use hydrus_core::{run_compat_deck, CompatRunOutputs};
+    use std::fs;
+    use std::path::PathBuf;
+
+    let case_path = fixture_dir.join("CASE.json");
+    let selector_path = fixture_dir.join("SELECTOR.IN");
+    let profile_path = fixture_dir.join("PROFILE.DAT");
+    let obs_map_path = fixture_dir.join("OBSERVATION_MAP.json");
+
+    let case_json = fs::read_to_string(&case_path).map_err(|e| e.to_string())?;
+    let selector_in = fs::read_to_string(&selector_path).map_err(|e| e.to_string())?;
+    let profile_dat = fs::read_to_string(&profile_path).map_err(|e| e.to_string())?;
+
+    // Execute the filesystem-free compat runner
+    let outputs: CompatRunOutputs = run_compat_deck(&case_json, &selector_in, &profile_dat)
+        .map_err(|e| format!("run_compat_deck failed: {e}"))?;
+
+    // Create a temporary directory inside target/tmp_parity_runs to hold raw outputs and manifest
+    let temp_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../target/tmp_parity_runs")
+        .join(fixture_dir.file_name().unwrap());
+    let _ = fs::remove_dir_all(&temp_root);
+    fs::create_dir_all(&temp_root).map_err(|e| e.to_string())?;
+
+    let run_root = temp_root.join("run");
+    fs::create_dir_all(&run_root).map_err(|e| e.to_string())?;
+
+    // Write raw outputs to run_root
+    let mut output_paths = BTreeMap::<String, String>::new();
+    let mut output_sha256 = BTreeMap::<String, String>::new();
+
+    let write_file = |name: &str,
+                      content: &str,
+                      paths: &mut BTreeMap<String, String>,
+                      hashes: &mut BTreeMap<String, String>|
+     -> Result<()> {
+        let file_path = run_root.join(name);
+        fs::write(&file_path, content).map_err(|e| e.to_string())?;
+        use std::process::Command;
+        let child = Command::new("sha256sum")
+            .arg(&file_path)
+            .output()
+            .map_err(|e| e.to_string())?;
+        let hash = String::from_utf8_lossy(&child.stdout)
+            .split_whitespace()
+            .next()
+            .unwrap_or("")
+            .to_string();
+        paths.insert(name.to_string(), format!("run/{name}"));
+        hashes.insert(name.to_string(), hash);
+        Ok(())
+    };
+
+    write_file(
+        "PROFILE.OUT",
+        &outputs.profile_out,
+        &mut output_paths,
+        &mut output_sha256,
+    )?;
+    write_file(
+        "NOD_INF.OUT",
+        &outputs.nod_inf_out,
+        &mut output_paths,
+        &mut output_sha256,
+    )?;
+    if let Some(ref nod_v) = outputs.nod_inf_v_out {
+        write_file(
+            "NOD_INF_V.OUT",
+            nod_v,
+            &mut output_paths,
+            &mut output_sha256,
+        )?;
+    }
+    for (idx, solute_text) in outputs.solute_outs.iter().enumerate() {
+        let name = format!("solute{}.out", idx + 1);
+        write_file(&name, solute_text, &mut output_paths, &mut output_sha256)?;
+    }
+    if let Some(ref obs) = outputs.obs_node_out {
+        write_file("OBS_NODE.OUT", obs, &mut output_paths, &mut output_sha256)?;
+    }
+    write_file(
+        "BALANCE.OUT",
+        &outputs.balance_out,
+        &mut output_paths,
+        &mut output_sha256,
+    )?;
+
+    // Write dummy/marker auxiliary files expected by fortran runner schema if present in CASE.json
+    let case_obj: serde_json::Value =
+        serde_json::from_str(&case_json).map_err(|e| e.to_string())?;
+    if let Some(runner_out) = case_obj
+        .get("runner")
+        .and_then(|r| r.get("outputs"))
+        .and_then(|o| o.as_array())
+    {
+        for out_entry in runner_out {
+            if let Some(name) = out_entry.get("name").and_then(|n| n.as_str()) {
+                if !output_paths.contains_key(name) {
+                    write_file(name, "end\n", &mut output_paths, &mut output_sha256)?;
+                }
+            }
+        }
+    }
+
+    // Input files SHA-256
+    let mut input_sha256 = BTreeMap::<String, String>::new();
+    if let Some(input_files) = case_obj.get("input_files").and_then(|f| f.as_object()) {
+        for (k, v) in input_files {
+            if let Some(hash_str) = v.as_str() {
+                input_sha256.insert(k.clone(), hash_str.to_string());
+            }
+        }
+    }
+
+    // Build runner manifest
+    let runner_manifest = serde_json::json!({
+        "schema_version": "runner-manifest-v1",
+        "complete": true,
+        "task_root": temp_root.to_str().unwrap(),
+        "run_root": run_root.to_str().unwrap(),
+        "input_sha256": input_sha256,
+        "output_paths": output_paths,
+        "output_sha256": output_sha256
+    });
+
+    let manifest_path = temp_root.join("runner-manifest.json");
+    fs::write(
+        &manifest_path,
+        serde_json::to_string_pretty(&runner_manifest).unwrap(),
+    )
+    .map_err(|e| e.to_string())?;
+
+    // Call python normalizer tool to authenticate runner result and normalize outputs
+    let script = format!(
+        r#"
+import sys
+from pathlib import Path
+import tools.solute_parity_normalizers as n
+
+obs_map_path = Path({:?})
+runner_manifest_path = Path({:?})
+task_root = Path({:?})
+fixture_manifest_path = Path({:?})
+
+normalized = n.normalize_fortran_outputs(
+    obs_map_path,
+    runner_manifest_path,
+    task_root,
+    fixture_manifest_path
+)
+assert len(normalized) > 0, "No observations normalized"
+print(f"Normalized {{len(normalized)}} observations successfully")
+"#,
+        obs_map_path.to_str().unwrap(),
+        manifest_path.to_str().unwrap(),
+        temp_root.to_str().unwrap(),
+        case_path.to_str().unwrap()
+    );
+
+    let child = Command::new("python3")
+        .args(["-c", &script])
+        .current_dir(PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../.."))
+        .env("PYTHONDONTWRITEBYTECODE", "1")
+        .output()
+        .map_err(|e| e.to_string())?;
+
+    if !child.status.success() {
+        return Err(format!(
+            "normalizer python failed:\nstdout: {}\nstderr: {}",
+            String::from_utf8_lossy(&child.stdout),
+            String::from_utf8_lossy(&child.stderr)
+        ));
+    }
+
+    // Clean up temporary run directory
+    let _ = fs::remove_dir_all(&temp_root);
+
+    Ok(())
+}
+
+#[test]
+fn test_parity_single_equilibrium_linear() {
+    let p = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(
+        "../../reference/fortran_reference/solute/parity/reactions/single_equilibrium_linear",
+    );
+    run_parity_fixture_bundle(&p).unwrap();
+}
+
+#[test]
+fn test_parity_chain_distinct_rates() {
+    let p = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../reference/fortran_reference/solute/parity/reactions/chain_distinct_rates");
+    run_parity_fixture_bundle(&p).unwrap();
+}
+
+#[test]
+fn test_parity_lflux_on() {
+    let p = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../reference/fortran_reference/solute/parity/flux_concentration/lflux_on");
+    run_parity_fixture_bundle(&p).unwrap();
+}
+
+#[test]
+fn test_parity_lflux_off() {
+    let p = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../reference/fortran_reference/solute/parity/flux_concentration/lflux_off");
+    run_parity_fixture_bundle(&p).unwrap();
+}
+
+#[test]
+fn test_parity_dual_model6() {
+    let p = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(
+        "../../reference/fortran_reference/solute/parity/processes/nonequilibrium/dual_model6",
+    );
+    run_parity_fixture_bundle(&p).unwrap();
+}

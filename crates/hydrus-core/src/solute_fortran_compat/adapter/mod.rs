@@ -9,9 +9,6 @@ pub(crate) const NORMALIZED_SCHEMA: &str = "solute-normalized-request-v1";
 pub(crate) const LEGACY_SCHEMA: &str = "solute-request-v1";
 
 mod biology;
-#[path = "../deck_reader.rs"]
-#[allow(dead_code)] // wired by 20.4.1
-pub(crate) mod deck_reader;
 mod fields;
 mod json_guard;
 mod nonequilibrium;
