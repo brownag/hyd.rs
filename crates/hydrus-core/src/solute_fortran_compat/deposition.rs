@@ -106,6 +106,7 @@ pub(crate) fn deposit(i: &DepositInput) -> Result<(f32, f32), KernelError> {
 
 /// Nodewise `Deposit` inputs. `theta` is the mobile water content the caller already
 /// reduced by `ThImob`; `dc1`, `dp1`, `alfa1`, `alfa2` are the caller's resolved values.
+#[cfg(test)]
 pub(crate) struct DepositNodes<'a> {
     pub alfa1: f32,
     pub alfa2: f32,
@@ -118,6 +119,7 @@ pub(crate) struct DepositNodes<'a> {
     pub t_conv: f32,
 }
 
+#[cfg(test)]
 impl DepositNodes<'_> {
     pub(crate) fn validate(&self) -> Result<(), KernelError> {
         let n = self.theta.len();
@@ -146,6 +148,7 @@ impl DepositNodes<'_> {
 }
 
 /// Per-node `(rKa1, rKa2)`, in node order, for `SorbConcState::deposited_ka`.
+#[cfg(test)]
 pub(crate) fn deposit_nodes(nodes: &DepositNodes<'_>) -> Result<Vec<(f32, f32)>, KernelError> {
     nodes.validate()?;
     (0..nodes.theta.len())

@@ -1,6 +1,6 @@
 //! Raw JSON syntax guards: duplicate keys, finite numbers, field and key validation.
 use super::fields::*;
-use serde_json::{Map, Value};
+use serde_json::Value;
 use std::collections::HashSet;
 
 /// Scan JSON syntax before Value parsing so duplicate object keys cannot be overwritten.
@@ -158,19 +158,6 @@ pub(super) fn validate_field(name: &str, v: &Value) -> Result<(), String> {
         return Err(format!(
             "field {name}: unavailable field requires availability and reason"
         ));
-    }
-    Ok(())
-}
-
-pub(super) fn validate_object_keys(
-    name: &str,
-    object: &Map<String, Value>,
-    allowed: &[&str],
-) -> Result<(), String> {
-    for key in object.keys() {
-        if !allowed.contains(&key.as_str()) {
-            return Err(format!("field {name}: unknown nested key {key}"));
-        }
     }
     Ok(())
 }

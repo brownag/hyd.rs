@@ -48,7 +48,9 @@ use super::processes::{
     prev_species_isotherm, should_call_sorb_conc, sorb_conc, source_terms, ChainSourceInput,
     IsothermInput, MoistureFactorTable, SorbConcSpec, SorbConcState, SourceTermsInput,
 };
-use super::source_coupling::{root_solute_uptake, size_exclusion, SizeExclusion};
+use super::source_coupling::root_solute_uptake;
+#[cfg(test)]
+use super::source_coupling::{size_exclusion, SizeExclusion};
 use super::transport::{coefficients, pecour, PecletInputs, TransportNode};
 use super::types::{
     DefaultReal, DoubleReal, EndpointPrimitiveState, Explicit, KernelError,
@@ -191,6 +193,7 @@ pub(crate) struct SpeciesFrame {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum DriverEvent {
+    #[cfg(test)]
     Exclusion,
     SetSSnk(usize),
     Coeff(usize, u8),
@@ -209,6 +212,7 @@ pub(crate) struct PassOutcome {
     pub converged: bool,
 }
 
+#[cfg(test)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) struct SoluteStepOutcome {
     /// A nonlinear species whose pass did not converge; 18.11.1 continues from it.
@@ -690,6 +694,7 @@ fn validate(cfg: &SoluteStepConfig, st: &SoluteStepState) -> Result<(), KernelEr
 }
 
 /// One full `Solute` call up to the first unconverged nonlinear species.
+#[cfg(test)]
 pub(crate) fn solute_step(
     cfg: &mut SoluteStepConfig,
     st: &mut SoluteStepState,
@@ -699,6 +704,7 @@ pub(crate) fn solute_step(
 }
 
 /// One full `Solute` call with caller-provided scratch buffers (zero heap allocations).
+#[cfg(test)]
 pub(crate) fn solute_step_with_scratch(
     cfg: &mut SoluteStepConfig,
     st: &mut SoluteStepState,
@@ -728,47 +734,7 @@ pub(crate) fn solute_step_with_scratch(
     Ok(outcome)
 }
 
-/// Continue the species loop from `start` (used by 18.11.1 after a pending species).
-pub(crate) fn solute_step_from(
-    cfg: &SoluteStepConfig,
-    st: &mut SoluteStepState,
-    start: usize,
-) -> Result<SoluteStepOutcome, KernelError> {
-    let mut scratch = SoluteDriverScratch::new(cfg.x.len(), cfg.species_count, cfg.th_sat.len());
-    solute_step_from_with_scratch(cfg, st, start, &mut scratch)
-}
-
-/// Continue the species loop from `start` with caller-provided scratch buffers.
-pub(crate) fn solute_step_from_with_scratch(
-    cfg: &SoluteStepConfig,
-    st: &mut SoluteStepState,
-    start: usize,
-    scratch: &mut SoluteDriverScratch,
-) -> Result<SoluteStepOutcome, KernelError> {
-    validate(cfg, st)?;
-    scratch.backup_state.copy_from(st);
-    let outcome = match step_from_with_scratch(cfg, st, start, scratch) {
-        Ok(out) => out,
-        Err(e) => {
-            st.copy_from(&scratch.backup_state);
-            return Err(e);
-        }
-    };
-    Ok(outcome)
-}
-
-fn step_from(
-    cfg: &SoluteStepConfig,
-    st: &mut SoluteStepState,
-    start: usize,
-) -> Result<SoluteStepOutcome, KernelError> {
-    let mut scratch = SoluteDriverScratch::new(cfg.x.len(), cfg.species_count, cfg.th_sat.len());
-    let mut s = st.clone();
-    let outcome = step_from_with_scratch(cfg, &mut s, start, &mut scratch)?;
-    *st = s;
-    Ok(outcome)
-}
-
+#[cfg(test)]
 fn step_from_with_scratch(
     cfg: &SoluteStepConfig,
     working_st: &mut SoluteStepState,
@@ -789,6 +755,7 @@ fn step_from_with_scratch(
 
 /// `HYDRUS.FOR:384-391`: `ThNew`/`vNew` hold the old level, then `Exclusion` runs under
 /// `lBact.and..not.lWat` and rewrites all four node arrays and `ChPar(4,1)`.
+#[cfg(test)]
 #[allow(clippy::nonminimal_bool)]
 fn exclusion_call(cfg: &mut SoluteStepConfig, st: &mut SoluteStepState) -> Result<(), KernelError> {
     if !(cfg.bact && !cfg.water_flow) {
@@ -881,16 +848,6 @@ pub(crate) fn begin_species(
         }
     }
     Ok(())
-}
-
-struct LevelOut {
-    disp: Vec<f32>,
-    retard: Vec<f32>,
-    g0: Vec<f32>,
-    g1: Vec<f32>,
-    peclet: f32,
-    courant: f32,
-    dt_max: f32,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -1514,40 +1471,6 @@ fn coeff_level_into(
     })
 }
 
-fn coeff_level(
-    cfg: &SoluteStepConfig,
-    st: &mut SoluteStepState,
-    js: usize,
-    level: u8,
-    iter: u32,
-) -> Result<LevelOut, KernelError> {
-    let n = cfg.x.len();
-    let mut disp = vec![0.0_f32; n];
-    let mut retard = vec![0.0_f32; n];
-    let mut g0 = vec![0.0_f32; n];
-    let mut g1 = vec![0.0_f32; n];
-    let scalars = coeff_level_into(
-        cfg,
-        st,
-        js,
-        level,
-        iter,
-        &mut disp,
-        &mut retard,
-        &mut g0,
-        &mut g1,
-    )?;
-    Ok(LevelOut {
-        disp,
-        retard,
-        g0,
-        g1,
-        peclet: scalars.peclet,
-        courant: scalars.courant,
-        dt_max: scalars.dt_max,
-    })
-}
-
 /// `MatSet` water adjustment (`768-776`), applied to the interior rows only; the
 /// endpoint kernel applies it itself.
 fn adjusted_into(cfg: &SoluteStepConfig, th: &[f32], dst: &mut [f32]) {
@@ -1559,12 +1482,6 @@ fn adjusted_into(cfg: &SoluteStepConfig, th: &[f32], dst: &mut [f32]) {
             th[i]
         };
     }
-}
-
-fn adjusted(cfg: &SoluteStepConfig, th: &[f32]) -> Vec<f32> {
-    let mut out = vec![0.0_f32; th.len()];
-    adjusted_into(cfg, th, &mut out);
-    out
 }
 
 fn mass_tran_input<'a>(
@@ -1653,30 +1570,6 @@ fn mass_bufs_into(cfg: &SoluteStepConfig, st: &SoluteStepState, js: usize, bufs:
     copy_slice_dr(&mut bufs.sink_im, &st.sink_im);
 }
 
-fn mass_bufs(cfg: &SoluteStepConfig, st: &SoluteStepState, js: usize) -> MassBufs {
-    let mut bufs = MassBufs {
-        x: vec![DefaultReal(0.0); cfg.x.len()],
-        mat0: vec![0; cfg.x.len()],
-        temp_o: vec![DefaultReal(0.0); cfg.x.len()],
-        temp_n: vec![DefaultReal(0.0); cfg.x.len()],
-        chpar: vec![vec![DefaultReal(0.0); cfg.ch_par[0].len()]; cfg.ch_par.len()],
-        tdep: vec![DefaultReal(0.0); cfg.t_dep.len()],
-        conc: vec![DefaultReal(0.0); cfg.x.len()],
-        sorb: vec![DefaultReal(0.0); cfg.x.len()],
-        sorb2: vec![DefaultReal(0.0); cfg.x.len()],
-        q0: vec![DefaultReal(0.0); cfg.x.len()],
-        q1: vec![DefaultReal(0.0); cfg.x.len()],
-        s_sink: vec![DefaultReal(0.0); cfg.x.len()],
-        th_o: vec![DefaultReal(0.0); cfg.x.len()],
-        th_n: vec![DefaultReal(0.0); cfg.x.len()],
-        v_o: vec![DefaultReal(0.0); cfg.x.len()],
-        v_n: vec![DefaultReal(0.0); cfg.x.len()],
-        sink_im: vec![DefaultReal(0.0); cfg.x.len()],
-    };
-    mass_bufs_into(cfg, st, js, &mut bufs);
-    bufs
-}
-
 fn sync_s_trans_in(st: &mut SoluteStepState) {
     if st.totals.s_trans.len() == st.s_trans.len() {
         for (d, &s) in st.totals.s_trans.iter_mut().zip(&st.s_trans) {
@@ -1698,6 +1591,7 @@ fn sync_s_trans_out(st: &mut SoluteStepState) {
 }
 
 /// One execution of labels 12-16 for species `js`.
+#[cfg(test)]
 pub(crate) fn solve_pass(
     cfg: &SoluteStepConfig,
     st: &mut SoluteStepState,
@@ -1947,6 +1841,7 @@ pub(crate) fn solve_pass_with_scratch(
 }
 
 /// Label 17 and everything after it for one accepted species (`SOLUTE.FOR:184-225`).
+#[cfg(test)]
 pub(crate) fn finish_species(
     cfg: &SoluteStepConfig,
     st: &mut SoluteStepState,

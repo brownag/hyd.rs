@@ -69,12 +69,14 @@ pub(crate) struct EndpointResult {
     pub flux: EndpointFlux,
 }
 
+#[cfg(test)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum CanonicalEndpoint {
     Lower,
     Upper,
 }
 
+#[cfg(test)]
 pub(crate) fn canonical_endpoint(
     native_node: usize,
     node_count: usize,

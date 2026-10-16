@@ -506,6 +506,7 @@ pub(crate) fn dual_neighbor_theta(
 }
 
 /// Zero-based material index per node from one-based `MatNum(i)`.
+#[cfg(test)]
 pub(crate) fn dual_material_selection(
     material_ids: &[usize],
     material_count: usize,

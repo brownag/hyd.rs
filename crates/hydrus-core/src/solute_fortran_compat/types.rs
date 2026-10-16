@@ -13,13 +13,11 @@ impl DefaultReal {
     pub(crate) fn from_input(value: f64) -> Self {
         Self(value as f32)
     }
-    pub(crate) fn to_double(self) -> DoubleReal {
-        DoubleReal(self.0 as f64)
-    }
 }
 
 impl DoubleReal {
     /// Mirrors `sngl(F(i))` followed by the active nonnegative concentration clamp.
+    #[cfg(test)]
     pub(crate) fn accepted_concentration(self) -> DefaultReal {
         DefaultReal((self.0 as f32).max(0.0))
     }
@@ -51,13 +49,6 @@ pub(crate) enum BlockingMode {
     Type3,
     Type4,
     Type5,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(crate) enum SorptionMode {
-    Equilibrium,
-    MobileImmobile,
-    DualDomain,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -176,6 +167,7 @@ pub(crate) enum Explicit<T> {
 }
 
 impl<T> Explicit<T> {
+    #[cfg(test)]
     pub(crate) fn unavailable_reason(&self) -> Option<&str> {
         match self {
             Self::Available(_) => None,
@@ -703,33 +695,6 @@ impl CompatibilityInput {
         }
         Ok(())
     }
-}
-
-#[derive(Clone, Debug, PartialEq)]
-pub(crate) struct CompatibilityState {
-    pub time: DefaultReal,
-    pub concentration: Vec<Vec<DefaultReal>>,
-    pub sorb: Vec<Explicit<Vec<DefaultReal>>>,
-    pub sorb2: Vec<Explicit<Vec<DefaultReal>>>,
-}
-
-#[derive(Clone, Debug, PartialEq)]
-pub(crate) struct CompatibilityWorkspace {
-    pub lower: Vec<DoubleReal>,
-    pub diagonal: Vec<DoubleReal>,
-    pub upper: Vec<DoubleReal>,
-    pub rhs: Vec<DoubleReal>,
-    pub source_terms: Vec<Vec<DefaultReal>>,
-}
-
-#[derive(Clone, Debug, PartialEq)]
-pub(crate) struct TraceObservation {
-    pub species: usize,
-    pub native_node: Option<usize>,
-    pub checkpoint: String,
-    pub default_real: Option<DefaultReal>,
-    pub double_real: Option<DoubleReal>,
-    pub unavailable_reason: Option<String>,
 }
 
 #[cfg(test)]

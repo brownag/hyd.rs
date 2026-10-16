@@ -973,7 +973,7 @@ fn run_parsed_deck(deck: &ParsedDeck) -> Result<CompatRunOutputs, String> {
                 tables: &tables,
                 mat_num: &mat_num_1b,
                 par_d: &mat.par,
-                par_w: &mat.par,
+                _par_w: &mat.par,
                 ah: &nod.ah,
                 ak: &nod.ak,
                 ath: &nod.ath,
@@ -1007,7 +1007,7 @@ fn run_parsed_deck(deck: &ParsedDeck) -> Result<CompatRunOutputs, String> {
                 th_eq: &th_eq,
                 i_dual_por: i_dual_por_u8,
                 dual_por_materials: &dual_por_materials,
-                temp_o: &temp_o,
+                _temp_o: &temp_o,
                 h_seep: bas.h_seep,
                 i_enhanc: 0,
             };

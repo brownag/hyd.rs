@@ -54,6 +54,7 @@ impl Default for NonlinearConfig {
 }
 
 /// Convergence check report for one iteration pass.
+#[cfg(test)]
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) struct ConvergenceCheck {
     /// True if all nodes satisfy the absolute/relative tolerance condition.
@@ -82,6 +83,7 @@ pub(crate) struct ConvergenceCheck {
 /// - `ChPar(9)` is index 8
 /// - `ChPar(15)` is index 14
 /// - `ChPar(18)` is index 17
+#[cfg(test)]
 pub(crate) fn check_linear_predicate(ch_par_row: &[f32], is_bact: bool) -> bool {
     if ch_par_row.len() < 9 {
         return true;
@@ -111,6 +113,7 @@ pub(crate) fn check_linear_predicate(ch_par_row: &[f32], is_bact: bool) -> bool 
 ///  !    lConv=.false.
 /// 16 continue
 /// ```
+#[cfg(test)]
 pub(crate) fn evaluate_convergence(
     c_new: &[f32],
     c_temp: &[f32],
@@ -150,6 +153,7 @@ pub(crate) enum SpeciesIterationOutcome {
 ///
 /// If `cfg.linear[js]` is true, this executes exactly one iteration pass.
 /// If `!cfg.linear[js]`, it iterates up to `nonlin_cfg.max_it_c`.
+#[cfg(test)]
 pub(crate) fn step_nonlinear_species(
     cfg: &SoluteStepConfig,
     st: &mut SoluteStepState,
@@ -207,6 +211,7 @@ pub(crate) struct SoluteIterationReport {
 
 /// Execute the full solute step with nonlinear iteration, timestep reduction retry,
 /// and rollback/commit sequencing matching `SOLUTE.FOR:10-226`.
+#[cfg(test)]
 pub(crate) fn solve_solute_with_nonlinear(
     cfg: &mut SoluteStepConfig,
     st: &mut SoluteStepState,

@@ -220,7 +220,7 @@ pub(crate) fn con_vh(h_new: f32, theta: f32, ths: f32, x_conv: f32, t_conv: f32)
 #[derive(Clone, Debug)]
 pub(crate) struct MaterialTables {
     pub n_tab: usize,
-    pub n_mat: usize,
+    pub _n_mat: usize,
     pub h_tab: Vec<f32>,        // 100 entries for iModel < nTabMod
     pub con_tab: Vec<Vec<f32>>, // [n_mat][n_tab]
     pub cap_tab: Vec<Vec<f32>>, // [n_mat][n_tab]
@@ -284,7 +284,7 @@ pub(crate) fn gen_mat(
 
     MaterialTables {
         n_tab,
-        n_mat,
+        _n_mat: n_mat,
         h_tab,
         con_tab,
         cap_tab,
@@ -1195,7 +1195,7 @@ pub(crate) struct WatFlowInputs<'a> {
     pub tables: &'a MaterialTables,
     pub mat_num: &'a [usize],
     pub par_d: &'a [Vec<f32>],
-    pub par_w: &'a [Vec<f32>],
+    pub _par_w: &'a [Vec<f32>],
     pub ah: &'a [f32],
     pub ak: &'a [f32],
     pub ath: &'a [f32],
@@ -1229,7 +1229,7 @@ pub(crate) struct WatFlowInputs<'a> {
     pub th_eq: &'a [f32],
     pub i_dual_por: u8,
     pub dual_por_materials: &'a [DualPorMaterial],
-    pub temp_o: &'a [f32],
+    pub _temp_o: &'a [f32],
     pub h_seep: f32,
     pub i_enhanc: i32,
 }
@@ -1753,7 +1753,7 @@ mod tests {
             tables: &tables,
             mat_num: &mat_num,
             par_d: &par_d,
-            par_w: &par_w,
+            _par_w: &par_w,
             ah: &ah,
             ak: &ak,
             ath: &ath,
@@ -1787,7 +1787,7 @@ mod tests {
             th_eq: &th_eq,
             i_dual_por: 0,
             dual_por_materials: &[],
-            temp_o: &temp_o,
+            _temp_o: &temp_o,
             h_seep: 0.0,
             i_enhanc: 0,
         };

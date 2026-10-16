@@ -449,7 +449,7 @@ fn all_wave3_case_requests_match_python_canonical_hash_and_map_to_typed_input() 
         let text = std::fs::read_to_string(&entry).unwrap();
         let parsed =
             parse_case_manifest(&text).unwrap_or_else(|e| panic!("{}: {e}", entry.display()));
-        assert_eq!(parsed.input.request_sha256, parsed.request_sha256);
+        assert_eq!(parsed.input.request_sha256, parsed._request_sha256);
         assert!(parsed.input.validate_dimensions().is_ok());
         count += 1;
     }
