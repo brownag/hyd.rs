@@ -26,9 +26,9 @@ Plan: [EXECUTION_PLAN_20.md](EXECUTION_PLAN_20.md). Worker template: [PROMPT_TEM
 | 1 | 20.1.3 | Deduplicate `accounting.rs` deposition helpers and add `dual_exchange` group alias | done |
 | 2 | 20.2.1 | Preallocated scratch buffers in `assembly.rs`, `driver.rs`, and `iteration.rs` | done |
 | 2B | 20.2.2 | Full `SoluteConfig` mapping and zero-allocation compat step in `solute.rs` | done |
-| 3 | 20.3.1 | Source-compatible deck reader (`SELECTOR.IN` + `PROFILE.DAT` + `CASE.json`) | pending |
-| 3 | 20.3.2 | Source-precision `WatFlow`, `DualPor`, `SetMat`, `Veloc`, and `TmCont` port | pending |
-| 3 | 20.3.3 | Source-precision `OUTPUT.FOR` table formatters (`Profil`, `NodOut`, `TLInf`, `ObsNod`, `SubReg`) | pending |
+| 3 | 20.3.1 | Source-compatible deck reader (`SELECTOR.IN` + `PROFILE.DAT` + `CASE.json`) | done |
+| 3 | 20.3.2 | Source-precision `WatFlow`, `DualPor`, `SetMat`, `Veloc`, and `TmCont` port | done |
+| 3 | 20.3.3 | Source-precision `OUTPUT.FOR` table formatters (`Profil`, `NodOut`, `TLInf`, `ObsNod`, `SubReg`) | done |
 | 4 | 20.4.1 | Full-run compatibility runner and removal of all `dead_code` allowances | pending |
 | 5 | 20.5.1 | Replace `solute_rust_candidate_adapter.py` with genuine Rust candidate execution | pending |
 | 6 | 20.6.1 | Execute 44-fixture all-mode Rust-vs-Fortran parity gate and update evidence | pending |
@@ -50,6 +50,13 @@ Plan: [EXECUTION_PLAN_20.md](EXECUTION_PLAN_20.md). Worker template: [PROMPT_TEM
   - `cargo clippy --workspace --all-targets -- -D warnings`: Clean (0 warnings).
   - `git diff --check`: Clean.
   - `POLICY_HASHES` re-pin justification (D6): Re-pinned `crates/hydrus-core/src/solute.rs` to `46a7e00dc940058531ea3dfb39c262bb5c90581db752995e5d2d4ac0d4290cbc` in `tools/solute_benchmark_bridge.py` due to task 20.2.2 adding preallocated compatibility buffers in `SoluteWorkspace` and full `SoluteConfig` mapping while preserving the FV/BE solver path bitwise verbatim.
+- **Wave 3 gate (2026-10-16):**
+  - `cargo test --workspace`: **401 passed**, 0 failed, **1 ignored** (`dump_parsed_fixtures`).
+  - `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tools -p 'test_*.py'`: **314 passed**, 0 failed (`OK`).
+  - `cargo fmt --all -- --check`: Clean (0 diffs).
+  - `cargo clippy --workspace --all-targets -- -D warnings`: Clean (0 warnings).
+  - `git diff --check`: Clean.
+  - `POLICY_HASHES` re-pin: None (`solute.rs` was not modified in Wave 3).
 
 ## Task reports
 
@@ -82,3 +89,22 @@ Plan: [EXECUTION_PLAN_20.md](EXECUTION_PLAN_20.md). Worker template: [PROMPT_TEM
 - **Files changed:** `crates/hydrus-core/src/solute.rs`, `crates/hydrus-core/src/solute_fortran_compat/{boundary,driver,iteration}.rs`, `crates/hydrus-core/tests/{allocation_contract,solute_backend_contract}.rs`.
 - **Tests:** `cargo test -p hydrus-core --lib solute`: 221 passed. `cargo test -p hydrus-core --test allocation_contract`: 2 passed (asserting 0 allocations for all backends). `cargo test -p hydrus-core --test solute_backend_contract`: 8 passed.
 - **Deviations:** Under Escalation Rule 4, worker scope was amended to include `driver.rs`/`iteration.rs` to eliminate inner-loop endpoint and sorb_conc allocations.
+
+### 20.3.1 — Source-compatible deck reader (`SELECTOR.IN` + `PROFILE.DAT` + `CASE.json`)
+- **Status:** Done.
+- **Files changed:** `crates/hydrus-core/src/solute_fortran_compat/deck_reader.rs`, `crates/hydrus-core/src/solute_fortran_compat/adapter/mod.rs`.
+- **Tests:** `cargo test -p hydrus-core --lib solute_fortran_compat::deck_reader`: 3 passed (validating parser on all 44 parity fixtures).
+- **Deviations:** None.
+
+### 20.3.2 — Source-precision `WatFlow`, `DualPor`, `SetMat`, `Veloc`, and `TmCont` port
+- **Status:** Done.
+- **Files changed:** `crates/hydrus-core/src/solute_fortran_compat/water_compat.rs`, `crates/hydrus-core/src/solute_fortran_compat/types.rs`.
+- **Tests:** `cargo test -p hydrus-core --lib solute_fortran_compat::water_compat`: 4 passed.
+- **Deviations:** None.
+
+### 20.3.3 — Source-precision `OUTPUT.FOR` table formatters (`Profil`, `NodOut`, `TLInf`, `ObsNod`, `SubReg`)
+- **Status:** Done.
+- **Files changed:** `crates/hydrus-core/src/solute_fortran_compat/output_compat.rs`.
+- **Tests:** `cargo test -p hydrus-core --lib solute_fortran_compat::output_compat`: 6 passed.
+- **Deviations:** None.
+
