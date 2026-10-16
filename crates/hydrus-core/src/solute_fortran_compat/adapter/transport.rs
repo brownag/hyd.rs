@@ -65,10 +65,6 @@ fn one() -> usize {
     1
 }
 
-fn reals(v: Vec<f64>) -> Vec<DefaultReal> {
-    v.into_iter().map(DefaultReal::from_input).collect()
-}
-
 impl TryFrom<EndpointDto> for EndpointPrimitiveState {
     type Error = String;
     fn try_from(d: EndpointDto) -> Result<Self, String> {
@@ -121,27 +117,10 @@ impl TryFrom<EndpointDto> for EndpointPrimitiveState {
     }
 }
 
-/// Struct DTOs take the unit wrapper's `value`; reject a non-object before serde
-/// reads an array as a tuple.
-fn guard_wrapper_object(
-    fields: &Map<String, Value>,
-    name: &str,
-    units: &str,
-) -> Result<(), String> {
-    match field_value(fields, name, units)?.and_then(|w| w.get("value")) {
-        Some(v) => require_object(v, name),
-        None => Ok(()),
-    }
-}
-
 pub(super) fn maybe_endpoint_state(
     fields: &Map<String, Value>,
 ) -> Result<Option<UnitValue<EndpointPrimitiveState>>, String> {
-    guard_wrapper_object(
-        fields,
-        "endpoint_primitives",
-        "source primitive endpoint state",
-    )?;
+    require_wrapped_object(fields, "endpoint_primitives")?;
     let dto = decode_unit_value::<EndpointDto>(
         fields,
         "endpoint_primitives",
@@ -192,7 +171,7 @@ struct SwitchesDto {
 pub(super) fn maybe_transport_switches(
     fields: &Map<String, Value>,
 ) -> Result<Option<UnitValue<SourceSwitches>>, String> {
-    guard_wrapper_object(fields, "transport_switches", "source flags")?;
+    require_wrapped_object(fields, "transport_switches")?;
     let dto = decode_unit_value::<SwitchesDto>(fields, "transport_switches", "source flags")?;
     map_available(dto, |d| {
         Ok(SourceSwitches {
@@ -339,15 +318,6 @@ mod tests {
             json!({"units": "source flags", "value": value}),
         );
         m
-    }
-
-    // `a|b` passes on either: old bodies named the nested key, serde names the request field.
-    fn err_has(r: Result<impl std::fmt::Debug, String>, needle: &str) {
-        let e = r.expect_err("must reject");
-        assert!(
-            needle.split('|').any(|n| e.contains(n)),
-            "{e:?} should name {needle}"
-        );
     }
 
     #[test]

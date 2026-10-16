@@ -114,15 +114,6 @@ mod tests {
         maybe_coordinates(&m)
     }
 
-    // `a|b` passes on either: old bodies named the nested key, serde names the request field.
-    fn err_has(r: Result<impl std::fmt::Debug, String>, needle: &str) {
-        let e = r.expect_err("must reject");
-        assert!(
-            needle.split('|').any(|n| e.contains(n)),
-            "{e:?} should name {needle}"
-        );
-    }
-
     #[test]
     fn coordinates_accepts_valid_and_rejects_bad_values() {
         let ok = json!({"native": "z", "canonical": "z", "nodes": 3});

@@ -39,12 +39,16 @@ pub(crate) enum FlowOrientation {
     NegativeNative,
 }
 
+/// Attachment blocking function selection (`iPsi`).
+///
+/// `Type3` corresponds to `iPsi=3` (`src_reference/SOLUTE.FOR:1570-1579`),
+/// which is active via column-6 `!` continuation lines (`SOLUTE.FOR:1576, 1578`).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum BlockingMode {
     Default,
     Type1,
     Type2,
-    SourceNoOp3,
+    Type3,
     Type4,
     Type5,
 }

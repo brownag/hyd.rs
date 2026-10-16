@@ -96,8 +96,8 @@ pub(super) fn maybe_moisture_dependency(
     )?;
     map_available(raw, |v| {
         let d = decode_object::<MoistureDto>(&v, "moisture_dependency")?;
-        if d.selector > 2 {
-            return Err("moisture_dependency.selector must be 0, 1, or 2".into());
+        if d.selector > 1 {
+            return Err("moisture_dependency.selector must be 0 or 1".into());
         }
         let table = reals("moisture_dependency.table", d.table)?;
         if d.selector == 1 && table.is_empty() {
@@ -239,15 +239,6 @@ mod tests {
         ))
     }
 
-    // `a|b` passes on either: old bodies named the nested key, serde names the request field.
-    fn err_has(r: Result<impl std::fmt::Debug, String>, needle: &str) {
-        let e = r.expect_err("must reject");
-        assert!(
-            needle.split('|').any(|n| e.contains(n)),
-            "{e:?} should name {needle}"
-        );
-    }
-
     fn sp(patch: Value) -> Value {
         let mut v = json!({
             "name": "a", "position": 1, "chain_rate_per_hour": 0.0,
@@ -366,6 +357,10 @@ mod tests {
         );
         err_has(
             moisture(json!({"selector": null})),
+            "selector|moisture_dependency",
+        );
+        err_has(
+            moisture(json!({"selector": 2})),
             "selector|moisture_dependency",
         );
         err_has(

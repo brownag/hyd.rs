@@ -4,13 +4,6 @@ use super::*;
 use serde::Deserialize;
 use serde_json::{Map, Value};
 
-fn require_wrapped_object(fields: &Map<String, Value>, name: &str) -> Result<(), String> {
-    match fields.get(name).and_then(|w| w.get("value")) {
-        Some(v) => require_object(v, name),
-        None => Ok(()),
-    }
-}
-
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct BiologyModeDto {
@@ -75,21 +68,6 @@ pub(super) fn maybe_biology_parameters(
 mod tests {
     use super::*;
     use serde_json::json;
-
-    fn wrap(name: &str, units: &str, value: Value) -> Map<String, Value> {
-        let mut m = Map::new();
-        m.insert(name.into(), json!({"units": units, "value": value}));
-        m
-    }
-
-    // `a|b` passes on either: old bodies named the nested key, serde names the request field.
-    fn err_has(r: Result<impl std::fmt::Debug, String>, needle: &str) {
-        let e = r.expect_err("must reject");
-        assert!(
-            needle.split('|').any(|n| e.contains(n)),
-            "{e:?} should name {needle}"
-        );
-    }
 
     const MODE: &str = "ChemIn source flags";
     const PARAMS: &str = "source ChPar slots; selector file units";

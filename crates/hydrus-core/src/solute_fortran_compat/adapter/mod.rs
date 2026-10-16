@@ -574,7 +574,7 @@ fn derive_switches(fields: &RequestFields) -> Result<SourceSwitches, String> {
                 0 => BlockingMode::Default,
                 1 => BlockingMode::Type1,
                 2 => BlockingMode::Type2,
-                3 => BlockingMode::SourceNoOp3,
+                3 => BlockingMode::Type3,
                 4 => BlockingMode::Type4,
                 5 => BlockingMode::Type5,
                 _ => return Err("blocking_iPsi must be 1..5 when present".into()),
