@@ -265,9 +265,22 @@ impl SoluteStepState {
             dt_max_c: 1.0e30,
             iter_c: 1,
             ierr: 0,
-            frame: None,
-            trace: Vec::new(),
+            frame: Some(SpeciesFrame {
+                v_o0: z(),
+                conc0: z(),
+                endpoint: Some(blank_endpoint(nodes, 16)),
+            }),
+            trace: Vec::with_capacity(64),
         }
+    }
+
+    /// Zero-filled state with specified material capacity for endpoint buffers.
+    pub(crate) fn blank_with_materials(nodes: usize, species: usize, materials: usize) -> Self {
+        let mut s = Self::blank(nodes, species);
+        if let Some(ref mut frame) = s.frame {
+            frame.endpoint = Some(blank_endpoint(nodes, materials));
+        }
+        s
     }
 
     /// Copy all data from `other` into `self`, reusing existing `Vec` capacities without reallocating.
@@ -344,10 +357,140 @@ impl SoluteStepState {
         self.dt_max_c = other.dt_max_c;
         self.iter_c = other.iter_c;
         self.ierr = other.ierr;
-        self.frame = other.frame.clone();
+        match (&mut self.frame, &other.frame) {
+            (Some(dst), Some(src)) => {
+                copy_vec_f32(&mut dst.v_o0, &src.v_o0);
+                copy_vec_f32(&mut dst.conc0, &src.conc0);
+                match (&mut dst.endpoint, &src.endpoint) {
+                    (Some(dst_ep), Some(src_ep)) => {
+                        copy_endpoint_in_place(dst_ep, src_ep);
+                    }
+                    (None, Some(src_ep)) => {
+                        dst.endpoint = Some(src_ep.clone());
+                    }
+                    _ => {}
+                }
+            }
+            _ => self.frame = other.frame.clone(),
+        }
         self.trace.clear();
         self.trace.extend_from_slice(&other.trace);
     }
+}
+
+pub(crate) fn blank_endpoint(nodes: usize, materials: usize) -> EndpointPrimitiveState {
+    let n = nodes;
+    let z_dr = || vec![DefaultReal(0.0); n];
+    EndpointPrimitiveState {
+        coordinates: z_dr(),
+        old_water: z_dr(),
+        new_water: z_dr(),
+        old_velocity: z_dr(),
+        new_velocity: z_dr(),
+        old_matrix_velocity: z_dr(),
+        new_matrix_velocity: z_dr(),
+        old_dispersion: z_dr(),
+        new_dispersion: z_dr(),
+        old_retardation: z_dr(),
+        new_retardation: z_dr(),
+        old_concentration: z_dr(),
+        new_accepted_concentration: z_dr(),
+        material_immobile_water: vec![DefaultReal(0.0); materials],
+        old_source_g0: z_dr(),
+        old_source_g1: z_dr(),
+        new_source_g0: z_dr(),
+        new_source_g1: z_dr(),
+        upwind_weight: vec![DefaultReal(0.0); n.saturating_sub(1)],
+        epsi: DefaultReal(0.0),
+        dt: DefaultReal(0.0),
+        alf: DefaultReal(0.0),
+        top_atmospheric_concentration: None,
+        top_surface_distance: None,
+        old_temperature: None,
+        new_temperature: None,
+        source_chpar: None,
+        source_tdep: None,
+        material_ids: vec![0; n],
+        source_species: 1,
+        mobile_immobile: vec![false; materials],
+        bacteria: false,
+        dual_porosity: 0,
+        bottom_resistance: DefaultReal(0.0),
+        bottom_prescribed: DefaultReal(0.0),
+        top_prescribed: DefaultReal(0.0),
+        t_level: 0,
+        vapor: false,
+        r_min: DefaultReal(R_MIN),
+    }
+}
+
+pub(crate) fn copy_endpoint_in_place(
+    dst: &mut EndpointPrimitiveState,
+    src: &EndpointPrimitiveState,
+) {
+    fn copy_dr(dst: &mut Vec<DefaultReal>, src: &[DefaultReal]) {
+        if dst.len() == src.len() {
+            dst.copy_from_slice(src);
+        } else {
+            dst.clear();
+            dst.extend_from_slice(src);
+        }
+    }
+    copy_dr(&mut dst.coordinates, &src.coordinates);
+    copy_dr(&mut dst.old_water, &src.old_water);
+    copy_dr(&mut dst.new_water, &src.new_water);
+    copy_dr(&mut dst.old_velocity, &src.old_velocity);
+    copy_dr(&mut dst.new_velocity, &src.new_velocity);
+    copy_dr(&mut dst.old_matrix_velocity, &src.old_matrix_velocity);
+    copy_dr(&mut dst.new_matrix_velocity, &src.new_matrix_velocity);
+    copy_dr(&mut dst.old_dispersion, &src.old_dispersion);
+    copy_dr(&mut dst.new_dispersion, &src.new_dispersion);
+    copy_dr(&mut dst.old_retardation, &src.old_retardation);
+    copy_dr(&mut dst.new_retardation, &src.new_retardation);
+    copy_dr(&mut dst.old_concentration, &src.old_concentration);
+    copy_dr(
+        &mut dst.new_accepted_concentration,
+        &src.new_accepted_concentration,
+    );
+    copy_dr(
+        &mut dst.material_immobile_water,
+        &src.material_immobile_water,
+    );
+    copy_dr(&mut dst.old_source_g0, &src.old_source_g0);
+    copy_dr(&mut dst.old_source_g1, &src.old_source_g1);
+    copy_dr(&mut dst.new_source_g0, &src.new_source_g0);
+    copy_dr(&mut dst.new_source_g1, &src.new_source_g1);
+    copy_dr(&mut dst.upwind_weight, &src.upwind_weight);
+    dst.epsi = src.epsi;
+    dst.dt = src.dt;
+    dst.alf = src.alf;
+    dst.top_atmospheric_concentration = src.top_atmospheric_concentration;
+    dst.top_surface_distance = src.top_surface_distance;
+    dst.old_temperature = src.old_temperature;
+    dst.new_temperature = src.new_temperature;
+    dst.source_chpar = src.source_chpar.clone();
+    dst.source_tdep = src.source_tdep.clone();
+    if dst.material_ids.len() == src.material_ids.len() {
+        dst.material_ids.copy_from_slice(&src.material_ids);
+    } else {
+        dst.material_ids.clear();
+        dst.material_ids.extend_from_slice(&src.material_ids);
+    }
+    dst.source_species = src.source_species;
+    if dst.mobile_immobile.len() == src.mobile_immobile.len() {
+        dst.mobile_immobile.copy_from_slice(&src.mobile_immobile);
+    } else {
+        dst.mobile_immobile.clear();
+        dst.mobile_immobile.extend_from_slice(&src.mobile_immobile);
+    }
+    dst.bacteria = src.bacteria;
+    dst.dual_porosity = src.dual_porosity;
+    dst.bottom_resistance = src.bottom_resistance;
+    dst.bottom_prescribed = src.bottom_prescribed;
+    dst.top_prescribed = src.top_prescribed;
+    dst.t_level = src.t_level;
+    dst.vapor = src.vapor;
+    dst.r_min = src.r_min;
 }
 
 /// Reusable preallocated working buffers for solute transport passes.
@@ -372,6 +515,8 @@ pub(crate) struct SoluteDriverScratch {
     pub(crate) rhs: Vec<f64>,
     pub(crate) mass_bufs: MassBufs,
     pub(crate) endpoint: EndpointPrimitiveState,
+    pub(crate) sorb2_scratch: Vec<f32>,
+    pub(crate) deposited: Vec<(f32, f32)>,
 }
 
 impl SoluteDriverScratch {
@@ -381,7 +526,7 @@ impl SoluteDriverScratch {
         let z64 = || vec![0.0_f64; n];
         let z_dr = || vec![DefaultReal(0.0); n];
         Self {
-            backup_state: SoluteStepState::blank(n, species_count),
+            backup_state: SoluteStepState::blank_with_materials(n, species_count, material_count),
             th_o_adj: z(),
             th_n_adj: z(),
             old_matrix_v: z(),
@@ -459,6 +604,8 @@ impl SoluteDriverScratch {
                 vapor: false,
                 r_min: DefaultReal(R_MIN),
             },
+            sorb2_scratch: z(),
+            deposited: vec![(0.0, 0.0); n],
         }
     }
 }
@@ -634,7 +781,7 @@ fn step_from_with_scratch(
         if !cfg.linear[js] && !pass.converged {
             return Ok(SoluteStepOutcome { pending: Some(js) });
         }
-        finish_species(cfg, working_st, js, 1)?;
+        finish_species_with_scratch(cfg, working_st, js, 1, scratch)?;
     }
     finish_step(cfg, working_st)?;
     Ok(SoluteStepOutcome { pending: None })
@@ -709,11 +856,16 @@ pub(crate) fn begin_species(
         }
     }
     // `cvBot`/`cvTop` phase A is evaluated by the endpoint kernel from these snapshots.
-    st.frame = Some(SpeciesFrame {
-        v_o0: st.v_o.clone(),
-        conc0: st.conc[js].clone(),
-        endpoint: None,
-    });
+    if let Some(ref mut frame) = st.frame {
+        frame.v_o0.copy_from_slice(&st.v_o);
+        frame.conc0.copy_from_slice(&st.conc[js]);
+    } else {
+        st.frame = Some(SpeciesFrame {
+            v_o0: st.v_o.clone(),
+            conc0: st.conc[js].clone(),
+            endpoint: None,
+        });
+    }
     if cfg.root_sink {
         let mut state = cfg
             .root_uptake
@@ -1754,7 +1906,15 @@ pub(crate) fn solve_pass_with_scratch(
         &mut scratch.rhs,
     )?;
     st.trace.push(DriverEvent::BanSol(js));
-    st.frame.as_mut().expect("checked above").endpoint = Some(ep.clone());
+    // Pre-allocated endpoint in frame avoids cloning ep on subsequent iterations
+    if let Some(frame) = st.frame.as_mut() {
+        if let Some(ref mut dst) = frame.endpoint {
+            copy_endpoint_in_place(dst, ep);
+        } else {
+            // First time this frame sees an endpoint, clone into it
+            frame.endpoint = Some(ep.clone());
+        }
+    }
 
     // Convergence test and Conc update (151-179).
     let mut converged = true;
@@ -1793,6 +1953,18 @@ pub(crate) fn finish_species(
     js: usize,
     iter: u32,
 ) -> Result<(), KernelError> {
+    let mut scratch = SoluteDriverScratch::new(cfg.x.len(), cfg.species_count, cfg.th_sat.len());
+    finish_species_with_scratch(cfg, st, js, iter, &mut scratch)
+}
+
+/// Zero-allocation implementation of `finish_species` using preallocated scratch buffers.
+pub(crate) fn finish_species_with_scratch(
+    cfg: &SoluteStepConfig,
+    st: &mut SoluteStepState,
+    js: usize,
+    iter: u32,
+    scratch: &mut SoluteDriverScratch,
+) -> Result<(), KernelError> {
     validate(cfg, st)?;
     let n = cfg.x.len();
     if !cfg.linear[js] {
@@ -1810,13 +1982,13 @@ pub(crate) fn finish_species(
     if should_call_sorb_conc(cfg.equil, cfg.linear[js]) {
         let jjj = js * 16;
         let deposited = if cfg.bact && cfg.filtr {
-            let mut v = Vec::with_capacity(n);
+            scratch.deposited.clear();
             for i in 0..n {
                 let m = cfg.mat_num[i] - 1;
                 let row = &cfg.ch_par[m];
                 let tt = tfac(st.temp_n[i]);
                 let p = |slot: usize| row[slot - 1] * (cfg.t_dep[slot - 1] * tt).exp();
-                v.push(deposit(&DepositInput {
+                scratch.deposited.push(deposit(&DepositInput {
                     alfa1: p(jjj + 19),
                     alfa2: p(jjj + 16),
                     dc1: p(jjj + 13),
@@ -1828,11 +2000,13 @@ pub(crate) fn finish_species(
                     t_conv: cfg.t_conv,
                 })?);
             }
-            Some(v)
+            Some(scratch.deposited.as_slice())
         } else {
             None
         };
-        let material: Vec<usize> = cfg.mat_num.iter().map(|m| m - 1).collect();
+        for (d, &m) in scratch.mass_bufs.mat0.iter_mut().zip(&cfg.mat_num) {
+            *d = m - 1;
+        }
         let spec = SorbConcSpec {
             species: js,
             dt: st.dt,
@@ -1846,11 +2020,11 @@ pub(crate) fn finish_species(
             tdep: &cfg.t_dep,
             moisture: cfg.moisture.as_ref(),
         };
-        let mut sorb2_scratch = st.sorb2[js].clone();
+        scratch.sorb2_scratch.copy_from_slice(&st.sorb2[js]);
         let mut sorb = std::mem::take(&mut st.sorb[js]);
         {
             let mut state = SorbConcState {
-                material: &material,
+                material: &scratch.mass_bufs.mat0[..n],
                 temperature: &st.temp_n,
                 water: &st.th_n,
                 immobile_new: &st.th_n_im,
@@ -1858,15 +2032,15 @@ pub(crate) fn finish_species(
                 sink_im: &st.sink_im,
                 conc: &st.conc[js],
                 sorb: &mut sorb,
-                sorb2: &mut sorb2_scratch,
+                sorb2: &mut scratch.sorb2_scratch,
                 s_trans: &mut st.s_trans,
-                deposited_ka: deposited.as_deref(),
+                deposited_ka: deposited,
             };
             sorb_conc(&spec, &mut state)?;
         }
         st.sorb[js] = sorb;
         if cfg.bact || cfg.dual_neq {
-            st.sorb2[js] = sorb2_scratch;
+            st.sorb2[js].copy_from_slice(&scratch.sorb2_scratch);
         }
         st.trace.push(DriverEvent::SorbConc(js));
     }
@@ -1874,23 +2048,24 @@ pub(crate) fn finish_species(
     // End-of-step MassTran (189-193).
     {
         sync_s_trans_in(st);
-        let bufs = mass_bufs(cfg, st, js);
-        let input = mass_tran_input(cfg, js, &bufs, false);
-        let mut totals = st.totals.clone();
-        totals.accumulate(&input)?;
-        st.totals = totals;
+        mass_bufs_into(cfg, st, js, &mut scratch.mass_bufs);
+        let input = mass_tran_input(cfg, js, &scratch.mass_bufs, false);
+        st.totals.accumulate(&input)?;
         sync_s_trans_out(st);
         st.trace.push(DriverEvent::MassTranEnd(js));
     }
 
-    // Flux closure (195-225): the endpoint kernel evaluates both phases.
-    let mut ep = st
-        .frame
-        .as_ref()
-        .and_then(|f| f.endpoint.clone())
-        .ok_or("finish_species needs a completed pass")?;
-    ep.new_accepted_concentration = dr(&st.conc[js]);
-    let ends = assemble_endpoints(&ep, cfg.k_bot, cfg.k_top)?;
+    // Flux closure (195-225): evaluate endpoints from the completed pass.
+    let ends = if let Some(ref mut ep) = st.frame.as_mut().and_then(|f| f.endpoint.as_mut()) {
+        copy_slice_dr(&mut ep.new_accepted_concentration, &st.conc[js]);
+        assemble_endpoints(ep, cfg.k_bot, cfg.k_top)?
+    } else {
+        copy_slice_dr(
+            &mut scratch.endpoint.new_accepted_concentration,
+            &st.conc[js],
+        );
+        assemble_endpoints(&scratch.endpoint, cfg.k_bot, cfg.k_top)?
+    };
     st.cv_top[js] = ends.flux.top as f32;
     st.cv_bot[js] = ends.flux.bottom as f32;
     if st.cv_top[js].abs() < R_MIN {

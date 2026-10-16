@@ -21,8 +21,8 @@
 //! - If `dt <= dtMin || lWat`, `ierr = 1` is set and the solver terminates.
 
 use crate::solute_fortran_compat::driver::{
-    begin_species, finish_species, finish_step, solve_pass_with_scratch, SoluteDriverScratch,
-    SoluteStepConfig, SoluteStepState,
+    begin_species, finish_species_with_scratch, finish_step, solve_pass_with_scratch,
+    SoluteDriverScratch, SoluteStepConfig, SoluteStepState,
 };
 use crate::solute_fortran_compat::types::KernelError;
 
@@ -186,7 +186,7 @@ pub(crate) fn step_nonlinear_species_with_scratch(
         st.iter_c = st.iter_c.max(iter);
 
         if cfg.linear[js] || pass.converged {
-            finish_species(cfg, st, js, iter)?;
+            finish_species_with_scratch(cfg, st, js, iter, scratch)?;
             return Ok(SpeciesIterationOutcome::Converged { iterations: iter });
         }
 
