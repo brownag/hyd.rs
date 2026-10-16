@@ -1,7 +1,7 @@
 # State — Orchestration 20
 
 Plan status: **Approved by user on 2026-10-15 (“yes”).**
-Execution status: **Wave 1 complete; ready for Wave 2 (20.2.1).**
+Execution status: **Waves 0, 1, 2, and 2B complete; ready for Wave 3 dispatch.**
 Plan: [EXECUTION_PLAN_20.md](EXECUTION_PLAN_20.md). Worker template: [PROMPT_TEMPLATE_20.md](PROMPT_TEMPLATE_20.md).
 
 ## Baseline and guardrails
@@ -24,8 +24,8 @@ Plan: [EXECUTION_PLAN_20.md](EXECUTION_PLAN_20.md). Worker template: [PROMPT_TEM
 | 1 | 20.1.1 | Revert unverified default backend to `FiniteVolumeBackwardEuler` | done |
 | 1 | 20.1.2 | Deduplicate adapter helpers, reject moisture selector 2, rename `BlockingMode::Type3` | done |
 | 1 | 20.1.3 | Deduplicate `accounting.rs` deposition helpers and add `dual_exchange` group alias | done |
-| 2 | 20.2.1 | Preallocated scratch buffers in `assembly.rs`, `driver.rs`, and `iteration.rs` | pending |
-| 2B | 20.2.2 | Full `SoluteConfig` mapping and zero-allocation compat step in `solute.rs` | pending |
+| 2 | 20.2.1 | Preallocated scratch buffers in `assembly.rs`, `driver.rs`, and `iteration.rs` | done |
+| 2B | 20.2.2 | Full `SoluteConfig` mapping and zero-allocation compat step in `solute.rs` | done |
 | 3 | 20.3.1 | Source-compatible deck reader (`SELECTOR.IN` + `PROFILE.DAT` + `CASE.json`) | pending |
 | 3 | 20.3.2 | Source-precision `WatFlow`, `DualPor`, `SetMat`, `Veloc`, and `TmCont` port | pending |
 | 3 | 20.3.3 | Source-precision `OUTPUT.FOR` table formatters (`Profil`, `NodOut`, `TLInf`, `ObsNod`, `SubReg`) | pending |
@@ -43,6 +43,13 @@ Plan: [EXECUTION_PLAN_20.md](EXECUTION_PLAN_20.md). Worker template: [PROMPT_TEM
   - `cargo clippy --workspace --all-targets -- -D warnings`: Clean (0 warnings).
   - `git diff --check`: Clean.
   - `POLICY_HASHES` re-pin justification (D6): Re-pinned `crates/hydrus-core/src/solute.rs` to `7b0912e5a536b6e1851602eaa05d33de13b6f04d2d59f2d400ba347c2e7ffc7d` in `tools/solute_benchmark_bridge.py` due to task 20.1.1 reverting the default backend to `FiniteVolumeBackwardEuler` pending genuine 44/44 Rust-vs-Fortran parity in Wave 6.
+- **Wave 2 / 2B gate (2026-10-16):**
+  - `cargo test --workspace`: **388 passed**, 0 failed, **1 ignored** (`dump_parsed_fixtures`).
+  - `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tools -p 'test_*.py'`: **314 passed**, 0 failed (`OK`).
+  - `cargo fmt --all -- --check`: Clean (0 diffs).
+  - `cargo clippy --workspace --all-targets -- -D warnings`: Clean (0 warnings).
+  - `git diff --check`: Clean.
+  - `POLICY_HASHES` re-pin justification (D6): Re-pinned `crates/hydrus-core/src/solute.rs` to `46a7e00dc940058531ea3dfb39c262bb5c90581db752995e5d2d4ac0d4290cbc` in `tools/solute_benchmark_bridge.py` due to task 20.2.2 adding preallocated compatibility buffers in `SoluteWorkspace` and full `SoluteConfig` mapping while preserving the FV/BE solver path bitwise verbatim.
 
 ## Task reports
 
@@ -63,3 +70,15 @@ Plan: [EXECUTION_PLAN_20.md](EXECUTION_PLAN_20.md). Worker template: [PROMPT_TEM
 - **Files changed:** `crates/hydrus-core/src/solute_fortran_compat/{accounting,deposition}.rs`, `tools/run_solute_parity.py`, `tools/test_solute_fortran_parity.py`.
 - **Tests:** `cargo test -p hydrus-core --lib solute_fortran_compat::accounting`: 12 passed. `cargo test -p hydrus-core --lib solute_fortran_compat::deposition`: 7 passed. `python3 -m unittest tools.test_solute_fortran_parity`: 17 passed (was 16).
 - **Deviations:** None. Preserved exact `SOLUTE.FOR:1450-1451` `Mi`/`Mj` node-material indexing in `accumulate_bacteria`.
+
+### 20.2.1 — Preallocated scratch buffers in `assembly.rs`, `driver.rs`, and `iteration.rs`
+- **Status:** Done.
+- **Files changed:** `crates/hydrus-core/src/solute_fortran_compat/{assembly,driver,iteration}.rs`.
+- **Tests:** `cargo test -p hydrus-core --lib solute_fortran_compat::{assembly,driver,iteration}`: all passed.
+- **Deviations:** None.
+
+### 20.2.2 — Full `SoluteConfig` mapping and zero-allocation compat step in `solute.rs`
+- **Status:** Done.
+- **Files changed:** `crates/hydrus-core/src/solute.rs`, `crates/hydrus-core/src/solute_fortran_compat/{boundary,driver,iteration}.rs`, `crates/hydrus-core/tests/{allocation_contract,solute_backend_contract}.rs`.
+- **Tests:** `cargo test -p hydrus-core --lib solute`: 221 passed. `cargo test -p hydrus-core --test allocation_contract`: 2 passed (asserting 0 allocations for all backends). `cargo test -p hydrus-core --test solute_backend_contract`: 8 passed.
+- **Deviations:** Under Escalation Rule 4, worker scope was amended to include `driver.rs`/`iteration.rs` to eliminate inner-loop endpoint and sorb_conc allocations.
