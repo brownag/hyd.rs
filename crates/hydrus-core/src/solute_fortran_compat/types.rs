@@ -861,3 +861,7 @@ pub(crate) mod tests {
         );
     }
 }
+
+#[path = "output_compat.rs"]
+#[allow(dead_code)] // wired by 20.4.1
+pub(crate) mod output_compat;
