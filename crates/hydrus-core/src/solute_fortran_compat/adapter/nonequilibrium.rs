@@ -4,13 +4,6 @@ use super::*;
 use serde::Deserialize;
 use serde_json::{Map, Value};
 
-fn require_wrapped_object(fields: &Map<String, Value>, name: &str) -> Result<(), String> {
-    match fields.get(name).and_then(|w| w.get("value")) {
-        Some(v) => require_object(v, name),
-        None => Ok(()),
-    }
-}
-
 /// Keeps the pre-serde wording for an absent required key ("`name.key` missing")
 /// and for a non-number in a real slot ("expected finite number").
 fn legacy_text(name: &str, text: String) -> String {
@@ -21,10 +14,6 @@ fn legacy_text(name: &str, text: String) -> String {
         Some((key, _)) => format!("{name}.{key} missing"),
         None => text.replace(", expected f64", ", expected finite number"),
     }
-}
-
-fn reals(v: Vec<f64>) -> Vec<DefaultReal> {
-    v.into_iter().map(DefaultReal::from_input).collect()
 }
 
 #[derive(Deserialize)]
@@ -235,21 +224,6 @@ pub(super) fn validate_dual_domain_dimensions(fields: &RequestFields) -> Result<
 mod tests {
     use super::*;
     use serde_json::json;
-
-    fn wrap(name: &str, units: &str, value: Value) -> Map<String, Value> {
-        let mut m = Map::new();
-        m.insert(name.into(), json!({"units": units, "value": value}));
-        m
-    }
-
-    // `a|b` passes on either: old bodies named the nested key, serde names the request field.
-    fn err_has(r: Result<impl std::fmt::Debug, String>, needle: &str) {
-        let e = r.expect_err("must reject");
-        assert!(
-            needle.split('|').any(|n| e.contains(n)),
-            "{e:?} should name {needle}"
-        );
-    }
 
     fn dual(v: Value) -> Result<Option<UnitValue<DualDomainRequest>>, String> {
         maybe_dual_domain(&wrap("dual_domain", "source iDualPor selector", v))

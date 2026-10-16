@@ -5,13 +5,6 @@ use super::*;
 use serde::Deserialize;
 use serde_json::{Map, Value};
 
-fn require_wrapped_object(fields: &Map<String, Value>, name: &str) -> Result<(), String> {
-    match fields.get(name).and_then(|w| w.get("value")) {
-        Some(v) => require_object(v, name),
-        None => Ok(()),
-    }
-}
-
 /// `lWat` and `SinkF`, the two `Site.dat` control-section logicals of the
 /// `INPUT.FOR:31` read that guard the two source-coupling calls. Both keys are
 /// required whenever the field is present: a request that maps one of them and
@@ -71,10 +64,6 @@ struct RootUptakeDto {
     potential_uptake: f64,
     michaelis_constant: f64,
     minimum_concentration: f64,
-}
-
-fn reals(v: Vec<f64>) -> Vec<DefaultReal> {
-    v.into_iter().map(DefaultReal::from_input).collect()
 }
 
 pub(super) fn maybe_root_uptake_state(
@@ -211,21 +200,6 @@ pub(super) fn validate_source_coupling_guards(
 mod tests {
     use super::*;
     use serde_json::json;
-
-    fn wrap(name: &str, units: &str, value: Value) -> Map<String, Value> {
-        let mut m = Map::new();
-        m.insert(name.into(), json!({"units": units, "value": value}));
-        m
-    }
-
-    // `a|b` passes on either: old bodies named the nested key, serde names the request field.
-    fn err_has(r: Result<impl std::fmt::Debug, String>, needle: &str) {
-        let e = r.expect_err("must reject");
-        assert!(
-            needle.split('|').any(|n| e.contains(n)),
-            "{e:?} should name {needle}"
-        );
-    }
 
     fn control(v: Value) -> Result<Option<UnitValue<SourceSwitches>>, String> {
         maybe_control_switches(&wrap("control_switches", "Site.dat control logicals", v))

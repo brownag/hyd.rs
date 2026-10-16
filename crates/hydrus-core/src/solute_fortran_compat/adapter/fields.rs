@@ -256,3 +256,36 @@ pub(super) fn map_available<A, B>(
     })
     .transpose()
 }
+
+pub(super) fn require_wrapped_object(
+    fields: &Map<String, Value>,
+    field: &str,
+) -> Result<(), String> {
+    match fields.get(field).and_then(|w| w.get("value")) {
+        Some(v) => require_object(v, field),
+        None => Ok(()),
+    }
+}
+
+pub(super) fn reals(v: Vec<f64>) -> Vec<DefaultReal> {
+    v.into_iter().map(DefaultReal::from_input).collect()
+}
+
+#[cfg(test)]
+pub(super) fn wrap(field: &str, units: &str, v: Value) -> Map<String, Value> {
+    let mut m = Map::new();
+    m.insert(
+        field.into(),
+        serde_json::json!({"units": units, "value": v}),
+    );
+    m
+}
+
+#[cfg(test)]
+pub(super) fn err_has(res: Result<impl std::fmt::Debug, String>, needle: &str) {
+    let e = res.expect_err("must reject");
+    assert!(
+        needle.split('|').any(|n| e.contains(n)),
+        "{e:?} should name {needle}"
+    );
+}
