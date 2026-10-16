@@ -23,3 +23,5 @@ mod processes;
 #[allow(dead_code)] // wired by 18.12.1
 mod source_coupling;
 mod transport;
+#[allow(dead_code)] // wired by 20.4.1
+pub(crate) mod water_compat;
