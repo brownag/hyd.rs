@@ -23,9 +23,9 @@ FIXTURE = "reference/fortran_reference/solute/example3"
 OLD_RUN = ".development/12.2.1/run"
 OLD_RUST = ".development/12.6.1/rust-observations.json"
 POLICY_HASHES = {
-    # Re-pinned under Amendment 2026-10-14 & 2026-10-15 (18.16.1 / D11): default SoluteBackend switched
-    # to FortranCompatible based on all-mode parity evidence while FV/BE path is preserved bitwise verbatim.
-    "crates/hydrus-core/src/solute.rs": "904d09027ad23f68d6f0d437500398bcdfcedb89460fba5351fcfd545a8c0294",
+    # Re-pinned under Orchestration 20 D6 (Wave 1 / 20.1.1): default SoluteBackend reverted
+    # to FiniteVolumeBackwardEuler pending genuine 44-fixture Rust-vs-Fortran parity verification.
+    "crates/hydrus-core/src/solute.rs": "7b0912e5a536b6e1851602eaa05d33de13b6f04d2d59f2d400ba347c2e7ffc7d",
     "crates/hydrus-core/src/hydraulics/linear.rs": "6b5649011b1c605e77d55500fa08bd5bfbb708d3548abd225c3dbc11f3e0196e",
     "crates/hydrus-core/tests/solute_fixture_parity.rs": "890bb77171f189402299cf9ceaf8b4809ffa15e3c52a82355016e92b6893bba9",
     "crates/hydrus-core/tests/solute_verification_harness.rs": "df60e942863d08738ec60945aec548815a3ab021d70ff1b7d2b0469e73beb3f1",
