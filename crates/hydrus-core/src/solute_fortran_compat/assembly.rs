@@ -12,6 +12,7 @@ pub(crate) enum AssemblyLevel {
     New,
 }
 
+#[allow(dead_code)]
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct EndpointAssemblySeam {
     /// Previously accumulated RHS contributions, including endpoint terms.
@@ -19,6 +20,7 @@ pub(crate) struct EndpointAssemblySeam {
     pub rhs: Vec<f64>,
 }
 
+#[allow(dead_code)]
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct InteriorRows {
     /// Double-precision source `B` (lower diagonal), `D` (diagonal), `E`
@@ -47,14 +49,18 @@ pub(crate) struct AssemblyInputs<'a> {
 
 /// Assemble interior nodes. `!` at physical column 6 in SOLUTE.FOR:836-849
 /// is a fixed-form continuation marker, so Level-1 F(i) is executable.
-pub(crate) fn assemble_interior(
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn assemble_interior_into(
     inputs: AssemblyInputs<'_>,
     level: AssemblyLevel,
     epsi: f32,
     alf: f32,
     dt: f32,
-    endpoint_seam: EndpointAssemblySeam,
-) -> Result<InteriorRows, KernelError> {
+    lower: &mut [f64],
+    diagonal: &mut [f64],
+    upper: &mut [f64],
+    rhs: &mut [f64],
+) -> Result<(), KernelError> {
     let n = inputs.x.len();
     if n < 3
         || inputs.theta_old.len() != n
@@ -67,16 +73,13 @@ pub(crate) fn assemble_interior(
         || inputs.upstream_weight.len() != n
         || inputs.g0.len() != n
         || inputs.g1.len() != n
-        || endpoint_seam.rhs.len() != n
+        || lower.len() != n
+        || diagonal.len() != n
+        || upper.len() != n
+        || rhs.len() != n
     {
         return Err("interior assembly arrays must have the same length of at least three");
     }
-    let mut result = InteriorRows {
-        lower: vec![0.0; n],
-        diagonal: vec![0.0; n],
-        upper: vec![0.0; n],
-        rhs: endpoint_seam.rhs,
-    };
     for i in 1..n - 1 {
         let a1 = inputs.x[i] - inputs.x[i - 1];
         let b1 = inputs.x[i + 1] - inputs.x[i];
@@ -116,17 +119,17 @@ pub(crate) fn assemble_interior(
                 * (a1 * (inputs.g0[i - 1] + 2.0 * inputs.g0[i])
                     + b1 * (2.0 * inputs.g0[i] + inputs.g0[i + 1]))
                 / 6.0;
-            result.rhs[i] = (((left + center) + right) + source) as f64;
+            rhs[i] = (((left + center) + right) + source) as f64;
         } else {
             let th = inputs.theta_new;
             let v = inputs.velocity_new;
             let disp = inputs.dispersion;
             let g1 = inputs.g1;
-            let lower = epsi
+            let low = epsi
                 * (-(th[i - 1] * disp[i - 1] + th[i] * disp[i]) / a1 / 2.0
                     - ((2.0 + 3.0 * inputs.upstream_weight[i - 1]) * v[i - 1] + v[i]) / 6.0
                     - a1 / 12.0 * (g1[i - 1] + g1[i]));
-            let diagonal = dx / dt * th[i] * inputs.retardation[i]
+            let diag = dx / dt * th[i] * inputs.retardation[i]
                 + epsi
                     * ((th[i - 1] * disp[i - 1] + th[i] * disp[i]) / a1 / 2.0
                         + (th[i + 1] * disp[i + 1] + th[i] * disp[i]) / b1 / 2.0
@@ -137,7 +140,7 @@ pub(crate) fn assemble_interior(
                             - v[i - 1])
                             / 6.0
                         - (a1 * (g1[i - 1] + 3.0 * g1[i]) + b1 * (3.0 * g1[i] + g1[i + 1])) / 12.0);
-            let upper = epsi
+            let up = epsi
                 * (-(th[i + 1] * disp[i + 1] + th[i] * disp[i]) / b1 / 2.0
                     + (v[i] + (2.0 - 3.0 * inputs.upstream_weight[i]) * v[i + 1]) / 6.0
                     - b1 / 12.0 * (g1[i] + g1[i + 1]));
@@ -148,12 +151,45 @@ pub(crate) fn assemble_interior(
             // Fortran evaluates each coefficient expression in default REAL,
             // then stores it in DOUBLE PRECISION. F(i) is already double, so
             // its existing value is added to the promoted source contribution.
-            result.lower[i] = lower as f64;
-            result.diagonal[i] = diagonal as f64;
-            result.upper[i] = upper as f64;
-            result.rhs[i] += source as f64;
+            lower[i] = low as f64;
+            diagonal[i] = diag as f64;
+            upper[i] = up as f64;
+            rhs[i] += source as f64;
         }
     }
+    Ok(())
+}
+
+#[allow(dead_code)]
+pub(crate) fn assemble_interior(
+    inputs: AssemblyInputs<'_>,
+    level: AssemblyLevel,
+    epsi: f32,
+    alf: f32,
+    dt: f32,
+    endpoint_seam: EndpointAssemblySeam,
+) -> Result<InteriorRows, KernelError> {
+    let n = inputs.x.len();
+    if endpoint_seam.rhs.len() != n {
+        return Err("interior assembly arrays must have the same length of at least three");
+    }
+    let mut result = InteriorRows {
+        lower: vec![0.0; n],
+        diagonal: vec![0.0; n],
+        upper: vec![0.0; n],
+        rhs: endpoint_seam.rhs,
+    };
+    assemble_interior_into(
+        inputs,
+        level,
+        epsi,
+        alf,
+        dt,
+        &mut result.lower,
+        &mut result.diagonal,
+        &mut result.upper,
+        &mut result.rhs,
+    )?;
     Ok(result)
 }
 

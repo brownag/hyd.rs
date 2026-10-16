@@ -21,7 +21,8 @@
 //! - If `dt <= dtMin || lWat`, `ierr = 1` is set and the solver terminates.
 
 use crate::solute_fortran_compat::driver::{
-    begin_species, finish_species, finish_step, solve_pass, SoluteStepConfig, SoluteStepState,
+    begin_species, finish_species, finish_step, solve_pass_with_scratch, SoluteDriverScratch,
+    SoluteStepConfig, SoluteStepState,
 };
 use crate::solute_fortran_compat::types::KernelError;
 
@@ -161,6 +162,18 @@ pub(crate) fn step_nonlinear_species(
     js: usize,
     nonlin_cfg: &NonlinearConfig,
 ) -> Result<SpeciesIterationOutcome, KernelError> {
+    let mut scratch = SoluteDriverScratch::new(cfg.x.len(), cfg.species_count, cfg.th_sat.len());
+    step_nonlinear_species_with_scratch(cfg, st, js, nonlin_cfg, &mut scratch)
+}
+
+/// Execute nonlinear iteration for a single species `js` with caller-provided scratch buffers (`SOLUTE.FOR:12-164`).
+pub(crate) fn step_nonlinear_species_with_scratch(
+    cfg: &SoluteStepConfig,
+    st: &mut SoluteStepState,
+    js: usize,
+    nonlin_cfg: &NonlinearConfig,
+    scratch: &mut SoluteDriverScratch,
+) -> Result<SpeciesIterationOutcome, KernelError> {
     let mut iter: u32 = 1;
     let max_iter = if cfg.linear[js] {
         1
@@ -169,7 +182,7 @@ pub(crate) fn step_nonlinear_species(
     };
 
     loop {
-        let pass = solve_pass(cfg, st, js, iter)?;
+        let pass = solve_pass_with_scratch(cfg, st, js, iter, scratch)?;
         st.iter_c = st.iter_c.max(iter);
 
         if cfg.linear[js] || pass.converged {
@@ -201,24 +214,29 @@ pub(crate) struct SoluteIterationReport {
 
 /// Execute the full solute step with nonlinear iteration, timestep reduction retry,
 /// and rollback/commit sequencing matching `SOLUTE.FOR:10-226`.
-///
-/// If any species fails to converge after `max_it_c` iterations:
-/// - If `dt > dt_min && !water_flow`:
-///   reduces timestep (`dtOld = dt; dt = max(dt/3, dt_min); t = t - dtOld + dt`),
-///   rolls back state to the beginning of the step (label 10 snapshot), and restarts from species 0.
-/// - If `dt <= dt_min || water_flow`:
-///   sets `st.ierr = 1` and returns `Err("Solute transport failed to converge within minimum timestep")`.
 #[allow(dead_code)] // wired by 18.12.1
 pub(crate) fn solve_solute_with_nonlinear(
     cfg: &mut SoluteStepConfig,
     st: &mut SoluteStepState,
     nonlin_cfg: &NonlinearConfig,
 ) -> Result<SoluteIterationReport, KernelError> {
+    let mut scratch = SoluteDriverScratch::new(cfg.x.len(), cfg.species_count, cfg.th_sat.len());
+    solve_solute_with_nonlinear_with_scratch(cfg, st, nonlin_cfg, &mut scratch)
+}
+
+/// Execute the full solute step with nonlinear iteration, timestep reduction retry,
+/// and rollback/commit sequencing matching `SOLUTE.FOR:10-226`, using preallocated scratch buffers.
+pub(crate) fn solve_solute_with_nonlinear_with_scratch(
+    cfg: &mut SoluteStepConfig,
+    st: &mut SoluteStepState,
+    nonlin_cfg: &NonlinearConfig,
+    scratch: &mut SoluteDriverScratch,
+) -> Result<SoluteIterationReport, KernelError> {
     cfg.c_tol_a = nonlin_cfg.c_tol_a;
     cfg.c_tol_r = nonlin_cfg.c_tol_r;
 
-    // Snapshot state at label 10 before species loop begins
-    let baseline_state = st.clone();
+    // Snapshot state at label 10 before species loop begins into scratch.backup_state
+    scratch.backup_state.copy_from(st);
     let baseline_dt = st.dt;
     let baseline_t = st.t;
 
@@ -227,8 +245,8 @@ pub(crate) fn solve_solute_with_nonlinear(
     let mut retries: u32 = 0;
 
     'retry_loop: loop {
-        // Reset state to baseline snapshot for this try
-        *st = baseline_state.clone();
+        // Reset state to baseline snapshot for this try without heap allocations
+        st.copy_from(&scratch.backup_state);
         st.dt = current_dt;
         st.t = current_t;
         st.iter_c = 1;
@@ -239,7 +257,7 @@ pub(crate) fn solve_solute_with_nonlinear(
         for js in 0..cfg.species_count {
             begin_species(cfg, st, js)?;
 
-            let outcome = step_nonlinear_species(cfg, st, js, nonlin_cfg)?;
+            let outcome = step_nonlinear_species_with_scratch(cfg, st, js, nonlin_cfg, scratch)?;
             match outcome {
                 SpeciesIterationOutcome::Converged { iterations } => {
                     max_species_iter = max_species_iter.max(iterations);
@@ -560,5 +578,46 @@ mod tests {
         assert_eq!(report.dt, 0.1);
         assert!(st.trace.contains(&DriverEvent::Update(0)));
         assert!(st.trace.contains(&DriverEvent::Update(1)));
+    }
+
+    #[test]
+    fn test_solve_solute_with_nonlinear_with_scratch_bit_identical_to_standard() {
+        let mut cfg1 = base_cfg();
+        cfg1.linear = vec![false];
+        let mut st1 = base_state();
+        let initial_dt = 0.09;
+        st1.dt = initial_dt;
+        st1.t = 1.0;
+
+        let mut cfg2 = cfg1.clone();
+        let mut st2 = st1.clone();
+
+        let nonlin_cfg = NonlinearConfig {
+            max_it_c: 1,
+            dt_min: 0.001,
+            c_tol_a: 0.0,
+            c_tol_r: 0.0,
+            water_flow: false,
+        };
+
+        let err1 = solve_solute_with_nonlinear(&mut cfg1, &mut st1, &nonlin_cfg).unwrap_err();
+        let mut scratch =
+            SoluteDriverScratch::new(cfg2.x.len(), cfg2.species_count, cfg2.th_sat.len());
+        let err2 = solve_solute_with_nonlinear_with_scratch(
+            &mut cfg2,
+            &mut st2,
+            &nonlin_cfg,
+            &mut scratch,
+        )
+        .unwrap_err();
+
+        assert_eq!(err1, err2);
+        assert_eq!(st1.ierr, st2.ierr);
+        assert_eq!(st1.dt, st2.dt);
+        assert_eq!(st1.t, st2.t);
+        assert_eq!(st1.conc, st2.conc);
+        assert_eq!(st1.sorb, st2.sorb);
+        assert_eq!(st1.c_new, st2.c_new);
+        assert_eq!(st1.trace, st2.trace);
     }
 }
