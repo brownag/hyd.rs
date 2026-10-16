@@ -6,8 +6,12 @@
 
 use crate::{
     hydraulics::{solve_tridiagonal_in_place, Mesh1D, TridiagonalError},
+    solute_fortran_compat::driver::{SoluteDriverScratch, SoluteStepConfig, SoluteStepState},
     SoluteConfigError,
 };
+
+/// Default material capacity for Fortran-compatible solute workspaces.
+pub const DEFAULT_MAX_MATERIALS: usize = 16;
 
 /// Explicit labels used by a solute configuration; no unit conversion is implied.
 #[derive(Clone, Debug, Eq, PartialEq)]
@@ -424,7 +428,6 @@ impl SoluteState {
 }
 
 /// Fixed-dimension trial buffers and complete accepted-state snapshot.
-#[derive(Clone, Debug)]
 pub struct SoluteWorkspace {
     node_count: usize,
     species_count: usize,
@@ -444,22 +447,93 @@ pub struct SoluteWorkspace {
     previous_species_mass: Vec<f64>,
     reaction_source: Vec<f64>,
     storage_before: Vec<f64>,
+    compat_cfg: SoluteStepConfig,
+    compat_state: SoluteStepState,
+    compat_scratch: SoluteDriverScratch,
+    compat_material_capacity: usize,
+}
+
+impl core::fmt::Debug for SoluteWorkspace {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("SoluteWorkspace")
+            .field("node_count", &self.node_count)
+            .field("species_count", &self.species_count)
+            .field("trial_time", &self.trial_time)
+            .field("trial_active", &self.trial_active)
+            .field("compat_material_capacity", &self.compat_material_capacity)
+            .finish()
+    }
 }
 
 impl SoluteWorkspace {
     pub fn new(node_count: usize, species_count: usize) -> Result<Self, SoluteConfigError> {
+        Self::with_materials(node_count, species_count, DEFAULT_MAX_MATERIALS)
+    }
+
+    pub fn with_materials(
+        node_count: usize,
+        species_count: usize,
+        material_count: usize,
+    ) -> Result<Self, SoluteConfigError> {
         let pool_len = node_count
             .checked_mul(species_count)
             .ok_or(SoluteConfigError::Invalid {
                 name: "workspace dimensions",
                 reason: "node and species count overflow",
             })?;
-        if node_count == 0 || species_count == 0 {
+        if node_count == 0 || species_count == 0 || material_count == 0 {
             return Err(SoluteConfigError::Invalid {
                 name: "workspace dimensions",
-                reason: "node and species counts must be nonzero",
+                reason: "node, species, and material counts must be nonzero",
             });
         }
+        let compat_cfg = SoluteStepConfig {
+            x: vec![0.0; node_count],
+            mat_num: vec![1; node_count],
+            th_sat: vec![1.0; material_count],
+            mobile_immobile: vec![false; material_count],
+            ch_par: vec![vec![0.0_f32; species_count * 16 + 4]; material_count],
+            t_dep: vec![0.0; species_count * 16 + 4],
+            species_count,
+            linear: vec![true; species_count],
+            equil: true,
+            upwind: false,
+            art_disp: false,
+            tort: false,
+            i_tort: 0,
+            bact: false,
+            filtr: false,
+            dual_neq: false,
+            water_flow: true,
+            root_sink: false,
+            vapor: false,
+            atm_bc: false,
+            density: false,
+            dual_por: 0,
+            conc_type: 0,
+            moisture_selector: 0,
+            moisture: None,
+            epsi: 1.0,
+            t_pulse: 1.0e30,
+            dt_min: 0.0,
+            k_bot: 0,
+            k_top: 0,
+            c_atm: 0.0,
+            d_surf: 0.0,
+            r_bot: 0.0,
+            t_level: 2,
+            pe_cr: 2.0,
+            x_conv: 1.0,
+            t_conv: 1.0,
+            c_tol_a: 0.0,
+            c_tol_r: 0.0,
+            root_uptake: None,
+            size_exclusion: None,
+        };
+        let compat_state =
+            SoluteStepState::blank_with_materials(node_count, species_count, material_count);
+        let compat_scratch = SoluteDriverScratch::new(node_count, species_count, material_count);
+
         Ok(Self {
             node_count,
             species_count,
@@ -479,6 +553,10 @@ impl SoluteWorkspace {
             previous_species_mass: vec![0.0; node_count],
             reaction_source: vec![0.0; node_count],
             storage_before: vec![0.0; species_count],
+            compat_cfg,
+            compat_state,
+            compat_scratch,
+            compat_material_capacity: material_count,
         })
     }
 
@@ -805,12 +883,19 @@ fn advance_fortran_compatible_step(
 ) -> Result<(), SoluteStepError> {
     let species_count = config.species.len();
     let node_count = mesh.coordinates().len();
+    let material_count = mesh.material_count();
     validate_transport_input(state, workspace, mesh, config, input, process_input)?;
 
     if node_count < 3 {
         return Err(invalid_transport(
             "mesh",
             "Fortran compatibility solver requires at least 3 nodes",
+        ));
+    }
+    if material_count > workspace.compat_material_capacity {
+        return Err(invalid_transport(
+            "workspace",
+            "mesh material count exceeds workspace capacity",
         ));
     }
 
@@ -836,64 +921,205 @@ fn advance_fortran_compatible_step(
             )?;
         }
 
-        let mut ch_par_row = vec![0.0_f32; species_count * 16 + 4];
-        let default_density = process_input.map_or(0.8_f32, |p| p.bulk_density[0] as f32);
-        ch_par_row[0] = default_density;
-        ch_par_row[1] = input.face_dispersion.first().copied().unwrap_or(0.0) as f32;
-        ch_par_row[2] = 1.0_f32; // Frac
+        let equil = config
+            .species
+            .iter()
+            .all(|sp| sp.kinetic_sorption.is_none());
 
-        let mut linear = Vec::with_capacity(species_count);
-        for (js, sp) in config.species.iter().enumerate() {
-            let offset = js * 16;
-            let (kd, exponent, nu) = match sp.equilibrium_sorption {
-                EquilibriumSorption::None => (0.0_f32, 1.0_f32, 0.0_f32),
-                EquilibriumSorption::Linear {
-                    distribution_coefficient,
-                } => (distribution_coefficient as f32, 1.0_f32, 0.0_f32),
-                EquilibriumSorption::Nonlinear {
-                    coefficient,
-                    exponent,
-                    saturation,
-                    ..
-                } => (coefficient as f32, exponent as f32, saturation as f32),
+        // Validate boundary uniformity across species and determine k_bot / k_top
+        let lower_mode_0 = config.boundaries[0].lower;
+        let upper_mode_0 = config.boundaries[0].upper;
+        for b in &config.boundaries {
+            let lower_same = matches!(
+                (b.lower, lower_mode_0),
+                (
+                    SoluteBoundaryMode::Concentration { .. },
+                    SoluteBoundaryMode::Concentration { .. },
+                ) | (
+                    SoluteBoundaryMode::TotalFlux { .. },
+                    SoluteBoundaryMode::TotalFlux { .. },
+                ) | (
+                    SoluteBoundaryMode::AdvectiveOutflow,
+                    SoluteBoundaryMode::AdvectiveOutflow,
+                )
+            );
+            let upper_same = matches!(
+                (b.upper, upper_mode_0),
+                (
+                    SoluteBoundaryMode::Concentration { .. },
+                    SoluteBoundaryMode::Concentration { .. },
+                ) | (
+                    SoluteBoundaryMode::TotalFlux { .. },
+                    SoluteBoundaryMode::TotalFlux { .. },
+                ) | (
+                    SoluteBoundaryMode::AdvectiveOutflow,
+                    SoluteBoundaryMode::AdvectiveOutflow,
+                )
+            );
+            if !lower_same || !upper_same {
+                return Err(invalid_transport(
+                    "boundary",
+                    "FortranCompatible backend requires uniform boundary mode across species",
+                ));
+            }
+        }
+
+        let k_bot = match lower_mode_0 {
+            SoluteBoundaryMode::TotalFlux { .. } => {
+                let v = input.accepted_water.face_fluxes[0];
+                if v.abs() > 1e-30 {
+                    -1
+                } else {
+                    1
+                }
+            }
+            SoluteBoundaryMode::Concentration { .. } => 1,
+            SoluteBoundaryMode::AdvectiveOutflow => 0,
+        };
+
+        let k_top = match upper_mode_0 {
+            SoluteBoundaryMode::TotalFlux { .. } => {
+                let v = input.accepted_water.face_fluxes[node_count];
+                if v.abs() > 1e-30 {
+                    -1
+                } else {
+                    1
+                }
+            }
+            SoluteBoundaryMode::Concentration { .. } => 1,
+            SoluteBoundaryMode::AdvectiveOutflow => 0,
+        };
+
+        // Populate boundary concentrations per species in compat_state
+        for js in 0..species_count {
+            let c_bot_val = match config.boundaries[js].lower {
+                SoluteBoundaryMode::TotalFlux { flux } => {
+                    let v = input.accepted_water.face_fluxes[0];
+                    if v.abs() > 1e-30 {
+                        (flux / v) as f32
+                    } else {
+                        flux as f32
+                    }
+                }
+                SoluteBoundaryMode::Concentration { value } => value as f32,
+                SoluteBoundaryMode::AdvectiveOutflow => 0.0_f32,
             };
-            ch_par_row[offset + 6] = kd;
-            ch_par_row[offset + 7] = nu;
-            ch_par_row[offset + 8] = exponent;
-            ch_par_row[offset + 13] = sp.decay_rate as f32; // GamL1
+            let c_top_val = match config.boundaries[js].upper {
+                SoluteBoundaryMode::TotalFlux { flux } => {
+                    let v = input.accepted_water.face_fluxes[node_count];
+                    if v.abs() > 1e-30 {
+                        (-flux / v) as f32
+                    } else {
+                        flux as f32
+                    }
+                }
+                SoluteBoundaryMode::Concentration { value } => value as f32,
+                SoluteBoundaryMode::AdvectiveOutflow => 0.0_f32,
+            };
+            workspace.compat_state.c_bot[js] = c_bot_val;
+            workspace.compat_state.c_top[js] = c_top_val;
+        }
 
+        // Map representative node for each material to find its bulk density
+        let default_dispersion = input.face_dispersion.first().copied().unwrap_or(0.0) as f32;
+        let mut rep_nodes = [0usize; 64];
+        let mut rep_assigned = [false; 64];
+        for (i, &mat_idx) in mesh.material_indices().iter().enumerate() {
+            if mat_idx < material_count && mat_idx < 64 && !rep_assigned[mat_idx] {
+                rep_nodes[mat_idx] = i;
+                rep_assigned[mat_idx] = true;
+            }
+        }
+
+        for m in 0..material_count {
+            let rep_node = if m < 64 && rep_assigned[m] {
+                rep_nodes[m]
+            } else {
+                0
+            };
+            let density = process_input.map_or(0.8_f32, |p| p.bulk_density[rep_node] as f32);
+
+            let ch_par_row = &mut workspace.compat_cfg.ch_par[m];
+            ch_par_row.fill(0.0);
+            ch_par_row[0] = density;
+            ch_par_row[1] = default_dispersion;
+
+            // Frac default
+            let mut frac_val = 1.0_f32;
+
+            for (js, sp) in config.species.iter().enumerate() {
+                let offset = js * 16;
+                let (kd_eq, exponent, nu, frac_eq) = match sp.equilibrium_sorption {
+                    EquilibriumSorption::None => (0.0_f64, 1.0_f32, 0.0_f32, 1.0_f32),
+                    EquilibriumSorption::Linear {
+                        distribution_coefficient,
+                    } => (distribution_coefficient, 1.0_f32, 0.0_f32, 1.0_f32),
+                    EquilibriumSorption::Nonlinear {
+                        fraction,
+                        coefficient,
+                        exponent,
+                        saturation,
+                    } => (
+                        coefficient,
+                        exponent as f32,
+                        saturation as f32,
+                        fraction as f32,
+                    ),
+                };
+
+                let (kd, frac, omega) = match (
+                    sp.equilibrium_sorption != EquilibriumSorption::None,
+                    sp.kinetic_sorption,
+                ) {
+                    (false, Some(kin)) => (
+                        kin.capacity_coefficient as f32,
+                        0.0_f32,
+                        kin.transfer_rate as f32,
+                    ),
+                    (true, Some(kin)) => {
+                        let total_kd = (kd_eq + kin.capacity_coefficient) as f32;
+                        let frac = if total_kd > 0.0 {
+                            match sp.equilibrium_sorption {
+                                EquilibriumSorption::Nonlinear { .. } => frac_eq,
+                                _ => (kd_eq / (kd_eq + kin.capacity_coefficient)) as f32,
+                            }
+                        } else {
+                            1.0_f32
+                        };
+                        (total_kd, frac, kin.transfer_rate as f32)
+                    }
+                    (true, None) => (kd_eq as f32, frac_eq, 0.0_f32),
+                    (false, None) => (0.0_f32, 1.0_f32, 0.0_f32),
+                };
+
+                if js == 0 {
+                    frac_val = frac;
+                }
+                ch_par_row[offset + 6] = kd;
+                ch_par_row[offset + 7] = nu;
+                ch_par_row[offset + 8] = exponent;
+                ch_par_row[offset + 13] = sp.decay_rate as f32; // GamL1
+                ch_par_row[offset + 19] = omega;
+            }
+            ch_par_row[2] = frac_val;
+        }
+
+        // Set up compat_cfg
+        for i in 0..node_count {
+            workspace.compat_cfg.x[i] = mesh.coordinates()[i] as f32;
+            workspace.compat_cfg.mat_num[i] = mesh.material_indices()[i] + 1;
+        }
+        for (js, sp) in config.species.iter().enumerate() {
             let is_linear = matches!(
                 sp.equilibrium_sorption,
                 EquilibriumSorption::None | EquilibriumSorption::Linear { .. }
             );
-            linear.push(is_linear);
+            workspace.compat_cfg.linear[js] = is_linear;
         }
-
-        let (k_bot, c_bot) = match config.boundaries[0].lower {
-            SoluteBoundaryMode::TotalFlux { flux } => {
-                let v = input.accepted_water.face_fluxes[0];
-                if v.abs() > 1e-30 {
-                    (-1, vec![(flux / v) as f32; species_count])
-                } else {
-                    (1, vec![flux as f32; species_count])
-                }
-            }
-            SoluteBoundaryMode::Concentration { value } => (1, vec![value as f32; species_count]),
-            SoluteBoundaryMode::AdvectiveOutflow => (0, vec![0.0_f32; species_count]),
-        };
-
-        let (k_top, c_top) = match config.boundaries[0].upper {
-            SoluteBoundaryMode::TotalFlux { flux } => {
-                let v = input.accepted_water.face_fluxes[node_count];
-                if v.abs() > 1e-30 {
-                    (-1, vec![(-flux / v) as f32; species_count])
-                } else {
-                    (1, vec![flux as f32; species_count])
-                }
-            }
-            SoluteBoundaryMode::Concentration { value } => (1, vec![value as f32; species_count]),
-            SoluteBoundaryMode::AdvectiveOutflow => (0, vec![0.0_f32; species_count]),
-        };
+        workspace.compat_cfg.equil = equil;
+        workspace.compat_cfg.dt_min = (input.timestep * 1e-4) as f32;
+        workspace.compat_cfg.k_bot = k_bot;
+        workspace.compat_cfg.k_top = k_top;
 
         let (max_it_c, c_tol_a, c_tol_r) = if let Some(p) = process_input {
             (
@@ -904,73 +1130,30 @@ fn advance_fortran_compatible_step(
         } else {
             (10, 0.0_f32, 0.0_f32)
         };
+        workspace.compat_cfg.c_tol_a = c_tol_a;
+        workspace.compat_cfg.c_tol_r = c_tol_r;
 
-        let mut step_cfg = crate::solute_fortran_compat::driver::SoluteStepConfig {
-            x: mesh.coordinates().iter().map(|&x| x as f32).collect(),
-            mat_num: vec![1; node_count],
-            th_sat: vec![1.0; 1],
-            mobile_immobile: vec![false; 1],
-            ch_par: vec![ch_par_row],
-            t_dep: vec![0.0; species_count * 16 + 4],
-            species_count,
-            linear,
-            equil: true,
-            upwind: false,
-            art_disp: false,
-            tort: false,
-            i_tort: 0,
-            bact: false,
-            filtr: false,
-            dual_neq: false,
-            water_flow: true,
-            root_sink: false,
-            vapor: false,
-            atm_bc: false,
-            density: false,
-            dual_por: 0,
-            conc_type: 0,
-            moisture_selector: 0,
-            moisture: None,
-            epsi: 1.0, // backward Euler (implicit)
-            t_pulse: 1.0e30,
-            dt_min: (input.timestep * 1e-4) as f32,
-            k_bot,
-            k_top,
-            c_atm: 0.0,
-            d_surf: 0.0,
-            r_bot: 0.0,
-            t_level: 2,
-            pe_cr: 2.0,
-            x_conv: 1.0,
-            t_conv: 1.0,
-            c_tol_a,
-            c_tol_r,
-            root_uptake: None,
-            size_exclusion: None,
-        };
-
-        let mut step_st =
-            crate::solute_fortran_compat::driver::SoluteStepState::blank(node_count, species_count);
+        // Set up compat_state
         for js in 0..species_count {
             let offset = js * node_count;
             for i in 0..node_count {
-                step_st.conc[js][i] = workspace.trial_concentrations[offset + i] as f32;
-                step_st.sorb[js][i] = workspace.trial_kinetic_sorbed[offset + i] as f32;
+                workspace.compat_state.conc[js][i] =
+                    workspace.trial_concentrations[offset + i] as f32;
+                workspace.compat_state.sorb[js][i] =
+                    workspace.trial_kinetic_sorbed[offset + i] as f32;
             }
         }
         for i in 0..node_count {
-            step_st.th_o[i] = input.start_water_contents[i] as f32;
-            step_st.th_n[i] = input.accepted_water.water_contents[i] as f32;
-            step_st.v_o[i] = input.accepted_water.face_fluxes[i] as f32;
-            step_st.v_n[i] = input.accepted_water.face_fluxes[i] as f32;
-            step_st.temp_o[i] = 20.0;
-            step_st.temp_n[i] = 20.0;
+            workspace.compat_state.th_o[i] = input.start_water_contents[i] as f32;
+            workspace.compat_state.th_n[i] = input.accepted_water.water_contents[i] as f32;
+            workspace.compat_state.v_o[i] = input.accepted_water.face_fluxes[i] as f32;
+            workspace.compat_state.v_n[i] = input.accepted_water.face_fluxes[i] as f32;
+            workspace.compat_state.temp_o[i] = 20.0;
+            workspace.compat_state.temp_n[i] = 20.0;
         }
-        step_st.c_bot = c_bot;
-        step_st.c_top = c_top;
-        step_st.t = state.time;
-        step_st.dt = input.timestep as f32;
-        step_st.c_mid = Some(0.0);
+        workspace.compat_state.t = state.time;
+        workspace.compat_state.dt = input.timestep as f32;
+        workspace.compat_state.c_mid = Some(0.0);
 
         let nonlin_cfg = crate::solute_fortran_compat::iteration::NonlinearConfig {
             max_it_c,
@@ -980,18 +1163,21 @@ fn advance_fortran_compatible_step(
             water_flow: true,
         };
 
-        crate::solute_fortran_compat::iteration::solve_solute_with_nonlinear(
-            &mut step_cfg,
-            &mut step_st,
+        crate::solute_fortran_compat::iteration::solve_solute_with_nonlinear_with_scratch(
+            &mut workspace.compat_cfg,
+            &mut workspace.compat_state,
             &nonlin_cfg,
+            &mut workspace.compat_scratch,
         )
         .map_err(|err| invalid_transport("fortran compatible solve", err))?;
 
         for js in 0..species_count {
             let offset = js * node_count;
             for i in 0..node_count {
-                workspace.trial_concentrations[offset + i] = step_st.conc[js][i] as f64;
-                workspace.trial_kinetic_sorbed[offset + i] = step_st.sorb[js][i] as f64;
+                workspace.trial_concentrations[offset + i] =
+                    workspace.compat_state.conc[js][i] as f64;
+                workspace.trial_kinetic_sorbed[offset + i] =
+                    workspace.compat_state.sorb[js][i] as f64;
             }
         }
 

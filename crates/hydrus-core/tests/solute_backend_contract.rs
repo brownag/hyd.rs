@@ -2,7 +2,7 @@
 use hydrus_core::hydraulics::{
     BoundaryRow, Evaluation, FaceAveraging, HydraulicDerivatives, HydraulicModel, Mesh1D,
 };
-use hydrus_core::solute::advance_solute_step_with_processes;
+use hydrus_core::solute::{advance_solute_step_with_processes, SoluteProcessInput};
 use hydrus_core::{
     advance_solute_step, advance_water_step, AcceptedWaterSnapshot, EquilibriumSorption,
     HydraulicError, LowerBoundaryMode, SoluteBackend, SoluteBoundaries, SoluteBoundaryMode,
@@ -330,5 +330,202 @@ fn any_failed_advance_leaves_state_unchanged_and_workspace_reusable() {
             .unwrap();
             assert_eq!(state.time(), water.accepted_time);
         });
+    }
+}
+
+#[test]
+fn fortran_compatible_supports_multi_material_mesh() {
+    let mesh = Mesh1D::new(
+        vec![0.0, 1.0, 2.0, 3.0, 4.0],
+        vec![0, 0, 1, 1, 1],
+        None,
+        2,
+        0,
+        0.8,
+    )
+    .unwrap();
+    let cfg = SoluteConfig::new(
+        SoluteUnits {
+            concentration: "mg/L".into(),
+            sorbed_mass: "mg/kg".into(),
+        },
+        vec![SoluteSpecies {
+            name: "tracer".into(),
+            decay_rate: 0.0,
+            equilibrium_sorption: EquilibriumSorption::None,
+            kinetic_sorption: None,
+        }],
+        SoluteBoundaries {
+            lower: SoluteBoundaryMode::Concentration { value: 1.0 },
+            upper: SoluteBoundaryMode::Concentration { value: 0.0 },
+        },
+        1,
+        &[],
+    )
+    .unwrap()
+    .with_backend(SoluteBackend::FortranCompatible);
+
+    let mut state = SoluteState::new(&cfg, &mesh, 0.0, vec![0.0; 5], vec![0.0; 5]).unwrap();
+    let mut ws = SoluteWorkspace::with_materials(5, 1, 4).unwrap();
+    let old_water = [0.3; 5];
+    let new_water = [0.3; 5];
+    let face_fluxes = [0.05; 6];
+    let dispersion = [0.1; 4];
+
+    let input = SoluteTransportInput {
+        accepted_water: AcceptedWaterSnapshot {
+            accepted_time: 1.0,
+            water_contents: &new_water,
+            face_fluxes: &face_fluxes,
+        },
+        start_water_contents: &old_water,
+        face_dispersion: &dispersion,
+        timestep: 1.0,
+        minimum_pivot: 1e-12,
+    };
+
+    let proc_input = SoluteProcessInput {
+        bulk_density: &[1.4, 1.4, 1.6, 1.6, 1.6],
+        max_iterations: 10,
+        nonlinear_tolerance: 1e-6,
+    };
+
+    advance_solute_step_with_processes(&mut state, &mut ws, &mesh, &cfg, input, Some(proc_input))
+        .unwrap();
+    assert_eq!(state.time(), 1.0);
+    assert!(state
+        .concentrations()
+        .iter()
+        .all(|c| c.is_finite() && *c >= 0.0));
+}
+
+#[test]
+fn fortran_compatible_respects_per_species_boundary_concentrations() {
+    let mesh = Mesh1D::new(vec![0.0, 1.0, 2.0], vec![0; 3], None, 1, 0, 1.0).unwrap();
+    let cfg = SoluteConfig::new_with_species_boundaries(
+        SoluteUnits {
+            concentration: "mg/L".into(),
+            sorbed_mass: "mg/kg".into(),
+        },
+        vec![
+            SoluteSpecies {
+                name: "sp1".into(),
+                decay_rate: 0.0,
+                equilibrium_sorption: EquilibriumSorption::None,
+                kinetic_sorption: None,
+            },
+            SoluteSpecies {
+                name: "sp2".into(),
+                decay_rate: 0.0,
+                equilibrium_sorption: EquilibriumSorption::None,
+                kinetic_sorption: None,
+            },
+        ],
+        vec![
+            SoluteBoundaries {
+                lower: SoluteBoundaryMode::Concentration { value: 10.0 },
+                upper: SoluteBoundaryMode::Concentration { value: 0.0 },
+            },
+            SoluteBoundaries {
+                lower: SoluteBoundaryMode::Concentration { value: 50.0 },
+                upper: SoluteBoundaryMode::Concentration { value: 5.0 },
+            },
+        ],
+        1,
+        &[],
+    )
+    .unwrap()
+    .with_backend(SoluteBackend::FortranCompatible);
+
+    let mut state = SoluteState::new(&cfg, &mesh, 0.0, vec![0.0; 6], vec![0.0; 6]).unwrap();
+    let mut ws = SoluteWorkspace::new(3, 2).unwrap();
+    let old_water = [0.3; 3];
+    let new_water = [0.3; 3];
+    let face_fluxes = [0.0; 4];
+    let dispersion = [0.1; 2];
+
+    let input = SoluteTransportInput {
+        accepted_water: AcceptedWaterSnapshot {
+            accepted_time: 1.0,
+            water_contents: &new_water,
+            face_fluxes: &face_fluxes,
+        },
+        start_water_contents: &old_water,
+        face_dispersion: &dispersion,
+        timestep: 1.0,
+        minimum_pivot: 1e-12,
+    };
+
+    advance_solute_step(&mut state, &mut ws, &mesh, &cfg, input).unwrap();
+    assert_eq!(state.time(), 1.0);
+    // Boundary conditions should produce higher concentration for sp2 than sp1 at node 0
+    assert_eq!(state.concentrations()[0], 10.0);
+    assert_eq!(state.concentrations()[3], 50.0);
+}
+
+#[test]
+fn fortran_compatible_evolves_kinetic_sorbed_pool() {
+    let mesh = Mesh1D::new(vec![0.0, 1.0, 2.0], vec![0; 3], None, 1, 0, 1.0).unwrap();
+    let cfg = SoluteConfig::new(
+        SoluteUnits {
+            concentration: "mg/L".into(),
+            sorbed_mass: "mg/kg".into(),
+        },
+        vec![SoluteSpecies {
+            name: "sorbing".into(),
+            decay_rate: 0.0,
+            equilibrium_sorption: EquilibriumSorption::Linear {
+                distribution_coefficient: 0.5,
+            },
+            kinetic_sorption: Some(hydrus_core::KineticSorption {
+                capacity_coefficient: 0.5,
+                transfer_rate: 0.1,
+            }),
+        }],
+        SoluteBoundaries {
+            lower: SoluteBoundaryMode::Concentration { value: 1.0 },
+            upper: SoluteBoundaryMode::Concentration { value: 1.0 },
+        },
+        1,
+        &[],
+    )
+    .unwrap()
+    .with_backend(SoluteBackend::FortranCompatible);
+
+    let mut state = SoluteState::new(&cfg, &mesh, 0.0, vec![1.0; 3], vec![0.0; 3]).unwrap();
+    let mut ws = SoluteWorkspace::new(3, 1).unwrap();
+    let old_water = [0.3; 3];
+    let new_water = [0.3; 3];
+    let face_fluxes = [0.0; 4];
+    let dispersion = [0.1; 2];
+
+    let input = SoluteTransportInput {
+        accepted_water: AcceptedWaterSnapshot {
+            accepted_time: 1.0,
+            water_contents: &new_water,
+            face_fluxes: &face_fluxes,
+        },
+        start_water_contents: &old_water,
+        face_dispersion: &dispersion,
+        timestep: 1.0,
+        minimum_pivot: 1e-12,
+    };
+
+    let proc_input = SoluteProcessInput {
+        bulk_density: &[1.5; 3],
+        max_iterations: 10,
+        nonlinear_tolerance: 1e-6,
+    };
+
+    advance_solute_step_with_processes(&mut state, &mut ws, &mesh, &cfg, input, Some(proc_input))
+        .unwrap();
+
+    // With concentration > 0 and initial kinetic sorbed = 0, kinetic sorption should evolve > 0
+    assert_eq!(state.time(), 1.0);
+    for &sorbed in state.kinetic_sorbed() {
+        assert!(
+            sorbed > 0.0,
+            "kinetic sorbed pool should evolve above zero, got {sorbed}"
+        );
     }
 }

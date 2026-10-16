@@ -5,7 +5,7 @@
 //! [`DefaultReal`] and only the `B`/`D`/`E`/`F` accumulations widen, statement by
 //! statement, as the source evaluates them.
 
-use super::types::{DefaultReal, EndpointPrimitiveState, KernelError};
+use super::types::{EndpointPrimitiveState, KernelError};
 
 /// `Tr` (`42`, `76`, `885`, `918`).
 const REFERENCE_TEMPERATURE_K: f32 = 293.15;
@@ -183,28 +183,41 @@ pub(super) fn validate(
     {
         return Err("endpoint epsi must lie in [0, 1], alf must equal 1 - epsi, and bottom resistance must be non-negative");
     }
-    let mut reals: Vec<&DefaultReal> = state
-        .material_immobile_water
-        .iter()
-        .chain(&state.upwind_weight)
-        .collect();
-    reals.extend(
-        [
-            &state.epsi,
-            &state.dt,
-            &state.alf,
-            &state.bottom_resistance,
-            &state.bottom_prescribed,
-            &state.top_prescribed,
-            &state.r_min,
-        ]
-        .into_iter()
-        .chain(state.old_temperature.as_ref())
-        .chain(state.new_temperature.as_ref())
-        .chain(state.top_surface_distance.as_ref())
-        .chain(state.top_atmospheric_concentration.as_ref()),
-    );
+    let scalars = [
+        state.epsi,
+        state.dt,
+        state.alf,
+        state.bottom_resistance,
+        state.bottom_prescribed,
+        state.top_prescribed,
+        state.r_min,
+    ];
+    if scalars.iter().any(|v| !v.0.is_finite()) {
+        return Err("endpoint primitives must be finite");
+    }
+    if let Some(t) = state.old_temperature {
+        if !t.0.is_finite() {
+            return Err("endpoint primitives must be finite");
+        }
+    }
+    if let Some(t) = state.new_temperature {
+        if !t.0.is_finite() {
+            return Err("endpoint primitives must be finite");
+        }
+    }
+    if let Some(d) = state.top_surface_distance {
+        if !d.0.is_finite() {
+            return Err("endpoint primitives must be finite");
+        }
+    }
+    if let Some(c) = state.top_atmospheric_concentration {
+        if !c.0.is_finite() {
+            return Err("endpoint primitives must be finite");
+        }
+    }
     for array in [
+        &state.material_immobile_water,
+        &state.upwind_weight,
         &state.old_water,
         &state.new_water,
         &state.old_velocity,
@@ -222,10 +235,9 @@ pub(super) fn validate(
         &state.new_source_g0,
         &state.new_source_g1,
     ] {
-        reals.extend(array.iter());
-    }
-    if reals.iter().any(|v| !v.0.is_finite()) {
-        return Err("endpoint primitives must be finite");
+        if array.iter().any(|v| !v.0.is_finite()) {
+            return Err("endpoint primitives must be finite");
+        }
     }
     Ok(())
 }
