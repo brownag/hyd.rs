@@ -186,8 +186,8 @@ mod tests {
         }
     }
 
-    // These pins repeat the values accounting.rs's own test pins for its private
-    // copy, so both implementations are held to the same numbers.
+    // These pins test the canonical blocking implementation (shared with
+    // accounting.rs via pub(crate)).
     #[test]
     fn blocking_matches_accounting_pinned_values() {
         assert_eq!(blocking(1, 10.0, 2.0, 0.0, 1.0, 0.0), 0.8);

@@ -1,5 +1,6 @@
 //! Source-ordered mass accounting and the conditionally active flux-concentration helper.
 
+use super::deposition::{blocking, deposit, DepositInput};
 use super::types::{DefaultReal, Explicit, KernelError};
 
 /// Cumulative values written by the active end-of-step `MassTran` call.
@@ -312,17 +313,17 @@ impl MassTotals {
         if input.filtration {
             let dc1 = par(jj + 12, mi, tti);
             let dp1 = par(jj + 13, mi, tti);
-            let (ka1, ka2) = deposit(
-                ka1i,
-                ka2i,
+            let (ka1, ka2) = deposit(&DepositInput {
+                alfa1: ka1i,
+                alfa2: ka2i,
                 dc1,
                 dp1,
-                thetai,
-                input.velocity[i].0,
-                input.temperature[i].0,
-                input.x_conv.0,
-                input.t_conv.0,
-            )?;
+                theta: thetai,
+                q: input.velocity[i].0,
+                temp: input.temperature[i].0,
+                x_conv: input.x_conv.0,
+                t_conv: input.t_conv.0,
+            })?;
             ka1i = ka1;
             ka1j = ka1;
             ka2i = ka2;
@@ -371,82 +372,6 @@ fn sorb_two_site(c: f32, frac: f32, ks: f32, nu: f32, exp: f32) -> f32 {
     } else {
         0.0
     }
-}
-fn blocking(kind: i32, smax: f32, ss: f32, x: f32, dc: f32, smax2: f32) -> f32 {
-    match kind {
-        1 if smax > 0.0 => 1.0 - ss / smax,
-        2 if smax > 0.0 => ss.powf(smax).max(1.0),
-        3 => {
-            let binf = 1.0 / smax;
-            let c = 0.546 * binf * ss;
-            if ss <= 0.8 * smax {
-                1.0 - 4.0 * c + 3.08 * c * c + 1.4069 * c * c * c
-            } else {
-                ((1.0 - binf * ss).powi(3)) / (2.0 * dc.powi(2) * binf.powi(3))
-            }
-        }
-        4 if smax > 0.0 && dc > 0.0 => ((x.abs() + dc) / dc).powf(-smax),
-        5 => {
-            let mut psi = if smax > 0.0 && dc > 0.0 {
-                ((x.abs() + dc) / dc).powf(-smax)
-            } else {
-                1.0
-            };
-            if smax2 > 0.0 {
-                psi *= 1.0 - ss / smax2;
-            }
-            psi
-        }
-        _ => 1.0,
-    }
-}
-// Mirrors the source Deposit parameter list and operation inputs.
-#[allow(clippy::too_many_arguments)]
-// Preserve the source's approximate PI literal used in the deposition equation.
-#[allow(clippy::approx_constant)]
-fn deposit(
-    ka1: f32,
-    ka2: f32,
-    dc1: f32,
-    dp1: f32,
-    theta: f32,
-    q: f32,
-    temp: f32,
-    x_conv: f32,
-    t_conv: f32,
-) -> Result<(f32, f32), KernelError> {
-    let dc = dc1 / x_conv;
-    let dp = dp1 / x_conv;
-    if dp <= 0.0 && dc <= 0.0 {
-        return Err("source Deposit stops when both particle and grain diameters are nonpositive");
-    }
-    let (eta, pore_velocity) = if q.abs() > 0.0 {
-        // Preserve the source literal rather than substituting a rounded PI constant.
-        let pi = 3.1415_f32;
-        let mu = 0.00093_f32;
-        let bk = 1.38048e-23_f32;
-        let h = 1e-20_f32;
-        let vel = (q / x_conv * t_conv).abs();
-        let pv = vel / theta;
-        let gamma = (1.0 - theta).powf(1.0 / 3.0);
-        let ass = 2.0 * (1.0 - gamma.powi(5))
-            / (2.0 - 3.0 * gamma + 3.0 * gamma.powi(5) - 2.0 * gamma.powi(6));
-        let npe = 3.0 * pi * mu * dp * dc * vel / (bk * (temp + 273.15));
-        let ediff = 4.0 * ass.powf(1.0 / 3.0) * npe.powf(-2.0 / 3.0);
-        let nlo = 4.0 * h / (9.0 * pi * mu * dp.powi(2) * vel);
-        let nr = dp / dc;
-        let einter = ass * nlo.powf(1.0 / 8.0) * nr.powf(15.0 / 8.0);
-        let ng = 9.81 * (1080.0 - 998.0) * dp.powi(2) / (18.0 * mu * vel);
-        (
-            ediff + einter + 0.00338 * ass * ng.powf(1.2) * nr.powf(-0.4),
-            pv,
-        )
-    } else {
-        (0.0, 0.0)
-    };
-    let ka1 = 3.0 * (1.0 - theta) / 2.0 / dc * eta * ka1 * pore_velocity / t_conv;
-    let ka2 = 3.0 * (1.0 - theta) / 2.0 / dc * eta * ka2 * pore_velocity / t_conv;
-    Ok((ka1, ka2))
 }
 
 /// Nodewise state required by the source `FluxConc` formula, returned when its
@@ -813,9 +738,14 @@ pub(crate) mod tests {
 
     #[test]
     fn source_blocking_modes_match_active_biology_helper_equations() {
+        let blocking = super::super::deposition::blocking;
         assert_eq!(blocking(1, 10.0, 2.0, 0.0, 1.0, 0.0), 0.8);
         assert_eq!(blocking(2, 2.0, 0.5, 0.0, 1.0, 0.0), 1.0);
+        // iPsi=3: branch ss <= 0.8 * smax (ss=1.0, smax=10.0)
         assert!((blocking(3, 10.0, 1.0, 0.0, 1.0, 0.0) - 0.791_011).abs() < 1e-5);
+        // iPsi=3: branch ss > 0.8 * smax (ss=0.9, smax=1.0, dc=2.0)
+        let hi = blocking(3, 1.0, 0.9, 0.0, 2.0, 0.0);
+        assert!((hi - (0.001 / 8.0)).abs() < 1e-6);
         assert_eq!(blocking(4, 1.0, 0.0, 1.0, 1.0, 0.0), 0.5);
         assert_eq!(blocking(5, 1.0, 2.0, 1.0, 1.0, 4.0), 0.25);
     }

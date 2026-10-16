@@ -21,6 +21,7 @@ FIXTURE_GROUPS = {
     "nonequilibrium": "processes/nonequilibrium",
     "biology": "processes/biology",
     "flux_concentration": "flux_concentration",
+    "dual_exchange": "processes/dual_exchange",
 }
 PINNED_PATCH_SHA256 = "622d1ea68285257e98a169f94dec83f3df1c671a9366f651e845806cb8c00d7e"
 if __package__ in (None, ""):
