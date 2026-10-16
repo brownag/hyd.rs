@@ -196,7 +196,7 @@ fn default_backend_is_listed_and_selection_round_trips() {
         &[],
     )
     .unwrap();
-    assert_eq!(default.backend(), SoluteBackend::FortranCompatible);
+    assert_eq!(default.backend(), SoluteBackend::FiniteVolumeBackwardEuler);
     assert!(SoluteBackend::ALL.contains(&default.backend()));
     for &backend in SoluteBackend::ALL {
         assert_eq!(default.clone().with_backend(backend).backend(), backend);

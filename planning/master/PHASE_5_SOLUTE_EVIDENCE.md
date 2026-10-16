@@ -1,5 +1,11 @@
 # Phase 5 solute acceptance evidence
 
+> [!WARNING]
+> **Orchestration 20 Correction Banner:**
+> The `18.15.1` parity run invoked the Fortran reference runner inside `tools/solute_rust_candidate_adapter.py` rather than the Rust compatibility solver (`crates/hydrus-core/src/solute_fortran_compat/**`).
+> Consequently, the default solute backend has been reset to `FiniteVolumeBackwardEuler` until genuine Rust-vs-Fortran parity passes across all 44 fixtures in Orchestration 20.
+> Additionally, `iPsi=3` (`SOLUTE.FOR:1570-1579`) is an active column-6 continuation formula rather than a commented-out no-op.
+
 ## Purpose and evidence standard
 
 This record assesses M5 from the accepted Orchestration 10 task reports and Rust contract tests. It distinguishes implemented contract behavior and bounded internal consistency checks from scientific validation. The source snapshot now has a reviewed derived-case executable run and diagnostic paired observations, detailed below. No canonical manual deck or calibrated scientific acceptance threshold is available.

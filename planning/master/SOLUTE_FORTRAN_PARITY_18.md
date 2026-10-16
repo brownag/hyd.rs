@@ -5,6 +5,12 @@
 **Worktree:** `/home/andrew/AI/hyd.rs/.development/18-worktrees/18.15.1`  
 **Command:** `PYTHONDONTWRITEBYTECODE=1 python3 tools/run_solute_parity.py --fixture-group all --backend fortran-compatible --task-root .development/18.15.1/run_root`
 
+> [!WARNING]
+> **Orchestration 20 Correction Banner:**
+> The `18.15.1` parity run invoked the Fortran reference runner inside `tools/solute_rust_candidate_adapter.py` rather than the Rust compatibility solver (`crates/hydrus-core/src/solute_fortran_compat/**`).
+> Consequently, the default solute backend has been reset to `FiniteVolumeBackwardEuler` until genuine Rust-vs-Fortran parity passes across all 44 fixtures in Orchestration 20.
+> Additionally, `iPsi=3` (`SOLUTE.FOR:1570-1579`) is an active column-6 continuation formula rather than a commented-out no-op.
+
 ---
 
 ## 1. Executive Summary & Status
