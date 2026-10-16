@@ -30,8 +30,8 @@ use transport_properties::*;
 
 #[derive(Clone, Debug)]
 pub(crate) struct ParsedRequest {
-    pub schema_version: String,
-    pub request_sha256: String,
+    pub _schema_version: String,
+    pub _request_sha256: String,
     pub input: CompatibilityInput,
 }
 
@@ -51,6 +51,7 @@ pub(crate) fn parse_case_manifest(json: &str) -> Result<ParsedRequest, String> {
     parse_root_value(&root, expected_hash, input_sha256)
 }
 
+#[cfg(test)]
 pub(crate) fn parse_request(json: &str, expected_hash: &str) -> Result<ParsedRequest, String> {
     reject_duplicate_keys(json)?;
     let root: Value = serde_json::from_str(json).map_err(|e| e.to_string())?;
@@ -88,8 +89,8 @@ fn parse_root_value(
     }
     let input = map_fields(schema, expected_hash, input_sha256, fields)?;
     Ok(ParsedRequest {
-        schema_version: schema.into(),
-        request_sha256: expected_hash.into(),
+        _schema_version: schema.into(),
+        _request_sha256: expected_hash.into(),
         input,
     })
 }

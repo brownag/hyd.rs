@@ -301,6 +301,7 @@ pub(crate) enum SizeExclusion {
 
 impl SizeExclusion {
     /// Whether `1723` returned before any write, i.e. whether `ChPar(4,1)` survives.
+    #[cfg(test)]
     pub(crate) const fn is_inactive(&self) -> bool {
         matches!(self, Self::Inactive { .. })
     }
