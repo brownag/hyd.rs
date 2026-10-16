@@ -749,7 +749,11 @@ struct LevelScalars {
 }
 
 /// One `Coeff` call (`SOLUTE.FOR:241-750`), `Level` 1 (old) or 2 (new), writing directly into buffers.
-#[allow(clippy::too_many_arguments, clippy::too_many_lines, clippy::needless_range_loop)]
+#[allow(
+    clippy::too_many_arguments,
+    clippy::too_many_lines,
+    clippy::needless_range_loop
+)]
 fn coeff_level_into(
     cfg: &SoluteStepConfig,
     st: &mut SoluteStepState,
