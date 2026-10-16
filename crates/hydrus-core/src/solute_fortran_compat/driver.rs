@@ -32,9 +32,7 @@
 //! * `lBact` with a chain, and `lBact` with `iDualPor>0`, are rejected.
 
 use super::accounting::{flux_concentration, FluxConcInput, MassTotals, MassTranInput};
-use super::assembly::{
-    assemble_interior, ban_solve, AssemblyInputs, AssemblyLevel, EndpointAssemblySeam,
-};
+use super::assembly::{assemble_interior_into, ban_solve, AssemblyInputs, AssemblyLevel};
 use super::biology::{
     select_new_level, select_old_level, BacteriaNode, BacteriaScalars, BacteriaSpec, CarriedLocals,
 };
@@ -271,6 +269,198 @@ impl SoluteStepState {
             trace: Vec::new(),
         }
     }
+
+    /// Copy all data from `other` into `self`, reusing existing `Vec` capacities without reallocating.
+    pub(crate) fn copy_from(&mut self, other: &Self) {
+        fn copy_vec_f32(dst: &mut Vec<f32>, src: &[f32]) {
+            if dst.len() == src.len() {
+                dst.copy_from_slice(src);
+            } else {
+                dst.clear();
+                dst.extend_from_slice(src);
+            }
+        }
+        fn copy_vec_dr(dst: &mut Vec<DefaultReal>, src: &[DefaultReal]) {
+            if dst.len() == src.len() {
+                dst.copy_from_slice(src);
+            } else {
+                dst.clear();
+                dst.extend_from_slice(src);
+            }
+        }
+        fn copy_2d_f32(dst: &mut Vec<Vec<f32>>, src: &[Vec<f32>]) {
+            if dst.len() == src.len() {
+                for (d, s) in dst.iter_mut().zip(src) {
+                    copy_vec_f32(d, s);
+                }
+            } else {
+                dst.clear();
+                dst.extend(src.iter().cloned());
+            }
+        }
+
+        copy_2d_f32(&mut self.conc, &other.conc);
+        copy_2d_f32(&mut self.sorb, &other.sorb);
+        copy_2d_f32(&mut self.sorb2, &other.sorb2);
+
+        copy_vec_f32(&mut self.c_new, &other.c_new);
+        copy_vec_f32(&mut self.sorb_n, &other.sorb_n);
+        copy_vec_f32(&mut self.sorb_n2, &other.sorb_n2);
+        copy_vec_f32(&mut self.c_prev_o, &other.c_prev_o);
+        copy_vec_f32(&mut self.c_temp, &other.c_temp);
+        copy_vec_f32(&mut self.th_o, &other.th_o);
+        copy_vec_f32(&mut self.th_n, &other.th_n);
+        copy_vec_f32(&mut self.v_o, &other.v_o);
+        copy_vec_f32(&mut self.v_n, &other.v_n);
+        copy_vec_f32(&mut self.v_corr, &other.v_corr);
+        copy_vec_f32(&mut self.temp_o, &other.temp_o);
+        copy_vec_f32(&mut self.temp_n, &other.temp_n);
+        copy_vec_f32(&mut self.th_o_im, &other.th_o_im);
+        copy_vec_f32(&mut self.th_n_im, &other.th_n_im);
+        copy_vec_f32(&mut self.sink_im, &other.sink_im);
+        copy_vec_f32(&mut self.s_trans, &other.s_trans);
+        copy_vec_f32(&mut self.s_sink, &other.s_sink);
+        copy_vec_f32(&mut self.wc, &other.wc);
+        copy_vec_f32(&mut self.q0, &other.q0);
+        copy_vec_f32(&mut self.q1, &other.q1);
+        copy_vec_f32(&mut self.c_top, &other.c_top);
+        copy_vec_f32(&mut self.c_bot, &other.c_bot);
+        copy_vec_f32(&mut self.cv_top, &other.cv_top);
+        copy_vec_f32(&mut self.cv_bot, &other.cv_bot);
+
+        copy_vec_dr(&mut self.totals.cv_ch0, &other.totals.cv_ch0);
+        copy_vec_dr(&mut self.totals.cv_ch1, &other.totals.cv_ch1);
+        copy_vec_dr(&mut self.totals.cv_ch_r, &other.totals.cv_ch_r);
+        copy_vec_dr(&mut self.totals.cv_ch_im, &other.totals.cv_ch_im);
+        copy_vec_dr(&mut self.totals.s_trans, &other.totals.s_trans);
+
+        self.carried = other.carried;
+        self.c_mid = other.c_mid;
+        self.dmob_i = other.dmob_i;
+        self.t = other.t;
+        self.dt = other.dt;
+        self.peclet = other.peclet;
+        self.courant = other.courant;
+        self.dt_max_c = other.dt_max_c;
+        self.iter_c = other.iter_c;
+        self.ierr = other.ierr;
+        self.frame = other.frame.clone();
+        self.trace.clear();
+        self.trace.extend_from_slice(&other.trace);
+    }
+}
+
+/// Reusable preallocated working buffers for solute transport passes.
+pub(crate) struct SoluteDriverScratch {
+    pub(crate) backup_state: SoluteStepState,
+    pub(crate) th_o_adj: Vec<f32>,
+    pub(crate) th_n_adj: Vec<f32>,
+    pub(crate) old_matrix_v: Vec<f32>,
+    pub(crate) new_matrix_v: Vec<f32>,
+    pub(crate) l1_disp: Vec<f32>,
+    pub(crate) l1_retard: Vec<f32>,
+    pub(crate) l1_g0: Vec<f32>,
+    pub(crate) l1_g1: Vec<f32>,
+    pub(crate) l2_disp: Vec<f32>,
+    pub(crate) l2_retard: Vec<f32>,
+    pub(crate) l2_g0: Vec<f32>,
+    pub(crate) l2_g1: Vec<f32>,
+    pub(crate) rows_old_rhs: Vec<f64>,
+    pub(crate) lower: Vec<f64>,
+    pub(crate) diag: Vec<f64>,
+    pub(crate) upper: Vec<f64>,
+    pub(crate) rhs: Vec<f64>,
+    pub(crate) mass_bufs: MassBufs,
+    pub(crate) endpoint: EndpointPrimitiveState,
+}
+
+impl SoluteDriverScratch {
+    pub(crate) fn new(node_count: usize, species_count: usize, material_count: usize) -> Self {
+        let n = node_count;
+        let z = || vec![0.0_f32; n];
+        let z64 = || vec![0.0_f64; n];
+        let z_dr = || vec![DefaultReal(0.0); n];
+        Self {
+            backup_state: SoluteStepState::blank(n, species_count),
+            th_o_adj: z(),
+            th_n_adj: z(),
+            old_matrix_v: z(),
+            new_matrix_v: z(),
+            l1_disp: z(),
+            l1_retard: z(),
+            l1_g0: z(),
+            l1_g1: z(),
+            l2_disp: z(),
+            l2_retard: z(),
+            l2_g0: z(),
+            l2_g1: z(),
+            rows_old_rhs: z64(),
+            lower: z64(),
+            diag: z64(),
+            upper: z64(),
+            rhs: z64(),
+            mass_bufs: MassBufs {
+                x: z_dr(),
+                mat0: vec![0; n],
+                temp_o: z_dr(),
+                temp_n: z_dr(),
+                chpar: vec![vec![DefaultReal(0.0); species_count * 16 + 4]; material_count],
+                tdep: vec![DefaultReal(0.0); species_count * 16 + 4],
+                conc: z_dr(),
+                sorb: z_dr(),
+                sorb2: z_dr(),
+                q0: z_dr(),
+                q1: z_dr(),
+                s_sink: z_dr(),
+                th_o: z_dr(),
+                th_n: z_dr(),
+                v_o: z_dr(),
+                v_n: z_dr(),
+                sink_im: z_dr(),
+            },
+            endpoint: EndpointPrimitiveState {
+                coordinates: z_dr(),
+                old_water: z_dr(),
+                new_water: z_dr(),
+                old_velocity: z_dr(),
+                new_velocity: z_dr(),
+                old_matrix_velocity: z_dr(),
+                new_matrix_velocity: z_dr(),
+                old_dispersion: z_dr(),
+                new_dispersion: z_dr(),
+                old_retardation: z_dr(),
+                new_retardation: z_dr(),
+                old_concentration: z_dr(),
+                new_accepted_concentration: z_dr(),
+                material_immobile_water: vec![DefaultReal(0.0); material_count],
+                old_source_g0: z_dr(),
+                old_source_g1: z_dr(),
+                new_source_g0: z_dr(),
+                new_source_g1: z_dr(),
+                upwind_weight: vec![DefaultReal(0.0); n.saturating_sub(1)],
+                epsi: DefaultReal(0.0),
+                dt: DefaultReal(0.0),
+                alf: DefaultReal(0.0),
+                top_atmospheric_concentration: None,
+                top_surface_distance: None,
+                old_temperature: None,
+                new_temperature: None,
+                source_chpar: None,
+                source_tdep: None,
+                material_ids: vec![0; n],
+                source_species: 1,
+                mobile_immobile: vec![false; material_count],
+                bacteria: false,
+                dual_porosity: 0,
+                bottom_resistance: DefaultReal(0.0),
+                bottom_prescribed: DefaultReal(0.0),
+                top_prescribed: DefaultReal(0.0),
+                t_level: 0,
+                vapor: false,
+                r_min: DefaultReal(R_MIN),
+            },
+        }
+    }
 }
 
 fn validate(cfg: &SoluteStepConfig, st: &SoluteStepState) -> Result<(), KernelError> {
@@ -357,19 +547,37 @@ pub(crate) fn solute_step(
     cfg: &mut SoluteStepConfig,
     st: &mut SoluteStepState,
 ) -> Result<SoluteStepOutcome, KernelError> {
+    let mut scratch = SoluteDriverScratch::new(cfg.x.len(), cfg.species_count, cfg.th_sat.len());
+    solute_step_with_scratch(cfg, st, &mut scratch)
+}
+
+/// One full `Solute` call with caller-provided scratch buffers (zero heap allocations).
+pub(crate) fn solute_step_with_scratch(
+    cfg: &mut SoluteStepConfig,
+    st: &mut SoluteStepState,
+    scratch: &mut SoluteDriverScratch,
+) -> Result<SoluteStepOutcome, KernelError> {
     validate(cfg, st)?;
-    // Work on copies so an error leaves the caller's state and config untouched.
+    // Save backup copy in scratch so an error leaves the caller's state untouched.
+    scratch.backup_state.copy_from(st);
     let mut c = cfg.clone();
-    let mut s = st.clone();
-    s.trace.clear();
-    exclusion_call(&mut c, &mut s)?;
-    s.peclet = 0.0;
-    s.courant = 0.0;
-    s.dt_max_c = 1.0e30;
-    s.iter_c = 1;
-    let outcome = step_from(&c, &mut s, 0)?;
+    st.trace.clear();
+    if let Err(e) = exclusion_call(&mut c, st) {
+        st.copy_from(&scratch.backup_state);
+        return Err(e);
+    }
+    st.peclet = 0.0;
+    st.courant = 0.0;
+    st.dt_max_c = 1.0e30;
+    st.iter_c = 1;
+    let outcome = match step_from_with_scratch(&c, st, 0, scratch) {
+        Ok(out) => out,
+        Err(e) => {
+            st.copy_from(&scratch.backup_state);
+            return Err(e);
+        }
+    };
     *cfg = c;
-    *st = s;
     Ok(outcome)
 }
 
@@ -379,10 +587,26 @@ pub(crate) fn solute_step_from(
     st: &mut SoluteStepState,
     start: usize,
 ) -> Result<SoluteStepOutcome, KernelError> {
+    let mut scratch = SoluteDriverScratch::new(cfg.x.len(), cfg.species_count, cfg.th_sat.len());
+    solute_step_from_with_scratch(cfg, st, start, &mut scratch)
+}
+
+/// Continue the species loop from `start` with caller-provided scratch buffers.
+pub(crate) fn solute_step_from_with_scratch(
+    cfg: &SoluteStepConfig,
+    st: &mut SoluteStepState,
+    start: usize,
+    scratch: &mut SoluteDriverScratch,
+) -> Result<SoluteStepOutcome, KernelError> {
     validate(cfg, st)?;
-    let mut s = st.clone();
-    let outcome = step_from(cfg, &mut s, start)?;
-    *st = s;
+    scratch.backup_state.copy_from(st);
+    let outcome = match step_from_with_scratch(cfg, st, start, scratch) {
+        Ok(out) => out,
+        Err(e) => {
+            st.copy_from(&scratch.backup_state);
+            return Err(e);
+        }
+    };
     Ok(outcome)
 }
 
@@ -391,15 +615,28 @@ fn step_from(
     st: &mut SoluteStepState,
     start: usize,
 ) -> Result<SoluteStepOutcome, KernelError> {
+    let mut scratch = SoluteDriverScratch::new(cfg.x.len(), cfg.species_count, cfg.th_sat.len());
+    let mut s = st.clone();
+    let outcome = step_from_with_scratch(cfg, &mut s, start, &mut scratch)?;
+    *st = s;
+    Ok(outcome)
+}
+
+fn step_from_with_scratch(
+    cfg: &SoluteStepConfig,
+    working_st: &mut SoluteStepState,
+    start: usize,
+    scratch: &mut SoluteDriverScratch,
+) -> Result<SoluteStepOutcome, KernelError> {
     for js in start..cfg.species_count {
-        begin_species(cfg, st, js)?;
-        let pass = solve_pass(cfg, st, js, 1)?;
+        begin_species(cfg, working_st, js)?;
+        let pass = solve_pass_with_scratch(cfg, working_st, js, 1, scratch)?;
         if !cfg.linear[js] && !pass.converged {
             return Ok(SoluteStepOutcome { pending: Some(js) });
         }
-        finish_species(cfg, st, js, 1)?;
+        finish_species(cfg, working_st, js, 1)?;
     }
-    finish_step(cfg, st)?;
+    finish_step(cfg, working_st)?;
     Ok(SoluteStepOutcome { pending: None })
 }
 
@@ -504,32 +741,35 @@ struct LevelOut {
     dt_max: f32,
 }
 
-/// One `Coeff` call (`SOLUTE.FOR:241-750`), `Level` 1 (old) or 2 (new).
-// The block mirrors the source's single-routine local scope; splitting it would
-// obscure the statement order the tests pin.
-#[allow(clippy::too_many_lines, clippy::needless_range_loop)]
-fn coeff_level(
+#[derive(Clone, Copy, Debug, PartialEq)]
+struct LevelScalars {
+    peclet: f32,
+    courant: f32,
+    dt_max: f32,
+}
+
+/// One `Coeff` call (`SOLUTE.FOR:241-750`), `Level` 1 (old) or 2 (new), writing directly into buffers.
+#[allow(clippy::too_many_arguments, clippy::too_many_lines, clippy::needless_range_loop)]
+fn coeff_level_into(
     cfg: &SoluteStepConfig,
     st: &mut SoluteStepState,
     js: usize,
     level: u8,
     iter: u32,
-) -> Result<LevelOut, KernelError> {
+    disp: &mut [f32],
+    retard: &mut [f32],
+    g0: &mut [f32],
+    g1: &mut [f32],
+) -> Result<LevelScalars, KernelError> {
     let n = cfg.x.len();
     let fin = level == 2;
     let jjj = js * 16;
     let dt = st.dt;
     let epsi = cfg.epsi;
     let linear = cfg.linear[js];
-    let mut out = LevelOut {
-        disp: vec![0.0; n],
-        retard: vec![0.0; n],
-        g0: vec![0.0; n],
-        g1: vec![0.0; n],
-        peclet: 0.0,
-        courant: 0.0,
-        dt_max: 1.0e30,
-    };
+    let mut peclet = 0.0_f32;
+    let mut courant = 0.0_f32;
+    let mut dt_max = 1.0e30_f32;
     let spec = BacteriaSpec {
         species: js,
         species_count: cfg.species_count,
@@ -890,8 +1130,8 @@ fn coeff_level(
             dual_domain: cfg.dual_por > 0,
         };
         let tc = coefficients(node, dt, fin, cfg.art_disp, cfg.upwind, cfg.pe_cr);
-        out.retard[i] = tc.retardation;
-        out.disp[i] = tc.dispersion;
+        retard[i] = tc.retardation;
+        disp[i] = tc.dispersion;
 
         // NEquil (631-641).
         let (mut ssorb, mut ssorb2, mut fl_macro) = (0.0_f32, 0.0_f32, 0.0_f32);
@@ -1057,8 +1297,8 @@ fn coeff_level(
             c_mid: iso.c_mid,
             chain,
         });
-        out.g0[i] = terms.g0;
-        out.g1[i] = terms.g1;
+        g0[i] = terms.g0;
+        g1[i] = terms.g1;
         st.q0[i] = terms.q0;
         st.q1[i] = terms.q1;
 
@@ -1091,10 +1331,10 @@ fn coeff_level(
                 neighbor_velocity: vj,
                 water: th_w,
                 neighbor_water: th_j.unwrap_or(0.0),
-                dispersion: out.disp[i],
-                neighbor_dispersion: out.disp[j],
-                retardation: out.retard[i],
-                neighbor_retardation: out.retard[j],
+                dispersion: disp[i],
+                neighbor_dispersion: disp[j],
+                retardation: retard[i],
+                neighbor_retardation: retard[j],
                 upstream_weighting: cfg.upwind,
                 artificial_dispersion: cfg.art_disp,
                 level_is_new: fin,
@@ -1103,30 +1343,72 @@ fn coeff_level(
                 threshold: cfg.pe_cr,
             });
             if fin {
-                out.peclet = out.peclet.max(pc.peclet_max);
-                out.courant = out.courant.max(pc.courant_max);
-                out.dt_max = out.dt_max.min(pc.dt_max);
+                peclet = peclet.max(pc.peclet_max);
+                courant = courant.max(pc.courant_max);
+                dt_max = dt_max.min(pc.dt_max);
             } else if let Some(w) = pc.weight {
                 st.wc[i] = w;
             }
         }
     }
-    Ok(out)
+    Ok(LevelScalars {
+        peclet,
+        courant,
+        dt_max,
+    })
+}
+
+fn coeff_level(
+    cfg: &SoluteStepConfig,
+    st: &mut SoluteStepState,
+    js: usize,
+    level: u8,
+    iter: u32,
+) -> Result<LevelOut, KernelError> {
+    let n = cfg.x.len();
+    let mut disp = vec![0.0_f32; n];
+    let mut retard = vec![0.0_f32; n];
+    let mut g0 = vec![0.0_f32; n];
+    let mut g1 = vec![0.0_f32; n];
+    let scalars = coeff_level_into(
+        cfg,
+        st,
+        js,
+        level,
+        iter,
+        &mut disp,
+        &mut retard,
+        &mut g0,
+        &mut g1,
+    )?;
+    Ok(LevelOut {
+        disp,
+        retard,
+        g0,
+        g1,
+        peclet: scalars.peclet,
+        courant: scalars.courant,
+        dt_max: scalars.dt_max,
+    })
 }
 
 /// `MatSet` water adjustment (`768-776`), applied to the interior rows only; the
 /// endpoint kernel applies it itself.
+fn adjusted_into(cfg: &SoluteStepConfig, th: &[f32], dst: &mut [f32]) {
+    for (i, d) in dst.iter_mut().enumerate().take(th.len()) {
+        let m = cfg.mat_num[i] - 1;
+        *d = if cfg.mobile_immobile[m] && cfg.dual_por == 0 || cfg.bact {
+            (th[i] - cfg.ch_par[m][3]).max(0.001)
+        } else {
+            th[i]
+        };
+    }
+}
+
 fn adjusted(cfg: &SoluteStepConfig, th: &[f32]) -> Vec<f32> {
-    (0..th.len())
-        .map(|i| {
-            let m = cfg.mat_num[i] - 1;
-            if cfg.mobile_immobile[m] && cfg.dual_por == 0 || cfg.bact {
-                (th[i] - cfg.ch_par[m][3]).max(0.001)
-            } else {
-                th[i]
-            }
-        })
-        .collect()
+    let mut out = vec![0.0_f32; th.len()];
+    adjusted_into(cfg, th, &mut out);
+    out
 }
 
 fn mass_tran_input<'a>(
@@ -1165,64 +1447,119 @@ fn mass_tran_input<'a>(
 }
 
 /// Owned `DefaultReal` views of the arrays a `MassTran` call reads.
-struct MassBufs {
-    x: Vec<DefaultReal>,
-    mat0: Vec<usize>,
-    temp_o: Vec<DefaultReal>,
-    temp_n: Vec<DefaultReal>,
-    chpar: Vec<Vec<DefaultReal>>,
-    tdep: Vec<DefaultReal>,
-    conc: Vec<DefaultReal>,
-    sorb: Vec<DefaultReal>,
-    sorb2: Vec<DefaultReal>,
-    q0: Vec<DefaultReal>,
-    q1: Vec<DefaultReal>,
-    s_sink: Vec<DefaultReal>,
-    th_o: Vec<DefaultReal>,
-    th_n: Vec<DefaultReal>,
-    v_o: Vec<DefaultReal>,
-    v_n: Vec<DefaultReal>,
-    sink_im: Vec<DefaultReal>,
+pub(crate) struct MassBufs {
+    pub(crate) x: Vec<DefaultReal>,
+    pub(crate) mat0: Vec<usize>,
+    pub(crate) temp_o: Vec<DefaultReal>,
+    pub(crate) temp_n: Vec<DefaultReal>,
+    pub(crate) chpar: Vec<Vec<DefaultReal>>,
+    pub(crate) tdep: Vec<DefaultReal>,
+    pub(crate) conc: Vec<DefaultReal>,
+    pub(crate) sorb: Vec<DefaultReal>,
+    pub(crate) sorb2: Vec<DefaultReal>,
+    pub(crate) q0: Vec<DefaultReal>,
+    pub(crate) q1: Vec<DefaultReal>,
+    pub(crate) s_sink: Vec<DefaultReal>,
+    pub(crate) th_o: Vec<DefaultReal>,
+    pub(crate) th_n: Vec<DefaultReal>,
+    pub(crate) v_o: Vec<DefaultReal>,
+    pub(crate) v_n: Vec<DefaultReal>,
+    pub(crate) sink_im: Vec<DefaultReal>,
 }
 
-fn mass_bufs(cfg: &SoluteStepConfig, st: &SoluteStepState, js: usize) -> MassBufs {
-    MassBufs {
-        x: dr(&cfg.x),
-        mat0: cfg.mat_num.iter().map(|m| m - 1).collect(),
-        temp_o: dr(&st.temp_o),
-        temp_n: dr(&st.temp_n),
-        chpar: cfg.ch_par.iter().map(|r| dr(r)).collect(),
-        tdep: dr(&cfg.t_dep),
-        conc: dr(&st.conc[js]),
-        sorb: dr(&st.sorb[js]),
-        sorb2: dr(&st.sorb2[js]),
-        q0: dr(&st.q0),
-        q1: dr(&st.q1),
-        s_sink: dr(&st.s_sink),
-        th_o: dr(&st.th_o),
-        th_n: dr(&st.th_n),
-        v_o: dr(&st.v_o),
-        v_n: dr(&st.v_n),
-        sink_im: dr(&st.sink_im),
+fn copy_slice_dr(dst: &mut [DefaultReal], src: &[f32]) {
+    for (d, &s) in dst.iter_mut().zip(src) {
+        *d = DefaultReal(s);
     }
 }
 
+fn mass_bufs_into(cfg: &SoluteStepConfig, st: &SoluteStepState, js: usize, bufs: &mut MassBufs) {
+    copy_slice_dr(&mut bufs.x, &cfg.x);
+    for (d, &m) in bufs.mat0.iter_mut().zip(&cfg.mat_num) {
+        *d = m - 1;
+    }
+    copy_slice_dr(&mut bufs.temp_o, &st.temp_o);
+    copy_slice_dr(&mut bufs.temp_n, &st.temp_n);
+    for (d_row, s_row) in bufs.chpar.iter_mut().zip(&cfg.ch_par) {
+        copy_slice_dr(d_row, s_row);
+    }
+    copy_slice_dr(&mut bufs.tdep, &cfg.t_dep);
+    copy_slice_dr(&mut bufs.conc, &st.conc[js]);
+    copy_slice_dr(&mut bufs.sorb, &st.sorb[js]);
+    copy_slice_dr(&mut bufs.sorb2, &st.sorb2[js]);
+    copy_slice_dr(&mut bufs.q0, &st.q0);
+    copy_slice_dr(&mut bufs.q1, &st.q1);
+    copy_slice_dr(&mut bufs.s_sink, &st.s_sink);
+    copy_slice_dr(&mut bufs.th_o, &st.th_o);
+    copy_slice_dr(&mut bufs.th_n, &st.th_n);
+    copy_slice_dr(&mut bufs.v_o, &st.v_o);
+    copy_slice_dr(&mut bufs.v_n, &st.v_n);
+    copy_slice_dr(&mut bufs.sink_im, &st.sink_im);
+}
+
+fn mass_bufs(cfg: &SoluteStepConfig, st: &SoluteStepState, js: usize) -> MassBufs {
+    let mut bufs = MassBufs {
+        x: vec![DefaultReal(0.0); cfg.x.len()],
+        mat0: vec![0; cfg.x.len()],
+        temp_o: vec![DefaultReal(0.0); cfg.x.len()],
+        temp_n: vec![DefaultReal(0.0); cfg.x.len()],
+        chpar: vec![vec![DefaultReal(0.0); cfg.ch_par[0].len()]; cfg.ch_par.len()],
+        tdep: vec![DefaultReal(0.0); cfg.t_dep.len()],
+        conc: vec![DefaultReal(0.0); cfg.x.len()],
+        sorb: vec![DefaultReal(0.0); cfg.x.len()],
+        sorb2: vec![DefaultReal(0.0); cfg.x.len()],
+        q0: vec![DefaultReal(0.0); cfg.x.len()],
+        q1: vec![DefaultReal(0.0); cfg.x.len()],
+        s_sink: vec![DefaultReal(0.0); cfg.x.len()],
+        th_o: vec![DefaultReal(0.0); cfg.x.len()],
+        th_n: vec![DefaultReal(0.0); cfg.x.len()],
+        v_o: vec![DefaultReal(0.0); cfg.x.len()],
+        v_n: vec![DefaultReal(0.0); cfg.x.len()],
+        sink_im: vec![DefaultReal(0.0); cfg.x.len()],
+    };
+    mass_bufs_into(cfg, st, js, &mut bufs);
+    bufs
+}
+
 fn sync_s_trans_in(st: &mut SoluteStepState) {
-    st.totals.s_trans = dr(&st.s_trans);
+    if st.totals.s_trans.len() == st.s_trans.len() {
+        for (d, &s) in st.totals.s_trans.iter_mut().zip(&st.s_trans) {
+            *d = DefaultReal(s);
+        }
+    } else {
+        st.totals.s_trans = dr(&st.s_trans);
+    }
 }
 
 fn sync_s_trans_out(st: &mut SoluteStepState) {
-    st.s_trans = st.totals.s_trans.iter().map(|d| d.0).collect();
+    if st.s_trans.len() == st.totals.s_trans.len() {
+        for (s, d) in st.s_trans.iter_mut().zip(&st.totals.s_trans) {
+            *s = d.0;
+        }
+    } else {
+        st.s_trans = st.totals.s_trans.iter().map(|d| d.0).collect();
+    }
 }
 
 /// One execution of labels 12-16 for species `js`.
-// Mirrors the source's single loop; see `coeff_level`.
-#[allow(clippy::too_many_lines, clippy::needless_range_loop)]
 pub(crate) fn solve_pass(
     cfg: &SoluteStepConfig,
     st: &mut SoluteStepState,
     js: usize,
     iter: u32,
+) -> Result<PassOutcome, KernelError> {
+    let mut scratch = SoluteDriverScratch::new(cfg.x.len(), cfg.species_count, cfg.th_sat.len());
+    solve_pass_with_scratch(cfg, st, js, iter, &mut scratch)
+}
+
+/// One execution of labels 12-16 for species `js` with preallocated scratch (zero heap allocations).
+#[allow(clippy::too_many_lines, clippy::needless_range_loop)]
+pub(crate) fn solve_pass_with_scratch(
+    cfg: &SoluteStepConfig,
+    st: &mut SoluteStepState,
+    js: usize,
+    iter: u32,
+    scratch: &mut SoluteDriverScratch,
 ) -> Result<PassOutcome, KernelError> {
     validate(cfg, st)?;
     if st.frame.is_none() {
@@ -1232,35 +1569,50 @@ pub(crate) fn solve_pass(
     let alf = 1.0 - cfg.epsi;
     let linear = cfg.linear[js];
     if !linear {
-        st.c_temp = st.c_new.clone();
+        st.c_temp.copy_from_slice(&st.c_new);
     }
 
     // ---- Level 1 ----
-    let l1 = coeff_level(cfg, st, js, 1, iter)?;
+    let _l1 = coeff_level_into(
+        cfg,
+        st,
+        js,
+        1,
+        iter,
+        &mut scratch.l1_disp,
+        &mut scratch.l1_retard,
+        &mut scratch.l1_g0,
+        &mut scratch.l1_g1,
+    )?;
     st.trace.push(DriverEvent::Coeff(js, 1));
-    let th_o_adj = adjusted(cfg, &st.th_o);
-    let th_n_adj = adjusted(cfg, &st.th_n);
-    let old_matrix_v = st.v_o.clone();
-    let new_unmodified_v = st.v_n.clone();
-    let rows_old = assemble_interior(
+    adjusted_into(cfg, &st.th_o, &mut scratch.th_o_adj);
+    adjusted_into(cfg, &st.th_n, &mut scratch.th_n_adj);
+    scratch.old_matrix_v.copy_from_slice(&st.v_o);
+    scratch.new_matrix_v.copy_from_slice(&st.v_n);
+
+    scratch.rows_old_rhs.fill(0.0);
+    assemble_interior_into(
         AssemblyInputs {
             x: &cfg.x,
-            theta_old: &th_o_adj,
-            theta_new: &th_n_adj,
-            velocity_old: &old_matrix_v,
-            velocity_new: &new_unmodified_v,
+            theta_old: &scratch.th_o_adj,
+            theta_new: &scratch.th_n_adj,
+            velocity_old: &scratch.old_matrix_v,
+            velocity_new: &scratch.new_matrix_v,
             concentration: &st.conc[js],
-            dispersion: &l1.disp,
-            retardation: &l1.retard,
+            dispersion: &scratch.l1_disp,
+            retardation: &scratch.l1_retard,
             upstream_weight: &st.wc,
-            g0: &l1.g0,
-            g1: &l1.g1,
+            g0: &scratch.l1_g0,
+            g1: &scratch.l1_g1,
         },
         AssemblyLevel::Old,
         cfg.epsi,
         alf,
         st.dt,
-        EndpointAssemblySeam { rhs: vec![0.0; n] },
+        &mut scratch.lower,
+        &mut scratch.diag,
+        &mut scratch.upper,
+        &mut scratch.rows_old_rhs,
     )?;
     st.trace.push(DriverEvent::MatSet(js, 1));
     for i in 0..n {
@@ -1269,11 +1621,11 @@ pub(crate) fn solve_pass(
     // Beginning MassTran (135-140): old temperature, water, velocity and pools, weight alf.
     {
         sync_s_trans_in(st);
-        let bufs = mass_bufs(cfg, st, js);
-        let input = mass_tran_input(cfg, js, &bufs, true);
-        let mut totals = st.totals.clone();
-        let ran = totals.accumulate_step_start(1, iter, &input, DefaultReal(alf))?;
-        st.totals = totals;
+        mass_bufs_into(cfg, st, js, &mut scratch.mass_bufs);
+        let input = mass_tran_input(cfg, js, &scratch.mass_bufs, true);
+        let ran = st
+            .totals
+            .accumulate_step_start(1, iter, &input, DefaultReal(alf))?;
         sync_s_trans_out(st);
         if ran {
             st.trace.push(DriverEvent::MassTranBegin(js));
@@ -1281,31 +1633,46 @@ pub(crate) fn solve_pass(
     }
 
     // ---- Level 2 ----
-    let l2 = coeff_level(cfg, st, js, 2, iter)?;
+    let l2 = coeff_level_into(
+        cfg,
+        st,
+        js,
+        2,
+        iter,
+        &mut scratch.l2_disp,
+        &mut scratch.l2_retard,
+        &mut scratch.l2_g0,
+        &mut scratch.l2_g1,
+    )?;
     st.trace.push(DriverEvent::Coeff(js, 2));
     st.peclet = st.peclet.max(l2.peclet);
     st.courant = st.courant.max(l2.courant);
     st.dt_max_c = st.dt_max_c.min(l2.dt_max);
-    let new_matrix_v = st.v_n.clone();
-    let rows_new = assemble_interior(
+    scratch.new_matrix_v.copy_from_slice(&st.v_n);
+
+    scratch.rhs.copy_from_slice(&scratch.rows_old_rhs);
+    assemble_interior_into(
         AssemblyInputs {
             x: &cfg.x,
-            theta_old: &th_o_adj,
-            theta_new: &th_n_adj,
+            theta_old: &scratch.th_o_adj,
+            theta_new: &scratch.th_n_adj,
             velocity_old: &st.v_o,
-            velocity_new: &new_matrix_v,
+            velocity_new: &scratch.new_matrix_v,
             concentration: &st.conc[js],
-            dispersion: &l2.disp,
-            retardation: &l2.retard,
+            dispersion: &scratch.l2_disp,
+            retardation: &scratch.l2_retard,
             upstream_weight: &st.wc,
-            g0: &l2.g0,
-            g1: &l2.g1,
+            g0: &scratch.l2_g0,
+            g1: &scratch.l2_g1,
         },
         AssemblyLevel::New,
         cfg.epsi,
         alf,
         st.dt,
-        EndpointAssemblySeam { rhs: rows_old.rhs },
+        &mut scratch.lower,
+        &mut scratch.diag,
+        &mut scratch.upper,
+        &mut scratch.rhs,
     )?;
     for i in 0..n {
         st.v_n[i] += st.v_corr[i];
@@ -1314,73 +1681,76 @@ pub(crate) fn solve_pass(
     let jjj = js * 16;
     let top_atm = cfg.k_top == -2;
     let frame = st.frame.as_ref().expect("checked above");
-    let ep = EndpointPrimitiveState {
-        coordinates: dr(&cfg.x),
-        old_water: dr(&st.th_o),
-        new_water: dr(&st.th_n),
-        old_velocity: dr(&frame.v_o0),
-        new_velocity: dr(&st.v_n),
-        old_matrix_velocity: dr(&old_matrix_v),
-        new_matrix_velocity: dr(&new_matrix_v),
-        old_dispersion: dr(&l1.disp),
-        new_dispersion: dr(&l2.disp),
-        old_retardation: dr(&l1.retard),
-        new_retardation: dr(&l2.retard),
-        old_concentration: dr(&frame.conc0),
-        new_accepted_concentration: dr(&frame.conc0),
-        material_immobile_water: cfg.ch_par.iter().map(|r| DefaultReal(r[3])).collect(),
-        old_source_g0: dr(&l1.g0),
-        old_source_g1: dr(&l1.g1),
-        new_source_g0: dr(&l2.g0),
-        new_source_g1: dr(&l2.g1),
-        upwind_weight: dr(&st.wc[..n - 1]),
-        epsi: DefaultReal(cfg.epsi),
-        dt: DefaultReal(st.dt),
-        alf: DefaultReal(alf),
-        top_atmospheric_concentration: top_atm.then_some(DefaultReal(cfg.c_atm)),
-        top_surface_distance: top_atm.then_some(DefaultReal(cfg.d_surf)),
-        old_temperature: top_atm.then_some(DefaultReal(st.temp_o[n - 1])),
-        new_temperature: top_atm.then_some(DefaultReal(st.temp_n[n - 1])),
-        source_chpar: top_atm.then(|| {
-            cfg.ch_par
-                .iter()
-                .enumerate()
-                .map(|(m, r)| MaterialSpeciesParameters {
-                    species: js + 1,
-                    material: m + 1,
-                    slots: dr(&r[jjj..jjj + 20]),
-                })
-                .collect()
-        }),
-        source_tdep: top_atm.then(|| dr(&cfg.t_dep)),
-        material_ids: cfg.mat_num.clone(),
-        source_species: js + 1,
-        mobile_immobile: cfg.mobile_immobile.clone(),
-        bacteria: cfg.bact,
-        dual_porosity: cfg.dual_por,
-        bottom_resistance: DefaultReal(cfg.r_bot),
-        bottom_prescribed: DefaultReal(st.c_bot[js]),
-        top_prescribed: DefaultReal(st.c_top[js]),
-        t_level: cfg.t_level,
-        vapor: cfg.vapor,
-        r_min: DefaultReal(R_MIN),
-    };
-    let ends = assemble_endpoints(&ep, cfg.k_bot, cfg.k_top)?;
+    let ep = &mut scratch.endpoint;
+    copy_slice_dr(&mut ep.coordinates, &cfg.x);
+    copy_slice_dr(&mut ep.old_water, &st.th_o);
+    copy_slice_dr(&mut ep.new_water, &st.th_n);
+    copy_slice_dr(&mut ep.old_velocity, &frame.v_o0);
+    copy_slice_dr(&mut ep.new_velocity, &st.v_n);
+    copy_slice_dr(&mut ep.old_matrix_velocity, &scratch.old_matrix_v);
+    copy_slice_dr(&mut ep.new_matrix_velocity, &scratch.new_matrix_v);
+    copy_slice_dr(&mut ep.old_dispersion, &scratch.l1_disp);
+    copy_slice_dr(&mut ep.new_dispersion, &scratch.l2_disp);
+    copy_slice_dr(&mut ep.old_retardation, &scratch.l1_retard);
+    copy_slice_dr(&mut ep.new_retardation, &scratch.l2_retard);
+    copy_slice_dr(&mut ep.old_concentration, &frame.conc0);
+    copy_slice_dr(&mut ep.new_accepted_concentration, &frame.conc0);
+    for (d, r) in ep.material_immobile_water.iter_mut().zip(&cfg.ch_par) {
+        *d = DefaultReal(r[3]);
+    }
+    copy_slice_dr(&mut ep.old_source_g0, &scratch.l1_g0);
+    copy_slice_dr(&mut ep.old_source_g1, &scratch.l1_g1);
+    copy_slice_dr(&mut ep.new_source_g0, &scratch.l2_g0);
+    copy_slice_dr(&mut ep.new_source_g1, &scratch.l2_g1);
+    copy_slice_dr(&mut ep.upwind_weight, &st.wc[..n - 1]);
+    ep.epsi = DefaultReal(cfg.epsi);
+    ep.dt = DefaultReal(st.dt);
+    ep.alf = DefaultReal(alf);
+    ep.top_atmospheric_concentration = top_atm.then_some(DefaultReal(cfg.c_atm));
+    ep.top_surface_distance = top_atm.then_some(DefaultReal(cfg.d_surf));
+    ep.old_temperature = top_atm.then_some(DefaultReal(st.temp_o[n - 1]));
+    ep.new_temperature = top_atm.then_some(DefaultReal(st.temp_n[n - 1]));
+    ep.source_chpar = top_atm.then(|| {
+        cfg.ch_par
+            .iter()
+            .enumerate()
+            .map(|(m, r)| MaterialSpeciesParameters {
+                species: js + 1,
+                material: m + 1,
+                slots: dr(&r[jjj..jjj + 20]),
+            })
+            .collect()
+    });
+    ep.source_tdep = top_atm.then(|| dr(&cfg.t_dep));
+    ep.material_ids.copy_from_slice(&cfg.mat_num);
+    ep.source_species = js + 1;
+    ep.mobile_immobile.copy_from_slice(&cfg.mobile_immobile);
+    ep.bacteria = cfg.bact;
+    ep.dual_porosity = cfg.dual_por;
+    ep.bottom_resistance = DefaultReal(cfg.r_bot);
+    ep.bottom_prescribed = DefaultReal(st.c_bot[js]);
+    ep.top_prescribed = DefaultReal(st.c_top[js]);
+    ep.t_level = cfg.t_level;
+    ep.vapor = cfg.vapor;
+    ep.r_min = DefaultReal(R_MIN);
+
+    let ends = assemble_endpoints(ep, cfg.k_bot, cfg.k_top)?;
     st.trace.push(DriverEvent::MatSet(js, 2));
 
-    let mut lower = rows_new.lower;
-    let mut diag = rows_new.diagonal;
-    let mut upper = rows_new.upper;
-    let mut rhs = rows_new.rhs;
     for (idx, row) in [(0, ends.lower.assembled), (n - 1, ends.upper.assembled)] {
-        lower[idx] = row.lower;
-        diag[idx] = row.diagonal;
-        upper[idx] = row.upper;
-        rhs[idx] = row.rhs;
+        scratch.lower[idx] = row.lower;
+        scratch.diag[idx] = row.diagonal;
+        scratch.upper[idx] = row.upper;
+        scratch.rhs[idx] = row.rhs;
     }
-    ban_solve(&mut lower, &mut diag, &mut upper, &mut rhs)?;
+    ban_solve(
+        &mut scratch.lower,
+        &mut scratch.diag,
+        &mut scratch.upper,
+        &mut scratch.rhs,
+    )?;
     st.trace.push(DriverEvent::BanSol(js));
-    st.frame.as_mut().expect("checked above").endpoint = Some(ep);
+    st.frame.as_mut().expect("checked above").endpoint = Some(ep.clone());
 
     // Convergence test and Conc update (151-179).
     let mut converged = true;
@@ -1388,7 +1758,7 @@ pub(crate) fn solve_pass(
         if (cfg.species_count > 1 && iter == 1) || cfg.density {
             st.c_prev_o[i] = st.conc[js][i];
         }
-        let f = rhs[i] as f32;
+        let f = scratch.rhs[i] as f32;
         if linear {
             let mut c = if f > 0.0 { f } else { 0.0 };
             if c < 1.0e-30 && c > 0.0 {
