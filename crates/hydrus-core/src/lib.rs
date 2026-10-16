@@ -30,6 +30,7 @@ pub use solute::{
     SoluteEndpoint, SoluteSpecies, SoluteState, SoluteStepError, SoluteTransportInput, SoluteUnits,
     SoluteWorkspace,
 };
+pub use solute_fortran_compat::compat_runner::{run_compat_deck, CompatRunOutputs};
 pub use water_solver::{
     advance_water_step, UpperBoundary, WaterBalance, WaterProductConfig, WaterStepInput,
     WaterStepPolicy, WaterStepReport,

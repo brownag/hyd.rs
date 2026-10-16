@@ -179,8 +179,8 @@ struct Wire<T> {
     value: Option<T>,
     availability: Option<String>,
     reason: Option<String>,
-    #[allow(dead_code)]
-    provenance: Option<IgnoredAny>,
+    #[serde(rename = "provenance")]
+    _provenance: Option<IgnoredAny>,
 }
 
 fn no_value<T>() -> Option<T> {

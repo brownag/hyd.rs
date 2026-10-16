@@ -27,7 +27,6 @@ use crate::solute_fortran_compat::driver::{
 use crate::solute_fortran_compat::types::KernelError;
 
 /// Configuration parameters governing nonlinear iteration and convergence.
-#[allow(dead_code)] // wired by 18.12.1
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) struct NonlinearConfig {
     /// `MaxItC`: maximum number of nonlinear iterations before timestep reduction.
@@ -55,7 +54,6 @@ impl Default for NonlinearConfig {
 }
 
 /// Convergence check report for one iteration pass.
-#[allow(dead_code)] // wired by 18.12.1
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) struct ConvergenceCheck {
     /// True if all nodes satisfy the absolute/relative tolerance condition.
@@ -84,7 +82,6 @@ pub(crate) struct ConvergenceCheck {
 /// - `ChPar(9)` is index 8
 /// - `ChPar(15)` is index 14
 /// - `ChPar(18)` is index 17
-#[allow(dead_code)] // wired by 18.12.1
 pub(crate) fn check_linear_predicate(ch_par_row: &[f32], is_bact: bool) -> bool {
     if ch_par_row.len() < 9 {
         return true;
@@ -114,7 +111,6 @@ pub(crate) fn check_linear_predicate(ch_par_row: &[f32], is_bact: bool) -> bool 
 ///  !    lConv=.false.
 /// 16 continue
 /// ```
-#[allow(dead_code)] // wired by 18.12.1
 pub(crate) fn evaluate_convergence(
     c_new: &[f32],
     c_temp: &[f32],
@@ -142,7 +138,6 @@ pub(crate) fn evaluate_convergence(
 }
 
 /// Outcome of attempting iteration for a single species.
-#[allow(dead_code)] // wired by 18.12.1
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) enum SpeciesIterationOutcome {
     /// Converged within `iterations`.
@@ -155,7 +150,6 @@ pub(crate) enum SpeciesIterationOutcome {
 ///
 /// If `cfg.linear[js]` is true, this executes exactly one iteration pass.
 /// If `!cfg.linear[js]`, it iterates up to `nonlin_cfg.max_it_c`.
-#[allow(dead_code)] // wired by 18.12.1
 pub(crate) fn step_nonlinear_species(
     cfg: &SoluteStepConfig,
     st: &mut SoluteStepState,
@@ -199,7 +193,6 @@ pub(crate) fn step_nonlinear_species_with_scratch(
 }
 
 /// Outcome of the overall solute iteration solve.
-#[allow(dead_code)] // wired by 18.12.1
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) struct SoluteIterationReport {
     /// Total number of timestep reductions performed.
@@ -214,7 +207,6 @@ pub(crate) struct SoluteIterationReport {
 
 /// Execute the full solute step with nonlinear iteration, timestep reduction retry,
 /// and rollback/commit sequencing matching `SOLUTE.FOR:10-226`.
-#[allow(dead_code)] // wired by 18.12.1
 pub(crate) fn solve_solute_with_nonlinear(
     cfg: &mut SoluteStepConfig,
     st: &mut SoluteStepState,
