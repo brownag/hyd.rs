@@ -705,6 +705,81 @@ class ParityTests(unittest.TestCase):
                     "--task-root", str(task_root / "err-run"),
                 ])
 
+    def test_rust_candidate_adapter_does_not_import_or_call_fortran_reference(self):
+        from tools import solute_rust_candidate_adapter
+        import sys
+
+        fixture_manifest = parity.ROOT / "reference/fortran_reference/solute/parity/reactions/single_equilibrium_linear/CASE.json"
+        task_root = self.root / "candidate-no-fortran"
+
+        def forbidden_run_fixture(*args, **kwargs):
+            raise AssertionError("Fortran runner must not be called by Rust candidate adapter")
+
+        with patch("tools.run_fortran_reference.run_fixture", side_effect=forbidden_run_fixture):
+            res = solute_rust_candidate_adapter.run_candidate(fixture_manifest, task_root)
+            self.assertTrue(res["complete"])
+            self.assertEqual(res["backend"], "fortran-compatible")
+            self.assertGreater(len(res["observations"]), 0)
+
+    def test_rust_candidate_adapter_rejects_tampered_request_sha256_and_inputs(self):
+        from tools import solute_rust_candidate_adapter
+        import shutil
+
+        # Copy valid fixture to mutable directory
+        fixture_source_dir = parity.ROOT / "reference/fortran_reference/solute/parity/reactions/single_equilibrium_linear"
+        test_fixture_dir = self.root / "tamper-fixture"
+        shutil.copytree(fixture_source_dir, test_fixture_dir)
+
+        manifest_path = test_fixture_dir / "CASE.json"
+        case_data = json.loads(manifest_path.read_text(encoding="utf-8"))
+
+        # 1. Tamper request_sha256
+        tampered_case = dict(case_data)
+        tampered_case["request_sha256"] = "0" * 64
+        manifest_path.write_text(json.dumps(tampered_case), encoding="utf-8")
+        task_root = self.root / "cand-tamper-req"
+        with self.assertRaisesRegex(ValueError, "tampered request_sha256"):
+            solute_rust_candidate_adapter.run_candidate(manifest_path, task_root)
+
+        # Restore request_sha256
+        manifest_path.write_text(json.dumps(case_data), encoding="utf-8")
+
+        # 2. Tamper input file SELECTOR.IN
+        (test_fixture_dir / "SELECTOR.IN").write_text("tampered selector content\n", encoding="utf-8")
+        task_root = self.root / "cand-tamper-sel"
+        with self.assertRaisesRegex(ValueError, "tampered input file SELECTOR.IN"):
+            solute_rust_candidate_adapter.run_candidate(manifest_path, task_root)
+
+        # Restore SELECTOR.IN and tamper PROFILE.DAT
+        shutil.copyfile(fixture_source_dir / "SELECTOR.IN", test_fixture_dir / "SELECTOR.IN")
+        (test_fixture_dir / "PROFILE.DAT").write_text("tampered profile content\n", encoding="utf-8")
+        task_root = self.root / "cand-tamper-prof"
+        with self.assertRaisesRegex(ValueError, "tampered input file PROFILE.DAT"):
+            solute_rust_candidate_adapter.run_candidate(manifest_path, task_root)
+
+    def test_rust_candidate_adapter_executes_rust_harness_and_normalizes_outputs(self):
+        from tools import solute_rust_candidate_adapter
+
+        fixture_manifest = parity.ROOT / "reference/fortran_reference/solute/parity/reactions/single_equilibrium_linear/CASE.json"
+        task_root = self.root / "cand-genuine-run"
+
+        res = solute_rust_candidate_adapter.run_candidate(fixture_manifest, task_root)
+        self.assertTrue(res["complete"])
+        self.assertEqual(res["backend"], "fortran-compatible")
+        self.assertEqual(res["fixture_id"], "single_equilibrium_linear")
+        self.assertTrue((task_root / "candidate_observations.json").is_file())
+        self.assertTrue((task_root / "candidate_run_manifest.json").is_file())
+        self.assertTrue((task_root / "rust_candidate_run" / "run-manifest.json").is_file())
+
+        obs = res["observations"]
+        self.assertGreater(len(obs), 0)
+        self.assertTrue(all(item.get("source") == "rust-fortran-compatible" for item in obs))
+
+        # Validate with parity validator
+        fixture_data = json.loads(fixture_manifest.read_text(encoding="utf-8"))
+        validated = parity._validate_candidate_result(res, task_root, fixture_data)
+        self.assertIs(validated, res)
+
 
 if __name__ == "__main__":
     unittest.main()
