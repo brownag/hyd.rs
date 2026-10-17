@@ -30,7 +30,7 @@ Plan: [EXECUTION_PLAN_20.md](EXECUTION_PLAN_20.md). Worker template: [PROMPT_TEM
 | 3 | 20.3.2 | Source-precision `WatFlow`, `DualPor`, `SetMat`, `Veloc`, and `TmCont` port | done |
 | 3 | 20.3.3 | Source-precision `OUTPUT.FOR` table formatters (`Profil`, `NodOut`, `TLInf`, `ObsNod`, `SubReg`) | done |
 | 4 | 20.4.1 | Full-run compatibility runner and removal of all `dead_code` allowances | done |
-| 5 | 20.5.1 | Replace `solute_rust_candidate_adapter.py` with genuine Rust candidate execution | pending |
+| 5 | 20.5.1 | Replace `solute_rust_candidate_adapter.py` with genuine Rust candidate execution | done |
 | 6 | 20.6.1 | Execute 44-fixture all-mode Rust-vs-Fortran parity gate and update evidence | pending |
 | 7 | 20.7.1 | Switch default backend to `FortranCompatible` after 44/44 parity gate | pending |
 
@@ -65,6 +65,14 @@ Plan: [EXECUTION_PLAN_20.md](EXECUTION_PLAN_20.md). Worker template: [PROMPT_TEM
   - `cargo clippy --workspace --all-targets -- -D warnings`: Clean (0 warnings).
   - `git diff --check`: Clean.
   - `POLICY_HASHES` re-pin: None (`solute.rs` was not modified in Wave 4).
+- **Wave 5 gate (2026-10-16):**
+  - `cargo test --workspace`: **407 passed**, 0 failed, **1 ignored** (`dump_parsed_fixtures`).
+  - `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest discover -s tools -p 'test_*.py'`: **317 passed** (was 314; +3 genuine candidate adapter tests), 0 failed (`OK`).
+  - `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest tools.test_solute_fortran_parity`: **20 passed** (was 17), 0 failed (`OK`).
+  - `cargo fmt --all -- --check`: Clean (0 diffs).
+  - `cargo clippy --workspace --all-targets -- -D warnings`: Clean (0 warnings).
+  - `git diff --check`: Clean.
+  - `POLICY_HASHES` re-pin: None (`solute.rs` was not modified in Wave 5).
 
 ## Task reports
 
@@ -121,5 +129,12 @@ Plan: [EXECUTION_PLAN_20.md](EXECUTION_PLAN_20.md). Worker template: [PROMPT_TEM
 - **Files changed:** `crates/hydrus-core/src/lib.rs`, `crates/hydrus-core/src/solute_fortran_compat/compat_runner.rs`, `crates/hydrus-core/src/solute_fortran_compat/mod.rs`, `crates/hydrus-core/src/solute_fortran_compat/iteration.rs`, `crates/hydrus-core/src/solute_fortran_compat/types.rs`, `crates/hydrus-core/src/solute_fortran_compat/driver.rs`, `crates/hydrus-core/src/solute_fortran_compat/water_compat.rs`, `crates/hydrus-core/src/solute_fortran_compat/adapter/{mod,fields,json_guard,tests}.rs`, `crates/hydrus-core/src/solute_fortran_compat/{boundary,deposition,dual_domain,source_coupling}.rs`, `crates/hydrus-core/tests/solute_fortran_compat_harness.rs`.
 - **Tests:** `cargo test -p hydrus-core --lib solute_fortran_compat`: 232 passed, 1 ignored. `cargo test -p hydrus-core --test solute_fortran_compat_harness`: 6 passed.
 - **Deviations:** Removed unused legacy helper functions and gated test-only routines with `#[cfg(test)]` to cleanly eliminate all module-level and item-level `dead_code` allowances under `-D warnings`.
+
+### 20.5.1 — Replace `solute_rust_candidate_adapter.py` with genuine Rust candidate execution
+- **Status:** Done.
+- **Files changed:** `tools/solute_rust_candidate_adapter.py`, `tools/test_solute_fortran_parity.py`.
+- **Tests:** `python3 -m unittest tools.test_solute_fortran_parity`: 20 passed (added unit tests proving Fortran runner is never called, hash tampering is rejected, and real Rust outputs normalize accurately). `python3 -m unittest discover -s tools -p 'test_*.py'`: 317 passed.
+- **Deviations:** None.
+
 
 
