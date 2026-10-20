@@ -121,3 +121,31 @@ Task 18.15.1 completed full serial execution of all 44 parity fixtures across al
 - **Documentation:** Full audit record, active modes, inactive helpers, and scientific gaps are recorded in [SOLUTE_FORTRAN_PARITY_18.md](SOLUTE_FORTRAN_PARITY_18.md).
 - **Parity vs. Validity:** This result confirms numerical parity against the pinned legacy Fortran source algorithms; it does not claim continuum physical correctness or empirical validation against physical experimental data.
 
+## 20.6.1 all-mode Rust-vs-Fortran parity run (round 5, 2026-10-20T10:47:56Z) — FAIL, 35/44
+
+- **Command:** `PYTHONDONTWRITEBYTECODE=1 python3 tools/run_solute_parity.py --fixture-group all --backend fortran-compatible --task-root .development/20.6.1/r5_final`, plus one run per named group (`.development/20.6.1/r5_final_<group>`).
+- **Commit:** `62c4b37` plus uncommitted 20.6.1 changes.
+- **Result:** 35 of 44 fixtures pass. The gate does not pass, so 44/44 is not claimed.
+
+| Group | Fixtures | Pass | Fail |
+|---|---|---|---|
+| transport | 18 | 18 | 0 |
+| reactions | 4 | 4 | 0 |
+| transport_properties | 5 | 0 | 5 |
+| nonequilibrium | 5 | 5 | 0 |
+| dual_exchange | 4 | 0 | 4 |
+| biology | 6 | 6 | 0 |
+| flux_concentration | 2 | 2 | 0 |
+
+- **Divergence metric:** the runner has no `divergent_count` field. Per-fixture `status` and `first_divergence` are the metric; fail counts above are the substitute.
+- **Digests:** 44 fixtures. 315 distinct Fortran reference output SHA-256 values and 121 distinct Rust candidate values. Shared reference/candidate digests: 0. Pinned patch SHA-256 `622d1ea6...`.
+- **Coverage:** active `iPsi=3` is exercised by one fixture, `biology/blocking_type_3_noop`. Coupled `WatFlow`/`DualPor` for `W-volumeI[L]` is exposed by nine fixtures; the coupling is not yet confirmed from `SELECTOR.IN`, so it remains a stated gap.
+- **Fixed in round 5:**
+  - `reactions/chain_distinct_rates` now passes. The cumulative solute accumulators (`CumCh`) are default REAL in `OUTPUT.FOR`, so they must accumulate in single precision. The Rust runner used f64, which moved a printed value across a rounding interval. Regression: `chain_distinct_rates_paired_gate`.
+  - Equilibrium water content now follows the new head. `WATFLOW.FOR:73-76` (Hyst) runs after SetMat and sets `ThEq` at `hNew`, and `Reset` uses it (`WATFLOW.FOR:194`). The Rust reset used `ThEq = ThOld`, which froze the mobile moisture. Regression: `equilibrium_water_content_follows_the_new_head`. Moisture now matches the pinned value (0.4294).
+  - Con/Cap are now evaluated at `hNew` after SetMat, as the pinned Hyst overwrite does (`WATFLOW.FOR:73-76`). No measured effect on the gate.
+- **Open, root cause localized:** Hyst (`HYSTER.FOR`, `HysterIni` lines 124-240, `DRY` 535-594) is not ported. The pinned code evaluates `Con`, `Cap`, and `ThEq` from tabulated Lenhard k-S-P curves on every iteration, with per-node history. Rust uses analytic van Genuchten values.
+  - `dual_exchange` (4): the first divergent quantity is the step-1 water iteration count (Fortran `ItrW`=8, Rust 9). Head at node 2 at t=1 is -3.319 vs -3.339. Mobile moisture and immobile moisture match.
+  - `transport_properties` (5): pinned `Con` varies between nodes at identical head (Kappa history), so the top flux drifts in time. Rust keeps it constant.
+  - Two attempts were made on this cause. The porting work is the next step.
+- **Disclaimer (unchanged):** `FortranCompatible` establishes pinned-source numerical parity, while continuum and mathematical accuracy are tracked separately by the FV/BE analytical and convergence suites.
