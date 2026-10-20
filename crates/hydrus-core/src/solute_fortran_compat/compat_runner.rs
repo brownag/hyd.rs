@@ -966,8 +966,7 @@ fn run_parsed_deck(deck: &ParsedDeck) -> Result<CompatRunOutputs, String> {
         t += dt as f64;
 
         // Water flow solve (HYDRUS.FOR:419-470)
-        if bas.l_wat && (t_level > 1 || bas.l_w_dep) {
-            th_eq.copy_from_slice(&th_old);
+        if bas.l_wat {
             let mut inputs = WatFlowInputs {
                 num_np,
                 tables: &tables,
@@ -1004,7 +1003,6 @@ fn run_parsed_deck(deck: &ParsedDeck) -> Result<CompatRunOutputs, String> {
                 x_conv,
                 t_conv,
                 tau_w: 0.0,
-                th_eq: &th_eq,
                 i_dual_por: i_dual_por_u8,
                 dual_por_materials: &dual_por_materials,
                 _temp_o: &temp_o,
@@ -1024,6 +1022,7 @@ fn run_parsed_deck(deck: &ParsedDeck) -> Result<CompatRunOutputs, String> {
                 th_new_im: &mut th_new_im,
                 th_old_im: &mut th_old_im,
                 sink_im: &mut sink_im,
+                th_eq: &mut th_eq,
                 th_v_new: &mut th_v_new,
                 th_v_old: &th_v_old,
                 con_lt: &mut con_lt,
@@ -1092,6 +1091,7 @@ fn run_parsed_deck(deck: &ParsedDeck) -> Result<CompatRunOutputs, String> {
         let mut cv_bot = vec![0.0f32; ns];
         let mut cv_ch0 = vec![0.0f32; ns];
         let mut cv_ch1 = vec![0.0f32; ns];
+        let mut cv_ch_im = vec![0.0f32; ns];
         let mut c_new_flux = vec![0.0f32; num_np];
 
         if bas.l_chem {
@@ -1204,6 +1204,7 @@ fn run_parsed_deck(deck: &ParsedDeck) -> Result<CompatRunOutputs, String> {
             cv_bot = solute_st.cv_bot;
             cv_ch0 = solute_st.totals.cv_ch0.iter().map(|x| x.0).collect();
             cv_ch1 = solute_st.totals.cv_ch1.iter().map(|x| x.0).collect();
+            cv_ch_im = solute_st.totals.cv_ch_im.iter().map(|x| x.0).collect();
             conc = solute_st.conc;
             sorb = solute_st.sorb;
             sorb2 = solute_st.sorb2;
@@ -1282,10 +1283,13 @@ fn run_parsed_deck(deck: &ParsedDeck) -> Result<CompatRunOutputs, String> {
         if bas.l_chem {
             for js in 0..ns {
                 let dt_dble = dt as f64;
-                cum_ch[0][js] -= (cv_top[js] as f64) * dt_dble;
-                cum_ch[1][js] += (cv_bot[js] as f64) * dt_dble;
-                cum_ch[2][js] += (cv_ch0[js] as f64) * dt_dble;
-                cum_ch[3][js] += (cv_ch1[js] as f64) * dt_dble;
+                // CumCh is default REAL in OUTPUT.FOR (no double declaration), so each
+                // accumulation `CumCh = CumCh + cv*dt` is single precision.
+                cum_ch[0][js] = (cum_ch[0][js] as f32 - cv_top[js] * dt) as f64;
+                cum_ch[1][js] = (cum_ch[1][js] as f32 + cv_bot[js] * dt) as f64;
+                cum_ch[2][js] = (cum_ch[2][js] as f32 + cv_ch0[js] * dt) as f64;
+                cum_ch[3][js] = (cum_ch[3][js] as f32 + cv_ch1[js] * dt) as f64;
+                cum_ch[5][js] = (cum_ch[5][js] as f32 + cv_ch_im[js] * dt) as f64;
                 c_cum_t[js] +=
                     ((cv_top[js] - cv_bot[js] - cv_ch0[js] - cv_ch1[js]) as f64) * dt_dble;
                 c_cum_a[js] += ((cv_bot[js] as f64).abs()
@@ -1301,8 +1305,9 @@ fn run_parsed_deck(deck: &ParsedDeck) -> Result<CompatRunOutputs, String> {
                         } else {
                             conc[js][node_converted]
                         };
-                        cum_ch[6 + obs_idx][js] +=
-                            (v_new[node_converted] * c_conc_flux) as f64 * dt_dble;
+                        cum_ch[6 + obs_idx][js] = (cum_ch[6 + obs_idx][js] as f32
+                            + v_new[node_converted] * c_conc_flux * dt)
+                            as f64;
                     }
                 }
             }
@@ -1324,14 +1329,16 @@ fn run_parsed_deck(deck: &ParsedDeck) -> Result<CompatRunOutputs, String> {
                 cv_bot: cv_bot[js] as f64,
                 sum_cv_top: cum_ch[0][js],
                 sum_cv_bot: cum_ch[1][js],
-                cv_ch0: cv_ch0[js] as f64,
-                cv_ch1: cv_ch1[js] as f64,
+                // OUTPUT.FOR:190 prints CumCh(3,jS) and CumCh(4,jS) in the cvCh0/cvCh1
+                // columns and CumCh(6,jS) in the Sum(cvNEql) column (cvChIm).
+                cv_ch0: cum_ch[2][js],
+                cv_ch1: cum_ch[3][js],
                 c_top: conc[js][num_np - 1] as f64,
                 c_root: 0.0,
                 c_bot: conc[js][0] as f64,
                 cv_root: 0.0,
                 sum_cv_root: 0.0,
-                sum_cv_ch1: cum_ch[3][js],
+                sum_cv_ch1: cum_ch[5][js],
                 t_level,
                 c_gwl: 0.0,
                 c_runoff: 0.0,

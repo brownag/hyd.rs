@@ -549,15 +549,14 @@ pub(crate) fn parse_selector_in(text: &str) -> Result<(BasInf, MatIn, TmIn, Chem
     reader.next_line()?; // 'thr ths Alfa n Ks l...' header
     let mut par = Vec::with_capacity(n_mat);
     for _ in 0..n_mat {
-        let mut row: Vec<f32> = parse_tokens(reader.next_line()?)?;
+        let row: Vec<f32> = parse_tokens(reader.next_line()?)?;
         if row.len() != n_par {
             return Err(format!(
                 "expected {n_par} parameters in material row, got {}",
                 row.len()
             ));
         }
-        // Par(5, M) = Par(5, M) / (xConv / tConv)
-        row[4] /= conv.x_conv / conv.t_conv;
+        // The pinned source reads Par(5,M) without rescaling (INPUT.FOR:793 ConSat(M)=Par(5,M)).
         par.push(row);
     }
 

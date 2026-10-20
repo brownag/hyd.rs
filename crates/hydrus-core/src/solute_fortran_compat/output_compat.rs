@@ -367,13 +367,16 @@ pub struct SoluteRow {
     pub cv_bot: f64,
     pub sum_cv_top: f64,
     pub sum_cv_bot: f64,
+    /// Cumulative `CumCh(3,jS)` (OUTPUT.FOR:190 column 6, printed under `cvCh0`).
     pub cv_ch0: f64,
+    /// Cumulative `CumCh(4,jS)` (OUTPUT.FOR:190 column 7, printed under `cvCh1`).
     pub cv_ch1: f64,
     pub c_top: f64,
     pub c_root: f64,
     pub c_bot: f64,
     pub cv_root: f64,
     pub sum_cv_root: f64,
+    /// Cumulative `CumCh(6,jS)`, the `cvChIm` sum printed under `Sum(cvNEql)`.
     pub sum_cv_ch1: f64,
     pub t_level: i32,
     pub c_gwl: f64,

@@ -1226,7 +1226,6 @@ pub(crate) struct WatFlowInputs<'a> {
     pub x_conv: f32,
     pub t_conv: f32,
     pub tau_w: f32,
-    pub th_eq: &'a [f32],
     pub i_dual_por: u8,
     pub dual_por_materials: &'a [DualPorMaterial],
     pub _temp_o: &'a [f32],
@@ -1239,6 +1238,8 @@ pub(crate) struct WatFlowState<'a> {
     pub h_new: &'a mut [f32],
     pub h_old: &'a mut [f32],
     pub h_temp: &'a mut [f32],
+    /// `ThEq`: the equilibrium water content at the new head (WATFLOW.FOR:73-76).
+    pub th_eq: &'a mut [f32],
     pub con: &'a mut [f32],
     pub cap: &'a mut [f32],
     pub sink: &'a [f32],
@@ -1366,6 +1367,49 @@ pub(crate) fn wat_flow(inputs: &mut WatFlowInputs<'_>, state: &mut WatFlowState<
                 inputs.i_enhanc,
             );
 
+            // `call Hyst(NumNP,...,hNew,hOld,ThEq,Con,Cap,0,2)` (WATFLOW.FOR:73-76) runs after
+            // SetMat and overwrites `Con`, `Cap` and `ThEq` from the new head, so Shift and
+            // Gauss use the values at `hNew`. For the non-hysteretic curves the same
+            // conductivity/capacity/content formulas evaluated at `hNew` are obtained by
+            // passing `hNew` as the temporary head. `iter` is 1 so `ConO` keeps the SetMat value.
+            set_mat(
+                inputs.num_np,
+                inputs.tables,
+                state.h_new,
+                inputs.mat_num,
+                inputs.par_d,
+                state.con,
+                state.cap,
+                inputs.ah,
+                inputs.ak,
+                inputs.ath,
+                state.h_new,
+                &mut *state.th_eq,
+                inputs.l_wt_dep,
+                inputs.temp_n,
+                1,
+                state.con_o,
+                inputs.kappa,
+                inputs.aths,
+                inputs.th_rr,
+                inputs.con_r,
+                inputs.aks,
+                inputs.ah_w,
+                inputs.ath_w,
+                inputs.ak_w,
+                inputs.model,
+                inputs.l_table,
+                inputs.l_vapor,
+                state.th_v_new,
+                state.con_lt,
+                state.con_vt,
+                state.con_vh_buf,
+                inputs.x_conv,
+                inputs.t_conv,
+                state.h_crit_a,
+                inputs.i_enhanc,
+            );
+
             let mut pb = 0.0f64;
             let mut rb = 0.0f64;
             let mut sb = 0.0f64;
@@ -1400,7 +1444,7 @@ pub(crate) fn wat_flow(inputs: &mut WatFlowInputs<'_>, state: &mut WatFlowState<
                 state.th_new,
                 state.th_old,
                 state.v_top,
-                inputs.th_eq,
+                &*state.th_eq,
                 rate,
                 inputs.l_vapor,
                 inputs.l_wt_dep,
@@ -1711,7 +1755,7 @@ mod tests {
         let ak_w = vec![1.0; 1];
         let temp_n = vec![20.0; num_np];
         let temp_o = vec![20.0; num_np];
-        let th_eq = vec![0.0; num_np];
+        let mut th_eq = vec![0.0; num_np];
 
         let mut h_new = vec![-100.0f32; num_np];
         let mut h_old = vec![-100.0f32; num_np];
@@ -1719,8 +1763,10 @@ mod tests {
         let mut con = vec![0.0f32; num_np];
         let mut cap = vec![0.0f32; num_np];
         let sink = vec![0.0f32; num_np];
-        let mut th_new = vec![0.2f32; num_np];
-        let mut th_old = vec![0.2f32; num_np];
+        // Water content consistent with the initial head (-100 cm), as InitW sets it.
+        let th_init = fq(0, -100.0, &par[0]);
+        let mut th_new = vec![th_init; num_np];
+        let mut th_old = vec![th_init; num_np];
         let mut th_new_im = vec![0.0f32; num_np];
         let mut th_old_im = vec![0.0f32; num_np];
         let mut sink_im = vec![0.0f32; num_np];
@@ -1784,7 +1830,6 @@ mod tests {
             x_conv: 1.0,
             t_conv: 1.0,
             tau_w: 0.0,
-            th_eq: &th_eq,
             i_dual_por: 0,
             dual_por_materials: &[],
             _temp_o: &temp_o,
@@ -1804,6 +1849,7 @@ mod tests {
             th_new_im: &mut th_new_im,
             th_old_im: &mut th_old_im,
             sink_im: &mut sink_im,
+            th_eq: &mut th_eq,
             th_v_new: &mut th_v_new,
             th_v_old: &th_v_old,
             con_lt: &mut con_lt,

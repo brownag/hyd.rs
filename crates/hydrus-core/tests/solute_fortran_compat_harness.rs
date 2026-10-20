@@ -1,7 +1,9 @@
 //! Harness test for the FortranCompatible candidate backend emitting schema-valid observations.
 use std::{
     collections::{BTreeMap, BTreeSet},
+    fs,
     io::Write,
+    path::PathBuf,
     process::{Command, Stdio},
 };
 
@@ -760,6 +762,124 @@ fn test_parity_single_equilibrium_linear() {
         "../../reference/fortran_reference/solute/parity/reactions/single_equilibrium_linear",
     );
     run_parity_fixture_bundle(&p).unwrap();
+}
+
+/// Regression for the top-flux root cause: `Par(5,M)` (Ks) is read without rescaling
+/// (`INPUT.FOR:793`, `ConSat(M)=Par(5,M)`), so the initial saturated top flux is the
+/// pinned `-0.43` (`BALANCE.OUT` Top Flux at t=0), not a value scaled by `xConv/tConv`.
+#[test]
+fn saturated_top_flux_uses_unscaled_ks() {
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(
+        "../../reference/fortran_reference/solute/parity/transport/transport-baseline-storage",
+    );
+    let read = |name: &str| std::fs::read_to_string(dir.join(name)).unwrap();
+    let outputs = hydrus_core::run_compat_deck(
+        &read("CASE.json"),
+        &read("SELECTOR.IN"),
+        &read("PROFILE.DAT"),
+    )
+    .unwrap();
+    let top = outputs
+        .balance_out
+        .lines()
+        .find(|l| l.contains("Top Flux"))
+        .unwrap();
+    let value: f64 = top.split_whitespace().last().unwrap().parse().unwrap();
+    assert!((value + 0.43).abs() < 1e-6, "initial Top Flux was {value}");
+}
+
+/// Regression for the equilibrium water content (WATFLOW.FOR:73-76 Hyst -> Reset):
+/// the mobile moisture must follow the new head. `model6_exchange` at t=1, node 2 has
+/// moisture 0.4294 in the pinned NOD_INF.OUT (head -3.339 cm).
+#[test]
+fn equilibrium_water_content_follows_the_new_head() {
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(
+        "../../reference/fortran_reference/solute/parity/processes/dual_exchange/model6_exchange",
+    );
+    let read = |name: &str| std::fs::read_to_string(dir.join(name)).unwrap();
+    let outputs = hydrus_core::run_compat_deck(
+        &read("CASE.json"),
+        &read("SELECTOR.IN"),
+        &read("PROFILE.DAT"),
+    )
+    .unwrap();
+    let nod = &outputs.nod_inf_out;
+    let start = nod.find("Time:        1.0000").unwrap();
+    let row = nod[start..]
+        .lines()
+        .find(|l| l.trim_start().starts_with("2 "))
+        .unwrap();
+    let fields: Vec<f64> = row
+        .split_whitespace()
+        .skip(1)
+        .map(|v| v.parse().unwrap())
+        .collect();
+    // Fields: depth, head, moisture, ... The head still differs by about 0.02 cm, which
+    // is an open dual-porosity item and is not asserted here.
+    assert!((fields[2] - 0.4294).abs() < 2e-4, "moisture {}", fields[2]);
+}
+
+#[test]
+fn chain_distinct_rates_paired_gate() {
+    let p = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../reference/fortran_reference/solute/parity/reactions/chain_distinct_rates");
+    run_paired_fixture_gate(&p).unwrap();
+}
+
+/// Paired Fortran-vs-Rust gate for one fixture: runs `run_solute_parity.py` with the
+/// real Rust candidate and requires `status == "pass"` (not only Fortran normalization).
+fn run_paired_fixture_gate(fixture_dir: &std::path::Path) -> Result<()> {
+    let repo = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let name = fixture_dir
+        .file_name()
+        .unwrap()
+        .to_string_lossy()
+        .to_string();
+    let task_root = repo
+        .join(".development/harness_paired")
+        .join(format!("{name}-{}", std::process::id()));
+    let _ = fs::remove_dir_all(&task_root);
+    let child = Command::new("python3")
+        .args([
+            "tools/run_solute_parity.py",
+            "--fixture-manifest",
+            fixture_dir.join("CASE.json").to_str().unwrap(),
+            "--backend",
+            "fortran-compatible",
+            "--task-root",
+            task_root.to_str().unwrap(),
+        ])
+        .current_dir(&repo)
+        .env("PYTHONDONTWRITEBYTECODE", "1")
+        .output()
+        .map_err(|e| e.to_string())?;
+    // The runner prints a JSON object that may contain bare NaN tokens, which serde_json
+    // rejects. The top-level status is the only field needed, and it is the one line
+    // indented exactly two spaces.
+    let text = String::from_utf8_lossy(&child.stdout).to_string();
+    let status_line = text.lines().find(|l| l.starts_with("  \"status\": "));
+    let _ = fs::remove_dir_all(&task_root);
+    require(
+        child.status.success() && status_line == Some("  \"status\": \"pass\","),
+        &format!("{name}: paired status {status_line:?}"),
+    )
+}
+
+#[test]
+fn test_parity_biology_blocking_type_3_noop() {
+    // iPsi=3 with SMax=0 gives psi1 = NaN in the pinned Fortran (ADR 0017).
+    let p = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(
+        "../../reference/fortran_reference/solute/parity/processes/biology/blocking_type_3_noop",
+    );
+    run_paired_fixture_gate(&p).unwrap();
+}
+
+#[test]
+fn test_parity_biology_filtration_deposition() {
+    let p = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(
+        "../../reference/fortran_reference/solute/parity/processes/biology/filtration_deposition",
+    );
+    run_paired_fixture_gate(&p).unwrap();
 }
 
 #[test]
