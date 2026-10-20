@@ -1,7 +1,7 @@
 # State — Orchestration 21
 
 Plan status: **Approved by user on 2026-10-20 (“yes”).**
-Execution status: **Wave 0 complete; ready for Wave 1 dispatch.**
+Execution status: **Wave 1 complete (reports merged); at Wave 2 user gate.**
 Plan: [EXECUTION_PLAN_21.md](EXECUTION_PLAN_21.md). Worker template: [PROMPT_TEMPLATE_21.md](PROMPT_TEMPLATE_21.md).
 Supersedes: Orchestration 20 tasks `20.6.1` (gate re-run → `21.4.1`) and `20.7.1` (default switch → `21.5.1`).
 
@@ -24,10 +24,10 @@ Supersedes: Orchestration 20 tasks `20.6.1` (gate re-run → `21.4.1`) and `20.7
 | Wave | Task | Deliverable | Status |
 |---|---|---|---|
 | 0 | — | Baseline, close Orchestration 20, commit plan | done |
-| 1 | 21.1.1 | Long-run single-porosity trace report (`tortuosity_millington`) | pending |
-| 1 | 21.1.2 | Wetting-front dual-porosity trace report (`model6_no_exchange`) | pending |
-| 1 | 21.1.3 | Model 0 isolating-deck trace report (WatFlow vs DualPor) | pending |
-| 2 | — | User gate: Wave 3 fix specs | pending |
+| 1 | 21.1.1 | Long-run single-porosity trace report (`tortuosity_millington`) | done |
+| 1 | 21.1.2 | Wetting-front dual-porosity trace report (`model6_no_exchange`) | done |
+| 1 | 21.1.3 | Model 0 isolating-deck trace report (WatFlow vs DualPor) | done |
+| 2 | — | User gate: Wave 3 fix specs | in progress |
 | 3 | 21.3.x | Fixes (specified at gate) | pending |
 | 4 | 21.4.1 | 44-fixture gate re-run and evidence docs | pending |
 | 5 | 21.5.1 | Default backend → `FortranCompatible` | pending |
@@ -35,3 +35,11 @@ Supersedes: Orchestration 20 tasks `20.6.1` (gate re-run → `21.4.1`) and `20.7
 ## Verification log
 
 ## Task reports
+
+### Wave 1 (2026-10-20) — docs only, A4 suites not re-run (no code changed; diffs to crates/tools/src_reference verified clean per worktree)
+- 21.1.1 `8aa43df`-lineage merge `883470f`: tortuosity_millington first divergence = hTemp zeroed via Solute vCorr (HYDRUS.FOR:510-511). Combined prototype (zeroing + l_table + l_extrap + OOB table read + single set_mat) 38/44; +l_min_step 39/44; no regressions.
+- 21.1.2 (`b32d2bb`): model6_no_exchange needs same 5 changes; iteration trace matches 482/482.
+- 21.1.3 (`8aa43df`): Model 0 deck also diverges => WatFlow-level cause, not DualPor.
+- Still failing after prototype: model6_exchange, model7_exchange, model7_no_exchange, temperature_coefficients, vapor_enabled_external_state.
+- Suspected source defects: hTemp/vCorr aliasing (HYDRUS.FOR:510-511); unbounded table index (WATFLOW.FOR:482-484,515-518).
+- Scratch: .development/21.1.1 (3.4 GB) etc.; disk 191 GB free.
