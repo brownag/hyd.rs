@@ -2,6 +2,7 @@
 
 Plan status: **Approved by user on 2026-10-15 (“yes”).**
 Execution status: **Waves 0, 1, 2, and 2B complete; ready for Wave 3 dispatch.**
+Superseded 2026-10-20: rows `20.6.1` and `20.7.1` continue in [EXECUTION_PLAN_21.md](EXECUTION_PLAN_21.md).
 Plan: [EXECUTION_PLAN_20.md](EXECUTION_PLAN_20.md). Worker template: [PROMPT_TEMPLATE_20.md](PROMPT_TEMPLATE_20.md).
 
 ## Baseline and guardrails
@@ -31,8 +32,8 @@ Plan: [EXECUTION_PLAN_20.md](EXECUTION_PLAN_20.md). Worker template: [PROMPT_TEM
 | 3 | 20.3.3 | Source-precision `OUTPUT.FOR` table formatters (`Profil`, `NodOut`, `TLInf`, `ObsNod`, `SubReg`) | done |
 | 4 | 20.4.1 | Full-run compatibility runner and removal of all `dead_code` allowances | done |
 | 5 | 20.5.1 | Replace `solute_rust_candidate_adapter.py` with genuine Rust candidate execution | done |
-| 6 | 20.6.1 | Execute 44-fixture all-mode Rust-vs-Fortran parity gate and update evidence | pending |
-| 7 | 20.7.1 | Switch default backend to `FortranCompatible` after 44/44 parity gate | pending |
+| 6 | 20.6.1 | Execute 44-fixture all-mode Rust-vs-Fortran parity gate and update evidence | superseded by Orchestration 21 (21.4.1) |
+| 7 | 20.7.1 | Switch default backend to `FortranCompatible` after 44/44 parity gate | superseded by Orchestration 21 (21.5.1) |
 
 ## Verification log
 
