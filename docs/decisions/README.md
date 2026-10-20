@@ -18,6 +18,7 @@
 | [0014](0014-validate-kernel-primitive-state-in-the-kernel.md) | Validate kernel primitive state in the kernel | Accepted | 2026-10-14 | - | - | Orch 19 |
 | [0015](0015-keep-precision-faithful-hydraulic-ports-in-compat-kernels.md) | Keep precision-faithful hydraulic ports in compat kernels | Accepted | 2026-10-14 | - | - | Orch 19 |
 | [0016](0016-add-serde-derive-for-request-decoding.md) | Add serde derive for request decoding | Accepted | 2026-10-14 | - | - | Orch 19 |
+| [0017](0017-propagate-nonfinite-endpoint-primitives-as-fortran-does.md) | Propagate non-finite endpoint primitives as the pinned Fortran does | Accepted | 2026-10-19 | - | - | Orch 20 (20.6.1) |
 
 ## Scope and Status Notes
 

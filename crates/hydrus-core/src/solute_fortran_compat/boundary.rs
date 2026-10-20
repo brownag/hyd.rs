@@ -185,62 +185,8 @@ pub(super) fn validate(
     {
         return Err("endpoint epsi must lie in [0, 1], alf must equal 1 - epsi, and bottom resistance must be non-negative");
     }
-    let scalars = [
-        state.epsi,
-        state.dt,
-        state.alf,
-        state.bottom_resistance,
-        state.bottom_prescribed,
-        state.top_prescribed,
-        state.r_min,
-    ];
-    if scalars.iter().any(|v| !v.0.is_finite()) {
-        return Err("endpoint primitives must be finite");
-    }
-    if let Some(t) = state.old_temperature {
-        if !t.0.is_finite() {
-            return Err("endpoint primitives must be finite");
-        }
-    }
-    if let Some(t) = state.new_temperature {
-        if !t.0.is_finite() {
-            return Err("endpoint primitives must be finite");
-        }
-    }
-    if let Some(d) = state.top_surface_distance {
-        if !d.0.is_finite() {
-            return Err("endpoint primitives must be finite");
-        }
-    }
-    if let Some(c) = state.top_atmospheric_concentration {
-        if !c.0.is_finite() {
-            return Err("endpoint primitives must be finite");
-        }
-    }
-    for array in [
-        &state.material_immobile_water,
-        &state.upwind_weight,
-        &state.old_water,
-        &state.new_water,
-        &state.old_velocity,
-        &state.new_velocity,
-        &state.old_matrix_velocity,
-        &state.new_matrix_velocity,
-        &state.old_dispersion,
-        &state.new_dispersion,
-        &state.old_retardation,
-        &state.new_retardation,
-        &state.old_concentration,
-        &state.new_accepted_concentration,
-        &state.old_source_g0,
-        &state.old_source_g1,
-        &state.new_source_g0,
-        &state.new_source_g1,
-    ] {
-        if array.iter().any(|v| !v.0.is_finite()) {
-            return Err("endpoint primitives must be finite");
-        }
-    }
+    // NaN and inf primitives are not rejected here. The pinned Fortran propagates
+    // IEEE non-finite values (ADR 0017), so the kernel must too.
     Ok(())
 }
 
@@ -1315,9 +1261,6 @@ mod tests {
         let mut ordered = fixture();
         ordered.coordinates[1] = R(5.0);
         assert!(assemble_endpoints(&ordered, 1, 1).is_err());
-        let mut finite = fixture();
-        finite.new_source_g1[1] = R(f32::NAN);
-        assert!(assemble_endpoints(&finite, 1, 1).is_err());
         let mut dt = fixture();
         dt.dt = R(0.0);
         assert!(assemble_endpoints(&dt, 1, 1).is_err());
@@ -1327,6 +1270,24 @@ mod tests {
         let mut t_level = fixture();
         t_level.t_level = 3;
         assert!(assemble_endpoints(&t_level, 1, 1).is_err());
+    }
+
+    #[test]
+    fn endpoint_nonfinite_primitives_propagate_like_fortran() {
+        // ADR 0017: `SOLUTE.FOR:1561-1594` gives psi1 = NaN for iPsi=3 with SMax=0, and
+        // `SOLUTE.FOR:710` carries it into g1. The kernel must not reject that state.
+        let mut nan_g1 = fixture();
+        nan_g1.new_source_g1[0] = R(f32::NAN);
+        nan_g1.old_source_g1[0] = R(f32::NAN);
+        let out = assemble_endpoints(&nan_g1, 1, 1).expect("NaN primitives must not be rejected");
+        assert!(
+            format!("{out:?}").contains("NaN"),
+            "NaN should reach the endpoint rows"
+        );
+
+        let mut inf_water = fixture();
+        inf_water.old_water[1] = R(f32::INFINITY);
+        assert!(assemble_endpoints(&inf_water, 1, 1).is_ok());
     }
 
     #[test]
