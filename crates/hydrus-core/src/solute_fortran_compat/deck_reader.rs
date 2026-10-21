@@ -105,6 +105,8 @@ pub(crate) struct BasInf {
 pub(crate) struct MatIn {
     pub h_tab1: f32,
     pub h_tab_n: f32,
+    /// `lTable` (`INPUT.FOR:565-580`).
+    pub l_table: bool,
     pub i_model: usize,
     pub i_hyst: usize,
     pub i_dual_por: usize,
@@ -522,9 +524,16 @@ pub(crate) fn parse_selector_in(text: &str) -> Result<(BasInf, MatIn, TmIn, Chem
     let mut i_model = model_toks[0];
     let i_hyst = model_toks[1];
 
-    if (h_tab1 > -0.00001 && h_tab_n > -0.00001) || h_tab1 == h_tab_n {
-        h_tab1 = -0.0001 * conv.x_conv;
-        h_tab_n = -100.0 * conv.x_conv;
+    // INPUT.FOR:560-580: negate first (iModel < nTabMod = 9), then the reset test.
+    let mut l_table = true;
+    if i_model < 9 {
+        h_tab1 = -h_tab1.abs().min(h_tab_n.abs());
+        h_tab_n = -h_tab1.abs().max(h_tab_n.abs());
+        if (h_tab1 > -0.00001 && h_tab_n > -0.00001) || h_tab1 == h_tab_n {
+            l_table = false;
+            h_tab1 = -0.0001 * conv.x_conv;
+            h_tab_n = -100.0 * conv.x_conv;
+        }
     }
 
     let mut i_dual_por = 0;
@@ -563,6 +572,7 @@ pub(crate) fn parse_selector_in(text: &str) -> Result<(BasInf, MatIn, TmIn, Chem
     let mat_in = MatIn {
         h_tab1,
         h_tab_n,
+        l_table,
         i_model,
         i_hyst,
         i_dual_por,
@@ -1244,6 +1254,39 @@ mod tests {
             assert!(deck.chem_in.ns > 0);
             assert_eq!(deck.nod_inf.conc.len(), deck.chem_in.ns);
             assert_eq!(deck.tm_in.t_print.len(), deck.tm_in.mpl + 1);
+        }
+    }
+
+    #[test]
+    fn deck_reader_derives_table_range_and_ltable_from_input_for_570_580() {
+        let root = Path::new("../../reference/fortran_reference/solute/parity");
+        let root = if root.exists() {
+            root.to_path_buf()
+        } else {
+            Path::new("reference/fortran_reference/solute/parity").to_path_buf()
+        };
+        let case = collect_cases(&root).into_iter().next().expect("fixture");
+        let dir = case.parent().expect("dir");
+        let case_json = std::fs::read_to_string(&case).expect("CASE.json");
+        let sel = std::fs::read_to_string(dir.join("SELECTOR.IN")).expect("SELECTOR.IN");
+        let prof = std::fs::read_to_string(dir.join("PROFILE.DAT")).expect("PROFILE.DAT");
+        let (_m, deck) = parse_and_validate_case(&case_json, &sel, &prof).expect("parse");
+        // Deck hTab1 hTabN = 0.0001 100 -> negated to -0.0001 / -100, lTable true.
+        assert!(deck.mat_in.l_table);
+        assert_eq!(deck.mat_in.h_tab1, -0.0001);
+        assert_eq!(deck.mat_in.h_tab_n, -100.0);
+
+        // hTab1 = hTabN = 0 triggers the INPUT.FOR:570 reset: lTable false.
+        let lines: Vec<&str> = sel.lines().collect();
+        let idx = lines
+            .iter()
+            .position(|l| l.contains("hTab1") && l.contains("hTabN"))
+            .expect("header");
+        let mut edited: Vec<String> = lines.iter().map(|l| l.to_string()).collect();
+        edited[idx + 1] = "0.0 0.0".to_string();
+        let sel0 = edited.join("\n") + "\n";
+        if let Ok((_m, deck0)) = parse_and_validate_case(&case_json, &sel0, &prof) {
+            assert!(!deck0.mat_in.l_table);
         }
     }
 }
