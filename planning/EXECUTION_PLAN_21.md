@@ -84,6 +84,8 @@
 | 1 | 21.1.3 | Trace a task-local Model 0 wetting-front deck (WatFlow vs DualPor isolation) | create `planning/master/WATER_TRANSIENT_DIAGNOSIS_21_ISOLATION.md` |
 | 2 | — | **User gate**: orchestrator drafts Wave 3 fix specs from the three reports; user approves (no worker) | `planning/EXECUTION_PLAN_21.md` (Wave 3 section), `planning/STATE_21.md` |
 | 3 | 21.3.x | Fixes, as specified at the Wave 2 gate (sub-waves `3`, `3B`, … if files overlap) | TBD at gate; bounded by the Wave 3 envelope below |
+| 3R | 21.3.4-6 | Second diagnosis round for the 5 remaining fixtures (reports only) | create `planning/master/WATER_TRANSIENT_DIAGNOSIS_21R_*.md` |
+| 3S/3F | — | User gate D7, then fixes from 3R | TBD |
 | 4 | 21.4.1 | Re-run the 44-fixture all-mode gate and refresh evidence docs | `planning/master/{SOLUTE_FORTRAN_PARITY_18,PHASE_5_SOLUTE_EVIDENCE,VALIDATION_STRATEGY}.md` |
 | 5 | 21.5.1 | Switch default backend to `FortranCompatible` after 44/44 | `crates/hydrus-core/src/solute.rs`, `crates/hydrus-core/tests/{solute_solver_selection,solute_backend_contract}.rs`, `docs/decisions/README.md` |
 
@@ -186,6 +188,38 @@
 - If the fix removes the extra `set_mat` call from `72d2544`, the spec states which fixture(s) that change was protecting and how they stay green.
 - Reproduced pinned-Fortran defects: `SD-NNN` entry in `docs/FORTRAN_SOURCE_DEFECTS.md`, `// SD-NNN` tag at the reproducing code, `source_defect_sdNNN_*` pinning test.
 - Never: tolerance or `OBSERVATION_MAP.json` changes, `tools/` comparison changes, `solute.rs`, FV/BE paths, `Cargo.*`, `TODO.md`, `src_reference/`.
+
+### Wave 3 amendment (drafted 2026-10-20 from the three Wave 1 reports; pending user approval as D6)
+
+**Classification.** Root causes are **WatFlow-level** (the `21.1.3` Model 0 deck diverges at the same `ItCum 2, Iter 2` point), shared by `transport_properties` and `dual_exchange`; none is specific to `DualPor`. A prototype combining items 1-6 below reached **39/44** (no regression among the 35 passing). Five fixtures remain outside this evidence: `model6_exchange`, `model7_exchange`, `model7_no_exchange`, `temperature_coefficients`, `vapor_enabled_external_state`; they get a second diagnosis round (Wave 3R). Wave 4 does not run until Wave 3R fixes land.
+
+**Sequencing (file overlap).** Sub-wave 3A: `21.3.1` and `21.3.2` in parallel (disjoint files). Sub-wave 3B: `21.3.3` (touches files of both). Each task's own bar: no regression of the 35 passing fixtures (`--fixture-group all`), its named regression tests fail at HEAD and pass after; the 39/44 target is checked only after `21.3.3`. Per ADR 0002, no edits outside `solute_fortran_compat/` and the harness test file; SD docs/ADR as named.
+
+#### 21.3.1 — Deck-derived `lTable`, `lExtrap`, `lMinStep` (sub-wave 3A)
+- **Must edit:** `crates/hydrus-core/src/solute_fortran_compat/deck_reader.rs`, `compat_runner.rs`. **Can create:** `planning/tasks/21.3.1.todo.md`; scratch `.development/21.3.1/`. Tests may be added inline in these files' test modules.
+- **Spec:** (a) `deck_reader.rs:517-527`: apply `INPUT.FOR:560-561` negation (`hTab1 = -min(|hTab1|,|hTabN|)`, `hTabN = -max(...)`) before the reset test; derive and carry `l_table` per `INPUT.FOR:565-580`; pass it at `compat_runner.rs:166,1001` instead of `false`. (b) `compat_runner.rs:~1463-1469`: `l_extrap = true` (`INPUT.FOR:1712`). (c) `compat_runner.rs:896`: initial `l_min_step = true` (`INPUT.FOR:1584`); tag `// SD-NNN` only if the orchestrator assigns one (hypothesis in the reports: default storage, not a defect).
+- **Tests:** `deck_reader_derives_table_range_and_ltable_from_input_for_570_580`, `update_extrapolates_head_as_fortran_lextrap`, `tm_cont_first_call_clamps_dt_opt_to_dt_max_c`.
+- **Verification:** `cargo test -p hydrus-core --lib solute_fortran_compat`; `cargo test -p hydrus-core --test solute_fortran_compat_harness`; parity `--fixture-group all` ≥ 35 with the same 35 passing (candidate binary rebuilt: delete `target/debug/solute_compat_deck_runner` first); fmt, clippy.
+- **Anchors:** `INPUT.FOR:560-580,1584,1712`; reports `..._LONGRUN.md` Fix outline items 2-3, `..._WETTING.md` items 1-3.
+
+#### 21.3.2 — Single blended `set_mat` in `wat_flow` (sub-wave 3A)
+- **Must edit:** `crates/hydrus-core/src/solute_fortran_compat/water_compat.rs` (`wat_flow`, ~`:1332-1411`, and its unit tests). **Can create:** `planning/tasks/21.3.2.todo.md`; scratch `.development/21.3.2/`.
+- **Spec:** delete the second `set_mat` call from `72d2544` (`:1370-1411`) and the comment citing unreachable `WATFLOW.FOR:73-76`; pass `state.th_eq` as `theta` in the first call (`WATFLOW.FOR:65`). The spec must state which fixture `72d2544` protected: the worker identifies the `reactions` fixture whose equilibrium water content it fixed (diagnosis reports found no regression with the call removed) and shows it still passes.
+- **Test:** `wat_flow_uses_single_blended_set_mat_for_ihyst0`; update unit tests that relied on `hTemp = hNew`, without weakening assertions (A1).
+- **Verification:** targeted lib tests; parity `--fixture-group all` ≥ 35 with the same 35; `--fixture-group reactions` all pass; fmt, clippy.
+
+#### 21.3.3 — `hTemp`/`vCorr` aliasing and table overrun (sub-wave 3B; depends 21.3.1, 21.3.2)
+- **Must edit:** `compat_runner.rs` (post-solute step ~`:1200-1472`), `water_compat.rs` (`set_mat` table branches ~`:540-580`), `docs/FORTRAN_SOURCE_DEFECTS.md`. **Can create:** `planning/tasks/21.3.3.todo.md`; scratch.
+- **Spec:** (a) SD-NNN: after each solute step copy the solver's final `v_corr` (`driver.rs:1431`) into `h_temp` before `update` (`HYDRUS.FOR:510-511`, `SOLUTE.FOR:741`); the prototype's "zero it" is exact only for `Dg = 0`, so use the real `v_corr`; check `Dg > 0` decks. (b) SD-NNN: when `hiM` is within ~1e-6 of -100, reproduce Fortran's `iT = NTab` read of index `NTab+1` as zeros for `hTab/ConTab/CapTab/TheTab` (`WATFLOW.FOR:482-484,515-518`). Check every other site computing the same quantity first. Tag `// SD-NNN`; register both in the defect register; pin with `source_defect_sdNNN_htemp_aliases_vcorr_on_dirichlet_nodes` and `source_defect_sdNNN_set_mat_reads_past_table`.
+- **Verification:** lib + harness tests; parity `--fixture-group all` ≥ **39** and `tortuosity_millington`, `tortuosity_moldrup_artificial`, `gas_henry_diffusion`, `model6_no_exchange` pass; no previously passing fixture regresses; if the `model6_no_exchange` 1-ulp `top_flux` record blocks it, report (it moves to Wave 3R); fmt, clippy; `python3 -m unittest tools.test_solute_fortran_parity`.
+
+## Wave 3R — Second diagnosis round (after Wave 3; trace and report only, same rules as Wave 1)
+
+Starting point is HEAD after Wave 3, with the remaining failing fixtures. Same method, validation and A5 rules as `21.1.1`; reports under `planning/master/WATER_TRANSIENT_DIAGNOSIS_21R_*.md`; each task sets `CARGO_TARGET_DIR=.development/21-target/<id>`; ≤3 concurrent workers.
+- **21.3.4 — `model6_exchange`** (plus the `model6_no_exchange` 1-ulp `Con` table-interpolation / `top_flux` residual if it persists). Report `..._21R_EXCH6.md`. Start: first divergence after Wave 3; solute-side residuals (`SinkIm`, immobile solute), Model 6 exchange path.
+- **21.3.5 — `model7_exchange` and `model7_no_exchange`.** Report `..._21R_MODEL7.md`. Start: `DualPor` `iDualPor = 2`; `SinkIm` is 2.07e-4 in Fortran and 0 in Rust at the first `DualPor` call after step 1; `water_compat.rs:~1303` silently ignores an `Err` from `dual_porosity_exchange`; `dual_domain.rs`.
+- **21.3.6 — `temperature_coefficients` and `vapor_enabled_external_state`.** Report `..._21R_TEMPVAPOR.md`. Start: `lTemp`/`lVapor` paths in `SetMat`, `ConVapor`, `Temper`; reachability per ADR 0007; these decks were not examined in Wave 1.
+- **Then Wave 3S (user gate, D7):** orchestrator drafts fix specs from the 3R reports; Wave 3F fixes; then Wave 4. Any fixture the 3R reports show cannot be matched (a pinned-source defect that cannot be reproduced) goes to the user as an explicit exclusion decision, never silently dropped.
 
 ## Wave 4 — 44-fixture gate re-run
 
