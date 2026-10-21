@@ -1341,53 +1341,10 @@ pub(crate) fn wat_flow(inputs: &mut WatFlowInputs<'_>, state: &mut WatFlowState<
                 inputs.ak,
                 inputs.ath,
                 state.h_temp,
-                state.th_new,
-                inputs.l_wt_dep,
-                inputs.temp_n,
-                *state.iter,
-                state.con_o,
-                inputs.kappa,
-                inputs.aths,
-                inputs.th_rr,
-                inputs.con_r,
-                inputs.aks,
-                inputs.ah_w,
-                inputs.ath_w,
-                inputs.ak_w,
-                inputs.model,
-                inputs.l_table,
-                inputs.l_vapor,
-                state.th_v_new,
-                state.con_lt,
-                state.con_vt,
-                state.con_vh_buf,
-                inputs.x_conv,
-                inputs.t_conv,
-                state.h_crit_a,
-                inputs.i_enhanc,
-            );
-
-            // `call Hyst(NumNP,...,hNew,hOld,ThEq,Con,Cap,0,2)` (WATFLOW.FOR:73-76) runs after
-            // SetMat and overwrites `Con`, `Cap` and `ThEq` from the new head, so Shift and
-            // Gauss use the values at `hNew`. For the non-hysteretic curves the same
-            // conductivity/capacity/content formulas evaluated at `hNew` are obtained by
-            // passing `hNew` as the temporary head. `iter` is 1 so `ConO` keeps the SetMat value.
-            set_mat(
-                inputs.num_np,
-                inputs.tables,
-                state.h_new,
-                inputs.mat_num,
-                inputs.par_d,
-                state.con,
-                state.cap,
-                inputs.ah,
-                inputs.ak,
-                inputs.ath,
-                state.h_new,
                 &mut *state.th_eq,
                 inputs.l_wt_dep,
                 inputs.temp_n,
-                1,
+                *state.iter,
                 state.con_o,
                 inputs.kappa,
                 inputs.aths,
@@ -1724,8 +1681,11 @@ mod tests {
         }
     }
 
-    #[test]
-    fn test_steady_transient_watflow_and_veloc_21_node_column() {
+    /// Builds the 21-node sandy-loam column and runs one `wat_flow` step, then hands the
+    /// resulting state to `post`.
+    fn run_21_node_column(
+        post: impl FnOnce(&mut WatFlowState<'_>, &[f32], &[f32], &[f32], &[f32]),
+    ) {
         let num_np = 21;
         let mut x = vec![0.0f32; num_np];
         for (i, slot) in x.iter_mut().enumerate() {
@@ -1879,39 +1839,69 @@ mod tests {
 
         wat_flow(&mut inputs, &mut state);
 
-        assert!(*state.convg_f, "WatFlow should converge");
-        assert!(*state.iter > 0 && *state.iter < 20);
+        post(&mut state, &sink, &temp_n, &th_v_old, &x);
+    }
 
-        // Verify Veloc calculation
-        let mut v = vec![0.0f32; num_np];
-        let mut v_v = vec![0.0f32; num_np];
-        veloc(
-            num_np,
-            state.h_new,
-            state.con,
-            &x,
-            1.0,
-            &mut v,
-            state.th_new,
-            state.th_old,
-            &sink,
-            *state.dt,
-            false,
-            false,
-            state.con_lt,
-            state.con_vt,
-            state.con_vh_buf,
-            &temp_n,
-            &mut v_v,
-            state.th_v_new,
-            &th_v_old,
-        );
+    #[test]
+    fn wat_flow_uses_single_blended_set_mat_for_ihyst0() {
+        // WATFLOW.FOR:65 (iHyst != 3) is the only SetMat call: ThEq follows `hTemp`, the
+        // previous iterate, while Con/Cap follow `hNew`. WATFLOW.FOR:73-76 is the iHyst = 3 branch.
+        // With the second (iHyst = 3 only) SetMat call removed, ThEq keeps the value SetMat
+        // computed from `hTemp`, the previous iterate, in the last iteration. The golden
+        // values below come from that single call; the removed call re-evaluated ThEq at
+        // `hNew` and gave 0.12186449 / 0.13416614 for the same nodes.
+        run_21_node_column(|state, _, _, _, _| {
+            assert!(
+                (state.th_eq[18] - 0.12184765).abs() < 2e-6,
+                "{}",
+                state.th_eq[18]
+            );
+            assert!(
+                (state.th_eq[19] - 0.13425353).abs() < 2e-6,
+                "{}",
+                state.th_eq[19]
+            );
+        });
+    }
 
-        // Velocities should be finite and non-zero
-        for val in &v {
-            assert!(val.is_finite());
-            assert!(val.abs() > 0.0, "infiltration velocity should be non-zero");
-        }
+    #[test]
+    fn test_steady_transient_watflow_and_veloc_21_node_column() {
+        run_21_node_column(|state, sink, temp_n, th_v_old, x| {
+            let num_np = x.len();
+            assert!(*state.convg_f, "WatFlow should converge");
+            assert!(*state.iter > 0 && *state.iter < 20);
+
+            // Verify Veloc calculation
+            let mut v = vec![0.0f32; num_np];
+            let mut v_v = vec![0.0f32; num_np];
+            veloc(
+                num_np,
+                state.h_new,
+                state.con,
+                x,
+                1.0,
+                &mut v,
+                state.th_new,
+                state.th_old,
+                sink,
+                *state.dt,
+                false,
+                false,
+                state.con_lt,
+                state.con_vt,
+                state.con_vh_buf,
+                temp_n,
+                &mut v_v,
+                state.th_v_new,
+                th_v_old,
+            );
+
+            // Velocities should be finite and non-zero
+            for val in &v {
+                assert!(val.is_finite());
+                assert!(val.abs() > 0.0, "infiltration velocity should be non-zero");
+            }
+        });
     }
 
     #[test]
