@@ -481,6 +481,24 @@ pub(crate) fn vapor_content(
     }
 }
 
+/// Fortran table dimensions (`HYDRUS.FOR:48-50`): `ConTab(NTabD,NMatD)` etc.
+const N_TAB_D: usize = 100;
+const N_MAT_D: usize = 20;
+
+/// SD-004 (docs/FORTRAN_SOURCE_DEFECTS.md): read `tab(row+1, col+1)` as Fortran does,
+/// without a bound check. Storage is column-major with leading dimension `NTabD`, so a
+/// row at or past `NTab = NTabD` reads the next material's column; columns past the
+/// generated materials (up to `NMatD`) hold zeros.
+fn tab_elem(tab: &[Vec<f32>], col: usize, row: usize) -> f32 {
+    let flat = row + N_TAB_D * col;
+    let (c, r) = (flat / N_TAB_D, flat % N_TAB_D);
+    if c < N_MAT_D {
+        tab.get(c).and_then(|v| v.get(r)).copied().unwrap_or(0.0)
+    } else {
+        0.0
+    }
+}
+
 /// Material properties interpolation and update `SetMat` (`WATFLOW.FOR:433-568`).
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn set_mat(
@@ -524,6 +542,8 @@ pub(crate) fn set_mat(
     let n_tab = tables.n_tab;
     let alh1 = (-tables.h_tab[0]).log10();
     let dlh = ((-tables.h_tab[n_tab - 1]).log10() - alh1) / (n_tab as f32 - 1.0);
+    // Only column 1 of `hTab` is generated for iModel < nTabMod (INPUT.FOR:774-781).
+    let h_tab_cols = [tables.h_tab.clone()];
 
     for i in 0..num_np {
         let mut at = 1.0f32;
@@ -557,10 +577,14 @@ pub(crate) fn set_mat(
         let con_i = if hi1 >= tables.h_sat[m] && hi2 >= tables.h_sat[m] {
             tables.con_sat[m]
         } else if hi_m > tables.h_tab[n_tab - 1] && hi_m <= tables.h_tab[0] && l_table {
+            // SD-004: `iT` is unbounded (WATFLOW.FOR:482-484), so `iT+1` may be `NTab+1`.
             let i_t = (((-hi_m).log10() - alh1) / dlh) as usize;
-            let i_t = i_t.min(n_tab - 2);
-            let dh = (hi_m - tables.h_tab[i_t]) / (tables.h_tab[i_t + 1] - tables.h_tab[i_t]);
-            tables.con_tab[m][i_t] + (tables.con_tab[m][i_t + 1] - tables.con_tab[m][i_t]) * dh
+            let h0 = tab_elem(&h_tab_cols, 0, i_t);
+            let h1 = tab_elem(&h_tab_cols, 0, i_t + 1);
+            let dh = (hi_m - h0) / (h1 - h0);
+            let c0 = tab_elem(&tables.con_tab, m, i_t);
+            let c1 = tab_elem(&tables.con_tab, m, i_t + 1);
+            c0 + (c1 - c0) * dh
         } else {
             fk(model, hi_m, &par_d[m])
         };
@@ -569,13 +593,20 @@ pub(crate) fn set_mat(
         let (cap_i, the_i) = if hi_m >= tables.h_sat[m] {
             (0.0f32, tables.ths[m])
         } else if hi_m >= tables.h_tab[n_tab - 1] && hi_m <= tables.h_tab[0] && l_table {
+            // SD-004: same unbounded `iT` as above (WATFLOW.FOR:515-518).
             let i_t = (((-hi_m).log10() - alh1) / dlh) as usize;
-            let i_t = i_t.min(n_tab - 2);
-            let dh = (hi_m - tables.h_tab[i_t]) / (tables.h_tab[i_t + 1] - tables.h_tab[i_t]);
-            (
-                tables.cap_tab[m][i_t] + (tables.cap_tab[m][i_t + 1] - tables.cap_tab[m][i_t]) * dh,
-                tables.the_tab[m][i_t] + (tables.the_tab[m][i_t + 1] - tables.the_tab[m][i_t]) * dh,
-            )
+            let h0 = tab_elem(&h_tab_cols, 0, i_t);
+            let h1 = tab_elem(&h_tab_cols, 0, i_t + 1);
+            let dh = (hi_m - h0) / (h1 - h0);
+            let (k0, k1) = (
+                tab_elem(&tables.cap_tab, m, i_t),
+                tab_elem(&tables.cap_tab, m, i_t + 1),
+            );
+            let (q0, q1) = (
+                tab_elem(&tables.the_tab, m, i_t),
+                tab_elem(&tables.the_tab, m, i_t + 1),
+            );
+            (k0 + (k1 - k0) * dh, q0 + (q1 - q0) * dh)
         } else {
             (fc(model, hi_m, &par_d[m]), fq(model, hi_m, &par_d[m]))
         };
@@ -1568,6 +1599,101 @@ pub(crate) fn wat_flow(inputs: &mut WatFlowInputs<'_>, state: &mut WatFlowState<
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// SD-004: `SetMat` computes `iT` without a bound (WATFLOW.FOR:482-484,515-518), so
+    /// at the last table node it reads row `NTab+1`, i.e. the next material's column
+    /// (zeros past the last material, and for the single `hTab` column).
+    /// Fails if the read is clamped to the table.
+    #[test]
+    fn source_defect_sd004_set_mat_reads_past_table() {
+        let par = vec![
+            vec![0.065, 0.41, 0.075, 1.89, 4.42, 0.5, 0.0, 0.0, 0.0, 0.0, 0.0],
+            vec![0.05, 0.38, 0.03, 1.5, 1.0, 0.5, 0.0, 0.0, 0.0, 0.0, 0.0],
+        ];
+        let t = gen_mat(100, 2, &par, -0.0001, -100000.0, 0, 1.0, 1.0);
+        // Column-major aliasing: row 101 of material 1 is row 1 of material 2.
+        let cols = [t.h_tab.clone()];
+        assert_eq!(tab_elem(&t.con_tab, 0, 100), t.con_tab[1][0]);
+        assert_eq!(tab_elem(&t.cap_tab, 0, 100), t.cap_tab[1][0]);
+        assert_eq!(tab_elem(&t.the_tab, 0, 100), t.the_tab[1][0]);
+        assert_eq!(tab_elem(&t.con_tab, 1, 100), 0.0);
+        assert_eq!(tab_elem(&cols, 0, 100), 0.0);
+        assert_eq!(tab_elem(&t.con_tab, 0, 99), t.con_tab[0][99]);
+
+        // Scan heads just above the last node until SetMat's `iT` reaches NTab.
+        let alh1 = (-t.h_tab[0]).log10();
+        let dlh = ((-t.h_tab[99]).log10() - alh1) / 99.0;
+        let run = |h: f32, m: usize| {
+            let (mut con, mut cap, mut th, mut con_o) = ([0.0f32], [0.0f32], [0.0f32], [0.0f32]);
+            let (mut tv, mut cl, mut cv, mut cvh) = ([0.0f32], [0.0f32], [0.0f32], [0.0f32]);
+            let one = [1.0f32];
+            let w = vec![1.0f32; 2];
+            set_mat(
+                1,
+                &t,
+                &[h],
+                &[m + 1],
+                &par,
+                &mut con,
+                &mut cap,
+                &one,
+                &one,
+                &one,
+                &[h],
+                &mut th,
+                false,
+                &[20.0],
+                0,
+                &mut con_o,
+                &[-1],
+                &one,
+                &[0.0],
+                &[0.0],
+                &one,
+                &w,
+                &w,
+                &w,
+                0,
+                true,
+                false,
+                &mut tv,
+                &mut cl,
+                &mut cv,
+                &mut cvh,
+                1.0,
+                1.0,
+                -1.0e6,
+                0,
+            );
+            (con[0], cap[0], th[0])
+        };
+        let mut h = t.h_tab[99];
+        let mut found = false;
+        for _ in 0..4096 {
+            h = f32::from_bits(h.to_bits() - 1); // one ulp toward zero
+            let hi_m = 0.1 * h + 0.9 * h;
+            if hi_m > t.h_tab[99] && (((-hi_m).log10() - alh1) / dlh) as usize >= 99 {
+                found = true;
+                let (con0, cap0, th0) = run(h, 0);
+                // Expected per Fortran: row NTab+1 of material 2 for ConTab/CapTab/TheTab, 0 for hTab.
+                let dh = (hi_m - t.h_tab[99]) / (0.0 - t.h_tab[99]);
+                let k = t.con_tab[0][99] + (t.con_tab[1][0] - t.con_tab[0][99]) * dh;
+                assert_eq!(con0, k);
+                assert_eq!(
+                    cap0,
+                    t.cap_tab[0][99] + (t.cap_tab[1][0] - t.cap_tab[0][99]) * dh
+                );
+                assert_eq!(
+                    th0,
+                    t.the_tab[0][99] + (t.the_tab[1][0] - t.the_tab[0][99]) * dh
+                );
+                let (con1, _, _) = run(h, 1);
+                assert_eq!(con1, t.con_tab[1][99] + (0.0 - t.con_tab[1][99]) * dh);
+                break;
+            }
+        }
+        assert!(found, "no head reached iT = NTab");
+    }
 
     #[test]
     fn test_gen_mat_and_set_mat_interpolation_vs_direct() {

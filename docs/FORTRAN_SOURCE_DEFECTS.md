@@ -58,6 +58,56 @@ reproduces on purpose, so its output matches the reference program.
   - **Verdict:** untested
   - **Evidence:** untested
 
+### SD-003 — `Solute` overwrites the water iterate `hTemp` through its `vCorr` argument
+
+- **Source:** `HYDRUS.FOR:510-511` passes `hTemp` in the `vCorr` position of
+  `call Solute(...)`; `SOLUTE.FOR:11,30` declare it `vCorr(NumNP)` and
+  `SOLUTE.FOR:741` assigns `vCorr(i)=ThG*Dg*TauG*derK` for every node.
+- **Expected:** a separate scratch array. `hTemp` is the previous water iterate
+  that `SetMat` (`WATFLOW.FOR:470,473`), `Reset` and `Update` read on the next step.
+- **Effect:** after each solute step with `lChem`, `hTemp` holds the gas-diffusion
+  velocity correction (0 when `Dg=0` or the Henry gradient is 0). `Update`
+  rewrites `hTemp` at most nodes, so the alias shows at nodes it does not
+  rewrite (Dirichlet boundary nodes) through the `hi1` blend in `SetMat`, which
+  changes `Con`, `Cap` and `ThEq`, and so step selection.
+- **Port:** `solute_fortran_compat/compat_runner.rs` (`alias_h_temp_to_v_corr`,
+  called after the solute step). It copies the solver's final `v_corr`
+  (`driver.rs`, `st.v_corr`), not zero, so decks with `Dg>0` are exact.
+- **Pinning test:** `compat_runner::tests::source_defect_sd003_htemp_aliases_vcorr_on_dirichlet_nodes`.
+- **Status:** reproduced; not reported upstream.
+- **Modern HYDRUS:**
+  - **Version:** untested
+  - **Date:** untested
+  - **Verdict:** untested
+  - **Evidence:** untested
+
+### SD-004 — `SetMat` table interpolation reads row `NTab+1`
+
+- **Source:** `WATFLOW.FOR:482-484` (`Con`) and `:515-518` (`Cap`, `Theta`):
+  `iT=int((alog10(-hiM)-alh1)/dlh)+1`, then `hTab(iT+1,1)`, `ConTab(iT+1,M)`,
+  `CapTab(iT+1,M)`, `TheTab(iT+1,M)`. `iT` is not bounded by `NTab-1`.
+- **Expected:** `iT` limited to `NTab-1`. The `iModel.eq.nTabMod` branches
+  (`:491-497`, `:527-533`) loop `j=1,NTab-1` and cannot overrun, so the
+  `lTable` branches are the only unbounded sites.
+- **Effect:** when `hiM` is within rounding of the last node `hTab(NTab)`,
+  `iT=NTab` and the interpolation reads row `NTab+1`. The tables are
+  `ConTab(NTabD,NMatD)` with `NTabD=100`, `NMatD=20` (`HYDRUS.FOR:48-50,75,90`)
+  and `NTab(1)=100` (`INPUT.FOR:1590`), stored column-major, so
+  `ConTab(101,M)` is `ConTab(1,M+1)`: the next material's first row, and zero
+  for the last material. Only column 1 of `hTab` is generated for
+  `iModel<nTabMod` (`INPUT.FOR:774-781`), so `hTab(101,1)` is `hTab(1,2)=0`.
+- **Port:** `solute_fortran_compat/water_compat.rs` (`tab_elem` and the `lTable`
+  branches of `set_mat`). The old clamp `iT<=NTab-2` is gone; `tab_elem`
+  reproduces the column-major read with the same `NTabD`/`NMatD`.
+- **Pinning test:** `water_compat::tests::source_defect_sd004_set_mat_reads_past_table`
+  (two materials; fails if the read is clamped).
+- **Status:** reproduced; not reported upstream.
+- **Modern HYDRUS:**
+  - **Version:** untested
+  - **Date:** untested
+  - **Verdict:** untested
+  - **Evidence:** untested
+
 ## Probe procedure
 
 To determine whether a source defect persists or has been resolved in modern or closed-source HYDRUS builds:

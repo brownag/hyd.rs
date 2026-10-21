@@ -1213,6 +1213,7 @@ fn run_parsed_deck(deck: &ParsedDeck) -> Result<CompatRunOutputs, String> {
             conc = solute_st.conc;
             sorb = solute_st.sorb;
             sorb2 = solute_st.sorb2;
+            alias_h_temp_to_v_corr(&mut h_temp, &solute_st.v_corr);
 
             // Flux concentration calculation (SOLUTE.FOR:228-232)
             if bas.l_flux {
@@ -1536,9 +1537,25 @@ fn run_parsed_deck(deck: &ParsedDeck) -> Result<CompatRunOutputs, String> {
     })
 }
 
+/// SD-003 (docs/FORTRAN_SOURCE_DEFECTS.md): `HYDRUS.FOR:511` passes `hTemp` as
+/// `Solute`'s `vCorr` argument (`SOLUTE.FOR:11,30,741`), so after the solute step
+/// `hTemp` holds the gas-diffusion velocity correction instead of the water iterate.
+fn alias_h_temp_to_v_corr(h_temp: &mut [f32], v_corr: &[f32]) {
+    h_temp.copy_from_slice(v_corr);
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// SD-003: `Solute` overwrites `hTemp` through the `vCorr` alias (HYDRUS.FOR:511).
+    /// Fails if the alias is "fixed" by leaving `hTemp` untouched or zeroing it.
+    #[test]
+    fn source_defect_sd003_htemp_aliases_vcorr_on_dirichlet_nodes() {
+        let mut h_temp = vec![-5.0f32, -6.0, -7.0];
+        alias_h_temp_to_v_corr(&mut h_temp, &[0.25, 0.0, -1.5e-3]);
+        assert_eq!(h_temp, vec![0.25, 0.0, -1.5e-3]);
+    }
 
     #[test]
     fn update_extrapolates_head_as_fortran_lextrap() {
