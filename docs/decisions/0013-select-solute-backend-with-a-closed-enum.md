@@ -12,6 +12,8 @@ source_context: "planning/EXECUTION_PLAN_19.md decision D4; tasks 19.7.1, 18.12.
 
 # 13. Select the solute backend with a closed enum
 
+*Default-backend clause superseded by ADR 0018 (2026-10-22).*
+
 ## Context and Problem Statement
 
 [0002](0002-keep-fvbe-and-source-compatible-backends-separate.md) keeps the FV/BE and source-compatible solute backends separate and lets callers select one by name. The crate needs one place where that selection lives. Today `SoluteConfig` (`crates/hydrus-core/src/solute.rs`) carries the FV/BE settings and no backend choice.

@@ -19,9 +19,10 @@
 | [0015](0015-keep-precision-faithful-hydraulic-ports-in-compat-kernels.md) | Keep precision-faithful hydraulic ports in compat kernels | Accepted | 2026-10-14 | - | - | Orch 19 |
 | [0016](0016-add-serde-derive-for-request-decoding.md) | Add serde derive for request decoding | Accepted | 2026-10-14 | - | - | Orch 19 |
 | [0017](0017-propagate-nonfinite-endpoint-primitives-as-fortran-does.md) | Propagate non-finite endpoint primitives as the pinned Fortran does | Accepted | 2026-10-19 | - | - | Orch 20 (20.6.1) |
+| [0018](0018-default-to-the-fortran-compatible-solute-backend.md) | Default to the Fortran-compatible solute backend | Accepted | 2026-10-22 | 0013 (default clause) | - | Orch 22 (22.1.3) |
 
 ## Scope and Status Notes
 
-These records distill decisions the user made or approved in the planning documents. An accepted ADR doesn't mean its implementation or acceptance gate is complete. Regarding ADR 0002 and ADR 0013, `FortranCompatible` is the default solute backend following the `21.4.1` gate, where genuine Rust-vs-Fortran parity passed across all 44 fixtures (`17d9d9c`, `planning/master/SOLUTE_FORTRAN_PARITY_18.md`). `FiniteVolumeBackwardEuler` remains selectable through `SoluteConfig::with_backend`.
+These records distill decisions the user made or approved in the planning documents. An accepted ADR doesn't mean its implementation or acceptance gate is complete. Regarding ADR 0002 and ADR 0013, `FortranCompatible` is the default solute backend following the `21.4.1` gate, where genuine Rust-vs-Fortran parity passed across all 44 fixtures (`17d9d9c`, `planning/master/SOLUTE_FORTRAN_PARITY_18.md`). `FiniteVolumeBackwardEuler` remains selectable through `SoluteConfig::with_backend`. ADR 0018 records this switch and supersedes only the default-backend clause of ADR 0013.
 
 Non-solute architecture proposals stay as recommendations or user gates in the planning documents, not ADRs. They cover API hosts and formats, memory and solver policy, optional feature scope, and licensing review.
