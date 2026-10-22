@@ -32,26 +32,19 @@ pub fn format_fortran_e(val: f64, w: usize, d: usize) -> String {
     }
     let sign = if val < 0.0 { "-" } else { " " };
     let abs_v = val.abs();
-    let mut exp_val = (abs_v.log10().floor() as i32) + 1;
-    let man_val = abs_v / 10f64.powi(exp_val);
-
-    // Round mantissa to d decimal digits
-    let factor = 10f64.powi(d as i32);
-    let mut rounded = (man_val * factor).round() / factor;
-    if rounded >= 1.0 {
-        rounded /= 10.0;
-        exp_val += 1;
-    }
-    let man_str = format!("{:.precision$}", rounded, precision = d);
+    // Exact decimal conversion of the binary value, rounded to nearest with
+    // ties to even, as libgfortran does when `ROUND=` is unspecified (e.g. the
+    // `e13.5` write at `OUTPUT.FOR:209` prints `49.0625` as `0.49062E+02`;
+    // probe evidence in `planning/master/WATER_TRANSIENT_DIAGNOSIS_21R_TEMPVAPOR.md`).
+    // Rust's `{:.Ne}` gives `d` significant digits `x.xxxxe<k>` and carries into
+    // the exponent; Fortran's `0.xxxxxE<k+1>` is the same digits re-based.
+    let sci = format!("{:.prec$e}", abs_v, prec = d.max(1) - 1);
+    let (digits, rust_exp) = sci.split_once('e').unwrap_or((sci.as_str(), "0"));
+    let exp_val = rust_exp.parse::<i32>().unwrap_or(0) + 1;
+    let man_str = format!("0.{}", digits.replace('.', ""));
     let exp_sign = if exp_val >= 0 { "+" } else { "-" };
     let exp_str = format!("{}{:02}", exp_sign, exp_val.abs());
-    let s = format!(
-        "{}{}{}E{}",
-        sign,
-        if man_str.starts_with("0.") { "" } else { "0" },
-        man_str,
-        exp_str
-    );
+    let s = format!("{}{}E{}", sign, man_str, exp_str);
     format!("{:>w$}", s, w = w)
 }
 
@@ -878,6 +871,24 @@ mod tests {
         assert_eq!(format_fortran_e(1.2009, 13, 5), "  0.12009E+01");
         assert_eq!(format_fortran_e(-0.43, 12, 4), " -0.4300E+00");
         assert_eq!(format_fortran_e(0.43, 12, 4), "  0.4300E+00");
+    }
+
+    #[test]
+    fn format_fortran_e_rounds_exact_ties_to_even() {
+        // Expected strings are gfortran 13.3.0 output for REAL values (DOUBLE for 2^-12).
+        assert_eq!(format_fortran_e(49.0625, 13, 5), "  0.49062E+02");
+        assert_eq!(format_fortran_e(-49.0625, 13, 5), " -0.49062E+02");
+        assert_eq!(format_fortran_e(0.125, 11, 1), "    0.1E+00");
+        assert_eq!(format_fortran_e(0.375, 11, 1), "    0.4E+00");
+        assert_eq!(format_fortran_e(0.25, 11, 1), "    0.2E+00");
+        assert_eq!(format_fortran_e(2.5, 11, 1), "    0.2E+01");
+        assert_eq!(format_fortran_e(3.5, 11, 1), "    0.4E+01");
+        // f32 9.99995 widened to f64: rounding carries into the exponent.
+        assert_eq!(
+            format_fortran_e(9.999_95_f32 as f64, 13, 5),
+            "  0.10000E+02"
+        );
+        assert_eq!(format_fortran_e(2f64.powi(-12), 15, 8), " 0.24414062E-03");
     }
 
     #[test]
