@@ -1,7 +1,7 @@
 # State — Orchestration 21
 
 Plan status: **Approved by user on 2026-10-20 (“yes”).**
-Execution status: **Wave 3 complete and verified (39/44, 2026-10-21); Wave 3R (21.3.4–21.3.6) dispatched.**
+Execution status: **Wave 3 complete and verified (39/44, 2026-10-21); Wave 3R done; at Wave 3S user gate (D7).**
 Plan: [EXECUTION_PLAN_21.md](EXECUTION_PLAN_21.md). Worker template: [PROMPT_TEMPLATE_21.md](PROMPT_TEMPLATE_21.md).
 Supersedes: Orchestration 20 tasks `20.6.1` (gate re-run → `21.4.1`) and `20.7.1` (default switch → `21.5.1`).
 
@@ -34,8 +34,9 @@ Supersedes: Orchestration 20 tasks `20.6.1` (gate re-run → `21.4.1`) and `20.7
 | 3 | 21.3.3 | hTemp/vCorr aliasing (SD-003), table overrun (SD-004) | done |
 | 3R | 21.3.4 | Diagnose model6_exchange | done |
 | 3R | 21.3.5 | Diagnose model7_exchange, model7_no_exchange | done |
-| 3R | 21.3.6 | Diagnose temperature_coefficients, vapor_enabled_external_state | in progress |
-| 3S/3F | — | User gate D7, then fixes from 3R | pending |
+| 3R | 21.3.6 | Diagnose temperature_coefficients, vapor_enabled_external_state | done |
+| 3S | — | User gate D7: Wave 3F specs (21.3.7–21.3.9) | in progress |
+| 3F | 21.3.7–21.3.9 | Fixes from 3R | pending |
 | 4 | 21.4.1 | 44-fixture gate re-run and evidence docs | pending |
 | 5 | 21.5.1 | Default backend → `FortranCompatible` | pending |
 
@@ -68,4 +69,5 @@ Supersedes: Orchestration 20 tasks `20.6.1` (gate re-run → `21.4.1`) and `20.7
 - 21.3.4 (`36a3741`, merge `8a06634`), `..._21R_EXCH6.md`: model6_exchange first divergence = `lEquil` stays true in Rust; `HYDRUS.FOR:278` (`if(iDualPor.gt.0) lEquil=.false.`) not ported, so `NEquil`/`SorbConc` never run. Water matches in all 2,340 records. Prototype (`deck_reader.rs:~1056`, chem `l_equil=false` when `i_dual_por>0`) → 40/44, no regressions. Also: `STrans` never copied back to the `NOD_INF` array (unobserved); stale harness comment at `solute_fortran_compat_harness.rs:817-818`. model6_no_exchange 1-ulp residual gone. No SD.
 - 21.3.5 (`67df1a5`, merge `b72dae9`), `..._21R_MODEL7.md`: two causes. (1) `compat_runner.rs:920,925` test `mat.i_model == 7` after `deck_reader.rs:549-551` remapped it to 0, so `immobile_n`/`immobile_saturated_conductivity` = None → `dual_porosity_exchange` Err on every call, swallowed by `if let Ok` at `water_compat.rs:1334`; Ks floor 1e-37 (`MATERIAL.FOR:28`) explains model7_no_exchange's 1e-34 Sorb. (2) Same `HYDRUS.FOR:278` omission as 21.3.4. Both prototyped in `compat_runner.rs` → 42/44 (model6_exchange, model7_* pass), no regressions. No SD.
 - Fix-spec note: 21.3.4 and 21.3.5 share the `lEquil` fix; draft one task for it. Scratch lives inside each worktree's `.development/` (main-repo `.development/<id>` symlinks there): do not remove those worktrees before Wave 4.
+- 21.3.6 (merge after `e481b6d`), `..._21R_TEMPVAPOR.md`: temperature_coefficients = output-only: `CumCh` bit-identical; `format_fortran_e` rounds the exact tie 49.0625 away from zero, gfortran to even. vapor_enabled_external_state: first divergence `ConVT` at call 1 — `i_enhanc` 0 in Rust (`compat_runner.rs:180,1015`) vs `iEnhanc=1` (`INPUT.FOR:1718`); then `vTotal` f64 sum and `vVapIso`/`vVapTerm` = 0 in `NOD_INF_V`. SD-003 alias ruled out (`vCorr` = 0). Prototypes of all four → 41/44, no regressions. No SD.
 

@@ -249,6 +249,36 @@ Applies to each of `21.3.4`–`21.3.6`; per-task fields follow.
 
 - **Then Wave 3S (user gate, D7):** orchestrator drafts fix specs from the 3R reports; Wave 3F fixes; then Wave 4. Any fixture the 3R reports show cannot be matched (a pinned-source defect that cannot be reproduced) goes to the user as an explicit exclusion decision, never silently dropped.
 
+### Wave 3F amendment (drafted 2026-10-21 from the three 3R reports; pending user approval as D7)
+
+**Classification.** All five remaining failures are Rust porting omissions; none is a pinned-source defect, and no fixture needs a "cannot be matched" exclusion. Prototypes: 21.3.5 (dual-porosity, both causes) 42/44; 21.3.6 (vapor + formatter) 41/44; each with no regression. The union is untested; it is predicted to give 44/44 and is checked by `21.3.9`.
+- **Dual porosity** (`model6_exchange`, `model7_exchange`, `model7_no_exchange`): (i) `HYDRUS.FOR:278` `if(iDualPor.gt.0) lEquil=.false.` not ported; (ii) `compat_runner.rs:920,925` key the Model 7 immobile `n`/`Ks` on `i_model == 7` after `deck_reader.rs:549-551` remapped it to 0, and `water_compat.rs:1334` swallows the resulting `Err`.
+- **Output formatting** (`temperature_coefficients`): `format_fortran_e` rounds exact ties away from zero; libgfortran rounds them to even (`49.0625` → `0.49062E+02`). `CumCh` is bit-identical.
+- **Vapor** (`vapor_enabled_external_state`): `i_enhanc` passed as 0 (`compat_runner.rs:180,1015`), Fortran default 1 (`INPUT.FOR:1718`); then `NOD_INF_V.OUT` `vTotal` summed in f64 (`OUTPUT.FOR:816` is REAL) and `vVapIso`/`vVapTerm` hard-coded 0 (`OUTPUT.FOR:769-810`).
+
+**Sequencing.** Sub-wave 3F-A: `21.3.7` and `21.3.8` in parallel (disjoint files). Sub-wave 3F-B: `21.3.9` (shares `compat_runner.rs` with `21.3.7`). The Wave 3 envelope applies unchanged. No `SD-NNN` entries are expected; a task that finds one follows the D5(b) rule.
+
+#### 21.3.7 — Dual-porosity `lEquil`, Model 7 immobile parameters, exchange errors (sub-wave 3F-A)
+- **Must edit:** `crates/hydrus-core/src/solute_fortran_compat/deck_reader.rs`, `compat_runner.rs`, `water_compat.rs`; `crates/hydrus-core/tests/solute_fortran_compat_harness.rs` (stale comment `:817-818` only, plus the new harness test). **Can create:** `planning/tasks/21.3.7.todo.md`; scratch `.development/21.3.7/`.
+- **Spec:** (a) `deck_reader.rs` (`parse_and_validate_case`, ~`:1049-1061`): set the chemistry `l_equil = false` when `mat_in.i_dual_por > 0` (`HYDRUS.FOR:278`); leave `bas_inf.l_equil` (read by `NodInf`, `HYDRUS.FOR:196`) unchanged. (b) `compat_runner.rs:920,925`: key `immobile_n`/`immobile_saturated_conductivity` on `mat.i_dual_por == 2` (`INPUT.FOR:622-624`); grep the module for any other pre-remap `i_model == 6|7` test (21.3.5 found none). (c) `water_compat.rs:1334`: `wat_flow` returns `Result<(), String>` (or the module's `KernelError`), propagating the `dual_porosity_exchange` error; `compat_runner.rs:~1058` propagates it as the runner's `Err`. Update the `wat_flow` unit-test call sites mechanically (`.unwrap()`); do not weaken assertions. (d) `compat_runner.rs:~1213-1215`: copy `solute_st.s_trans` back into the outer `s_trans` next to `conc`/`sorb`/`sorb2` (`SOLUTE.FOR:191-194`, `OUTPUT.FOR:833-865`). (e) Replace the stale harness comment at `:817-818` with the current fact (head and moisture match at print precision).
+- **Tests (fail at HEAD, pass after):** `deck_reader_forces_nonequilibrium_solute_for_dual_porosity_as_hydrus_for_278`; `dual_por_materials_carry_model7_immobile_slots_after_imodel_remap`; `wat_flow_surfaces_dual_porosity_exchange_errors`; `nod_inf_reports_solute_strans_after_solute_step`; harness `model6_exchange_immobile_concentration_follows_fortran`.
+- **Verification:** `cargo test -p hydrus-core --lib solute_fortran_compat`; `cargo test -p hydrus-core --test solute_fortran_compat_harness`; parity (cached runner deleted, SHA-256 recorded) `--fixture-group dual_exchange` 4/4, `--fixture-group nonequilibrium` all pass (`dual_model6`/`dual_model7` now take the `lEquil=.false.` path), `--fixture-group all` ≥ 42 with no regression vs `.development/21.3V/all.json`; fmt, clippy.
+- **Anchors:** reports `planning/master/WATER_TRANSIENT_DIAGNOSIS_21R_{EXCH6,MODEL7}.md` (Fix outline); prototypes `.development/21.3.4/proto_lequil_dualpor.patch`, `.development/21.3.5/proto_dualpor2.patch`.
+
+#### 21.3.8 — `format_fortran_e` rounds exact ties to even (sub-wave 3F-A)
+- **Must edit:** `crates/hydrus-core/src/solute_fortran_compat/output_compat.rs` (`format_fortran_e`, `:20-55`, and its tests). **Can create:** `planning/tasks/21.3.8.todo.md`; scratch `.development/21.3.8/`.
+- **Spec:** replace the f64 `(man_val * factor).round()` mantissa with exact decimal conversion (e.g. Rust's `{:.Ne}` formatting, which rounds the exact binary value half-to-even), re-based to Fortran's `0.ddddd E±ee` form, including carry into the exponent. Keep the NaN, Infinity, zero and sign handling unchanged. Cite libgfortran's default `RN`-compatible rounding and the 21.3.6 probe evidence.
+- **Tests:** `format_fortran_e_rounds_exact_ties_to_even` (`49.0625`,`e11.5` → `0.49062E+02`; `0.375`/`0.125` at `d=1`); existing `format_fortran_e` tests unchanged and green (A1).
+- **Verification:** targeted lib tests; harness; parity `--fixture-group all` ≥ 40 with `temperature_coefficients` passing and no regression vs 21.3V (this changes every E-format field, so the whole gate is the regression check); fmt, clippy.
+- **Anchors:** `planning/master/WATER_TRANSIENT_DIAGNOSIS_21R_TEMPVAPOR.md` (Fix outline item 4); `output_compat.rs:1-60`.
+
+#### 21.3.9 — Vapor enhancement and `NOD_INF_V` vapor fluxes (sub-wave 3F-B; depends 21.3.7, 21.3.8)
+- **Must edit:** `crates/hydrus-core/src/solute_fortran_compat/compat_runner.rs`. **Can create:** `planning/tasks/21.3.9.todo.md`; scratch `.development/21.3.9/`.
+- **Spec:** (a) an `I_ENHANC: i32 = 1` constant beside `L_EXTRAP`/`L_MIN_STEP_INIT` (`INPUT.FOR:1718`), used at `:180` (initial `set_mat`, `HYDRUS.FOR:229`) and `:1015` (`WatFlowInputs.i_enhanc`). (b) `:468`: `vTotal` as an f32 sum (`OUTPUT.FOR:816`). (c) `make_nod_inf_v_block` (`:449-484`) takes `h_new` and the temperature and computes `vVapIso`/`vVapTerm` in f32 per `OUTPUT.FOR:769-772` (node 1), `:783-786` (node N), `:804-810` (interior); update both callers (`:864` with `temp_o`, `:1432` with `temp_n`). Anchor by grep; line numbers shift after 21.3.7.
+- **Tests:** `con_vapor_applies_enhancement_factor_as_fortran_ienhanc` (runner-level: `I_ENHANC == 1` reaches `con_vapor`); `nod_inf_v_total_is_single_precision_sum`; `nod_inf_v_reports_isothermal_and_thermal_vapor_flux`.
+- **Verification:** targeted lib + harness tests; parity `--fixture-group all` **44/44** (report any failure; do not chase it: the orchestrator returns to a user gate); fmt, clippy; `python3 -m unittest tools.test_solute_fortran_parity`.
+- **Anchors:** `..._21R_TEMPVAPOR.md` Fix outline items 1-3; prototype `.development/21.3.6/proto_all_with_trace.patch` (contains trace code too: port the fix only).
+
 ## Wave 4 — 44-fixture gate re-run
 
 ### 21.4.1 — Re-run the 44-fixture all-mode gate and refresh evidence docs
