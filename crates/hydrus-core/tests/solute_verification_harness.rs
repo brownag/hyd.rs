@@ -49,6 +49,7 @@ struct Request {
     initial: Vec<Vec<f64>>,
     steps: usize,
     print_steps: Vec<usize>,
+    backend: SoluteBackend,
 }
 
 fn require(condition: bool, message: &str) -> Result<()> {
@@ -140,12 +141,20 @@ impl Request {
             get("schema")? == "flat-ascii-v1",
             "unsupported request schema",
         )?;
+        let backend = match fields.get("backend").copied() {
+            None => SoluteBackend::FiniteVolumeBackwardEuler,
+            Some("fortran-compatible") => SoluteBackend::FortranCompatible,
+            Some(_) => return Err("unknown backend".into()),
+        };
         let count = integer(get("species_count")?)?;
         require((1..=3).contains(&count), "unsupported species count")?;
         let mut expected: BTreeSet<String> = "schema run_id launch_id case_id cases_sha256 case_sha256 nodes species_count length theta rho q dispersion dt time_end sampling_interval analysis_times species kd rates inlet_concentration"
             .split_whitespace().map(str::to_owned).collect();
         for i in 0..count {
             expected.insert(format!("initial_{i}"));
+        }
+        if fields.contains_key("backend") {
+            expected.insert("backend".to_owned());
         }
         require(
             fields
@@ -248,6 +257,7 @@ impl Request {
             initial,
             steps,
             print_steps,
+            backend,
         };
         request.validate_mapping()?;
         Ok(request)
@@ -535,7 +545,7 @@ fn simulate(request: &Request) -> Result<Observation> {
         &[],
     )
     .map_err(|e| e.to_string())?
-    .with_backend(SoluteBackend::FiniteVolumeBackwardEuler);
+    .with_backend(request.backend);
     let count = request.species.len();
     let mut state = SoluteState::new(
         &config,
@@ -726,6 +736,11 @@ fn observation_json(request: &Request, hash: &str, observations: &Observation) -
             .collect::<Vec<_>>()
             .join(",")
     };
+    // Backend text lives only in free-text fields; the frozen key set is unchanged.
+    let process = match request.backend {
+        SoluteBackend::FortranCompatible => "Fortran-compatible solute backend (REAL f32 arithmetic) through the public advance_solute_step API; process metadata (iteration limit, tolerances) is the pinned-Fortran scheme's own. ",
+        _ => "Linear equilibrium process: max_iterations=20, nonlinear_tolerance=1e-6, minimum_pivot=1e-12; backward Euler. ",
+    };
     // Identifiers were restricted to safe ASCII; no arbitrary strings are interpolated.
     format!(concat!(
         "{{\"schema_version\":\"solute-observation-v1\",\"run_id\":\"{}\",\"launch_id\":\"{}\",\"case_id\":\"{}\",",
@@ -733,11 +748,11 @@ fn observation_json(request: &Request, hash: &str, observations: &Observation) -
         "\"coordinates\":{},\"profiles\":[{}],\"steps\":[{}],\"endpoint_history\":[{}],",
         "\"solver_reported\":{{\"inventory\":null,\"boundary_cumulative\":[{}],\"reaction_cumulative\":[{}],\"balance\":null}},",
         "\"availability\":{{\"endpoint_history\":\"Initial and every accepted fixed step; canonical inlet,outlet order.\",",
-        "\"solver_reported\":\"Core cumulative boundary and reaction mass at profile times. Inventory and cumulative balance unavailable from public accounting API; iterations unavailable. Linear equilibrium process: max_iterations=20, nonlinear_tolerance=1e-6, minimum_pivot=1e-12; backward Euler. Peclet=q*dx/(theta*D), zero at zero flow; Courant=q*dt/(theta*dx), unretarded. Independent storage and continuous integrals are computed by metrics.\",",
+        "\"solver_reported\":\"Core cumulative boundary and reaction mass at profile times. Inventory and cumulative balance unavailable from public accounting API; iterations unavailable. {}Peclet=q*dx/(theta*D), zero at zero flow; Courant=q*dt/(theta*dx), unretarded. Independent storage and continuous integrals are computed by metrics.\",",
         "\"water\":\"Caller-supplied homogeneous theta and canonical q at all faces from hash-verified flat request; source mapping in SOLUTE_VERIFICATION_SPEC.md. These fields are prescribed, not water-solver measurements.\"}},\"warnings\":[]}}\n"),
         request.run_id, request.launch_id, request.case_id, request.cases_sha256, request.case_sha256, hash, UNITS,
         request.species.iter().map(|s| format!("\"{s}\"")).collect::<Vec<_>>().join(","),
-        array(&request.coordinates()), profiles, steps, endpoints, reported(true), reported(false))
+        array(&request.coordinates()), profiles, steps, endpoints, reported(true), reported(false), process)
 }
 
 #[test]
@@ -877,6 +892,42 @@ fn strict_parser_rejects_malformed_and_nonfinite_requests() {
             "accepted {request}"
         );
     }
+}
+
+#[test]
+fn request_backend_selects_fortran_compatible() {
+    let base = small_request("diffusion_cosine");
+    let request = Request::parse(format!("{base}backend=fortran-compatible\n").as_bytes()).unwrap();
+    assert_eq!(request.backend, SoluteBackend::FortranCompatible);
+    let observation = simulate(&request).unwrap();
+    let json = observation_json(&request, &"a".repeat(64), &observation);
+    assert!(json.contains("Fortran-compatible solute backend"));
+    assert!(!json.contains("backward Euler") && !json.contains("Linear equilibrium process"));
+    assert!(json.contains("\"solver\":\"rust\""));
+    assert!(!json.contains("\"backend\""));
+}
+
+#[test]
+fn absent_backend_keeps_fv_be() {
+    let request = Request::parse(small_request("diffusion_cosine").as_bytes()).unwrap();
+    assert_eq!(request.backend, SoluteBackend::FiniteVolumeBackwardEuler);
+    let observation = simulate(&request).unwrap();
+    let json = observation_json(&request, &"a".repeat(64), &observation);
+    assert!(json.contains("iterations unavailable. Linear equilibrium process: max_iterations=20, nonlinear_tolerance=1e-6, minimum_pivot=1e-12; backward Euler. Peclet=q*dx/(theta*D)"));
+    assert!(!json.contains("Fortran-compatible"));
+}
+
+#[test]
+fn unknown_backend_is_rejected() {
+    let base = small_request("reaction_zero");
+    for value in ["finite-volume", "FORTRAN-COMPATIBLE", "fortran_compatible"] {
+        assert!(Request::parse(format!("{base}backend={value}\n").as_bytes()).is_err());
+    }
+    assert!(Request::parse(format!("{base}backend=\n").as_bytes()).is_err());
+    assert!(Request::parse(
+        format!("{base}backend=fortran-compatible\nbackend=fortran-compatible\n").as_bytes()
+    )
+    .is_err());
 }
 
 #[test]
