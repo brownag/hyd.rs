@@ -6,7 +6,7 @@
 //! structured `CompatRunOutputs` matching Fortran raw output files.
 
 use super::accounting::{FluxConcInput, MassTotals};
-use super::deck_reader::{parse_and_validate_case, ParsedDeck};
+use super::deck_reader::{parse_and_validate_case, MatIn, ParsedDeck};
 use super::driver::{SoluteDriverScratch, SoluteStepConfig, SoluteStepState};
 use super::initialization::{initialize_sources, InitConfig, InitFlags, InitState};
 use super::iteration::{solve_solute_with_nonlinear_with_scratch, NonlinearConfig};
@@ -908,29 +908,7 @@ fn run_parsed_deck(deck: &ParsedDeck) -> Result<CompatRunOutputs, String> {
     let mut c_cum_a = vec![0.0f64; ns];
 
     // DualPorMaterial conversion for wat_flow
-    let dual_por_materials = if i_dual_por_u8 > 0 && !mat.par.is_empty() {
-        let p0 = &mat.par[0];
-        vec![DualPorMaterial {
-            mobile_residual_water: DefaultReal(p0[0]),
-            mobile_saturated_water: DefaultReal(p0[1]),
-            mobile_tortuosity: Some(DefaultReal(p0[5])),
-            immobile_residual_water: DefaultReal(p0.get(6).copied().unwrap_or(0.0)),
-            immobile_saturated_water: DefaultReal(p0.get(7).copied().unwrap_or(0.0)),
-            immobile_alpha: DefaultReal(p0.get(8).copied().unwrap_or(0.0)),
-            immobile_n: if mat.i_model == 7 {
-                p0.get(9).copied().map(DefaultReal)
-            } else {
-                None
-            },
-            immobile_saturated_conductivity: if mat.i_model == 7 {
-                p0.get(10).copied().map(DefaultReal)
-            } else {
-                None
-            },
-        }]
-    } else {
-        Vec::new()
-    };
+    let dual_por_materials = dual_por_materials(mat);
 
     let mut solute_rows = vec![Vec::<SoluteRow>::new(); ns];
     let mut obs_node_rows = Vec::<ObsNodeRow>::new();
@@ -1055,7 +1033,8 @@ fn run_parsed_deck(deck: &ParsedDeck) -> Result<CompatRunOutputs, String> {
                 w_transf: &mut w_transf_flow,
             };
 
-            wat_flow(&mut inputs, &mut state);
+            wat_flow(&mut inputs, &mut state)
+                .map_err(|e| format!("wat_flow dual-porosity exchange failed: {e}"))?;
 
             if !convg_f {
                 return Err("wat_flow did not converge".to_string());
@@ -1213,6 +1192,8 @@ fn run_parsed_deck(deck: &ParsedDeck) -> Result<CompatRunOutputs, String> {
             conc = solute_st.conc;
             sorb = solute_st.sorb;
             sorb2 = solute_st.sorb2;
+            // MassTran fills STrans (SOLUTE.FOR:191-194); NodOut prints it (OUTPUT.FOR:833-865).
+            s_trans.copy_from_slice(&solute_st.s_trans);
             alias_h_temp_to_v_corr(&mut h_temp, &solute_st.v_corr);
 
             // Flux concentration calculation (SOLUTE.FOR:228-232)
@@ -1537,6 +1518,34 @@ fn run_parsed_deck(deck: &ParsedDeck) -> Result<CompatRunOutputs, String> {
     })
 }
 
+/// `ParD` column 1 as the `DualPorMaterial` that `wat_flow` hands to `DualPor`.
+fn dual_por_materials(mat: &MatIn) -> Vec<DualPorMaterial> {
+    if mat.i_dual_por == 0 || mat.par.is_empty() {
+        return Vec::new();
+    }
+    let p0 = &mat.par[0];
+    vec![DualPorMaterial {
+        mobile_residual_water: DefaultReal(p0[0]),
+        mobile_saturated_water: DefaultReal(p0[1]),
+        mobile_tortuosity: Some(DefaultReal(p0[5])),
+        immobile_residual_water: DefaultReal(p0.get(6).copied().unwrap_or(0.0)),
+        immobile_saturated_water: DefaultReal(p0.get(7).copied().unwrap_or(0.0)),
+        immobile_alpha: DefaultReal(p0.get(8).copied().unwrap_or(0.0)),
+        // INPUT.FOR:622-624: Model 7 is stored as iModel=0, iDualPor=2 with NPar=11, so the
+        // immobile n and Ks slots key on iDualPor, not on the remapped iModel.
+        immobile_n: if mat.i_dual_por == 2 {
+            p0.get(9).copied().map(DefaultReal)
+        } else {
+            None
+        },
+        immobile_saturated_conductivity: if mat.i_dual_por == 2 {
+            p0.get(10).copied().map(DefaultReal)
+        } else {
+            None
+        },
+    }]
+}
+
 /// SD-003 (docs/FORTRAN_SOURCE_DEFECTS.md): `HYDRUS.FOR:511` passes `hTemp` as
 /// `Solute`'s `vCorr` argument (`SOLUTE.FOR:11,30,741`), so after the solute step
 /// `hTemp` holds the gas-diffusion velocity correction instead of the water iterate.
@@ -1627,5 +1636,59 @@ mod tests {
         );
         assert!(!l_min_step);
         assert!(dt_opt <= 0.05 + 1e-9);
+    }
+
+    /// Reads a `processes/dual_exchange` parity deck (test-only filesystem access).
+    fn dual_exchange_deck(name: &str) -> (String, String, String) {
+        let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../reference/fortran_reference/solute/parity/processes/dual_exchange")
+            .join(name);
+        let read = |f: &str| std::fs::read_to_string(dir.join(f)).expect(f);
+        (read("CASE.json"), read("SELECTOR.IN"), read("PROFILE.DAT"))
+    }
+
+    #[test]
+    fn dual_por_materials_carry_model7_immobile_slots_after_imodel_remap() {
+        // INPUT.FOR:622-624: iModel 7 is read as iModel=0, iDualPor=2, NPar=11.
+        let (case, sel, prof) = dual_exchange_deck("model7_exchange");
+        let (_m, deck) = parse_and_validate_case(&case, &sel, &prof).expect("parse");
+        assert_eq!((deck.mat_in.i_model, deck.mat_in.i_dual_por), (0, 2));
+        let m7 = dual_por_materials(&deck.mat_in);
+        assert_eq!(m7.len(), 1);
+        assert_eq!(m7[0].immobile_n, Some(DefaultReal(1.2)));
+        assert_eq!(
+            m7[0].immobile_saturated_conductivity,
+            Some(DefaultReal(0.01))
+        );
+
+        // iModel 6 (iDualPor=1, NPar=9) has no immobile n/Ks slots.
+        let (case, sel, prof) = dual_exchange_deck("model6_exchange");
+        let (_m, deck) = parse_and_validate_case(&case, &sel, &prof).expect("parse");
+        let m6 = dual_por_materials(&deck.mat_in);
+        assert_eq!(m6[0].immobile_n, None);
+        assert_eq!(m6[0].immobile_saturated_conductivity, None);
+    }
+
+    /// `MassTran` fills `STrans` (SOLUTE.FOR:191-194) and `NodOut` prints it
+    /// (OUTPUT.FOR:833-865). Pinned Fortran `NOD_INF.OUT` for `model6_exchange`, t = 1,
+    /// node 2 prints STrans `0.2612E-01` (21.3.4 canonical run,
+    /// `.development/21.3.4/base_f/run/model6_exchange\NOD_INF.OUT:32`).
+    #[test]
+    fn nod_inf_reports_solute_strans_after_solute_step() {
+        let (case, sel, prof) = dual_exchange_deck("model6_exchange");
+        let outputs = run_compat_deck(&case, &sel, &prof).expect("run");
+        let nod = &outputs.nod_inf_out;
+        let start = nod.find("Time:        1.0000").expect("t = 1 block");
+        let row = nod[start..]
+            .lines()
+            .find(|l| l.trim_start().starts_with("2 "))
+            .expect("node 2");
+        // Fields after Node: depth, head, moisture, WTrans, Im.Moist., Flux, STrans, ...
+        let fields: Vec<f64> = row
+            .split_whitespace()
+            .skip(1)
+            .map(|v| v.parse().expect("number"))
+            .collect();
+        assert!((fields[6] - 0.2612e-1).abs() < 5e-6, "STrans {}", fields[6]);
     }
 }

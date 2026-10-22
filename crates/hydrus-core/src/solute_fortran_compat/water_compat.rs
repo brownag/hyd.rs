@@ -11,7 +11,7 @@
 //! - `TIME.FOR`: `TmCont`.
 
 use super::dual_domain::dual_porosity_exchange;
-use super::types::{DefaultReal, DualPorMaterial, DualPorPrimitiveState};
+use super::types::{DefaultReal, DualPorMaterial, DualPorPrimitiveState, KernelError};
 
 /// Normalizes hydraulic model ID: models 6 and 7 route to 0 (fracture/macropore domain).
 #[inline]
@@ -1307,7 +1307,10 @@ pub(crate) struct WatFlowState<'a> {
 }
 
 /// Solves 1D Richards equation for one time step `WatFlow` (`WATFLOW.FOR:3-169`).
-pub(crate) fn wat_flow(inputs: &mut WatFlowInputs<'_>, state: &mut WatFlowState<'_>) {
+pub(crate) fn wat_flow(
+    inputs: &mut WatFlowInputs<'_>,
+    state: &mut WatFlowState<'_>,
+) -> Result<(), KernelError> {
     let r_max = 1.0e10f32;
     let r_min = 1.0e-100f64;
 
@@ -1331,13 +1334,12 @@ pub(crate) fn wat_flow(inputs: &mut WatFlowInputs<'_>, state: &mut WatFlowState<
             hydraulic_model: inputs.model,
             dual_porosity: inputs.i_dual_por,
         };
-        if let Ok(exchange) = dual_porosity_exchange(&primitive_state) {
-            for i in 0..inputs.num_np {
-                state.sink_im[i] = exchange.sink_immobile[i].0;
-                state.th_new_im[i] = exchange.new_immobile_water[i].0;
-            }
-            *state.w_transf = exchange.transfer.0;
+        let exchange = dual_porosity_exchange(&primitive_state)?;
+        for i in 0..inputs.num_np {
+            state.sink_im[i] = exchange.sink_immobile[i].0;
+            state.th_new_im[i] = exchange.new_immobile_water[i].0;
         }
+        *state.w_transf = exchange.transfer.0;
     }
 
     let mut p = vec![0.0f64; inputs.num_np];
@@ -1561,7 +1563,7 @@ pub(crate) fn wat_flow(inputs: &mut WatFlowInputs<'_>, state: &mut WatFlowState<
                     continue 'inner_iteration;
                 } else if *state.dt <= inputs.dt_min {
                     *state.convg_f = false;
-                    return;
+                    return Ok(());
                 } else {
                     // Retry with smaller timestep
                     for i in 0..inputs.num_np {
@@ -1594,6 +1596,7 @@ pub(crate) fn wat_flow(inputs: &mut WatFlowInputs<'_>, state: &mut WatFlowState<
             break 'outer_retry;
         }
     }
+    Ok(())
 }
 
 #[cfg(test)]
@@ -1812,6 +1815,16 @@ mod tests {
     fn run_21_node_column(
         post: impl FnOnce(&mut WatFlowState<'_>, &[f32], &[f32], &[f32], &[f32]),
     ) {
+        run_21_node_column_with(0, &[], post).unwrap();
+    }
+
+    /// `run_21_node_column` with the dual-porosity selector and materials given; returns
+    /// the `wat_flow` result (`post` runs only on success).
+    fn run_21_node_column_with(
+        i_dual_por: u8,
+        dual_por_materials: &[DualPorMaterial],
+        post: impl FnOnce(&mut WatFlowState<'_>, &[f32], &[f32], &[f32], &[f32]),
+    ) -> Result<(), KernelError> {
         let num_np = 21;
         let mut x = vec![0.0f32; num_np];
         for (i, slot) in x.iter_mut().enumerate() {
@@ -1916,8 +1929,8 @@ mod tests {
             x_conv: 1.0,
             t_conv: 1.0,
             tau_w: 0.0,
-            i_dual_por: 0,
-            dual_por_materials: &[],
+            i_dual_por,
+            dual_por_materials,
             _temp_o: &temp_o,
             h_seep: 0.0,
             i_enhanc: 0,
@@ -1963,9 +1976,28 @@ mod tests {
             w_transf: &mut w_transf,
         };
 
-        wat_flow(&mut inputs, &mut state);
+        wat_flow(&mut inputs, &mut state)?;
 
         post(&mut state, &sink, &temp_n, &th_v_old, &x);
+        Ok(())
+    }
+
+    #[test]
+    fn wat_flow_surfaces_dual_porosity_exchange_errors() {
+        // iDualPor = 2 (INPUT.FOR:622-624) needs the immobile n and Ks slots; without them
+        // `dual_porosity_exchange` rejects the material, and `wat_flow` must not drop that.
+        let material = DualPorMaterial {
+            mobile_residual_water: DefaultReal(0.065),
+            mobile_saturated_water: DefaultReal(0.41),
+            mobile_tortuosity: Some(DefaultReal(0.5)),
+            immobile_residual_water: DefaultReal(0.01),
+            immobile_saturated_water: DefaultReal(0.12),
+            immobile_alpha: DefaultReal(0.1),
+            immobile_n: None,
+            immobile_saturated_conductivity: None,
+        };
+        let result = run_21_node_column_with(2, &[material], |_, _, _, _, _| {});
+        assert!(result.is_err(), "{result:?}");
     }
 
     #[test]
