@@ -1,7 +1,7 @@
 # State — Orchestration 21
 
 Plan status: **Approved by user on 2026-10-20 (“yes”).**
-Execution status: **Wave 3 complete and verified (39/44, 2026-10-21); Wave 3S approved (D7); Wave 3 (incl. 3R/3F) complete: 44/44 at `99fe2a6`; Wave 4 done (44/44 documented); Wave 5 (21.5.1) dispatched.**
+Execution status: **Complete (2026-10-22). 44/44 parity; default backend is `FortranCompatible`.**
 Plan: [EXECUTION_PLAN_21.md](EXECUTION_PLAN_21.md). Worker template: [PROMPT_TEMPLATE_21.md](PROMPT_TEMPLATE_21.md).
 Supersedes: Orchestration 20 tasks `20.6.1` (gate re-run → `21.4.1`) and `20.7.1` (default switch → `21.5.1`).
 
@@ -40,7 +40,7 @@ Supersedes: Orchestration 20 tasks `20.6.1` (gate re-run → `21.4.1`) and `20.7
 | 3F-A | 21.3.8 | format_fortran_e ties-to-even | done |
 | 3F-B | 21.3.9 | Vapor enhancement and NOD_INF_V fluxes | done |
 | 4 | 21.4.1 | 44-fixture gate re-run and evidence docs | done |
-| 5 | 21.5.1 | Default backend → `FortranCompatible` | in progress |
+| 5 | 21.5.1 | Default backend → `FortranCompatible` | done |
 
 ## Verification log
 
@@ -86,4 +86,16 @@ Supersedes: Orchestration 20 tasks `20.6.1` (gate re-run → `21.4.1`) and `20.7
 
 ### Wave 4 (2026-10-22) — docs only
 - 21.4.1 (merge after `17d9d9c`): all-mode + 7 group runs at `17d9d9c`, all exit 0, **44/44** (transport 18, reactions 4, transport_properties 5, nonequilibrium 5, dual_exchange 4, biology 6, flux_concentration 2). 349 reference vs 122 candidate digests, disjoint; candidate digests identical to the orchestrator's 21.3F run in all 44; reference digests differ only in wall-clock `Date/Time` and `Calculation time` lines (not reproducible run to run: compare candidate digests). Coverage: iPsi=3 ×1; W-volumeI ×9 (6 coupled DualPor); iHyst=0 ×44. Same section appended to `SOLUTE_FORTRAN_PARITY_18.md`, `PHASE_5_SOLUTE_EVIDENCE.md`, `VALIDATION_STRATEGY.md`; 20.6.1 sections marked superseded.
+
+### Wave 5 (2026-10-22) — verified by orchestrator (A4, serial)
+- 21.5.1 (merge after `cc314d3`): `SoluteConfig::new` defaults to `FortranCompatible` (`solute.rs:287`; only code line changed, rest doc comments); FV/BE selectable via `with_backend`. `solute_solver_selection.rs` renames + new strict `to_bits` test `default_step_is_bit_identical_to_explicit_fortran_compatible_and_differs_from_fv_be`; `solute_backend_contract.rs:199`; `docs/decisions/README.md:24`. No fallout outside Must edit; no newly ignored tests. ADR 0013 `:35` ("default is FiniteVolumeBackwardEuler") left as historical record; README note supersedes.
+- D5 re-pin: `POLICY_HASHES["crates/hydrus-core/src/solute.rs"]` `46a7e00d…` → `f82eb0e2…` (justification: default switch only; FV/BE equations unchanged).
+- A4: `cargo test --workspace --no-fail-fast` **429 passed**, 0 failed, 1 ignored (second run; first run hit the paired-gate flake in `test_parity_biology_{filtration_deposition,blocking_type_3_noop}`, passing 12/12 alone); fmt, clippy, `git diff --check` clean; Python discover **317 OK**.
+
+## Follow-ups (not scheduled)
+- Paired-gate flake: `solute_fortran_compat_harness` paired gates fail ("paired status None") on the first run after a rebuild, because concurrent tests race on the cached `solute_compat_deck_runner` rebuild (`tools/solute_rust_candidate_adapter.py:40-70`). Seen 3 times this orchestration.
+- Unobserved output differences: `-0.0` E-format sign; NOD_INF node depth sign at t=1; `NodOut` recomputed `vi`/`vVi` vs solver `v`/`vv`.
+- `HYSTER.FOR` port (D1, deferred until this orchestration completed).
+- ADR 0013 default statement: consider an ADR note via adr-distillation.
+- Worktrees `.development/21-worktrees/21.*` hold trace scratch (main `.development/21.3.{4,5}` symlink into them); remove once the reports no longer need their evidence.
 
