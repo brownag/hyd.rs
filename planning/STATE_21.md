@@ -1,7 +1,7 @@
 # State — Orchestration 21
 
 Plan status: **Approved by user on 2026-10-20 (“yes”).**
-Execution status: **Wave 3 complete and verified (39/44, 2026-10-21); Wave 3S approved (D7); 3F-A done (43/44); 3F-B (21.3.9) dispatched.**
+Execution status: **Wave 3 complete and verified (39/44, 2026-10-21); Wave 3S approved (D7); Wave 3 (incl. 3R/3F) complete: 44/44 at `99fe2a6`; Wave 4 (21.4.1) dispatched.**
 Plan: [EXECUTION_PLAN_21.md](EXECUTION_PLAN_21.md). Worker template: [PROMPT_TEMPLATE_21.md](PROMPT_TEMPLATE_21.md).
 Supersedes: Orchestration 20 tasks `20.6.1` (gate re-run → `21.4.1`) and `20.7.1` (default switch → `21.5.1`).
 
@@ -38,8 +38,8 @@ Supersedes: Orchestration 20 tasks `20.6.1` (gate re-run → `21.4.1`) and `20.7
 | 3S | — | User gate D7: Wave 3F specs (21.3.7–21.3.9) | done |
 | 3F-A | 21.3.7 | Dual-porosity lEquil, Model 7 immobile params, exchange errors | done |
 | 3F-A | 21.3.8 | format_fortran_e ties-to-even | done |
-| 3F-B | 21.3.9 | Vapor enhancement and NOD_INF_V fluxes | in progress |
-| 4 | 21.4.1 | 44-fixture gate re-run and evidence docs | pending |
+| 3F-B | 21.3.9 | Vapor enhancement and NOD_INF_V fluxes | done |
+| 4 | 21.4.1 | 44-fixture gate re-run and evidence docs | in progress |
 | 5 | 21.5.1 | Default backend → `FortranCompatible` | pending |
 
 ## Verification log
@@ -77,4 +77,10 @@ Supersedes: Orchestration 20 tasks `20.6.1` (gate re-run → `21.4.1`) and `20.7
 - 21.3.8 (`7fc72f5`, merge `d14337e`): `format_fortran_e` uses exact `{:.Ne}` conversion (ties to even), re-based to `0.ddddE±ee`. gfortran 13.3.0 probe: 39,295 field writes, 0 mismatches (HEAD function: 23, all ties). Test `format_fortran_e_rounds_exact_ties_to_even`. Worker parity 40/44. Known unobserved difference: gfortran prints `-0.0…E+00` (all 44 reference outputs), Rust ` 0.0…E+00`; parity parses numerically, so no effect (follow-up candidate, out of scope).
 - 21.3.7 (`0b6c1ff`, merge `dd95e58`): chem `l_equil=false` when `l_chem && i_dual_por>0` (`HYDRUS.FOR:271,278`, `deck_reader.rs:1065-1070`); `dual_por_materials` keys Model 7 immobile n/Ks on `i_dual_por==2`; `wat_flow` returns `Result<(), KernelError>` (error propagated by runner); `s_trans` copied back for NOD_INF; stale harness comment replaced. 5 tests (red by assertion against a stub). Worker parity: dual_exchange 4/4, nonequilibrium 5/5, all 42/44. Out-of-scope observation: Rust NOD_INF node-2 depth `0.2500` vs Fortran `-0.2500` at t=1 (unobserved).
 - Orchestrator on merged tree: lib `solute_fortran_compat` 244 passed/1 ignored; harness 12/12; parity all **43/44** (`.development/21.3FA/all.json`, runner `29596d66…`), only vapor_enabled_external_state failing.
+
+### Wave 3F-B (2026-10-21) — verified by orchestrator at `99fe2a6` (A4, serial)
+- 21.3.9 (merge `99fe2a6`): `I_ENHANC = 1` (`INPUT.FOR:1718`) at initial `set_mat` and `WatFlowInputs`; `make_nod_inf_v_block` extracted to a module fn: f32 `vTotal` (`OUTPUT.FOR:816`), `vVapIso`/`vVapTerm` per `OUTPUT.FOR:769-770,783-784,804-809`. 3 tests (red vs stub); deck-level test ~15 s debug. Worker parity 44/44.
+- A4 at `99fe2a6`: `cargo test --workspace --no-fail-fast` **428 passed**, 0 failed, 1 ignored; fmt, clippy `-D warnings`, `git diff --check` clean; Python discover **317 OK** (133.9 s); `planning/master` clean.
+- Parity `--fixture-group all`: **44/44**, top-level `"status": "pass"` (`.development/21.3F/all.json`).
+- Unobserved output differences (follow-up candidates, not parity-gated): `-0.0` E-format sign; NOD_INF node depth sign at t=1; `NodOut` recomputes `vi`/`vVi` where Rust prints solver `v`/`vv`.
 
