@@ -7,6 +7,7 @@ for comparison against normalized Fortran reference outputs.
 
 from __future__ import annotations
 
+import fcntl
 import hashlib
 import json
 import os
@@ -38,7 +39,19 @@ def load_json(path: Path):
 
 
 def _ensure_rust_runner_binary(workspace_root: Path) -> Path:
-    """Ensure a fast, standalone runner executable linking hydrus_core is compiled and cached."""
+    """Ensure a fast, standalone runner executable linking hydrus_core is compiled and cached.
+
+    The whole check-and-build runs under an exclusive file lock, so concurrent
+    callers build once and waiters reuse the binary that was just published.
+    """
+    target_dir = workspace_root / "target" / "debug"
+    target_dir.mkdir(parents=True, exist_ok=True)
+    with (target_dir / ".solute_compat_deck_runner.lock").open("a+b") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        return _ensure_rust_runner_binary_locked(workspace_root)
+
+
+def _ensure_rust_runner_binary_locked(workspace_root: Path) -> Path:
     target_dir = workspace_root / "target" / "debug"
     deps_dir = target_dir / "deps"
     cached_bin = target_dir / "solute_compat_deck_runner"
@@ -122,6 +135,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         raise RuntimeError(f"could not locate compiled libserde_json rlib in {deps_dir}")
     serde_json_rlib = serde_json_rlibs[0]
 
+    tmp_bin = target_dir / f".solute_compat_deck_runner.{os.getpid()}.tmp"
     cmd = [
         "rustc",
         "-",
@@ -136,11 +150,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "--crate-type",
         "bin",
         "-o",
-        str(cached_bin),
+        str(tmp_bin),
     ]
-    res = subprocess.run(cmd, input=runner_src, text=True, cwd=workspace_root, capture_output=True)
-    if res.returncode != 0:
-        raise RuntimeError(f"failed to compile rust candidate runner:\nstdout: {res.stdout}\nstderr: {res.stderr}")
+    try:
+        res = subprocess.run(cmd, input=runner_src, text=True, cwd=workspace_root, capture_output=True)
+        if res.returncode != 0:
+            raise RuntimeError(f"failed to compile rust candidate runner:\nstdout: {res.stdout}\nstderr: {res.stderr}")
+        os.replace(tmp_bin, cached_bin)
+    finally:
+        tmp_bin.unlink(missing_ok=True)
 
     return cached_bin
 
