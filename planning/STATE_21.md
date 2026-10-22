@@ -1,7 +1,7 @@
 # State — Orchestration 21
 
 Plan status: **Approved by user on 2026-10-20 (“yes”).**
-Execution status: **Wave 3 complete and verified (39/44, 2026-10-21); Wave 3S approved (D7); Wave 3 (incl. 3R/3F) complete: 44/44 at `99fe2a6`; Wave 4 (21.4.1) dispatched.**
+Execution status: **Wave 3 complete and verified (39/44, 2026-10-21); Wave 3S approved (D7); Wave 3 (incl. 3R/3F) complete: 44/44 at `99fe2a6`; Wave 4 done (44/44 documented); Wave 5 (21.5.1) dispatched.**
 Plan: [EXECUTION_PLAN_21.md](EXECUTION_PLAN_21.md). Worker template: [PROMPT_TEMPLATE_21.md](PROMPT_TEMPLATE_21.md).
 Supersedes: Orchestration 20 tasks `20.6.1` (gate re-run → `21.4.1`) and `20.7.1` (default switch → `21.5.1`).
 
@@ -18,7 +18,7 @@ Supersedes: Orchestration 20 tasks `20.6.1` (gate re-run → `21.4.1`) and `20.7
 - [x] `STATE_20.md` rows `20.6.1`/`20.7.1` marked superseded (Wave 0).
 - [x] Wave 2 user gate: Wave 3 fix specs approved (D6, 2026-10-20).
 - [x] Wave 3S user gate: fix specs from the 3R reports approved (D7, 2026-10-21).
-- [ ] Genuine 44/44 all-mode Rust-vs-Fortran parity (`21.4.1`) before the default switch (`21.5.1`).
+- [x] Genuine 44/44 all-mode Rust-vs-Fortran parity (`21.4.1`, 2026-10-22, `17d9d9c`) before the default switch (`21.5.1`).
 
 ## Wave board
 
@@ -39,8 +39,8 @@ Supersedes: Orchestration 20 tasks `20.6.1` (gate re-run → `21.4.1`) and `20.7
 | 3F-A | 21.3.7 | Dual-porosity lEquil, Model 7 immobile params, exchange errors | done |
 | 3F-A | 21.3.8 | format_fortran_e ties-to-even | done |
 | 3F-B | 21.3.9 | Vapor enhancement and NOD_INF_V fluxes | done |
-| 4 | 21.4.1 | 44-fixture gate re-run and evidence docs | in progress |
-| 5 | 21.5.1 | Default backend → `FortranCompatible` | pending |
+| 4 | 21.4.1 | 44-fixture gate re-run and evidence docs | done |
+| 5 | 21.5.1 | Default backend → `FortranCompatible` | in progress |
 
 ## Verification log
 
@@ -83,4 +83,7 @@ Supersedes: Orchestration 20 tasks `20.6.1` (gate re-run → `21.4.1`) and `20.7
 - A4 at `99fe2a6`: `cargo test --workspace --no-fail-fast` **428 passed**, 0 failed, 1 ignored; fmt, clippy `-D warnings`, `git diff --check` clean; Python discover **317 OK** (133.9 s); `planning/master` clean.
 - Parity `--fixture-group all`: **44/44**, top-level `"status": "pass"` (`.development/21.3F/all.json`).
 - Unobserved output differences (follow-up candidates, not parity-gated): `-0.0` E-format sign; NOD_INF node depth sign at t=1; `NodOut` recomputes `vi`/`vVi` where Rust prints solver `v`/`vv`.
+
+### Wave 4 (2026-10-22) — docs only
+- 21.4.1 (merge after `17d9d9c`): all-mode + 7 group runs at `17d9d9c`, all exit 0, **44/44** (transport 18, reactions 4, transport_properties 5, nonequilibrium 5, dual_exchange 4, biology 6, flux_concentration 2). 349 reference vs 122 candidate digests, disjoint; candidate digests identical to the orchestrator's 21.3F run in all 44; reference digests differ only in wall-clock `Date/Time` and `Calculation time` lines (not reproducible run to run: compare candidate digests). Coverage: iPsi=3 ×1; W-volumeI ×9 (6 coupled DualPor); iHyst=0 ×44. Same section appended to `SOLUTE_FORTRAN_PARITY_18.md`, `PHASE_5_SOLUTE_EVIDENCE.md`, `VALIDATION_STRATEGY.md`; 20.6.1 sections marked superseded.
 
