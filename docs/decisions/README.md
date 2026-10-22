@@ -22,6 +22,6 @@
 
 ## Scope and Status Notes
 
-These records distill decisions the user made or approved in the planning documents. An accepted ADR doesn't mean its implementation or acceptance gate is complete. Regarding ADR 0002, `FiniteVolumeBackwardEuler` remains the default backend until the 44-fixture genuine Rust-vs-Fortran parity gate passes in Wave 6/7. The all-mode solute parity gate and the default backend switch are still pending.
+These records distill decisions the user made or approved in the planning documents. An accepted ADR doesn't mean its implementation or acceptance gate is complete. Regarding ADR 0002 and ADR 0013, `FortranCompatible` is the default solute backend following the `21.4.1` gate, where genuine Rust-vs-Fortran parity passed across all 44 fixtures (`17d9d9c`, `planning/master/SOLUTE_FORTRAN_PARITY_18.md`). `FiniteVolumeBackwardEuler` remains selectable through `SoluteConfig::with_backend`.
 
 Non-solute architecture proposals stay as recommendations or user gates in the planning documents, not ADRs. They cover API hosts and formats, memory and solver policy, optional feature scope, and licensing review.
