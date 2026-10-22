@@ -23,9 +23,10 @@ FIXTURE = "reference/fortran_reference/solute/example3"
 OLD_RUN = ".development/12.2.1/run"
 OLD_RUST = ".development/12.6.1/rust-observations.json"
 POLICY_HASHES = {
-    # Re-pinned under Orchestration 20 D6 (Wave 2B / 20.2.2): preallocated compat buffers in
-    # SoluteWorkspace and full SoluteConfig mapping while FV/BE path is preserved bitwise verbatim.
-    "crates/hydrus-core/src/solute.rs": "46a7e00dc940058531ea3dfb39c262bb5c90581db752995e5d2d4ac0d4290cbc",
+    # Re-pinned under Orchestration 21 D5 (21.5.1): SoluteConfig::new defaults to
+    # FortranCompatible after the 21.4.1 44/44 parity gate; FV/BE equations unchanged and
+    # still selectable via with_backend.
+    "crates/hydrus-core/src/solute.rs": "f82eb0e2b888175758543e42fc0f83332d1930676e2af3a3306f527c8c0eba9b",
     "crates/hydrus-core/src/hydraulics/linear.rs": "6b5649011b1c605e77d55500fa08bd5bfbb708d3548abd225c3dbc11f3e0196e",
     "crates/hydrus-core/tests/solute_fixture_parity.rs": "890bb77171f189402299cf9ceaf8b4809ffa15e3c52a82355016e92b6893bba9",
     "crates/hydrus-core/tests/solute_verification_harness.rs": "df60e942863d08738ec60945aec548815a3ab021d70ff1b7d2b0469e73beb3f1",
