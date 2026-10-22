@@ -1,7 +1,7 @@
 # State — Orchestration 21
 
 Plan status: **Approved by user on 2026-10-20 (“yes”).**
-Execution status: **Wave 3 complete and verified (39/44, 2026-10-21); Wave 3S approved (D7); sub-wave 3F-A (21.3.7, 21.3.8) dispatched.**
+Execution status: **Wave 3 complete and verified (39/44, 2026-10-21); Wave 3S approved (D7); 3F-A done (43/44); 3F-B (21.3.9) dispatched.**
 Plan: [EXECUTION_PLAN_21.md](EXECUTION_PLAN_21.md). Worker template: [PROMPT_TEMPLATE_21.md](PROMPT_TEMPLATE_21.md).
 Supersedes: Orchestration 20 tasks `20.6.1` (gate re-run → `21.4.1`) and `20.7.1` (default switch → `21.5.1`).
 
@@ -36,9 +36,9 @@ Supersedes: Orchestration 20 tasks `20.6.1` (gate re-run → `21.4.1`) and `20.7
 | 3R | 21.3.5 | Diagnose model7_exchange, model7_no_exchange | done |
 | 3R | 21.3.6 | Diagnose temperature_coefficients, vapor_enabled_external_state | done |
 | 3S | — | User gate D7: Wave 3F specs (21.3.7–21.3.9) | done |
-| 3F-A | 21.3.7 | Dual-porosity lEquil, Model 7 immobile params, exchange errors | in progress |
-| 3F-A | 21.3.8 | format_fortran_e ties-to-even | in progress |
-| 3F-B | 21.3.9 | Vapor enhancement and NOD_INF_V fluxes | pending |
+| 3F-A | 21.3.7 | Dual-porosity lEquil, Model 7 immobile params, exchange errors | done |
+| 3F-A | 21.3.8 | format_fortran_e ties-to-even | done |
+| 3F-B | 21.3.9 | Vapor enhancement and NOD_INF_V fluxes | in progress |
 | 4 | 21.4.1 | 44-fixture gate re-run and evidence docs | pending |
 | 5 | 21.5.1 | Default backend → `FortranCompatible` | pending |
 
@@ -72,4 +72,9 @@ Supersedes: Orchestration 20 tasks `20.6.1` (gate re-run → `21.4.1`) and `20.7
 - 21.3.5 (`67df1a5`, merge `b72dae9`), `..._21R_MODEL7.md`: two causes. (1) `compat_runner.rs:920,925` test `mat.i_model == 7` after `deck_reader.rs:549-551` remapped it to 0, so `immobile_n`/`immobile_saturated_conductivity` = None → `dual_porosity_exchange` Err on every call, swallowed by `if let Ok` at `water_compat.rs:1334`; Ks floor 1e-37 (`MATERIAL.FOR:28`) explains model7_no_exchange's 1e-34 Sorb. (2) Same `HYDRUS.FOR:278` omission as 21.3.4. Both prototyped in `compat_runner.rs` → 42/44 (model6_exchange, model7_* pass), no regressions. No SD.
 - Fix-spec note: 21.3.4 and 21.3.5 share the `lEquil` fix; draft one task for it. Scratch lives inside each worktree's `.development/` (main-repo `.development/<id>` symlinks there): do not remove those worktrees before Wave 4.
 - 21.3.6 (merge after `e481b6d`), `..._21R_TEMPVAPOR.md`: temperature_coefficients = output-only: `CumCh` bit-identical; `format_fortran_e` rounds the exact tie 49.0625 away from zero, gfortran to even. vapor_enabled_external_state: first divergence `ConVT` at call 1 — `i_enhanc` 0 in Rust (`compat_runner.rs:180,1015`) vs `iEnhanc=1` (`INPUT.FOR:1718`); then `vTotal` f64 sum and `vVapIso`/`vVapTerm` = 0 in `NOD_INF_V`. SD-003 alias ruled out (`vCorr` = 0). Prototypes of all four → 41/44, no regressions. No SD.
+
+### Wave 3F-A (2026-10-21) — fixes; merged tree verified by orchestrator at `dd95e58`
+- 21.3.8 (`7fc72f5`, merge `d14337e`): `format_fortran_e` uses exact `{:.Ne}` conversion (ties to even), re-based to `0.ddddE±ee`. gfortran 13.3.0 probe: 39,295 field writes, 0 mismatches (HEAD function: 23, all ties). Test `format_fortran_e_rounds_exact_ties_to_even`. Worker parity 40/44. Known unobserved difference: gfortran prints `-0.0…E+00` (all 44 reference outputs), Rust ` 0.0…E+00`; parity parses numerically, so no effect (follow-up candidate, out of scope).
+- 21.3.7 (`0b6c1ff`, merge `dd95e58`): chem `l_equil=false` when `l_chem && i_dual_por>0` (`HYDRUS.FOR:271,278`, `deck_reader.rs:1065-1070`); `dual_por_materials` keys Model 7 immobile n/Ks on `i_dual_por==2`; `wat_flow` returns `Result<(), KernelError>` (error propagated by runner); `s_trans` copied back for NOD_INF; stale harness comment replaced. 5 tests (red by assertion against a stub). Worker parity: dual_exchange 4/4, nonequilibrium 5/5, all 42/44. Out-of-scope observation: Rust NOD_INF node-2 depth `0.2500` vs Fortran `-0.2500` at t=1 (unobserved).
+- Orchestrator on merged tree: lib `solute_fortran_compat` 244 passed/1 ignored; harness 12/12; parity all **43/44** (`.development/21.3FA/all.json`, runner `29596d66…`), only vapor_enabled_external_state failing.
 
