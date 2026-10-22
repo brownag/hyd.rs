@@ -123,6 +123,8 @@ Task 18.15.1 completed full serial execution of all 44 parity fixtures across al
 
 ## 20.6.1 all-mode Rust-vs-Fortran parity run (round 5, 2026-10-20T10:47:56Z) — FAIL, 35/44
 
+> **Superseded** by the 21.4.1 run below (2026-10-22, `17d9d9c`): 44/44 PASS. This section is kept as the round-5 record.
+
 - **Command:** `PYTHONDONTWRITEBYTECODE=1 python3 tools/run_solute_parity.py --fixture-group all --backend fortran-compatible --task-root .development/20.6.1/r5_final`, plus one run per named group (`.development/20.6.1/r5_final_<group>`).
 - **Commit:** `62c4b37` plus uncommitted 20.6.1 changes.
 - **Result:** 35 of 44 fixtures pass. The gate does not pass, so 44/44 is not claimed.
@@ -149,3 +151,45 @@ Task 18.15.1 completed full serial execution of all 44 parity fixtures across al
   - `transport_properties` (5): pinned `Con` varies between nodes at identical head (Kappa history), so the top flux drifts in time. Rust keeps it constant.
   - Two attempts were made on this cause. The porting work is the next step.
 - **Disclaimer (unchanged):** `FortranCompatible` establishes pinned-source numerical parity, while continuum and mathematical accuracy are tracked separately by the FV/BE analytical and convergence suites.
+
+## 21.4.1 all-mode Rust-vs-Fortran parity run (2026-10-22T04:45:25Z) — PASS, 44/44
+
+- **Command:** `PYTHONDONTWRITEBYTECODE=1 python3 tools/run_solute_parity.py --fixture-group all --backend fortran-compatible --task-root .development/21.4.1/all_parity`, then one run per named group with its own task root (`.development/21.4.1/<group>_parity`), run serially.
+- **Timestamp (UTC):** all-mode run 2026-10-22T04:45:25Z to 04:47:42Z; group runs finished 2026-10-22T04:50:03Z.
+- **Commit:** `17d9d9c` (clean tree; the last code change is merge `99fe2a6`).
+- **Result:** 44 of 44 fixtures pass. The all-mode run and all seven group runs exit 0 with top-level `"status": "pass"`. No fixture has status `fail`. The seven groups together hold the same 44 fixtures as the all-mode run.
+
+| Group | Fixtures | Pass | Fail |
+|---|---|---|---|
+| transport | 18 | 18 | 0 |
+| reactions | 4 | 4 | 0 |
+| transport_properties | 5 | 5 | 0 |
+| nonequilibrium | 5 | 5 | 0 |
+| dual_exchange | 4 | 4 | 0 |
+| biology | 6 | 6 | 0 |
+| flux_concentration | 2 | 2 | 0 |
+
+- **Divergence metric:** the runner has no `divergent_count` field. Per-fixture `status` is the metric, and the fail counts above stand in for it.
+- **Digests:** 44 fixtures. 349 distinct Fortran reference output SHA-256 values and 122 distinct Rust candidate values. Shared reference/candidate digests: 0, so the Rust candidate produced its own outputs. Pinned patch SHA-256 `622d1ea6...` on every fixture. Candidate runner `solute_compat_deck_runner` SHA-256 `320a4ad9...`, compiled fresh against `libhydrus_core` rlib `61ba7811...` in a new target directory.
+- **Reproducibility:** checked against an independent all-mode run at the same code (`99fe2a6`). Every candidate output digest is identical in all 44 fixtures, and every per-fixture status matches. Every Fortran reference digest differs. Across all 493 reference output files, the only lines that differ are the wall-clock `Date: … Time:` header line and the `BALANCE.OUT` `Calculation time [sec]` line. The Fortran executable is rebuilt for each fixture task root, and its SHA-256 differs from build to build (44 distinct values in each run).
+- **Coverage:**
+  - Active `iPsi = 3` is exercised by one fixture, `biology/blocking_type_3_noop` (`CASE.json`, `blocking_iPsi: 3`).
+  - `W-volumeI[L]` is output by nine fixtures (`CASE.json`/`OBSERVATION_MAP.json`). From `SELECTOR.IN`, all nine have `lWat = t`. Six of them run coupled `WatFlow`/`DualPor`: `Model Hysteresis` = `6 0` in `dual_exchange/model6_exchange`, `dual_exchange/model6_no_exchange` and `nonequilibrium/dual_model6`, and `7 0` in `dual_exchange/model7_exchange`, `dual_exchange/model7_no_exchange` and `nonequilibrium/dual_model7`. The other three have `0 0` (no `DualPor`): `nonequilibrium/dual_single_domain_control`, `mobile_control` and `mobile_immobile`.
+  - From `SELECTOR.IN`, all 44 fixtures have `iHyst = 0`.
+- **What changed since 20.6.1 (35/44):** pass counts went 35 → 39 → 43 → 44.
+  - The 20.6.1 attribution to an unported `Hyst` (`HYSTER.FOR`) was wrong. With `iHyst = 0` that code is unreachable. The water divergence came from the differences listed below, outside the solver equations.
+  - Deck-derived `lTable`, applying the `INPUT.FOR:560-580` `hTab` negation; `lExtrap = .true.` (`INPUT.FOR:1712`); `lMinStep = .true.` (`INPUT.FOR:1584`).
+  - `wat_flow` makes one blended `SetMat` call (`WATFLOW.FOR:65`). The second, unblended call (commit `72d2544`, citing the unreachable `iHyst = 3` branch at `WATFLOW.FOR:73-76`) is removed.
+  - Two pinned-source defects are reproduced in the Rust port and registered in `docs/FORTRAN_SOURCE_DEFECTS.md` with pinning tests:
+    - SD-003: `Solute` overwrites `hTemp` through its `vCorr` argument (`HYDRUS.FOR:510-511`).
+    - SD-004: `SetMat` table interpolation reads row `NTab+1` (`WATFLOW.FOR:482-484,515-518`).
+  - The pinned Fortran is not modified to reproduce SD-003/SD-004. The Rust port reproduces them, as ADR 0001 and the defect register require.
+  - With `lChem` set and `iDualPor > 0`, `lEquil` is set to `.false.` (`HYDRUS.FOR:278`), so `NEquil`/`SorbConc` run for the dual-porosity decks.
+  - Model 7 immobile `n`/`Ks` are keyed on `iDualPor = 2`; before, they were dropped and the exchange call failed silently. `WatFlow` exchange errors now propagate. `STrans` is copied back for `NOD_INF`.
+  - `format_fortran_e` rounds exact ties to even, as gfortran does.
+  - Vapor: `iEnhanc = 1` (`INPUT.FOR:1718`). `NOD_INF_V` reports an f32 `vTotal` and `vVapIso`/`vVapTerm` as `OUTPUT.FOR:769-816` does.
+- **Known gaps not covered by the gate:** these output differences are not observed by the parity comparison and are open follow-ups:
+  - gfortran prints `-0.0…E+00` where Rust prints ` 0.0…E+00`. Parity parses values numerically.
+  - The `NOD_INF` node depth sign at t=1: Rust prints `0.2500`, Fortran `-0.2500`.
+  - `NodOut` recomputes `vi`/`vVi`, while Rust prints the solver's `v`/`vv`.
+- **Disclaimer:** `FortranCompatible` establishes pinned-source numerical parity, while continuum and mathematical accuracy are tracked separately by the FV/BE analytical and convergence suites.
