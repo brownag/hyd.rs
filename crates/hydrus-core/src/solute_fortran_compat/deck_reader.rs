@@ -1053,7 +1053,7 @@ pub(crate) fn parse_and_validate_case(
 ) -> Result<(ParsedRequest, ParsedDeck), String> {
     let manifest = parse_case_manifest(case_json)?;
 
-    let (bas_inf, mat_in, tm_in, chem_in) = parse_selector_in(selector_in)?;
+    let (bas_inf, mat_in, tm_in, mut chem_in) = parse_selector_in(selector_in)?;
     let nod_inf = parse_profile_dat(
         profile_dat,
         bas_inf.l_chem,
@@ -1062,6 +1062,12 @@ pub(crate) fn parse_and_validate_case(
         chem_in.l_bact,
         chem_in.l_dual_n_eq,
     )?;
+    // HYDRUS.FOR:271,278: inside `if(lChem)`, after ChemIn, `if(iDualPor.gt.0)
+    // lEquil=.false.`. NodInf (HYDRUS.FOR:196) has already read PROFILE.DAT with the
+    // Block A value, so `bas_inf.l_equil` stays as read.
+    if bas_inf.l_chem && mat_in.i_dual_por > 0 {
+        chem_in.l_equil = false;
+    }
 
     // Cross-validate parsed deck parameters against manifest request fields
     let fields = &manifest.input.fields;
@@ -1288,5 +1294,28 @@ mod tests {
         if let Ok((_m, deck0)) = parse_and_validate_case(&case_json, &sel0, &prof) {
             assert!(!deck0.mat_in.l_table);
         }
+    }
+
+    #[test]
+    fn deck_reader_forces_nonequilibrium_solute_for_dual_porosity_as_hydrus_for_278() {
+        let root = Path::new("../../reference/fortran_reference/solute/parity");
+        let root = if root.exists() {
+            root.to_path_buf()
+        } else {
+            Path::new("reference/fortran_reference/solute/parity").to_path_buf()
+        };
+        let dir = root.join("processes/dual_exchange/model6_exchange");
+        let read = |name: &str| std::fs::read_to_string(dir.join(name)).expect(name);
+        let (_m, deck) = parse_and_validate_case(
+            &read("CASE.json"),
+            &read("SELECTOR.IN"),
+            &read("PROFILE.DAT"),
+        )
+        .expect("parse");
+        assert_eq!(deck.mat_in.i_dual_por, 1);
+        // HYDRUS.FOR:278 clears lEquil after ChemIn for iDualPor > 0 ...
+        assert!(!deck.chem_in.l_equil);
+        // ... while NodInf (HYDRUS.FOR:196) read PROFILE.DAT with the Block A value.
+        assert!(deck.bas_inf.l_equil);
     }
 }

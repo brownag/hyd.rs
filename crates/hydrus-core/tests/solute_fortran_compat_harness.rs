@@ -814,9 +814,35 @@ fn equilibrium_water_content_follows_the_new_head() {
         .skip(1)
         .map(|v| v.parse().unwrap())
         .collect();
-    // Fields: depth, head, moisture, ... The head still differs by about 0.02 cm, which
-    // is an open dual-porosity item and is not asserted here.
+    // Fields: depth, head, moisture, ... Head and moisture now match the pinned Fortran
+    // output at print precision; moisture is the quantity this test pins.
     assert!((fields[2] - 0.4294).abs() < 2e-4, "moisture {}", fields[2]);
+}
+
+/// `HYDRUS.FOR:278` sets `lEquil=.false.` for `iDualPor > 0`, so `NEquil`/`SorbConc` run
+/// and the immobile phase fills. `model6_exchange` at t=1, node 2 has Sorb `0.1754E+00` in
+/// the pinned Fortran NOD_INF.OUT (21.3.4 canonical run,
+/// `.development/21.3.4/base_f/run/model6_exchange\NOD_INF.OUT:32`).
+#[test]
+fn model6_exchange_immobile_concentration_follows_fortran() {
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join(
+        "../../reference/fortran_reference/solute/parity/processes/dual_exchange/model6_exchange",
+    );
+    let read = |name: &str| std::fs::read_to_string(dir.join(name)).unwrap();
+    let outputs = hydrus_core::run_compat_deck(
+        &read("CASE.json"),
+        &read("SELECTOR.IN"),
+        &read("PROFILE.DAT"),
+    )
+    .unwrap();
+    let nod = &outputs.nod_inf_out;
+    let start = nod.find("Time:        1.0000").unwrap();
+    let row = nod[start..]
+        .lines()
+        .find(|l| l.trim_start().starts_with("2 "))
+        .unwrap();
+    let sorb: f64 = row.split_whitespace().last().unwrap().parse().unwrap();
+    assert!((sorb - 0.1754).abs() < 5e-5, "Sorb {sorb}");
 }
 
 #[test]
