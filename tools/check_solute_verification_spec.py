@@ -11,6 +11,11 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_CASES = ROOT / 'reference/solute_verification/CASES.json'
+V1 = 'solute-verification-v1'
+V2 = 'solute-verification-v2'
+V2_BACKEND = 'fortran-compatible'
+CEILING_KEYS = {'launch_cap', 'failed_attempts_consume_cap', 'storage_bytes_cap', 'phase_caps',
+                'automatic_retries'}
 METRICS = {
     'profile_linf', 'profile_l2', 'profile_l1', 'endpoint_linf', 'interior_linf',
     'inventory', 'boundary', 'reaction', 'balance', 'temporal_l2', 'normalization', 'order',
@@ -56,6 +61,13 @@ def aligned(time, dt):
 
 
 def validate(data: dict, verify_hashes: bool = True) -> dict:
+    """Validate a casebook, dispatching on its schema version."""
+    if isinstance(data, dict) and data.get('schema_version') == V2:
+        return validate_v2(data, verify_hashes)
+    return validate_v1(data, verify_hashes)
+
+
+def validate_v1(data: dict, verify_hashes: bool = True) -> dict:
     """Validate mappings and the finite matrix, returning the unchanged casebook."""
     keys(data, 'schema_version units limits provenance contracts metrics cases launches budgets', 'root')
     require(data['schema_version'] == 'solute-verification-v1', 'unsupported schema')
@@ -251,7 +263,8 @@ def validate(data: dict, verify_hashes: bool = True) -> dict:
         phase: sum(r['phase'] == phase for r in data['launches'])
         for phase in ('benchmark', 'convergence', 'holdout')
     }, 'phase caps mismatch')
-    for solver in ('fortran', 'rust'):
+    solvers = sorted({r['solver'] for r in data['launches']})
+    for solver in solvers:
         rows = [r for r in data['launches'] if r['case_id'] == 'example3'
                 and r['solver'] == solver and r['role'] == 'study']
         require(sorted(r['nodes'] for r in rows if r['axis'] == 'space') == [251, 501, 1001],
@@ -259,7 +272,7 @@ def validate(data: dict, verify_hashes: bool = True) -> dict:
         require(len({r['dt'] for r in rows if r['axis'] == 'time'}) >= 3,
                 'missing derived temporal levels')
     for cid in cases:
-        for solver in ('fortran', 'rust'):
+        for solver in solvers:
             rows = [r for r in data['launches'] if r['case_id'] == cid
                     and r['solver'] == solver and r['role'] == 'study']
             spatial = [r for r in rows if r['axis'] == 'space']
@@ -277,6 +290,82 @@ def validate(data: dict, verify_hashes: bool = True) -> dict:
     return data
 
 
+def canonical(value):
+    return hashlib.sha256(json.dumps(value, sort_keys=True, separators=(',', ':')).encode()).hexdigest()
+
+
+def row_signature(row):
+    skip = {'id', 'solver', 'backend', 'status', 'precision'}
+    return canonical({k: v for k, v in row.items() if k not in skip})
+
+
+def load_v1_source(data):
+    derived = data['provenance']['derived_from']
+    keys(derived, 'path sha256', 'derived_from')
+    path = Path(derived['path'])
+    require(not path.is_absolute() and '..' not in path.parts, 'unsafe derived_from path')
+    raw = (ROOT / path).read_bytes()
+    require(hashlib.sha256(raw).hexdigest() == derived['sha256'], 'derived_from hash mismatch')
+    return json.loads(raw, object_pairs_hook=unique_object)
+
+
+def validate_v2(data: dict, verify_hashes: bool = True) -> dict:
+    """Validate a v2 casebook: v1 cases unchanged, one backend-tagged row per v1 rust row."""
+    keys(data, 'schema_version units limits provenance contracts metrics cases launches budgets', 'root')
+    require(data['schema_version'] == V2, 'unsupported schema')
+    require(isinstance(data['limits'], dict) and isinstance(data['budgets'], dict)
+            and isinstance(data['provenance'], dict), 'malformed root sections')
+    require(not (CEILING_KEYS & (set(data['limits']) | set(data['budgets']))), 'ceiling key present')
+    require(data['limits'] == {'nodes': 1001, 'print_times': 999, 'timeout_seconds': 60},
+            'unsupported source capacity or timeout limit')
+    keys(data['budgets'], 'cost_estimate policy', 'budgets')
+    require(data['budgets']['policy'] == 'no launch or storage ceilings (ADR 0003)'
+            and bool(data['budgets']['cost_estimate']), 'budget policy mismatch')
+    keys(data['provenance'], 'authorship source_sha256 derived_from', 'provenance')
+    v1 = load_v1_source(data)
+    require(v1['schema_version'] == V1, 'derived_from is not a v1 casebook')
+    for section in ('cases', 'units', 'contracts', 'metrics'):
+        require(canonical(data[section]) == canonical(v1[section]), f'{section} differ from v1')
+    require(isinstance(data['launches'], list), 'launches must be a list')
+    rows = data['launches']
+    for row in rows:
+        require(isinstance(row, dict) and row.get('backend') == V2_BACKEND, 'row lacks backend')
+        require(row.get('solver') == 'rust', 'v2 rows must be solver rust')
+        require(isinstance(row.get('id'), str) and '-rfc-' in row['id']
+                and '-rust-' not in row['id'], 'row id lacks rfc tag')
+        require(row.get('precision') == 'f64', 'precision label must stay f64')
+        reserved = row.get('role') == 'holdout' or row.get('phase') == 'holdout'
+        require(row.get('status') == ('reserved_until_threshold_gate' if reserved
+                                      else 'approved_pending_adapter_and_evaluator_gates'),
+                'holdout rows must be reserved; others approved')
+    v1_rust = [r for r in v1['launches'] if r['solver'] == 'rust']
+    require(len(rows) == len(v1_rust), 'v2 rows do not cover v1 rust rows')
+    by_id = {r['id']: r for r in rows}
+    require(len(by_id) == len(rows), 'duplicate launch')
+    for old in v1_rust:
+        new = by_id.get(old['id'].replace('-rust-', '-rfc-'))
+        require(new is not None, 'v1 rust row has no rfc counterpart')
+        require(row_signature(new) == row_signature(old), 'rfc row differs from v1 rust row')
+    # Reuse every v1 row, matrix and case check on a v1-shaped view of the casebook.
+    view = copy.deepcopy(data)
+    view['schema_version'] = V1
+    view['limits']['automatic_retries'] = 0
+    del view['provenance']['derived_from']
+    for row in view['launches']:
+        del row['backend']
+        if row['status'] == 'reserved_until_threshold_gate':
+            row['status'] = 'approved_pending_adapter_and_evaluator_gates'
+    view['budgets'] = {
+        'launch_cap': len(rows), 'failed_attempts_consume_cap': True,
+        'storage_bytes_cap': sum(r['estimated_output_bytes'] for r in rows),
+        'cost_estimate': data['budgets']['cost_estimate'],
+        'phase_caps': {p: sum(r['phase'] == p for r in rows)
+                       for p in ('benchmark', 'convergence', 'holdout')},
+    }
+    validate_v1(view, verify_hashes)
+    return data
+
+
 def validate_times(times, end):
     require(isinstance(times, list) and times, 'empty times')
     for time in times:
@@ -284,7 +373,36 @@ def validate_times(times, end):
     require(times == sorted(set(times)) and times[-1] <= end, 'mismatched or duplicate times')
 
 
+def self_test_v2(data):
+    validate(data)
+    checks = 1
+    mutations = [
+        lambda d: d['launches'][0].pop('backend'),
+        lambda d: d['launches'][0].update(backend='fv-be'),
+        lambda d: d['launches'].pop(),
+        lambda d: d['cases'][0].update(length=d['cases'][0]['length'] + 1),
+        lambda d: d['budgets'].update(launch_cap=10),
+        lambda d: d['limits'].update(automatic_retries=0),
+        lambda d: d['launches'][-1].update(status='approved_pending_adapter_and_evaluator_gates'),
+        lambda d: d['launches'][0].update(solver='fortran'),
+        lambda d: d['launches'][0].update(id='x-rust-baseline'),
+        lambda d: d['launches'][0].update(nodes=1002),
+    ]
+    for index, mutate in enumerate(mutations):
+        bad = copy.deepcopy(data)
+        mutate(bad)
+        try:
+            validate(bad)
+        except (ValueError, KeyError, TypeError, OSError):
+            checks += 1
+        else:
+            raise AssertionError(f'v2 negative test {index + 1} was accepted')
+    print(f'{checks} v2 contract checks passed; zero solver launches')
+
+
 def self_test(data):
+    if data.get('schema_version') == V2:
+        return self_test_v2(data)
     validate(data)
     checks = 1
     def alter_axis(data, axis):
