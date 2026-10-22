@@ -394,7 +394,8 @@ fn run_parsed_deck(deck: &ParsedDeck) -> Result<CompatRunOutputs, String> {
         for orig_idx in 0..num_np {
             let n_fortran = orig_idx + 1;
             let i = num_np - 1 - orig_idx;
-            let depth = (nod.x_surf - nod.x[i]) as f64;
+            // OUTPUT.FOR:737,825: xS=xSurf+Radius (Radius=0), printed x(i)-xS.
+            let depth = (nod.x[i] - (nod.x_surf + 0.0f32)) as f64;
             let head = h[i] as f64;
             let moisture = th[i] as f64;
             let (k_val, c_val, sink_val) = if i_dual_por_u8 > 0 {
@@ -822,8 +823,25 @@ fn run_parsed_deck(deck: &ParsedDeck) -> Result<CompatRunOutputs, String> {
     };
 
     // Push initial output blocks
+    // HYDRUS.FOR:365-369: thN = ThOld, ThOldT = ThOld(NumNP), Temp = TempO.
+    let (vi_out, vvi_out) = nod_out_fluxes(&NodOutState {
+        x: &nod.x[..num_np],
+        h_new: &h_new,
+        th_n: &th_old,
+        th_old_t: th_old[num_np - 1],
+        dt,
+        sink: &sink,
+        con: &con,
+        con_lt: &con_lt,
+        con_vh: &con_vh_buf,
+        con_vt: &con_vt,
+        temp: &temp_o,
+        cos_alf: bas.cos_alf,
+        l_w_dep: bas.l_w_dep,
+        l_vapor: bas.l_vapor,
+    });
     nod_inf_blocks.push(make_nod_inf_block(
-        tm.t_init, &h_new, &th_old, &con, &cap, &v_old, &v_v_old, &sink, &s_trans, &th_new_im,
+        tm.t_init, &h_new, &th_old, &con, &cap, &vi_out, &vvi_out, &sink, &s_trans, &th_new_im,
         &sink_im, &kappa, &temp_o, &conc, &sorb, &sorb2,
     ));
     if bas.l_vapor {
@@ -835,8 +853,8 @@ fn run_parsed_deck(deck: &ParsedDeck) -> Result<CompatRunOutputs, String> {
             &con_lt,
             &con_vh_buf,
             &con_vt,
-            &v_old,
-            &v_v_old,
+            &vi_out,
+            &vvi_out,
             &h_new,
             &temp_o, // HYDRUS.FOR:365-369 passes TempO
         ));
@@ -1337,8 +1355,25 @@ fn run_parsed_deck(deck: &ParsedDeck) -> Result<CompatRunOutputs, String> {
         if p_level < tm.mpl {
             let t_target = tm.t_print[p_level];
             if (t - t_target).abs() < 0.001 * (dt as f64) {
+                // HYDRUS.FOR:552-556: thN = ThNew, ThOldT = ThOld(NumNP), Temp = TempN.
+                let (vi_out, vvi_out) = nod_out_fluxes(&NodOutState {
+                    x: &nod.x[..num_np],
+                    h_new: &h_new,
+                    th_n: &th_new,
+                    th_old_t: th_old[num_np - 1],
+                    dt,
+                    sink: &sink,
+                    con: &con,
+                    con_lt: &con_lt,
+                    con_vh: &con_vh_buf,
+                    con_vt: &con_vt,
+                    temp: &temp_n,
+                    cos_alf: bas.cos_alf,
+                    l_w_dep: bas.l_w_dep,
+                    l_vapor: bas.l_vapor,
+                });
                 nod_inf_blocks.push(make_nod_inf_block(
-                    t_target, &h_new, &th_new, &con, &cap, &v_new, &v_v_new, &sink, &s_trans,
+                    t_target, &h_new, &th_new, &con, &cap, &vi_out, &vvi_out, &sink, &s_trans,
                     &th_new_im, &sink_im, &kappa, &temp_n, &conc, &sorb, &sorb2,
                 ));
                 if bas.l_vapor {
@@ -1350,8 +1385,8 @@ fn run_parsed_deck(deck: &ParsedDeck) -> Result<CompatRunOutputs, String> {
                         &con_lt,
                         &con_vh_buf,
                         &con_vt,
-                        &v_new,
-                        &v_v_new,
+                        &vi_out,
+                        &vvi_out,
                         &h_new,
                         &temp_n, // HYDRUS.FOR:552-556 passes TempN
                     ));
@@ -1527,6 +1562,102 @@ fn alias_h_temp_to_v_corr(h_temp: &mut [f32], v_corr: &[f32]) {
     h_temp.copy_from_slice(v_corr);
 }
 
+/// `vVii` (`ConVh`, `hNew`) or `vVTi` (`ConVT`, `Temp`) at internal node `i`, in REAL:
+/// node 1 `OUTPUT.FOR:769-770`, node N `:783-784`, interior `:804-809`.
+fn nod_out_vapor_flux(x: &[f32], c: &[f32], f: &[f32], i: usize) -> f32 {
+    let n = x.len() - 1;
+    if i == 0 {
+        let dx = x[1] - x[0];
+        -(c[0] + c[1]) / 2.0 * (f[1] - f[0]) / dx
+    } else if i == n {
+        let dx = x[n] - x[n - 1];
+        -(c[n] + c[n - 1]) / 2.0 * (f[n] - f[n - 1]) / dx
+    } else {
+        let dx_a = x[i + 1] - x[i];
+        let dx_b = x[i] - x[i - 1];
+        let v_a = -(c[i] + c[i + 1]) / 2.0 * (f[i + 1] - f[i]) / dx_a;
+        let v_b = -(c[i] + c[i - 1]) / 2.0 * (f[i] - f[i - 1]) / dx_b;
+        (v_a * dx_a + v_b * dx_b) / (dx_a + dx_b)
+    }
+}
+
+/// Everything `NodOut` needs to recompute `vi` and `vVi` (`OUTPUT.FOR:720-816`).
+struct NodOutState<'a> {
+    x: &'a [f32],
+    h_new: &'a [f32],
+    th_n: &'a [f32],
+    /// `ThOld(NumNP)` (HYDRUS.FOR:368,555).
+    th_old_t: f32,
+    dt: f32,
+    sink: &'a [f32],
+    con: &'a [f32],
+    con_lt: &'a [f32],
+    con_vh: &'a [f32],
+    con_vt: &'a [f32],
+    temp: &'a [f32],
+    cos_alf: f32,
+    l_w_dep: bool,
+    l_vapor: bool,
+}
+
+/// `vi` and `vVi` per internal node as `NodOut` recomputes them (`OUTPUT.FOR:730-816`), in
+/// REAL with Fortran grouping. The solver's velocities are not used.
+///
+/// Reachability (ADR 0007), checked over the 44 parity decks: `lDensity` is the INPUT.FOR:1713
+/// default `.false.` and the deck reader never sets it, so `fRE = 1`. `lCentrif` needs
+/// `CosAlf > 1`; the decks use `CosAlf` in {-1, 0, 1}, so `Grav = CosAlf` and `Radius = 0`.
+/// `lWTDep` is false in all 44 decks and `lVapor` is true only for
+/// `vapor_enabled_external_state`; both are ported because they are cheap and exact.
+/// Density and centrifuge branches are deliberately not ported.
+fn nod_out_fluxes(st: &NodOutState) -> (Vec<f32>, Vec<f32>) {
+    let x = st.x;
+    let n = x.len() - 1;
+    let grav = st.cos_alf;
+    let fre = 1.0f32;
+    let (h, con, clt, t) = (st.h_new, st.con, st.con_lt, st.temp);
+    let mut vi_all = vec![0.0f32; n + 1];
+    let mut vv_all = vec![0.0f32; n + 1];
+    for i in 0..=n {
+        let mut vi;
+        if i == 0 {
+            let dx = x[1] - x[0];
+            vi = -(con[0] + con[1]) / 2.0 * ((h[1] - h[0]) / dx + grav * fre);
+            if st.l_w_dep {
+                vi -= (clt[0] + clt[1]) / 2.0 * (t[1] - t[0]) / dx;
+            }
+        } else if i == n {
+            let n1 = n - 1;
+            let dx = x[n] - x[n - 1];
+            vi = -(con[n] + con[n1]) / 2.0 * ((h[n] - h[n1]) / dx + grav * fre)
+                - (st.th_n[n] - st.th_old_t) * fre * dx / 2.0 / st.dt
+                - st.sink[n] * dx / 2.0;
+            if st.l_w_dep {
+                vi -= (clt[n] + clt[n1]) / 2.0 * (t[n] - t[n1]) / dx;
+            }
+        } else {
+            let dx_a = x[i + 1] - x[i];
+            let dx_b = x[i] - x[i - 1];
+            let v_a = -(con[i] + con[i + 1]) / 2.0 * ((h[i + 1] - h[i]) / dx_a + grav * fre);
+            let v_b = -(con[i] + con[i - 1]) / 2.0 * ((h[i] - h[i - 1]) / dx_b + grav * fre);
+            vi = (v_a * dx_a + v_b * dx_b) / (dx_a + dx_b);
+            if st.l_w_dep {
+                let v_at = -(clt[i] + clt[i + 1]) / 2.0 * (t[i + 1] - t[i]) / dx_a;
+                let v_bt = -(clt[i] + clt[i - 1]) / 2.0 * (t[i] - t[i - 1]) / dx_b;
+                vi += (v_at * dx_a + v_bt * dx_b) / (dx_a + dx_b);
+            }
+        }
+        let mut vvi = 0.0f32;
+        if st.l_vapor {
+            let vvii = nod_out_vapor_flux(x, st.con_vh, h, i);
+            let vvti = nod_out_vapor_flux(x, st.con_vt, t, i);
+            vvi = vvii + vvti;
+        }
+        vi_all[i] = vi;
+        vv_all[i] = vvi;
+    }
+    (vi_all, vv_all)
+}
+
 /// One `NOD_INF_V.OUT` block, as written by `NodOut` (`OUTPUT.FOR:758-816`).
 /// `x` holds the `NumNP` internal (bottom-first) node coordinates; rows are emitted in
 /// Fortran print order, `N-i+1` (`OUTPUT.FOR:759`).
@@ -1545,29 +1676,12 @@ fn make_nod_inf_v_block(
     temp: &[f32],
 ) -> NodInfVBlock {
     let num_np = x.len();
-    let n = num_np - 1;
-    // vVii (ConVh, hNew) or vVTi (ConVT, Temp), in REAL:
-    // node 1 OUTPUT.FOR:769-770, node N :783-784, interior :804-809.
-    let vapor_flux = |c: &[f32], f: &[f32], i: usize| -> f32 {
-        if i == 0 {
-            let dx = x[1] - x[0];
-            -(c[0] + c[1]) / 2.0 * (f[1] - f[0]) / dx
-        } else if i == n {
-            let dx = x[n] - x[n - 1];
-            -(c[n] + c[n - 1]) / 2.0 * (f[n] - f[n - 1]) / dx
-        } else {
-            let dx_a = x[i + 1] - x[i];
-            let dx_b = x[i] - x[i - 1];
-            let v_a = -(c[i] + c[i + 1]) / 2.0 * (f[i + 1] - f[i]) / dx_a;
-            let v_b = -(c[i] + c[i - 1]) / 2.0 * (f[i] - f[i - 1]) / dx_b;
-            (v_a * dx_a + v_b * dx_b) / (dx_a + dx_b)
-        }
-    };
+    let vapor_flux = |c: &[f32], f: &[f32], i: usize| nod_out_vapor_flux(x, c, f, i);
     let mut rows = Vec::with_capacity(num_np);
     for orig_idx in 0..num_np {
         let n_fortran = orig_idx + 1;
         let i = num_np - 1 - orig_idx;
-        let depth = (x_surf - x[i]) as f64;
+        let depth = (x[i] - (x_surf + 0.0f32)) as f64; // OUTPUT.FOR:737,825
         let con_val = k[i] as f64;
         let con_lt_val = clt[i] as f64;
         let con_vh_val = cvh[i] as f64;
@@ -1825,5 +1939,75 @@ mod tests {
                 (3, -2.0, 0.5),
             ]
         );
+    }
+
+    /// Row `node` of the `Time:` block that starts with `marker` in a `NOD_INF.OUT` text.
+    fn nod_inf_row(out: &str, marker: &str, node: usize) -> String {
+        let start = out.find(marker).expect("time block");
+        out[start..]
+            .lines()
+            .find(|l| l.split_whitespace().next() == Some(&node.to_string()))
+            .expect("node row")
+            .to_string()
+    }
+
+    /// `NodOut` prints `x(i)-xS` (`OUTPUT.FOR:737,825`), negative below the surface.
+    /// Pinned Fortran, `model6_exchange` (canonical parity run,
+    /// `.development/22.1.4/parity_base/0008-model6_exchange/reference-run/run/
+    /// model6_exchange\NOD_INF.OUT:13-14,21,31-32`): node 1 `0.0000`, node 2 `-0.2500`,
+    /// node 9 `-2.0000`, at t = 0 and t = 1. `endpoint-lower--1-negative`
+    /// (`.../0021-endpoint-lower--1-negative/.../solute-input\NOD_INF.OUT:13-14`) reads
+    /// `x(N) = -0.00`, so `x(N)-(xSurf+Radius)` is `-0.0` and prints `-0.0000`.
+    #[test]
+    fn nod_inf_reports_signed_depth_as_fortran() {
+        let (case, sel, prof) = dual_exchange_deck("model6_exchange");
+        let out = run_compat_deck(&case, &sel, &prof)
+            .expect("run")
+            .nod_inf_out;
+        for marker in ["Time:        0.0000", "Time:        1.0000"] {
+            let depth = |n| {
+                nod_inf_row(&out, marker, n)
+                    .split_whitespace()
+                    .nth(1)
+                    .unwrap()
+                    .to_string()
+            };
+            assert_eq!(depth(1), "0.0000", "{marker}");
+            assert_eq!(depth(2), "-0.2500", "{marker}");
+            assert_eq!(depth(9), "-2.0000", "{marker}");
+        }
+
+        let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../reference/fortran_reference/solute/parity/transport")
+            .join("endpoint-lower--1-negative");
+        let read = |f: &str| std::fs::read_to_string(dir.join(f)).expect(f);
+        let out = run_compat_deck(
+            &read("CASE.json"),
+            &read("SELECTOR.IN"),
+            &read("PROFILE.DAT"),
+        )
+        .expect("run")
+        .nod_inf_out;
+        let row = nod_inf_row(&out, "Time:        0.0000", 1);
+        assert_eq!(row.split_whitespace().nth(1), Some("-0.0000"));
+        let row = nod_inf_row(&out, "Time:        0.0000", 2);
+        assert_eq!(row.split_whitespace().nth(1), Some("-0.2500"));
+    }
+
+    /// `v/KsTop` prints `vi/ConSN` with `vi` recomputed by `NodOut` (`OUTPUT.FOR:730-756`).
+    /// For the bottom node at t = 0 (`hNew` equal across the cell, `CosAlf` = 0) the REAL
+    /// product `-(Con1+Con2)/2*(0+Grav)` is `-0.0`, so the pinned Fortran prints
+    /// `-0.000E+00` (`.development/22.1.4/parity_base/0008-model6_exchange/reference-run/run/
+    /// model6_exchange\NOD_INF.OUT:21`) while the solver velocity is `+0`.
+    #[test]
+    fn nod_inf_v_recomputes_liquid_and_vapor_flux_as_nodout() {
+        let (case, sel, prof) = dual_exchange_deck("model6_exchange");
+        let out = run_compat_deck(&case, &sel, &prof)
+            .expect("run")
+            .nod_inf_out;
+        let row = nod_inf_row(&out, "Time:        0.0000", 9);
+        let f: Vec<&str> = row.split_whitespace().collect();
+        assert_eq!(f[6], "0.0000E+00", "vi+vVi: {row}"); // -0 + 0 = +0
+        assert_eq!(f[9], "-0.000E+00", "v/KsTop: {row}");
     }
 }
