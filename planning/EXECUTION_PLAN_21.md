@@ -37,6 +37,7 @@
 | 2026-10-20 | D4. Wave 1 is two parallel traces, `21.1.1` single-porosity long run (`transport_properties/tortuosity_millington`) and `21.1.2` dual-porosity wetting front (`dual_exchange/model6_no_exchange`), plus the task-local Model 0 isolating deck. Plan review split the isolating deck into its own parallel task `21.1.3` to keep each micro-plan ≤ 12 steps (3 workers, within the D5 cap); the orchestrator classifies WatFlow vs DualPor at the Wave 2 gate. Each reports the first diverging quantity with source line references. |
 | 2026-10-20 | D5. Execution setup inherits Orchestration 20 D6: ≤3 concurrent workers in `.development/21-worktrees/<id>` on branch `orchestration/<id>`, `inherit` model tier, escalation after one failed retry, serial wave-end gates (A4), and `POLICY_HASHES` re-pin by the orchestrator when `solute.rs` changes (Wave 5 only). Additions: (a) trace instrumentation is task-local patches only (Fortran and Rust) under `.development/<id>/`, with SHA-256 of every patch, instrumented source and binary recorded; diagnosis tasks commit only their report doc. (b) Suspected pinned-Fortran defects found by traces are flagged in the report and registered in `docs/FORTRAN_SOURCE_DEFECTS.md` as `SD-NNN` (with a `source_defect_sdNNN_*` pinning test) by the Wave 3 fix task that reproduces them. |
 | 2026-10-20 | D6. User approved the Wave 3 amendment (21.3.1-21.3.3) and the Wave 3R second diagnosis round (21.3.4-21.3.6) as drafted (“yes proceed”). |
+| 2026-10-21 | D7. User approved the Wave 3F amendment (21.3.7–21.3.9) as drafted (“Yes approve”). |
 
 ## Reconnaissance log (2026-10-20, HEAD `470ae05`, branch `phase4-water-acceptance`)
 
@@ -249,7 +250,7 @@ Applies to each of `21.3.4`–`21.3.6`; per-task fields follow.
 
 - **Then Wave 3S (user gate, D7):** orchestrator drafts fix specs from the 3R reports; Wave 3F fixes; then Wave 4. Any fixture the 3R reports show cannot be matched (a pinned-source defect that cannot be reproduced) goes to the user as an explicit exclusion decision, never silently dropped.
 
-### Wave 3F amendment (drafted 2026-10-21 from the three 3R reports; pending user approval as D7)
+### Wave 3F amendment (drafted 2026-10-21 from the three 3R reports; approved by the user as D7, 2026-10-21)
 
 **Classification.** All five remaining failures are Rust porting omissions; none is a pinned-source defect, and no fixture needs a "cannot be matched" exclusion. Prototypes: 21.3.5 (dual-porosity, both causes) 42/44; 21.3.6 (vapor + formatter) 41/44; each with no regression. The union is untested; it is predicted to give 44/44 and is checked by `21.3.9`.
 - **Dual porosity** (`model6_exchange`, `model7_exchange`, `model7_no_exchange`): (i) `HYDRUS.FOR:278` `if(iDualPor.gt.0) lEquil=.false.` not ported; (ii) `compat_runner.rs:920,925` key the Model 7 immobile `n`/`Ks` on `i_model == 7` after `deck_reader.rs:549-551` remapped it to 0, and `water_compat.rs:1334` swallows the resulting `Err`.

@@ -1,7 +1,7 @@
 # State — Orchestration 21
 
 Plan status: **Approved by user on 2026-10-20 (“yes”).**
-Execution status: **Wave 3 complete and verified (39/44, 2026-10-21); Wave 3R done; at Wave 3S user gate (D7).**
+Execution status: **Wave 3 complete and verified (39/44, 2026-10-21); Wave 3S approved (D7); sub-wave 3F-A (21.3.7, 21.3.8) dispatched.**
 Plan: [EXECUTION_PLAN_21.md](EXECUTION_PLAN_21.md). Worker template: [PROMPT_TEMPLATE_21.md](PROMPT_TEMPLATE_21.md).
 Supersedes: Orchestration 20 tasks `20.6.1` (gate re-run → `21.4.1`) and `20.7.1` (default switch → `21.5.1`).
 
@@ -17,7 +17,7 @@ Supersedes: Orchestration 20 tasks `20.6.1` (gate re-run → `21.4.1`) and `20.7
 - [x] User approves this execution plan.
 - [x] `STATE_20.md` rows `20.6.1`/`20.7.1` marked superseded (Wave 0).
 - [x] Wave 2 user gate: Wave 3 fix specs approved (D6, 2026-10-20).
-- [ ] Wave 3S user gate: fix specs from the 3R reports approved (D7).
+- [x] Wave 3S user gate: fix specs from the 3R reports approved (D7, 2026-10-21).
 - [ ] Genuine 44/44 all-mode Rust-vs-Fortran parity (`21.4.1`) before the default switch (`21.5.1`).
 
 ## Wave board
@@ -35,8 +35,10 @@ Supersedes: Orchestration 20 tasks `20.6.1` (gate re-run → `21.4.1`) and `20.7
 | 3R | 21.3.4 | Diagnose model6_exchange | done |
 | 3R | 21.3.5 | Diagnose model7_exchange, model7_no_exchange | done |
 | 3R | 21.3.6 | Diagnose temperature_coefficients, vapor_enabled_external_state | done |
-| 3S | — | User gate D7: Wave 3F specs (21.3.7–21.3.9) | in progress |
-| 3F | 21.3.7–21.3.9 | Fixes from 3R | pending |
+| 3S | — | User gate D7: Wave 3F specs (21.3.7–21.3.9) | done |
+| 3F-A | 21.3.7 | Dual-porosity lEquil, Model 7 immobile params, exchange errors | in progress |
+| 3F-A | 21.3.8 | format_fortran_e ties-to-even | in progress |
+| 3F-B | 21.3.9 | Vapor enhancement and NOD_INF_V fluxes | pending |
 | 4 | 21.4.1 | 44-fixture gate re-run and evidence docs | pending |
 | 5 | 21.5.1 | Default backend → `FortranCompatible` | pending |
 
