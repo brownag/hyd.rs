@@ -1,7 +1,7 @@
 # State — Orchestration 22
 
 Plan status: **Approved by user on 2026-10-22 (“YES”).**
-Execution status: **Wave 1A done; Wave 1B next.**
+Execution status: **Waves 1A, 1B, 2 done; Wave 3A next.**
 Plan: [EXECUTION_PLAN_22.md](EXECUTION_PLAN_22.md). Worker template: [PROMPT_TEMPLATE_22.md](PROMPT_TEMPLATE_22.md).
 Follows: Orchestration 21 (complete; [STATE_21.md](STATE_21.md) § Follow-ups).
 
@@ -27,8 +27,8 @@ Follows: Orchestration 21 (complete; [STATE_21.md](STATE_21.md) § Follow-ups).
 | 1A | 22.1.1 | Serialize cached parity-runner build (flake) | done |
 | 1A | 22.1.2 | Negative zero E-format sign | done |
 | 1A | 22.1.3 | ADR 0018 default backend | done |
-| 1B | 22.1.4 | NOD_INF depth sign; NodOut flux recomputation | pending |
-| 2 | — | Safe worktree cleanup (D5) | pending |
+| 1B | 22.1.4 | NOD_INF depth sign; NodOut flux recomputation | done |
+| 2 | — | Safe worktree cleanup (D5) | done |
 | 3A | 22.3.1 | `CASES_V2.json` and spec checker | pending |
 | 3B | 22.3.2 | v2 rows through reference and lifecycle tools | pending |
 | 3B | 22.3.3 | Harness backend selection; public-API path check | pending |
@@ -46,6 +46,10 @@ Follows: Orchestration 21 (complete; [STATE_21.md](STATE_21.md) § Follow-ups).
 
 - Wave 1A (merged 7124aa0): cargo workspace 430/0/1; Python 320 OK; fmt, clippy, diff --check clean; parity 44/44 (worker run on 22.1.2; paired gate in cargo suite passed). No POLICY_HASHES change needed.
 
+- Wave 1B (merged): cargo workspace 432/0/1; Python 320 OK; fmt, clippy, diff --check clean; parity 44/44 (worker run; paired gate in cargo suite passed).
+- Wave 2: worktrees 64 -> 48 (also removed 16 merged+clean: the .claude agent, 18.7.8, 21.1.1-21.5.1, with `git branch -d`); `.development/21-target` (5.9G) removed; disk free 91G -> 104G. 21.3.4/5/6 evidence moved to `.development/21.3.N/` (symlinks replaced; 21.3.6 merged with no conflicts); other worktrees' `.development/<id>` dirs moved to main first; `harness_paired` scratch dropped. Remaining: 22-target (1.3G, active). Doc paths cited in STATE_21 and WATER_TRANSIENT_DIAGNOSIS_21R_* resolve.
+- Remaining worktrees for the user: unmerged 18.5.1, 18.5.3; unmerged `docs/master-plan-*` (1.x, 2.x) and detached 7.x; dirty 20.6.1 (43 files), 18.5.2, 13.2.1-13.2.3, detached 18.2.x/18.3.x; 7 antigravity worktrees under `~/.gemini/antigravity-cli/worktrees/`; active 22.1.1-22.1.4 (to remove at end).
+
 ## Task reports
 
 ### 22.1.1 — done (a9583ee)
@@ -56,3 +60,6 @@ fcntl lock around check-and-build in `tools/solute_rust_candidate_adapter.py`; t
 
 ### 22.1.3 — done (e6fa676)
 ADR 0018 written, ADR 0013 status line, README row and note.
+
+### 22.1.4 — done
+`make_nod_inf_block`/`make_nod_inf_v_block` print depth as `x(i)-xS` (Fortran sign); new `nod_out_fluxes` recomputes `vi`/`vVi` as NodOut in f32; lDensity/lCentrif branches unported (unreachable in all 44 decks). 2 new tests. NOD_INF files now match Fortran in all 44 fixtures except `chain_zero_rates` cols 12-13 (Conc/Sorb, `-0.0000E+00` vs `0.0000E+00`, a separate negative-zero case, not fixed). PROFILE.OUT depth already correct. Candidate digests unchanged (NOD_INF unobserved).
