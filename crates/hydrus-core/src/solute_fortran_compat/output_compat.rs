@@ -27,7 +27,9 @@ pub fn format_fortran_e(val: f64, w: usize, d: usize) -> String {
     }
     if val == 0.0 {
         let zeros = "0".repeat(d);
-        let s = format!(" 0.{}E+00", zeros);
+        // gfortran prints IEEE negative zero with a minus sign.
+        let sign = if val.is_sign_negative() { "-" } else { " " };
+        let s = format!("{}0.{}E+00", sign, zeros);
         return format!("{:>w$}", s, w = w);
     }
     let sign = if val < 0.0 { "-" } else { " " };
@@ -871,6 +873,17 @@ mod tests {
         assert_eq!(format_fortran_e(1.2009, 13, 5), "  0.12009E+01");
         assert_eq!(format_fortran_e(-0.43, 12, 4), " -0.4300E+00");
         assert_eq!(format_fortran_e(0.43, 12, 4), "  0.4300E+00");
+    }
+
+    #[test]
+    fn format_fortran_e_prints_negative_zero_as_gfortran() {
+        // gfortran probe (.development/22.1.2/probe/probe.out) and
+        // reference/fortran_reference/solute/defect_probes/sd002_defect_a/T_LEVEL.OUT:9.
+        assert_eq!(format_fortran_e(-0.0, 13, 5), " -0.00000E+00");
+        assert_eq!(format_fortran_e(-0.0_f32 as f64, 13, 5), " -0.00000E+00");
+        assert_eq!(format_fortran_e(-0.0, 15, 8), "-0.00000000E+00");
+        assert_eq!(format_fortran_e(-0.0, 11, 1), "   -0.0E+00");
+        assert_eq!(format_fortran_e(0.0, 13, 5), "  0.00000E+00");
     }
 
     #[test]
