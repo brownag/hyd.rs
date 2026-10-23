@@ -117,6 +117,7 @@ M5-V is re-scoped (D2). Calibrated source parity is recorded as met by the 44/44
 | 3B | 22.3.2 | v2 rows through the reference and lifecycle tools | `tools/run_solute_verification_reference.py`, `tools/solute_benchmark_lifecycle.py`, their tests |
 | 3B | 22.3.3 | Harness backend selection; public-API path check | `crates/hydrus-core/tests/solute_verification_harness.rs` |
 | 3C | 22.3.4 | Benchmark, convergence and holdout CLIs on v2; bug fixes | `tools/{run_solute_convergence,solute_convergence_evidence,check_solute_benchmarks}.py`, their tests |
+| 3C | 22.3.5 | Fix the public `FortranCompatible` step on prescribed-water transport (user-approved scope change, 2026-10-22) | `crates/hydrus-core/src/solute.rs`; create `crates/hydrus-core/tests/solute_fortran_public_path.rs` |
 | 4A | 22.4.1 | Study: closed reactions | create `planning/master/M5V_STUDY_22_REACTIONS.md` |
 | 4A | 22.4.2 | Study: `diffusion_cosine` | create `planning/master/M5V_STUDY_22_DIFFUSION.md` |
 | 4A | 22.4.3 | Study: `scalar_robin` | create `planning/master/M5V_STUDY_22_ROBIN.md` |
@@ -316,6 +317,7 @@ M5-V is re-scoped (D2). Calibrated source parity is recorded as met by the 44/44
 ### 22.3.4 — Benchmark, convergence and holdout CLIs on v2; fix the state and classification bugs (sub-wave 3C)
 
 - **Must edit:**
+  - `tools/solute_verification_metrics.py` and `tools/test_solute_verification_metrics.py` (added after 22.3.2): allow an optional top-level manifest `backend` key (`MANIFEST_KEYS` `:33`, enforced `:293`); v1 manifests without it stay valid and no other check is loosened.
   - `tools/run_solute_convergence.py`: phase use `:36,51,72,87,144,336,389`.
   - `tools/solute_convergence_evidence.py`: roots `:104-106`, budget read `:498`.
   - `tools/check_solute_benchmarks.py`: the benchmark CLI.
@@ -336,11 +338,31 @@ M5-V is re-scoped (D2). Calibrated source parity is recorded as met by the 44/44
   - `test_holdout_rows_dry_run_only_in_v2_until_reserved_status_lifted`. The CLI refuses to execute a `reserved_until_threshold_gate` row; Wave 6 lifts the status by committing `THRESHOLDS_V2.json`, and the CLI checks for it.
 - **Verification:**
   - The named test modules pass.
-  - One existing O13 Rust batch still passes `--verify-only` (read-only); record its ID.
+  - `--verify-only` of an O13 Rust batch fails with "source identity changed" even without the 22.3.2 edits (pinned source hashes have moved); record that as a known limit and verify only the O13 batch manifests the lifecycle can still verify (the `test_*` verify-only test).
   - A v2 `--dry-run` succeeds for one benchmark, one convergence and one holdout row.
   - `git diff --check`.
 - **Do not touch:** the files owned by 22.3.2 and 22.3.3, `CASES*.json`, `solute_benchmark_bridge.py`, `.development/13.*`.
 - **Anchors:** `tools/run_solute_convergence.py:20-100,130-150,300-400`; `tools/solute_convergence_evidence.py:90-130,490-506`; `tools/check_solute_benchmarks.py:100-300`; `planning/master/SOLUTE_CONVERGENCE_EVIDENCE.md`.
+
+### 22.3.5 — Fix the public `FortranCompatible` step for prescribed-water transport (sub-wave 3C, parallel with 22.3.4)
+
+Added after 22.3.3: the hand runs of the harness with `backend fortran-compatible` gave results that differ from FV/BE by up to 1.0 (`reaction_zero`) and 1.19 (`diffusion_cosine`). The interior stays unchanged for `diffusion_cosine` (no diffusion), and node 0 drops to 0. The user approved a diagnose-and-fix task (2026-10-22) instead of studying through the deck runner.
+
+- **Must edit:** `crates/hydrus-core/src/solute.rs` (the `advance_fortran_compatible_step` setup, `~:840-1200`, and its in-file tests).
+- **Can create:** `crates/hydrus-core/tests/solute_fortran_public_path.rs`; `planning/tasks/22.3.5.todo.md`; scratch `.development/22.3.5/`.
+- **Depends on:** `22.3.3` (harness `backend` key; its hand-run requests are in `.development/22.3.3/`).
+- **Spec:**
+  - Diagnose first. Reproduce with the 22.3.3 requests. Name each cause with a file:line, compared to how `run_compat_deck` builds the same inputs. Suspects: effective dispersion passed into the Fortran `ch_par[1]` dispersivity slot (`solute.rs:~1026-1047`); the `TotalFlux` bottom and `AdvectiveOutflow` top boundary mapping; `reaction_zero` rate and sink mapping; node-0 behaviour.
+  - Fix only in the `FortranCompatible` branch of `solute.rs`. The `solute_fortran_compat/**` kernels, FV/BE equations (ADR 0002) and the deck runner stay untouched. If the fix needs those, stop and report (escalation rule 4).
+  - The public path must give the physically right answer for prescribed-water transport (D = dispersion/theta semantics as in `SoluteConfig` docs). Expected values come from the analytical references in the tests (cosine decay `exp(-D k^2 t)` for `diffusion_cosine`; zero-order decay for `reaction_zero`) at a tolerance stated in the test, never from solver output.
+  - ADR 0007/0010: prove reachability before touching any branch, and preserve f32 conversion points in `solute_fortran_compat/`.
+- **Tests:** `public_fortran_compatible_diffusion_matches_cosine_decay`, `public_fortran_compatible_zero_order_decay_matches_analytical`, `public_fortran_compatible_agrees_with_fvbe_on_resolved_diffusion` (loose tolerance, stated).
+- **Verification:**
+  - `cargo test -p hydrus-core --test solute_fortran_public_path`; `cargo test -p hydrus-core --lib solute`; `cargo test -p hydrus-core --test solute_backend_contract --test solute_solver_selection`.
+  - Parity `--fixture-group all` = 44/44 with no candidate digest change.
+  - fmt, clippy, `git diff --check`. The orchestrator re-pins `POLICY_HASHES` for `solute.rs`.
+- **Do not touch:** `tools/`, the harness, `solute_fortran_compat/**`, `OBSERVATION_MAP.json`, `Cargo.*`.
+- **Anchors:** `solute.rs:840-1200`; `compat_runner.rs` (`run_compat_deck`, grep `ch_par`); `.development/22.3.3/` requests and observations; `planning/tasks/22.3.3.todo.md`.
 
 ---
 

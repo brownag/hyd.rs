@@ -29,7 +29,9 @@ POLICY_HASHES = {
     "crates/hydrus-core/src/solute.rs": "f82eb0e2b888175758543e42fc0f83332d1930676e2af3a3306f527c8c0eba9b",
     "crates/hydrus-core/src/hydraulics/linear.rs": "6b5649011b1c605e77d55500fa08bd5bfbb708d3548abd225c3dbc11f3e0196e",
     "crates/hydrus-core/tests/solute_fixture_parity.rs": "890bb77171f189402299cf9ceaf8b4809ffa15e3c52a82355016e92b6893bba9",
-    "crates/hydrus-core/tests/solute_verification_harness.rs": "df60e942863d08738ec60945aec548815a3ab021d70ff1b7d2b0469e73beb3f1",
+    # Re-pinned under Orchestration 22 (22.3.3): the harness selects its backend from the request;
+    # requests without `backend` keep FV/BE behaviour.
+    "crates/hydrus-core/tests/solute_verification_harness.rs": "125466801ff4e19fe6b25dcd41cbdcd347c74c7595e6d5b08c60a8fae2517ade",
 }
 COMPARATORS = (
     "tools/solute_benchmark_bridge.py",
