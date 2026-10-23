@@ -966,28 +966,30 @@ fn advance_fortran_compatible_step(
             }
         }
 
-        let k_bot = match lower_mode_0 {
-            SoluteBoundaryMode::TotalFlux { .. } => {
-                let v = input.accepted_water.face_fluxes[0];
-                if v.abs() > 1e-30 {
-                    -1
-                } else {
-                    1
+        // TotalFlux is the Cauchy/flux code -1 for every velocity. With no inflow the
+        // kernel assembles the natural (zero-flux) row (boundary.rs:359-403); the old
+        // Dirichlet +1 at zero velocity pinned the end node to the flux value.
+        // A nonzero flux cannot be carried by a zero-velocity Cauchy code.
+        for b in &config.boundaries {
+            for (mode, face) in [(b.lower, 0), (b.upper, node_count)] {
+                if let SoluteBoundaryMode::TotalFlux { flux } = mode {
+                    if flux != 0.0 && input.accepted_water.face_fluxes[face].abs() <= 1e-30 {
+                        return Err(invalid_transport(
+                            "boundary",
+                            "FortranCompatible cannot impose a nonzero total flux at zero water flux",
+                        ));
+                    }
                 }
             }
+        }
+        let k_bot = match lower_mode_0 {
+            SoluteBoundaryMode::TotalFlux { .. } => -1,
             SoluteBoundaryMode::Concentration { .. } => 1,
             SoluteBoundaryMode::AdvectiveOutflow => 0,
         };
 
         let k_top = match upper_mode_0 {
-            SoluteBoundaryMode::TotalFlux { .. } => {
-                let v = input.accepted_water.face_fluxes[node_count];
-                if v.abs() > 1e-30 {
-                    -1
-                } else {
-                    1
-                }
-            }
+            SoluteBoundaryMode::TotalFlux { .. } => -1,
             SoluteBoundaryMode::Concentration { .. } => 1,
             SoluteBoundaryMode::AdvectiveOutflow => 0,
         };
@@ -1000,7 +1002,7 @@ fn advance_fortran_compatible_step(
                     if v.abs() > 1e-30 {
                         (flux / v) as f32
                     } else {
-                        flux as f32
+                        0.0_f32 // flux == 0 (checked above)
                     }
                 }
                 SoluteBoundaryMode::Concentration { value } => value as f32,
@@ -1012,7 +1014,7 @@ fn advance_fortran_compatible_step(
                     if v.abs() > 1e-30 {
                         (-flux / v) as f32
                     } else {
-                        flux as f32
+                        0.0_f32 // flux == 0 (checked above)
                     }
                 }
                 SoluteBoundaryMode::Concentration { value } => value as f32,
@@ -1023,7 +1025,6 @@ fn advance_fortran_compatible_step(
         }
 
         // Map representative node for each material to find its bulk density
-        let default_dispersion = input.face_dispersion.first().copied().unwrap_or(0.0) as f32;
         let mut rep_nodes = [0usize; 64];
         let mut rep_assigned = [false; 64];
         for (i, &mat_idx) in mesh.material_indices().iter().enumerate() {
@@ -1041,10 +1042,36 @@ fn advance_fortran_compatible_step(
             };
             let density = process_input.map_or(0.8_f32, |p| p.bulk_density[rep_node] as f32);
 
+            // face_dispersion is an effective D (cm2/h) per face; the kernel takes one
+            // value per material. Require it to be uniform over the material's faces.
+            let mut material_dispersion: Option<f64> = None;
+            for face in 0..node_count - 1 {
+                let touches = [face, face + 1]
+                    .iter()
+                    .any(|&node| mesh.material_indices()[node] == m);
+                if !touches {
+                    continue;
+                }
+                let d = input.face_dispersion[face];
+                match material_dispersion {
+                    None => material_dispersion = Some(d),
+                    Some(first) if (d - first).abs() <= 1e-12 * first.abs().max(d.abs()) => {}
+                    Some(_) => {
+                        return Err(invalid_transport(
+                            "face dispersion",
+                            "FortranCompatible requires uniform dispersion within each material",
+                        ));
+                    }
+                }
+            }
+            let material_dispersion = material_dispersion.unwrap_or(0.0) as f32;
+
             let ch_par_row = &mut workspace.compat_cfg.ch_par[m];
             ch_par_row.fill(0.0);
             ch_par_row[0] = density;
-            ch_par_row[1] = default_dispersion;
+            // ch_par[1] is the longitudinal dispersivity (transport.rs:90 multiplies it by
+            // |v|/theta); it stays 0. D goes in the molecular-diffusion slot below.
+            ch_par_row[1] = 0.0;
 
             // Frac default
             let mut frac_val = 1.0_f32;
@@ -1097,10 +1124,22 @@ fn advance_fortran_compatible_step(
                 if js == 0 {
                     frac_val = frac;
                 }
+                // Dw (driver.rs:956, p(jjj+5)); transport.rs:90 adds Dw*tau_water, tau = 1.
+                ch_par_row[offset + 4] = material_dispersion;
                 ch_par_row[offset + 6] = kd;
                 ch_par_row[offset + 7] = nu;
                 ch_par_row[offset + 8] = exponent;
-                ch_par_row[offset + 13] = sp.decay_rate as f32; // GamL1
+                // First-order decay of dissolved and sorbed mass (gam_l driver.rs:962,
+                // gam_s driver.rs:964), as FV/BE decays total mass (solute.rs:1625).
+                ch_par_row[offset + 10] = sp.decay_rate as f32;
+                ch_par_row[offset + 11] = sp.decay_rate as f32;
+                // Chain production from the parent's decay (gam_l1 driver.rs:967, gam_s1
+                // driver.rs:969), as FV/BE sources the next species (solute.rs:1629).
+                if js > 0 {
+                    let parent = config.species[js - 1].decay_rate as f32;
+                    ch_par_row[offset + 13] = parent;
+                    ch_par_row[offset + 14] = parent;
+                }
                 ch_par_row[offset + 19] = omega;
             }
             ch_par_row[2] = frac_val;
