@@ -982,17 +982,34 @@ fn advance_fortran_compatible_step(
                 }
             }
         }
-        let k_bot = match lower_mode_0 {
+        // Orientation mapping (public API -> HYDRUS kernel). The public API numbers nodes
+        // from the lower endpoint (inlet) to the upper (outlet) and q > 0 flows toward
+        // increasing index. The kernel is HYDRUS's: only flow toward node 1 (vN < 0) is
+        // closed at the outflow end. Its node-1 row for kBotCh = -1 without inflow, or
+        // kBotCh = 0, is `D=-1, E=1, F=0` (c1 = c2; SOLUTE.FOR:803-827,
+        // boundary.rs:`assemble_lower`), while its node-N row (SOLUTE.FOR:895-915,
+        // boundary.rs:`assemble_upper`) has only the inflow term (vN(N) < 0) and no
+        // outflow term, so an outflow through the top node piles mass up there (its
+        // row coefficients sum to -v, not 0). For net flow toward increasing public
+        // index the step therefore runs the kernel on the mirror image: kernel node k is
+        // public node N-1-k, x_k = x_last - x, nodal velocities change sign, and the public
+        // upper/lower boundaries become the kernel bottom/top. The result is mirrored back,
+        // so conc/sorbed, accounting and `update_step_balances` stay in public order.
+        // Net flow toward index 0 or q = 0 keeps the identity mapping.
+        let reversed = input.accepted_water.face_fluxes.iter().sum::<f64>() > 0.0;
+        let kernel_node = |i: usize| if reversed { node_count - 1 - i } else { i };
+        let (bottom_mode, top_mode) = if reversed {
+            (upper_mode_0, lower_mode_0)
+        } else {
+            (lower_mode_0, upper_mode_0)
+        };
+        let code_of = |mode: SoluteBoundaryMode| match mode {
             SoluteBoundaryMode::TotalFlux { .. } => -1,
             SoluteBoundaryMode::Concentration { .. } => 1,
             SoluteBoundaryMode::AdvectiveOutflow => 0,
         };
-
-        let k_top = match upper_mode_0 {
-            SoluteBoundaryMode::TotalFlux { .. } => -1,
-            SoluteBoundaryMode::Concentration { .. } => 1,
-            SoluteBoundaryMode::AdvectiveOutflow => 0,
-        };
+        let k_bot = code_of(bottom_mode);
+        let k_top = code_of(top_mode);
 
         // Populate boundary concentrations per species in compat_state
         for js in 0..species_count {
@@ -1020,8 +1037,14 @@ fn advance_fortran_compatible_step(
                 SoluteBoundaryMode::Concentration { value } => value as f32,
                 SoluteBoundaryMode::AdvectiveOutflow => 0.0_f32,
             };
-            workspace.compat_state.c_bot[js] = c_bot_val;
-            workspace.compat_state.c_top[js] = c_top_val;
+            // c_bot_val is the public lower (inlet-side) value, c_top_val the public upper.
+            let (kernel_bot, kernel_top) = if reversed {
+                (c_top_val, c_bot_val)
+            } else {
+                (c_bot_val, c_top_val)
+            };
+            workspace.compat_state.c_bot[js] = kernel_bot;
+            workspace.compat_state.c_top[js] = kernel_top;
         }
 
         // Map representative node for each material to find its bulk density
@@ -1129,26 +1152,37 @@ fn advance_fortran_compatible_step(
                 ch_par_row[offset + 6] = kd;
                 ch_par_row[offset + 7] = nu;
                 ch_par_row[offset + 8] = exponent;
-                // First-order decay of dissolved and sorbed mass (gam_l driver.rs:962,
-                // gam_s driver.rs:964), as FV/BE decays total mass (solute.rs:1625).
-                ch_par_row[offset + 10] = sp.decay_rate as f32;
-                ch_par_row[offset + 11] = sp.decay_rate as f32;
-                // Chain production from the parent's decay (gam_l1 driver.rs:967, gam_s1
-                // driver.rs:969), as FV/BE sources the next species (solute.rs:1629).
-                if js > 0 {
-                    let parent = config.species[js - 1].decay_rate as f32;
-                    ch_par_row[offset + 13] = parent;
-                    ch_par_row[offset + 14] = parent;
-                }
+                // First-order decay of total mass, as FV/BE (solute.rs:1664-1670). The
+                // kernel sinks -(gam_l + gam_l1) and -(gam_s + gam_s1) (processes.rs:697,
+                // :325) and sources the NEXT species from this species' gam_l1/gam_s1
+                // (parent slots pj+14/pj+15, driver.rs:1051-1070): a species with a
+                // daughter carries its whole decay in gam_l1/gam_s1 (driver.rs:967,969),
+                // the last species in gam_l/gam_s (driver.rs:962,964).
+                let decay = sp.decay_rate as f32;
+                let (sink, produce) = if js + 1 < species_count {
+                    (0.0_f32, decay)
+                } else {
+                    (decay, 0.0_f32)
+                };
+                ch_par_row[offset + 10] = sink;
+                ch_par_row[offset + 11] = sink;
+                ch_par_row[offset + 13] = produce;
+                ch_par_row[offset + 14] = produce;
                 ch_par_row[offset + 19] = omega;
             }
             ch_par_row[2] = frac_val;
         }
 
         // Set up compat_cfg
+        let last_x = mesh.coordinates()[node_count - 1];
         for i in 0..node_count {
-            workspace.compat_cfg.x[i] = mesh.coordinates()[i] as f32;
-            workspace.compat_cfg.mat_num[i] = mesh.material_indices()[i] + 1;
+            let k = kernel_node(i);
+            workspace.compat_cfg.x[k] = if reversed {
+                (last_x - mesh.coordinates()[i]) as f32
+            } else {
+                mesh.coordinates()[i] as f32
+            };
+            workspace.compat_cfg.mat_num[k] = mesh.material_indices()[i] + 1;
         }
         for (js, sp) in config.species.iter().enumerate() {
             let is_linear = matches!(
@@ -1178,19 +1212,32 @@ fn advance_fortran_compatible_step(
         for js in 0..species_count {
             let offset = js * node_count;
             for i in 0..node_count {
-                workspace.compat_state.conc[js][i] =
+                let k = kernel_node(i);
+                workspace.compat_state.conc[js][k] =
                     workspace.trial_concentrations[offset + i] as f32;
-                workspace.compat_state.sorb[js][i] =
+                workspace.compat_state.sorb[js][k] =
                     workspace.trial_kinetic_sorbed[offset + i] as f32;
             }
         }
         for i in 0..node_count {
-            workspace.compat_state.th_o[i] = input.start_water_contents[i] as f32;
-            workspace.compat_state.th_n[i] = input.accepted_water.water_contents[i] as f32;
-            workspace.compat_state.v_o[i] = input.accepted_water.face_fluxes[i] as f32;
-            workspace.compat_state.v_n[i] = input.accepted_water.face_fluxes[i] as f32;
-            workspace.compat_state.temp_o[i] = 20.0;
-            workspace.compat_state.temp_n[i] = 20.0;
+            let k = kernel_node(i);
+            // Nodal Darcy flux: the endpoint face at the ends, the mean of the two
+            // adjacent faces inside; mirrored runs negate it.
+            let faces = input.accepted_water.face_fluxes;
+            let q_node = if i == 0 {
+                faces[0]
+            } else if i + 1 == node_count {
+                faces[node_count]
+            } else {
+                0.5 * (faces[i] + faces[i + 1])
+            };
+            let v = if reversed { -q_node } else { q_node } as f32;
+            workspace.compat_state.th_o[k] = input.start_water_contents[i] as f32;
+            workspace.compat_state.th_n[k] = input.accepted_water.water_contents[i] as f32;
+            workspace.compat_state.v_o[k] = v;
+            workspace.compat_state.v_n[k] = v;
+            workspace.compat_state.temp_o[k] = 20.0;
+            workspace.compat_state.temp_n[k] = 20.0;
         }
         workspace.compat_state.t = state.time;
         workspace.compat_state.dt = input.timestep as f32;
@@ -1215,10 +1262,11 @@ fn advance_fortran_compatible_step(
         for js in 0..species_count {
             let offset = js * node_count;
             for i in 0..node_count {
+                let k = kernel_node(i);
                 workspace.trial_concentrations[offset + i] =
-                    workspace.compat_state.conc[js][i] as f64;
+                    workspace.compat_state.conc[js][k] as f64;
                 workspace.trial_kinetic_sorbed[offset + i] =
-                    workspace.compat_state.sorb[js][i] as f64;
+                    workspace.compat_state.sorb[js][k] as f64;
             }
         }
 
