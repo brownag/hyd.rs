@@ -364,6 +364,21 @@ Added after 22.3.3: the hand runs of the harness with `backend fortran-compatibl
 - **Do not touch:** `tools/`, the harness, `solute_fortran_compat/**`, `OBSERVATION_MAP.json`, `Cargo.*`.
 - **Anchors:** `solute.rs:840-1200`; `compat_runner.rs` (`run_compat_deck`, grep `ch_par`); `.development/22.3.3/` requests and observations; `planning/tasks/22.3.3.todo.md`.
 
+### 22.3.7 — v2-aware bridge gate (added 2026-10-22, user-approved "waive for v2, record why")
+
+Found by 22.4.1–22.4.3: `bridge.require_bridges` (`solute_benchmark_bridge.py:641`), called from `check_solute_benchmarks.py:~276-291,683-685` and `run_solute_convergence.py:~253-254,456`, demands the two O13 bridge reports (`benchmark-example3-bridge-{fortran,rust}-baseline`). `CASES_V2.json` has no Fortran bridge row, so no v2 row can be executed.
+
+- **Must edit:** `tools/solute_benchmark_bridge.py`, `tools/check_solute_benchmarks.py`, `tools/run_solute_convergence.py`, `tools/test_solute_benchmarks.py`, `tools/test_solute_convergence_cli.py`, and the bridge's test module (grep `test_solute_benchmark_bridge*`).
+- **Can create:** `planning/tasks/22.3.7.todo.md`; scratch `.development/22.3.7/`.
+- **Spec:**
+  - For a v2 casebook (`schema_version` v2, detected as in 22.3.1) the bridge gate is not applicable. `require_bridges` is not called for it. Instead the gate writes the same receipt file name (`bridge-gate.json`) with `status: "not_applicable_v2"`, the casebook SHA-256, and the reason: "no Fortran rows in v2; source parity is covered by the 44/44 gate (21.4.1) and the public-path analytical tests (22.3.5)"; `scientific_accuracy_accepted: false`.
+  - The v2 `benchmark-example3-bridge-rfc-baseline` row stays an ordinary role=`bridge` row and runs as a recorded Rust run, with no comparison against retained O12 outputs.
+  - The v2 `--stage` and `--bridge-report` handling accepts no bridge reports for v2 and rejects any that are passed. v1 behaviour, receipts and error text stay byte-identical (v1 tests unchanged).
+  - Do not weaken any v1 check; if the bridge file is hash-pinned anywhere (`COMPARATORS`, recipe hashes, `13-baseline`), report it and list the re-pin the orchestrator must do.
+- **Tests:** `test_v2_benchmark_executes_without_bridge_reports`, `test_v2_convergence_executes_without_bridge_reports`, `test_v2_rejects_bridge_reports`, `test_v1_still_requires_both_bridge_reports`, `test_v2_gate_receipt_records_reason`.
+- **Verification:** the named modules pass; a v2 `--execute` on one `reaction_zero` benchmark row and one `diffusion_cosine` convergence row, using throwaway activations in scratch, reaches `complete` (these two runs are the proof; keep them in scratch, do not copy); `git diff --check`.
+- **Do not touch:** `CASES*.json`, `.development/13.*`, Rust, the other tools.
+
 ---
 
 ## Wave 4 — Refinement study of the default backend (run and report; no code changes)
