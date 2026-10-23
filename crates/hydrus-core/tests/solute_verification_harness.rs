@@ -432,7 +432,15 @@ fn output_path(root: &Path, destination: &Path) -> Result<PathBuf> {
         "output paths must be absolute without traversal",
     )?;
     let repo = repo_root();
-    let allowed = ["13.2.2", "13.3.1", "13.4.1", "13.6.1"];
+    let allowed = [
+        "13.2.2",
+        "13.3.1",
+        "13.4.1",
+        "13.6.1",
+        "22-benchmark",
+        "22-convergence",
+        "22-holdout",
+    ];
     require(
         allowed
             .iter()
@@ -1219,6 +1227,27 @@ fn output_confinement_and_exclusive_creation() {
     write_observations(&scratch.0, &output, "original").unwrap();
     assert!(write_observations(&scratch.0, &output, "replacement").is_err());
     assert_eq!(fs::read_to_string(output).unwrap(), "original");
+}
+
+#[test]
+fn output_path_accepts_v2_scratch_roots_and_rejects_others() {
+    let output = |root: &Path| root.join("batch/observations.json");
+    for task in ["22-benchmark", "22-convergence", "22-holdout"] {
+        let root = repo_root()
+            .join(".development")
+            .join(task)
+            .join("runs/run-1");
+        output_path(&root, &output(&root)).unwrap();
+    }
+    for task in ["22-other", "22-benchmark-escape", "22.3.7", "22"] {
+        let root = repo_root()
+            .join(".development")
+            .join(task)
+            .join("runs/run-1");
+        assert!(output_path(&root, &output(&root)).is_err());
+    }
+    let root = repo_root().join(".development/22-benchmark/run-1");
+    assert!(output_path(&root, &repo_root().join("observations.json")).is_err());
 }
 
 #[cfg(unix)]

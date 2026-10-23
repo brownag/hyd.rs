@@ -1,5 +1,6 @@
 """Synthetic, hand-computed parser and accounting checks; never launch a solver."""
 
+import json
 import copy
 import math
 import tempfile
@@ -570,6 +571,34 @@ class MetricsTests(unittest.TestCase):
         fixture.manifest["extra"] = 1
         fixture.refresh()
         with self.assertRaisesRegex(ValueError, "wrong keys"):
+            fixture.load()
+
+    def test_request_backend_key_is_optional_and_matches_manifest(self):
+        fixture = RunFixture(self.root)
+        path = self.root / "request.txt"
+
+        def rebind(path):
+            digest = metrics.digest_file(path)
+            fixture.manifest["request_sha256"] = digest
+            fixture.manifest["provenance"]["input_sha256"]["request.txt"] = digest
+            obs = metrics.json_load(self.root / "observations.json")
+            obs["request_sha256"] = digest
+            (self.root / "observations.json").write_text(json.dumps(obs))
+
+        path.write_text(path.read_text() + "backend=fortran-compatible\n")
+        rebind(path)
+        fixture.manifest["backend"] = "fortran-compatible"
+        fixture.refresh()
+        fixture.load()
+        del fixture.manifest["backend"]
+        fixture.refresh()
+        with self.assertRaisesRegex(ValueError, "request backend"):
+            fixture.load()
+        path.write_text(path.read_text().replace("backend=fortran-compatible", "backend=other"))
+        rebind(path)
+        fixture.manifest["backend"] = "fortran-compatible"
+        fixture.refresh()
+        with self.assertRaisesRegex(ValueError, "request backend"):
             fixture.load()
 
     def test_json_duplicate_nonfinite_and_symlink(self):

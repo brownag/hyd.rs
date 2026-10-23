@@ -356,5 +356,36 @@ class V2AndStateTests(unittest.TestCase):
         self.assertEqual(code, 2)
 
 
+class V2BridgeGateTests(unittest.TestCase):
+    V2 = cli.ROOT / "reference/solute_verification/CASES_V2.json"
+
+    def batch(self, reports):
+        instance = object.__new__(cli.ConvergenceBatch)
+        instance.cases_path = self.V2
+        instance.book = {}
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        instance.path = Path(tmp.name)
+        instance.recipe = {"rows": [{"role": "convergence"}], "bridge_reports": reports}
+        return instance
+
+    def test_v2_convergence_executes_without_bridge_reports(self):
+        instance = self.batch([])
+        with mock.patch.object(cli.batch_artifacts, "write_artifact",
+                               lambda t, r, b: t.write_text(json.dumps(r))), \
+             mock.patch.object(cli.batch_artifacts, "read_artifact",
+                               lambda t: json.loads(t.read_text())), \
+             mock.patch.object(cli.bridge, "require_bridges",
+                               side_effect=AssertionError("v1 gate")):
+            instance.bridge_gate(write=True)
+            instance.bridge_gate(write=False)
+        receipt = json.loads((instance.path / "bridge-gate.json").read_text())
+        self.assertEqual(receipt["status"], "not_applicable_v2")
+
+    def test_v2_rejects_bridge_reports(self):
+        with self.assertRaisesRegex(ValueError, "accept no bridge reports"):
+            self.batch(["a.json", "b.json"]).bridge_gate(write=False)
+
+
 if __name__ == "__main__":
     unittest.main()

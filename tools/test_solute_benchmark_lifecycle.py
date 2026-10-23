@@ -225,6 +225,18 @@ class LifecycleTests(unittest.TestCase):
             self.assertEqual(lifecycle.metrics.json_load(run / "manifest.json")["status"], "failed")
         self.assertFalse(any(r["event"] == "start" for r in self.events()))
 
+    def test_v1_row_cap_still_enforced(self):
+        def large(task_root, book, sources):
+            build, receipt = self.mock_build(task_root, book, sources)
+            (build / receipt["executable"]).write_bytes(b"x" * RUST["estimated_output_bytes"])
+            return build, receipt
+
+        run = self.execute(build=large)
+        manifest = lifecycle.metrics.json_load(run / "manifest.json")
+        self.assertEqual(manifest["status"], "failed")
+        self.assertIn("exceeds row cap", " ".join(manifest["warnings"]))
+        self.assertFalse(any(r["event"] == "start" for r in self.events()))
+
     def test_independent_observation_corruptions_fail_actual_metrics(self):
         mutations = {
             "species": lambda d: d["species"].reverse(),
@@ -564,6 +576,24 @@ class BuildTests(unittest.TestCase):
                 lifecycle.build_rust(self.root, BOOK, self.sources)
             self.assertEqual(compile.call_count, 1)
 
+    def test_cargo_jsonl_ignores_non_json_build_lines(self):
+        def noisy(command, cwd, storage_root, timeout, cap, env, stdout, stderr, global_cap):
+            code = self.compile(command, cwd, storage_root, timeout, cap, env, stdout, stderr,
+                                global_cap)
+            stdout.write_text("[serde_json 1.0] cargo:rerun-if-changed=build.rs\n" + stdout.read_text())
+            return code
+
+        with patch.object(lifecycle, "controlled_environment", return_value={}), patch.object(
+            lifecycle.shutil, "which", return_value=str(self.tool)
+        ), patch.object(
+            lifecycle.subprocess, "run", return_value=Mock(stdout="mock compiler v1")
+        ), patch.object(lifecycle, "total_storage", return_value=0), patch.object(
+            lifecycle, "run_bounded", side_effect=noisy
+        ):
+            build, receipt = lifecycle.build_rust(self.root, BOOK, self.sources)
+        self.assertEqual(receipt["status"], "complete")
+        self.assertIn("rerun-if-changed", (build / "cargo.jsonl").read_text())
+
     def test_failed_or_ambiguous_build_never_automatically_retries(self):
         def ambiguous(*args):
             self.compile(*args)
@@ -646,6 +676,39 @@ class V2LifecycleTests(unittest.TestCase):
         book["budgets"]["storage_bytes_cap"] = 1
         with self.assertRaisesRegex(ValueError, "storage reservation"):
             lifecycle.check_budget(book, RUST)
+
+    def test_v2_skips_row_reservation_ceiling(self):
+        row = next(
+            r for r in self.book["launches"]
+            if r["phase"] == "benchmark" and r["case_id"] == "reaction_zero"
+        )
+        self.assertEqual(lifecycle.row_cap(self.book, row), float("inf"))
+        self.assertEqual(lifecycle.row_cap(BOOK, RUST), 2 * RUST["estimated_output_bytes"])
+        runner = lifecycle.Lifecycle(
+            self.V2_PATH, self.checkout / ".development/22-benchmark/runs"
+        )
+
+        def big(task_root, book, sources):
+            build = task_root / "rust-builds/synthetic"
+            build.mkdir(parents=True, exist_ok=True)
+            exe = build / "synthetic-harness"
+            exe.write_bytes(b"x" * (3 * row["estimated_output_bytes"]))
+            exe.chmod(0o755)
+            return build, {"status": "complete", "executable": exe.name,
+                           "identity": {"sources": sources, "versions": {"rustc": "synthetic"}}}
+
+        activation = {
+            "cases_sha256": lifecycle.sha256(self.V2_PATH), "phase": "benchmark",
+            "launch_ids": [row["id"]], "kind": "benchmark", "authorization": "mock",
+        }
+        with patch.object(lifecycle, "build_rust", side_effect=big), patch.object(
+            lifecycle, "run_bounded", return_value=1
+        ) as run:
+            (path,) = runner.execute([row["id"]], activation)
+        run.assert_called_once()
+        self.assertEqual(run.call_args.args[4], float("inf"))
+        warnings = " ".join(json.loads((path / "manifest.json").read_text())["warnings"])
+        self.assertNotIn("row cap", warnings)
 
     def test_v1_manifest_has_no_backend(self):
         runner = lifecycle.Lifecycle(BOOK_PATH, self.checkout / ".development/13.3.1/runs")
