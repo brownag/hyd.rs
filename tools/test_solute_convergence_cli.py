@@ -203,7 +203,7 @@ class NoWorkContractTests(unittest.TestCase):
                 return [root / "planned" / str(index) for index, _ in enumerate(ids)]
 
         class Batch:
-            def __init__(self, _cases, _output, path):
+            def __init__(self, _cases, _output, path, _phase=None):
                 self.path, self.book = Path(path), book
             def create(self, *_args, **_kwargs):
                 self.path.mkdir(parents=True)
@@ -242,6 +242,118 @@ class NoWorkContractTests(unittest.TestCase):
     @staticmethod
     def _small_book():
         return {"budgets": {"launch_cap": 77}}
+
+
+V2_CASES = cli.ROOT / "reference/solute_verification/CASES_V2.json"
+
+
+class V2AndStateTests(unittest.TestCase):
+    def _execute_batch(self, status, tmp):
+        """A batch whose lifecycle returns one run with the given manifest status."""
+        book = contract.validate(contract.load_cases(
+            cli.ROOT / "reference/solute_verification/CASES.json"))
+        row = next(r for r in book["launches"] if r["phase"] == "convergence")
+        run = Path(tmp) / "run"
+        run.mkdir()
+        (run / "manifest.json").write_text(json.dumps({"launch_id": row["id"], "status": status}))
+        seen = {}
+
+        class Helper:
+            def derive(self, *_args, **_kw):
+                return ({"derived": True}, None)
+            def classify(self, rows, runs, write):
+                seen["runs"] = runs
+                return {"ordered_evidence": []}
+
+        class RunManager:
+            def execute(self, ids, activation):
+                return [run]
+
+        batch = object.__new__(cli.ConvergenceBatch)
+        batch.path, batch.book = Path(tmp) / "batch", book
+        batch.recipe = {"mode": "execute", "rows": [row], "allow_reference_work": False,
+                        "activation": {"launch_ids": [row["id"]]}, "activation_sha256": "0" * 64}
+        batch.bridge_gate = lambda write: None
+        batch.helper = lambda: Helper()
+        batch.references = lambda *_a, **_k: ({}, {row["id"]: {"status": "admitted"}})
+        batch.reconcile = lambda resume: ({}, [row], RunManager())
+        batch._publish = lambda *_a: ({"status": "evidence_complete"}, 0)
+        return batch, row, seen
+
+    def test_cli_accepts_raw_complete_like_lifecycle_api(self):
+        for status in ("complete", "raw_complete"):
+            with tempfile.TemporaryDirectory() as tmp, \
+                 mock.patch.object(cli.batch_artifacts, "write_artifact"), \
+                 mock.patch.object(cli.lifecycle.fortran, "canonical_hash", return_value="h"):
+                batch, _row, _seen = self._execute_batch(status, tmp)
+                self.assertEqual(batch.execute()[1], 0, status)
+        with tempfile.TemporaryDirectory() as tmp, \
+             mock.patch.object(cli.batch_artifacts, "write_artifact"), \
+             mock.patch.object(cli.lifecycle.fortran, "canonical_hash", return_value="h"):
+            batch, _row, _seen = self._execute_batch("failed", tmp)
+            with self.assertRaisesRegex(ValueError, "cannot be retried"):
+                batch.execute()
+
+    def test_rust_classification_accepts_batch_path(self):
+        # classify() takes run directories; the CLI used to hand it derived record dicts.
+        with tempfile.TemporaryDirectory() as tmp, \
+             mock.patch.object(cli.batch_artifacts, "write_artifact"), \
+             mock.patch.object(cli.lifecycle.fortran, "canonical_hash", return_value="h"):
+            batch, row, seen = self._execute_batch("complete", tmp)
+            batch.execute()
+        self.assertIsInstance(seen["runs"][row["id"]], Path)
+
+    def test_v1_defaults_unchanged(self):
+        v1 = {"budgets": {"launch_cap": 2}}
+        starts = [{"event": "start"}]
+        self.assertEqual(cli._launch_counts(v1, starts), {"consumed": 1, "remaining": 1, "cap": 2})
+        with self.assertRaisesRegex(ValueError, "launch cap exceeded"):
+            cli._launch_counts(v1, starts * 3)
+        book = contract.validate(contract.load_cases(
+            cli.ROOT / "reference/solute_verification/CASES.json"))
+        self.assertEqual(set(lifecycle.book_tasks(book)), {"13.3.1", "13.4.1", "13.6.1"})
+        self.assertEqual(evidence.CONVERGENCE_TASKS[0], "13.4.1")
+
+    def test_v2_roots_per_phase(self):
+        book = contract.validate(contract.load_cases(V2_CASES))
+        self.assertEqual(set(lifecycle.book_tasks(book)),
+                         {"22-benchmark", "22-convergence", "22-holdout"})
+        self.assertEqual(cli._launch_counts(book, [{"event": "start"}] * 5),
+                         {"consumed": 5, "remaining": None, "cap": None})
+        for task, phase in (("22-benchmark", "benchmark"), ("22-convergence", "convergence"),
+                            ("22-holdout", "holdout")):
+            root = cli.ROOT / ".development" / task / "x"
+            self.assertEqual(lifecycle.Lifecycle(V2_CASES, root).phase, phase)
+        self.assertEqual(cli._phase_root(cli.ROOT / ".development/22-convergence/x", V2_CASES).phase,
+                         "convergence")
+        with self.assertRaisesRegex(ValueError, "execution root"):
+            cli._phase_root(cli.ROOT / ".development/22-holdout/x", V2_CASES)
+        self.assertIn("22-convergence", evidence.CONVERGENCE_TASKS)
+
+    def test_holdout_rows_dry_run_only_in_v2_until_reserved_status_lifted(self):
+        book = contract.validate(contract.load_cases(V2_CASES))
+        rows = cli._rows(book, None, "holdout")
+        self.assertTrue(all(r["status"] == "reserved_until_threshold_gate" for r in rows))
+        with mock.patch.object(cli, "THRESHOLDS_V2", cli.ROOT / "reference/absent-thresholds.json"):
+            with self.assertRaisesRegex(ValueError, "reserved until the threshold gate"):
+                cli._gate_holdout(rows)
+        with tempfile.NamedTemporaryFile() as lifted, \
+             mock.patch.object(cli, "THRESHOLDS_V2", Path(lifted.name)):
+            cli._gate_holdout(rows)  # committed thresholds lift the reservation
+
+        class Manager:
+            phase = "holdout"
+            def __init__(self, *_a):
+                self.book = book
+            def execute(self, *_a):
+                raise AssertionError("reserved holdout row must not execute")
+
+        activation = Path(tempfile.mkdtemp()) / "act.json"
+        activation.write_text(json.dumps({"launch_ids": [r["id"] for r in rows]}))
+        with mock.patch.object(cli.lifecycle, "Lifecycle", Manager):
+            code = cli.main(["--cases", str(V2_CASES), "--output-root", "unused", "--holdout",
+                             "--execute", "--activation-file", str(activation)])
+        self.assertEqual(code, 2)
 
 
 if __name__ == "__main__":

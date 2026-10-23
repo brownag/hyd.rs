@@ -557,6 +557,21 @@ class MetricsTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "initial condition"):
             fixture.load()
 
+    def test_manifest_backend_key_is_optional_and_exact(self):
+        fixture = RunFixture(self.root)
+        fixture.manifest["backend"] = "fortran-compatible"
+        fixture.refresh()
+        fixture.load()
+        fixture.manifest["backend"] = "other"
+        fixture.refresh()
+        with self.assertRaisesRegex(ValueError, "manifest backend"):
+            fixture.load()
+        del fixture.manifest["backend"]
+        fixture.manifest["extra"] = 1
+        fixture.refresh()
+        with self.assertRaisesRegex(ValueError, "wrong keys"):
+            fixture.load()
+
     def test_json_duplicate_nonfinite_and_symlink(self):
         path = self.root / "bad.json"
         for text in ('{"a":1,"a":2}', '{"a":NaN}'):

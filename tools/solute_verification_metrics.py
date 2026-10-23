@@ -290,7 +290,9 @@ def _context(manifest_path, cases_path):
     root = manifest_path.parent.resolve()
     book = validate(load_cases(Path(cases_path)))
     manifest = json_load(manifest_path)
-    keys(manifest, MANIFEST_KEYS, "manifest")
+    # v2 manifests add an optional top-level backend; v1 manifests stay valid unchanged.
+    keys(manifest, MANIFEST_KEYS + (" backend" if "backend" in manifest else ""), "manifest")
+    require(manifest.get("backend", "fortran-compatible") == "fortran-compatible", "manifest backend")
     require(manifest["schema_version"] == "solute-manifest-v1", "manifest schema")
     for key in ("run_id", "launch_id", "case_id"):
         require(
