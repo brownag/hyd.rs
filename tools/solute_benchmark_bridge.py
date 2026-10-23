@@ -29,7 +29,9 @@ POLICY_HASHES = {
     # still selectable via with_backend. Re-pinned under Orchestration 22 (22.3.5): the public
     # FortranCompatible step maps dispersion, TotalFlux boundaries and decay to the kernel slots
     # the deck runner uses; FV/BE unchanged.
-    "crates/hydrus-core/src/solute.rs": "01d1c3d2be722fbb99d9cdc6a7c0d17cc5211773fc81d0ef988cfba08adf1e78",
+    # Re-pinned again under Orchestration 22 (22.3.8): chain production slots and flow-direction
+    # mirroring in the public FortranCompatible step; FV/BE unchanged.
+    "crates/hydrus-core/src/solute.rs": "30b84ce2d758e56cf8b4011936df29e004f4574d695b2c2374900f38da5e388b",
     "crates/hydrus-core/src/hydraulics/linear.rs": "6b5649011b1c605e77d55500fa08bd5bfbb708d3548abd225c3dbc11f3e0196e",
     "crates/hydrus-core/tests/solute_fixture_parity.rs": "890bb77171f189402299cf9ceaf8b4809ffa15e3c52a82355016e92b6893bba9",
     # Re-pinned under Orchestration 22 (22.3.3): the harness selects its backend from the request;

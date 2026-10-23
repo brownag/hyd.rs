@@ -1,7 +1,7 @@
 # State — Orchestration 22
 
 Plan status: **Approved by user on 2026-10-22 (“YES”).**
-Execution status: **Waves 1A, 1B, 2, 3A, 3B done; Wave 3C done (22.3.7 added); Wave 4A re-launching.**
+Execution status: **Waves 1A, 1B, 2, 3A, 3B done; Wave 3C done (22.3.7, 22.3.8 added); Wave 4A being re-run on the fixed public path (first-pass reports 22.4.1-22.4.3 are superseded).**
 Plan: [EXECUTION_PLAN_22.md](EXECUTION_PLAN_22.md). Worker template: [PROMPT_TEMPLATE_22.md](PROMPT_TEMPLATE_22.md).
 Follows: Orchestration 21 (complete; [STATE_21.md](STATE_21.md) § Follow-ups).
 
@@ -33,6 +33,7 @@ Follows: Orchestration 21 (complete; [STATE_21.md](STATE_21.md) § Follow-ups).
 | 3B | 22.3.2 | v2 rows through reference and lifecycle tools | done |
 | 3B | 22.3.3 | Harness backend selection; public-API path check | done |
 | 3C | 22.3.5 | Fix public FortranCompatible step (added 2026-10-22, user-approved) | done |
+| 3C | 22.3.8 | Fix chain production + flow-direction mirroring in public FC step (added; from 4A findings) | done |
 | 3C | 22.3.7 | v2 bridge gate waived; lifecycle/harness/metrics v2 execute fixes (added; user-approved) | done |
 | 3C | 22.3.6 | Allow `22-*` roots in the reference cache (added; 22.3.4 finding) | done |
 | 3C | 22.3.4 | Benchmark/convergence/holdout CLIs on v2; bug fixes | done |
@@ -60,6 +61,9 @@ Follows: Orchestration 21 (complete; [STATE_21.md](STATE_21.md) § Follow-ups).
 
 - 22.3.7 gate (merged): cargo workspace 440/0/1; Python 352 OK; fmt, clippy, diff --check clean. `POLICY_HASHES` harness hash re-pinned again.
 - DECISION 2026-10-22 (user): bridge gate waived for v2 (receipt `not_applicable_v2`). First 4A attempts (22.4.1-22.4.3) stopped on the bridge gate; 22.3.7 also had to fix cargo.jsonl parsing, the per-row reservation ceiling, the harness scratch-root allow-list and the metrics request key set before a v2 row could execute. Editing `solute_benchmark_bridge.py` changes `COMPARATORS`/`PRODUCERS` hashes, so retained O13 bridge reports no longer re-verify (O13 verify-only was already failing).
+
+- 22.3.8 gate (merged): cargo workspace 448/0/1; Python 352 OK; fmt, clippy, diff --check clean; parity `--backend fortran-compatible --fixture-group all` exit 0, 44 fixtures pass (`.development/22-gate-3c/out2.log`). `POLICY_HASHES` solute.rs re-pinned.
+- Study findings that triggered 22.3.8 (first-pass 4A, unmerged branches `orchestration/22.4.1-22.4.3`): daughters exactly 0 in the reaction chain (22.4.1); `diffusion_cosine` inventory not conserved; `scalar_robin` outlet 1.49 > c_in (22.4.3). Causes: chain production read from parent's slots; kernel has only a node-1 outflow closure (`SOLUTE.FOR:803-827`, top row `:895-915` no outflow term). `diffusion_cosine` inventory loss (first order in dx: -1.50e-2/-7.33e-3/-3.76e-3 at 17/33/65 nodes) is inherent to the kernel's end-row c1=c2 treatment of the pinned Fortran; not a public-path defect. To decide: whether to log as an SD in `docs/FORTRAN_SOURCE_DEFECTS.md`.
 
 ## Task reports
 
@@ -95,3 +99,6 @@ Public `FortranCompatible` step fixed in `solute.rs:~969-1130`: (A) D now goes t
 
 ### 22.3.7 — done
 v2 gate: `is_v2_casebook`/`v2_gate_receipt` in the bridge module, CLIs skip `require_bridges` for v2 and reject `--bridge-report`; v2 bridge row recorded (`recorded`). Lifecycle: `build_rust` parses only `{` lines; `row_cap()` skips the 2x ceiling for cap-free books. Harness `output_path` allows `22-benchmark/22-convergence/22-holdout` (19 tests). Metrics `_request` accepts optional `backend`. Proofs: v2 `reaction_zero` benchmark `batch-77236ebf…` and `diffusion_cosine` `space_17` convergence `batch-725c83ad…`, both evidence_complete, verify-only exit 0 (scratch only).
+
+### 22.3.8 — done
+Chain: a species with a daughter carries its decay in `gam_l1/gam_s1`, the last in `gam_l/gam_s` (kernel reads production from the parent's slots, `driver.rs:1051-1070`). Flow direction: when summed face flux > 0 the kernel runs on the mirror image (node k = public N-1-k, velocities negated, boundaries swapped, results mapped back); nodal flux is now the endpoint face at the ends and the mean of adjacent faces inside (differs from the old lower-face rule only for non-uniform flux). 12 public-path tests, incl. 3 Bateman chain, 3 flux-inlet, 2 q<0. Limits: mirror chosen per step from the sign of the summed flux, a direction flip between steps is untested; the 22.3.5 comment that code -1 gives the natural row at v=0 is inaccurate (not corrected).
