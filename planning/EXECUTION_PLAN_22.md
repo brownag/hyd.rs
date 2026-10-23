@@ -382,6 +382,18 @@ Found by 22.4.1–22.4.3: `bridge.require_bridges` (`solute_benchmark_bridge.py:
   2. `:592-596` row reservation `size + estimated_output_bytes <= 2 * estimated_output_bytes` is a per-row ceiling; it fails for the 2.9 MB debug harness against a 2.28 MB estimate. For books without caps (v2, ADR 0003 / D7) skip this ceiling and the matching global reservation check (`:598`), but still record sizes and estimates. v1 stays byte-identical and its cap tests stay green. Add `test_v1_row_cap_still_enforced`, `test_v2_skips_row_reservation_ceiling`, `test_cargo_jsonl_ignores_non_json_build_lines`.
 - **Do not touch:** `CASES*.json`, `.development/13.*`, Rust, the other tools.
 
+### 22.3.8 — Fix chain production in the public `FortranCompatible` step (added 2026-10-22, from the 22.4.1 study)
+
+22.4.1 ran `reaction_distinct` and `reaction_equal` on the fixed public path: the parent S1 is first order in dt, but the daughters S2 and S3 are exactly 0 at every time (relative error 1.0, no change with dt). `reaction_zero` is exact. Suspect: the chain-production slots written by 22.3.5 fix C (`solute.rs:~1134-1141`, `offset+13/14` = `gam_l1/gam_s1`) produce no source in the kernel (a missing enabling flag, wrong parent mapping, or a skipped term). The 22.4.1 report (`planning/master/M5V_STUDY_22_REACTIONS.md` on branch `orchestration/22.4.1`, not merged) has the evidence; its batches are in `.development/22.4.1/`.
+
+- **Must edit:** `crates/hydrus-core/src/solute.rs`; `crates/hydrus-core/tests/solute_fortran_public_path.rs`.
+- **Can create:** `planning/tasks/22.3.8.todo.md`; scratch `.development/22.3.8/`.
+- **Depends on:** `22.3.5`.
+- **Spec:** reproduce with the 22.4.1 requests; name the cause with file:line against `driver.rs`/`transport.rs`/`run_compat_deck`'s own ChPar loading; fix only in the `FortranCompatible` setup in `solute.rs` (kernels, FV/BE and the deck runner stay untouched; stop on rule 4 otherwise). Expected values come from the analytical Bateman chain (closed form), never from solver output. Check that FV/BE chain semantics (`solute.rs:~1625-1629`) are matched, including Kd/retardation of parent and daughters.
+- **Tests (new, red first):** `public_fortran_compatible_three_species_chain_matches_bateman` (distinct rates), `..._equal_rates_chain_matches_bateman`, `..._chain_with_sorption_matches_analytical`.
+- **Verification:** `cargo test -p hydrus-core --test solute_fortran_public_path --lib solute --test solute_backend_contract --test solute_solver_selection`; parity `--backend fortran-compatible --fixture-group all` pass (44 fixtures); fmt, clippy, `git diff --check`. The orchestrator re-pins `POLICY_HASHES` for `solute.rs`.
+- **Do not touch:** `tools/`, the harness, `solute_fortran_compat/**`, `Cargo.*`.
+
 ---
 
 ## Wave 4 — Refinement study of the default backend (run and report; no code changes)
