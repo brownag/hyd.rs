@@ -1,7 +1,7 @@
 # State — Orchestration 22
 
 Plan status: **Approved by user on 2026-10-22 (“YES”).**
-Execution status: **Waves 1A, 1B, 2, 3A, 3B done; Wave 3C (22.3.4, 22.3.5) next.**
+Execution status: **Waves 1A, 1B, 2, 3A, 3B done; Wave 3C done; Wave 4A next.**
 Plan: [EXECUTION_PLAN_22.md](EXECUTION_PLAN_22.md). Worker template: [PROMPT_TEMPLATE_22.md](PROMPT_TEMPLATE_22.md).
 Follows: Orchestration 21 (complete; [STATE_21.md](STATE_21.md) § Follow-ups).
 
@@ -32,8 +32,9 @@ Follows: Orchestration 21 (complete; [STATE_21.md](STATE_21.md) § Follow-ups).
 | 3A | 22.3.1 | `CASES_V2.json` and spec checker | done |
 | 3B | 22.3.2 | v2 rows through reference and lifecycle tools | done |
 | 3B | 22.3.3 | Harness backend selection; public-API path check | done |
-| 3C | 22.3.5 | Fix public FortranCompatible step (added 2026-10-22, user-approved) | pending |
-| 3C | 22.3.4 | Benchmark/convergence/holdout CLIs on v2; bug fixes | pending |
+| 3C | 22.3.5 | Fix public FortranCompatible step (added 2026-10-22, user-approved) | done |
+| 3C | 22.3.6 | Allow `22-*` roots in the reference cache (added; 22.3.4 finding) | done |
+| 3C | 22.3.4 | Benchmark/convergence/holdout CLIs on v2; bug fixes | done |
 | 4A | 22.4.1 | Study: closed reactions | pending |
 | 4A | 22.4.2 | Study: `diffusion_cosine` | pending |
 | 4A | 22.4.3 | Study: `scalar_robin` | pending |
@@ -53,6 +54,8 @@ Follows: Orchestration 21 (complete; [STATE_21.md](STATE_21.md) § Follow-ups).
 
 - Wave 3B (merged 3a76529): cargo workspace 435/0/1; Python 333 OK; fmt, clippy, diff --check clean. `POLICY_HASHES` re-pinned for the harness (`1254668…`); `solute.rs` re-pin due after 22.3.5.
 - DECISION 2026-10-22 (user): 22.3.3 found the public FortranCompatible step wrong on harness inputs; add 22.3.5 (diagnose and fix in solute.rs) in parallel with 22.3.4. 22.3.2 found `solute_verification_metrics.py` `MANIFEST_KEYS` rejects the manifest `backend` key, so it was added to 22.3.4's scope; O13 `--verify-only` already fails (source identity moved), recorded as a known limit.
+
+- Wave 3C (merged 1fd285e + 22.3.5): cargo workspace 439/0/1; Python 342 OK; fmt, clippy, diff --check clean; parity `--backend fortran-compatible --fixture-group all` pass (44 fixtures, exit 0; log `.development/22-gate-3c/out.log`). `POLICY_HASHES` re-pinned for `solute.rs`.
 
 ## Task reports
 
@@ -76,3 +79,12 @@ ADR 0018 written, ADR 0013 status line, README row and note.
 
 ### 22.3.3 — done (2f70b7f)
 Harness parses optional `backend` (absent = FV/BE; unknown = error); no new observation key (metrics key set frozen), FC rows carry a different free-text solver description. 3 tests, 18/18. Path check: public step and deck runner both reach `iteration::solve_solute_with_nonlinear_with_scratch`, but configs differ (`dt_min`, `water_flow`, density/dual-porosity/vapor off). Hand runs complete but FC output is wrong vs FV/BE (max abs diff 1.0 reaction_zero, 1.19 diffusion_cosine; interior unchanged, node 0 drops to 0). Suspect `solute.rs:~1026-1047` (dispersion into dispersivity slot). Evidence in `.development/22.3.3/`.
+
+### 22.3.4 — done (merge c7e5198)
+Metrics accepts optional manifest `backend`; `run_solute_convergence.py` passes run paths to classify (mocked repro; both new tests red on old code), accepts `raw_complete`, scopes ledgers by casebook generation, adds `--holdout` (refuses reserved rows until `THRESHOLDS_V2.json` exists); evidence/benchmark CLIs cap-free for v2. Modules 93 -> 101 OK. v2 dry-run + verify-only OK for benchmark/convergence/holdout. O13 `--verify-only` known to fail ("source identity changed"). Commands: benchmark `check_solute_benchmarks.py --cases CASES_V2.json --output-root .development/22-benchmark/<x>`; convergence `run_solute_convergence.py --cases CASES_V2.json --output-root .development/22-convergence/<x>`; holdout same script with `--holdout --output-root .development/22-holdout/<x>`. Analysis/metrics modules not probed beyond the dry-runs (they key on `solver == "rust"`).
+
+### 22.3.5 — done (merge after 22.3.6)
+Public `FortranCompatible` step fixed in `solute.rs:~969-1130`: (A) D now goes to molecular-diffusion slot `offset+4`, dispersivity `ch_par[1]=0` (error if D differs within a material >1e-12 rel); (B) `TotalFlux` is Cauchy code -1 always, nonzero flux at zero velocity is an error; (C) first-order decay to `offset+10/11`, parent chain to `offset+13/14`. New `tests/solute_fortran_public_path.rs` 4/4 (analytical; first-order decay tolerance 1e-3 at dt=0.0125 set from the observed first-order dt convergence 2.4e-3/1.2e-3/6e-4, not from solver tuning of a study threshold). FC vs FV/BE hand runs: max abs diff 0 (reaction_zero), 0.0499 (diffusion_cosine). Limit: per-node velocity taken from the lower face (fine for uniform q).
+
+### 22.3.6 — done (1fd285e)
+`ALLOWED_TASKS` in `tools/solute_reference_cache.py` gains the three `22-*` roots; test added (22 OK).

@@ -25,8 +25,10 @@ OLD_RUST = ".development/12.6.1/rust-observations.json"
 POLICY_HASHES = {
     # Re-pinned under Orchestration 21 D5 (21.5.1): SoluteConfig::new defaults to
     # FortranCompatible after the 21.4.1 44/44 parity gate; FV/BE equations unchanged and
-    # still selectable via with_backend.
-    "crates/hydrus-core/src/solute.rs": "f82eb0e2b888175758543e42fc0f83332d1930676e2af3a3306f527c8c0eba9b",
+    # still selectable via with_backend. Re-pinned under Orchestration 22 (22.3.5): the public
+    # FortranCompatible step maps dispersion, TotalFlux boundaries and decay to the kernel slots
+    # the deck runner uses; FV/BE unchanged.
+    "crates/hydrus-core/src/solute.rs": "01d1c3d2be722fbb99d9cdc6a7c0d17cc5211773fc81d0ef988cfba08adf1e78",
     "crates/hydrus-core/src/hydraulics/linear.rs": "6b5649011b1c605e77d55500fa08bd5bfbb708d3548abd225c3dbc11f3e0196e",
     "crates/hydrus-core/tests/solute_fixture_parity.rs": "890bb77171f189402299cf9ceaf8b4809ffa15e3c52a82355016e92b6893bba9",
     # Re-pinned under Orchestration 22 (22.3.3): the harness selects its backend from the request;
