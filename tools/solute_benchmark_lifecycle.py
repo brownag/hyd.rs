@@ -193,9 +193,24 @@ def ledger_records(path, book, phase):
     return rows
 
 
+def has_caps(book):
+    """v1 casebooks carry launch and storage caps; v2 (ADR 0003) carries none."""
+    return "launch_cap" in book["budgets"]
+
+
+def storage_cap(book):
+    return book["budgets"]["storage_bytes_cap"] if has_caps(book) else float("inf")
+
+
+def book_tasks(book):
+    """Phase roots belonging to the casebook generation (v1 13.x, v2 22-*)."""
+    v2 = not has_caps(book)
+    return {t: p for t, p in PHASE_TASKS.items() if t.startswith("22-") == v2}
+
+
 def all_records(book):
     records = []
-    for task, phase in PHASE_TASKS.items():
+    for task, phase in book_tasks(book).items():
         records.extend(
             ledger_records(safe(ROOT, f".development/{task}/launch-ledger.jsonl"), book, phase)
         )
@@ -207,8 +222,9 @@ def all_records(book):
     return records
 
 
-def total_storage():
-    return sum(fortran.directory_bytes(safe(ROOT, f".development/{task}")) for task in PHASE_TASKS)
+def total_storage(book=None):
+    tasks = PHASE_TASKS if book is None else book_tasks(book)
+    return sum(fortran.directory_bytes(safe(ROOT, f".development/{task}")) for task in tasks)
 
 
 def check_budget(book, row):
@@ -216,17 +232,18 @@ def check_budget(book, row):
     starts = [r for r in records if r["event"] == "start"]
     by_id = {r["id"]: r for r in book["launches"]}
     require(not any(r["launch_id"] == row["id"] for r in starts), "launch row already consumed")
-    require(len(starts) < book["budgets"]["launch_cap"], "global launch cap exhausted")
     phase_count = sum(by_id[r["launch_id"]]["phase"] == row["phase"] for r in starts)
-    require(phase_count < book["budgets"]["phase_caps"][row["phase"]], "phase cap exhausted")
     reserved = sum(2 * by_id[r["launch_id"]]["estimated_output_bytes"] for r in starts)
-    require(
-        reserved + 2 * row["estimated_output_bytes"] <= book["budgets"]["storage_bytes_cap"],
-        "global storage reservation exceeded",
-    )
+    if has_caps(book):
+        require(len(starts) < book["budgets"]["launch_cap"], "global launch cap exhausted")
+        require(phase_count < book["budgets"]["phase_caps"][row["phase"]], "phase cap exhausted")
+        require(
+            reserved + 2 * row["estimated_output_bytes"] <= storage_cap(book),
+            "global storage reservation exceeded",
+        )
     return {
         "consumed": len(starts),
-        "remaining": book["budgets"]["launch_cap"] - len(starts),
+        "remaining": book["budgets"]["launch_cap"] - len(starts) if has_caps(book) else None,
         "phase_consumed": phase_count,
         "reserved_bytes": reserved,
     }
@@ -400,7 +417,7 @@ def build_rust(task_root, book, sources):
     build_dir.mkdir(parents=True, exist_ok=False)
     write_json(build_dir / "identity.json", identity)
     command = cargo_command(build_dir / "target")
-    cap = book["budgets"]["storage_bytes_cap"]
+    cap = storage_cap(book)
     receipt = {
         "identity": identity,
         "command": command,
@@ -497,6 +514,7 @@ class Lifecycle:
             "case_sha256": fortran.canonical_hash(case),
             "request_sha256": sha256(run_dir / "request.txt"),
             "solver": "rust",
+            **({"backend": row["backend"]} if "backend" in row else {}),
             "precision": row["precision"],
             "status": "planned",
             "command": [
@@ -578,7 +596,7 @@ class Lifecycle:
             "retained executable plus complete output reservation exceeds row cap",
         )
         require(
-            total_storage() + cap - size <= self.book["budgets"]["storage_bytes_cap"],
+            total_storage() + cap - size <= storage_cap(self.book),
             "insufficient global storage for complete row reservation",
         )
 
@@ -619,7 +637,7 @@ class Lifecycle:
             "candidate manifest exceeds row storage",
         )
         require(
-            total_storage() + added <= self.book["budgets"]["storage_bytes_cap"],
+            total_storage() + added <= storage_cap(self.book),
             "candidate manifest exceeds global storage",
         )
         write_json(candidate, manifest)
@@ -681,7 +699,7 @@ class Lifecycle:
                 env,
                 run_dir / "stdout.txt",
                 run_dir / "stderr.txt",
-                self.book["budgets"]["storage_bytes_cap"],
+                storage_cap(self.book),
             )
             manifest["exit_code"] = code
             fortran.append_event(self.task_root, "exit", manifest, {"exit_code": code})
@@ -693,7 +711,7 @@ class Lifecycle:
                 "validated run exceeds row storage",
             )
             require(
-                total_storage() <= self.book["budgets"]["storage_bytes_cap"],
+                total_storage() <= storage_cap(self.book),
                 "validated run exceeds global storage",
             )
             fortran.check_preserved(snapshot)
@@ -763,13 +781,13 @@ class Lifecycle:
             fortran.directory_bytes(run_dir) + added <= cap, "normalization exceeds row storage"
         )
         require(
-            total_storage() + added <= self.book["budgets"]["storage_bytes_cap"],
+            total_storage() + added <= storage_cap(self.book),
             "normalization exceeds global storage",
         )
         metrics.normalize_fortran(run_dir, self.cases_path)
         require(fortran.directory_bytes(run_dir) <= cap, "normalized row storage exceeded")
         require(
-            total_storage() <= self.book["budgets"]["storage_bytes_cap"],
+            total_storage() <= storage_cap(self.book),
             "normalized global storage exceeded",
         )
         return metrics.load_observations(
@@ -786,7 +804,7 @@ class Lifecycle:
                 check_budget(self.book, row)
                 require(
                     total_storage() + 2 * row["estimated_output_bytes"]
-                    <= self.book["budgets"]["storage_bytes_cap"],
+                    <= storage_cap(self.book),
                     "insufficient actual study storage",
                 )
                 case, run_dir, manifest, snapshot = self._prepare(row)
@@ -827,7 +845,7 @@ class Lifecycle:
         safe(self.root, run_dir.relative_to(self.root))
         with self._lock(readonly=True):
             manifest = metrics.json_load(run_dir / "manifest.json")
-            require(set(manifest) == fortran.MANIFEST_KEYS, "manifest schema mismatch")
+            require(set(manifest) - {"backend"} == fortran.MANIFEST_KEYS, "manifest schema mismatch")
             row = selected_rows(self.book, self.phase, [manifest["launch_id"]])[0]
             records = all_records(self.book)
             if row["solver"] == "fortran":

@@ -591,5 +591,67 @@ class BuildTests(unittest.TestCase):
                 lifecycle.controlled_environment()
 
 
+class V2LifecycleTests(unittest.TestCase):
+    V2_PATH = lifecycle.SOURCE_ROOT / "reference/solute_verification/CASES_V2.json"
+
+    def setUp(self):
+        scratch = lifecycle.SOURCE_ROOT / ".development/22.3.2"
+        scratch.mkdir(parents=True, exist_ok=True)
+        self.temp = tempfile.TemporaryDirectory(dir=scratch)
+        self.addCleanup(self.temp.cleanup)
+        self.checkout = Path(self.temp.name)
+        patcher = patch.object(lifecycle, "ROOT", self.checkout)
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        self.book = lifecycle.contract.validate(lifecycle.contract.load_cases(self.V2_PATH))
+
+    def test_v2_phase_roots_accepted(self):
+        for phase in ("benchmark", "convergence", "holdout"):
+            runner = lifecycle.Lifecycle(
+                self.V2_PATH, self.checkout / f".development/22-{phase}/runs"
+            )
+            self.assertEqual(runner.phase, phase)
+            self.assertFalse(lifecycle.has_caps(runner.book))
+
+    def test_v2_has_no_launch_or_storage_ceiling(self):
+        row = next(r for r in self.book["launches"] if r["phase"] == "benchmark")
+        info = lifecycle.check_budget(self.book, row)
+        self.assertIsNone(info["remaining"])
+        self.assertEqual(lifecycle.storage_cap(self.book), float("inf"))
+        # Estimates are still recorded for v2 rows.
+        self.assertGreater(row["estimated_output_bytes"], 0)
+        with patch.object(lifecycle, "total_storage", return_value=10**15):
+            lifecycle.check_budget(self.book, row)
+
+    def test_v2_dry_run_manifest_records_backend(self):
+        for phase, case_id in (("benchmark", "reaction_zero"), ("convergence", "diffusion_cosine")):
+            row = next(
+                r for r in self.book["launches"] if r["phase"] == phase and r["case_id"] == case_id
+            )
+            runner = lifecycle.Lifecycle(
+                self.V2_PATH, self.checkout / f".development/22-{phase}/runs"
+            )
+            (path,) = runner.dry_run([row["id"]])
+            manifest = json.loads((path / "manifest.json").read_text())
+            self.assertEqual(manifest["backend"], "fortran-compatible")
+            self.assertIn(b"backend=fortran-compatible\n", (path / "request.txt").read_bytes())
+
+    def test_v1_budget_caps_still_enforced(self):
+        book = copy.deepcopy(BOOK)
+        self.assertTrue(lifecycle.has_caps(book))
+        book["budgets"]["launch_cap"] = 0
+        with self.assertRaisesRegex(ValueError, "launch cap"):
+            lifecycle.check_budget(book, RUST)
+        book = copy.deepcopy(BOOK)
+        book["budgets"]["storage_bytes_cap"] = 1
+        with self.assertRaisesRegex(ValueError, "storage reservation"):
+            lifecycle.check_budget(book, RUST)
+
+    def test_v1_manifest_has_no_backend(self):
+        runner = lifecycle.Lifecycle(BOOK_PATH, self.checkout / ".development/13.3.1/runs")
+        (path,) = runner.dry_run([RUST["id"]])
+        self.assertNotIn("backend", json.loads((path / "manifest.json").read_text()))
+
+
 if __name__ == "__main__":
     unittest.main()
