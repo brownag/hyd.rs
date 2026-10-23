@@ -475,5 +475,14 @@ class BenchmarkTests(unittest.TestCase):
         self.assertEqual(self.reference_calls, [])
 
 
+class V2CapFreeTests(unittest.TestCase):
+    def test_v2_counts_have_no_caps_and_storage_is_unbounded(self):
+        book = cli.lifecycle.contract.validate(cli.lifecycle.contract.load_cases(
+            cli.SOURCE_ROOT / "reference/solute_verification/CASES_V2.json"))
+        with patch.object(cli.lifecycle, "all_records", return_value=[{"event": "start"}] * 3):
+            self.assertEqual(cli.counts(book), {"consumed": 3, "remaining": None, "cap": None})
+        self.assertEqual(cli.lifecycle.storage_cap(book), float("inf"))
+
+
 if __name__ == "__main__":
     unittest.main()

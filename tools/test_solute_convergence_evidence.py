@@ -268,6 +268,14 @@ class EvidenceTests(unittest.TestCase):
             "m5v_complete": False,
         }
 
+    def test_scratch_accepts_v2_convergence_root_only_for_convergence(self):
+        for task in evidence.CONVERGENCE_TASKS:
+            evidence._scratch(evidence.ROOT / ".development" / task / "batch-x",
+                              evidence.CONVERGENCE_TASKS)
+        with self.assertRaises(ValueError):
+            evidence._scratch(evidence.ROOT / ".development/22-holdout/batch-x",
+                              evidence.CONVERGENCE_TASKS)
+
     def test_constructor_rejects_forged_producers_and_wrong_roots(self):
         forged = {**self.producers, "tools/solute_reference_cache.py": "0" * 64}
         for changes in (

@@ -22,7 +22,9 @@ from tools import solute_verification_metrics as metrics
 ROOT = Path(__file__).resolve().parents[1]
 require = metrics.require
 PHASE = "convergence"
-TASK_ROOT = ROOT / ".development" / "13.4.1"
+HOLDOUT_PHASE = "holdout"
+# Execution roots per phase come from lifecycle.PHASE_TASKS: v1 13.4.1/13.6.1, v2 22-convergence/22-holdout.
+THRESHOLDS_V2 = ROOT / "reference/solute_verification/THRESHOLDS_V2.json"
 
 
 def _path(path):
@@ -31,14 +33,31 @@ def _path(path):
     return path
 
 
-def _phase_root(output_root):
-    manager = lifecycle.Lifecycle(ROOT / "reference/solute_verification/CASES.json", output_root)
-    require(manager.phase == PHASE, "convergence CLI requires the convergence execution root")
+def _phase_root(output_root, cases=None, phase=PHASE):
+    manager = lifecycle.Lifecycle(
+        cases or ROOT / "reference/solute_verification/CASES.json", output_root)
+    require(manager.phase == phase,
+            f"{phase} CLI requires the {phase} execution root")
     return manager
 
 
-def _rows(book, ids=None):
-    return lifecycle.selected_rows(book, PHASE, ids)
+def _rows(book, ids=None, phase=PHASE):
+    return lifecycle.selected_rows(book, phase, ids)
+
+
+def _gate_holdout(rows):
+    """Reserved holdout rows run only after THRESHOLDS_V2.json is committed (Wave 6)."""
+    if any(r.get("status") == "reserved_until_threshold_gate" for r in rows):
+        require(THRESHOLDS_V2.is_file(),
+                "holdout rows are reserved until the threshold gate (THRESHOLDS_V2.json); dry-run only")
+
+
+def _launch_counts(book, starts):
+    if not lifecycle.has_caps(book):
+        return {"consumed": len(starts), "remaining": None, "cap": None}
+    cap = book["budgets"]["launch_cap"]
+    require(len(starts) <= cap, "historical launch cap exceeded")
+    return {"consumed": len(starts), "remaining": cap - len(starts), "cap": cap}
 
 
 def _producer_hashes():
@@ -48,7 +67,7 @@ def _producer_hashes():
 def _ledger_snapshot(book):
     """Capture complete shared-ledger bytes and the validated records they encode."""
     snapshots = []
-    for task, phase in lifecycle.PHASE_TASKS.items():
+    for task, phase in lifecycle.book_tasks(book).items():
         path = ROOT / ".development" / task / "launch-ledger.jsonl"
         records = lifecycle.ledger_records(path, book, phase)
         data = path.read_bytes() if path.exists() else b""
@@ -69,9 +88,7 @@ def _ledger_snapshot(book):
 def _counts_from_snapshot(book, snapshots):
     records = [r for snapshot in snapshots for r in snapshot["records"]]
     starts = [r for r in records if r["event"] == "start"]
-    cap = book["budgets"]["launch_cap"]
-    require(len(starts) <= cap, "historical launch cap exceeded")
-    return {"consumed": len(starts), "remaining": cap - len(starts), "cap": cap}
+    return _launch_counts(book, starts)
 
 
 def _verify_budget_receipt(path, book, expected_batch=None):
@@ -84,7 +101,7 @@ def _verify_budget_receipt(path, book, expected_batch=None):
     require(expected_batch is None or payload["batch"] == str(expected_batch),
             "historical ledger receipt belongs to another batch")
     current = {task: (phase, ROOT / ".development" / task / "launch-ledger.jsonl")
-               for task, phase in lifecycle.PHASE_TASKS.items()}
+               for task, phase in lifecycle.book_tasks(book).items()}
     require(len(payload["ledgers"]) == len(current), "historical ledger inventory incomplete")
     verified = []
     seen = set()
@@ -139,9 +156,11 @@ def _cache_roots(values):
 
 
 class ConvergenceBatch:
-    def __init__(self, cases_path, output_root, batch_path):
+    def __init__(self, cases_path, output_root, batch_path, phase=PHASE):
         self.manager = lifecycle.Lifecycle(cases_path, output_root)
-        require(self.manager.phase == PHASE, "wrong lifecycle phase")
+        self.phase = phase
+        require(self.manager.phase == phase,
+                "wrong lifecycle phase")
         self.book, self.root, self.cases_path = self.manager.book, self.manager.root, self.manager.cases_path
         self.path = _path(batch_path)
         require(self.path.parent == self.root and self.path.name.startswith("batch-"),
@@ -157,7 +176,7 @@ class ConvergenceBatch:
             source = _path(activation_path)
             activation_bytes = source.read_bytes()
             activation = metrics.json_load(source)
-            lifecycle.validate_activation(self.book, self.cases_path, PHASE, rows, activation)
+            lifecycle.validate_activation(self.book, self.cases_path, self.phase, rows, activation)
             require(activation_bytes == source.read_bytes(), "activation changed while reading")
         require(type(allow_work) is bool and type(allow_escalation) is bool,
                 "reference policies must be explicit booleans")
@@ -194,7 +213,7 @@ class ConvergenceBatch:
         require(recipe["producer_sha256"] == _producer_hashes(), "producer provenance changed")
         require(recipe["budgets"] == self.book["budgets"], "batch budgets changed")
         ids = [row["id"] for row in recipe["rows"]]
-        require(recipe["rows"] == _rows(self.book, ids), "frozen rows changed")
+        require(recipe["rows"] == _rows(self.book, ids, self.phase), "frozen rows changed")
         require(recipe["mode"] in ("dry-run", "execute")
                 and type(recipe["allow_reference_work"]) is bool
                 and type(recipe["allow_reference_escalation"]) is bool,
@@ -212,7 +231,7 @@ class ConvergenceBatch:
             require(activation == recipe["activation"], "activation copy changed")
             require(batch_artifacts.sha256(recipe["activation_source"])
                     == recipe["activation_sha256"], "original activation source changed")
-            lifecycle.validate_activation(self.book, self.cases_path, PHASE,
+            lifecycle.validate_activation(self.book, self.cases_path, self.phase,
                                           recipe["rows"], activation)
         require(recipe["prior_cache_roots"] == [str(p) for p in _cache_roots(recipe["prior_cache_roots"])],
                 "prior cache source changed")
@@ -270,7 +289,7 @@ class ConvergenceBatch:
             run = self.path / "runs" / start["run_id"]
             manifest = run_lifecycle.verify(run, require_complete=True)
             subset = metrics.json_load(run / "activation.json")
-            require(subset["phase"] == PHASE and row["id"] in subset["launch_ids"]
+            require(subset["phase"] == self.phase and row["id"] in subset["launch_ids"]
                     and set(subset["launch_ids"]) <= set(activation["launch_ids"]),
                     "completed run outside original activation")
             receipt = self.path / "subsets" / (lifecycle.fortran.canonical_hash(subset) + ".json")
@@ -319,8 +338,10 @@ class ConvergenceBatch:
         done, pending, run_manager = self.reconcile(resume=resume)
         # The accepted lifecycle owns all shared launch/storage reservations and event writes.
         results = {}
+        runs = {}  # classify() takes run directories, not derived record dicts
         for row in self.recipe["rows"]:
             if row["id"] in done:
+                runs[row["id"]] = done[row["id"]]
                 results[row["id"]] = helper.derive(row, done[row["id"]], refs.get(row["id"]),
                                                     receipts.get(row["id"]), write=True)[0]
         if pending:
@@ -333,11 +354,13 @@ class ConvergenceBatch:
             require(len(run_paths) == len(pending), "incomplete lifecycle execution")
             for run in run_paths:
                 manifest = metrics.json_load(run / "manifest.json")
-                require(manifest["status"] == "complete", "failed/incomplete run cannot be retried")
+                require(manifest["status"] in ("complete", "raw_complete"),
+                        "failed/incomplete run cannot be retried")
                 row = next(r for r in pending if r["id"] == manifest["launch_id"])
+                runs[row["id"]] = run
                 results[row["id"]] = helper.derive(row, run, refs.get(row["id"]),
                                                     receipts.get(row["id"]), write=True)[0]
-        classification = helper.classify(self.recipe["rows"], results, write=True)
+        classification = helper.classify(self.recipe["rows"], runs, write=True)
         return self._publish("evidence_complete", results, refs, receipts, classification)
 
     def _publish(self, status, results, refs, receipts, classification):
@@ -378,6 +401,9 @@ def parser():
     result.add_argument("--allow-reference-escalation", action="store_true")
     result.add_argument("--batch", type=Path)
     result.add_argument("--resume-batch", type=Path)
+    result.add_argument("--holdout", action="store_true",
+                        help="operate on the holdout phase (22-holdout root); execution is "
+                             "refused for reserved rows until THRESHOLDS_V2.json exists")
     return result
 
 
@@ -385,8 +411,10 @@ def main(argv=None):
     args = parser().parse_args(argv)
     batch = None
     try:
+        phase = HOLDOUT_PHASE if args.holdout else PHASE
         manager = lifecycle.Lifecycle(args.cases, args.output_root)
-        require(manager.phase == PHASE, "wrong execution phase")
+        require(manager.phase == phase,
+                "wrong execution phase")
         require(not args.batch or args.verify_only, "--batch is verify-only")
         require(not args.resume_batch or args.execute, "--resume-batch requires --execute")
         if args.verify_only:
@@ -399,7 +427,7 @@ def main(argv=None):
             require(paths, "no convergence batches found")
             code = 0
             for path in paths:
-                batch = ConvergenceBatch(args.cases, args.output_root, path).load()
+                batch = ConvergenceBatch(args.cases, args.output_root, path, phase).load()
                 with (batch.path / "batch.lock").open("rb") as lock:
                     fcntl.flock(lock, fcntl.LOCK_SH)
                     result, status = batch.verify()
@@ -413,9 +441,17 @@ def main(argv=None):
                 "dry-run cannot activate work")
         activation = metrics.json_load(args.activation_file) if args.activation_file else None
         ids = args.launch_id if args.launch_id is not None else activation["launch_ids"] if activation else None
-        rows = _rows(manager.book, ids)
+        rows = _rows(manager.book, ids, phase)
         if args.execute:
-            lifecycle.validate_activation(manager.book, args.cases, PHASE, rows, activation)
+            if args.holdout:
+                _gate_holdout(rows)
+            lifecycle.validate_activation(manager.book, args.cases, phase, rows, activation)
+            if args.holdout:
+                # Holdout rows have no convergence evidence to derive: run via the lifecycle only.
+                paths = manager.execute([r["id"] for r in rows], activation)
+                print(json.dumps({"status": "holdout_runs_complete",
+                                  "runs": [str(x) for x in paths]}, sort_keys=True))
+                return 0
             if any(row["role"] != "bridge" for row in rows):
                 bridge.require_bridges(args.bridge_report, args.cases)
         prior = _cache_roots(args.prior_cache_root)
@@ -427,7 +463,7 @@ def main(argv=None):
             bounds = {"path": str(source), "sha256": batch_artifacts.sha256(source),
                       "review_path": str(review), "review_sha256": batch_artifacts.sha256(review)}
         path = args.resume_batch or manager.root / ("batch-" + uuid.uuid4().hex)
-        batch = ConvergenceBatch(args.cases, args.output_root, path)
+        batch = ConvergenceBatch(args.cases, args.output_root, path, phase)
         if args.resume_batch:
             batch.load()
             require(batch.recipe["rows"] == rows

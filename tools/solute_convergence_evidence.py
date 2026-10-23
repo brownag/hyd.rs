@@ -22,6 +22,7 @@ PRODUCERS = (
     "tools/solute_convergence_evidence.py",
 )
 CLI_PRODUCER = "tools/run_solute_convergence.py"
+CONVERGENCE_TASKS = ("13.4.1", "22-convergence")
 OBSERVABLES = {
     *("concentration." + name for name in ("l1", "l2", "linf", "endpoint_linf", "interior_linf")),
     *("inventory." + name for name in ("dissolved", "equilibrium_sorbed", "total")),
@@ -101,9 +102,9 @@ class ConvergenceEvidence:
         self.cases_sha256 = sha256(self.cases_path)
         self.book = lifecycle.contract.validate(lifecycle.contract.load_cases(self.cases_path))
         self.book_sha256 = digest(self.book)
-        self.root = _scratch(artifact_root, ("13.4.1",))
+        self.root = _scratch(artifact_root, CONVERGENCE_TASKS)
         require(self.root.name.startswith("batch-"), "evidence needs an original batch root")
-        self.current_cache = _scratch(current_cache_root, ("13.4.1",))
+        self.current_cache = _scratch(current_cache_root, CONVERGENCE_TASKS)
         require(
             self.current_cache == self.root.parent / "reference-cache",
             "current cache differs from batch output root",
@@ -130,8 +131,8 @@ class ConvergenceEvidence:
             self.producers == provenance(include_cli=CLI_PRODUCER in self.producers),
             "producer context differs from actual source hashes",
         )
-        _scratch(self.root, ("13.4.1",))
-        _scratch(self.current_cache, ("13.4.1",))
+        _scratch(self.root, CONVERGENCE_TASKS)
+        _scratch(self.current_cache, CONVERGENCE_TASKS)
         for root in self.prior_caches:
             _scratch(root, cache.ALLOWED_TASKS)
 
@@ -495,12 +496,21 @@ class ConvergenceEvidence:
             _same(summary[namespace], expected, "summary ordered " + namespace + " binding changed")
         counts = summary["launches"]
         metrics.keys(counts, "consumed remaining cap", "historical launch counts")
-        cap = self.book["budgets"]["launch_cap"]
-        require(
-            all(type(value) is int for value in counts.values())
-            and counts["cap"] == cap
-            and 0 <= counts["consumed"] <= cap
-            and counts["remaining"] == cap - counts["consumed"],
-            "historical budget counts invalid",
-        )
+        if lifecycle.has_caps(self.book):
+            cap = self.book["budgets"]["launch_cap"]
+            require(
+                all(type(value) is int for value in counts.values())
+                and counts["cap"] == cap
+                and 0 <= counts["consumed"] <= cap
+                and counts["remaining"] == cap - counts["consumed"],
+                "historical budget counts invalid",
+            )
+        else:  # v2 (ADR 0003): no ceilings, so only the consumed count is meaningful
+            require(
+                type(counts["consumed"]) is int
+                and counts["consumed"] >= 0
+                and counts["remaining"] is None
+                and counts["cap"] is None,
+                "historical budget counts invalid",
+            )
         return payload

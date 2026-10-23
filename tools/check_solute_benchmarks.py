@@ -73,8 +73,9 @@ def write_artifact(path, payload, book):
     if path.exists():
         require(path.read_bytes() == data, "conflicting immutable integration artifact")
         return path
+    used = lifecycle.total_storage() if lifecycle.has_caps(book) else lifecycle.total_storage(book)
     require(
-        lifecycle.total_storage() + len(data) <= book["budgets"]["storage_bytes_cap"],
+        used + len(data) <= lifecycle.storage_cap(book),
         "integration artifact exceeds global storage cap",
     )
     cache.mkdir_durable(path.parent)
@@ -91,6 +92,8 @@ def run_binding(run):
 
 def counts(book):
     starts = [r for r in lifecycle.all_records(book) if r["event"] == "start"]
+    if not lifecycle.has_caps(book):  # v2 (ADR 0003): no ceilings
+        return {"consumed": len(starts), "remaining": None, "cap": None}
     return {
         "consumed": len(starts),
         "remaining": book["budgets"]["launch_cap"] - len(starts),
