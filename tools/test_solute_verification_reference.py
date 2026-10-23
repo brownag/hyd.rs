@@ -575,5 +575,37 @@ class ReferenceTests(unittest.TestCase):
             adapter.validate_outputs(run_dir, self.case, self.row)
 
 
+class V2RequestTests(unittest.TestCase):
+    V2 = adapter.ROOT / "reference/solute_verification/CASES_V2.json"
+    V1 = adapter.ROOT / "reference/solute_verification/CASES.json"
+
+    def book(self, path):
+        return adapter.contract.validate(adapter.contract.load_cases(path))
+
+    def test_v1_request_bytes_unchanged(self):
+        book = self.book(self.V1)
+        for row in (r for r in book["launches"] if r["solver"] == "rust"):
+            case = next(c for c in book["cases"] if c["id"] == row["case_id"])
+            if case["status"] != "executable":
+                continue
+            request = adapter.request_bytes(case, row, "run-1", "a" * 64)
+            self.assertNotIn(b"backend", request)
+            self.assertTrue(request.endswith(b"species=" + ",".join(
+                s["name"] for s in case["species"]).encode() + b"\n"))
+
+    def test_v2_request_carries_backend(self):
+        book = self.book(self.V2)
+        row = next(r for r in book["launches"] if r["case_id"] == "diffusion_cosine")
+        case = next(c for c in book["cases"] if c["id"] == row["case_id"])
+        legacy = {k: v for k, v in row.items() if k != "backend"}
+        base = adapter.request_bytes(case, legacy, "run-1", "a" * 64)
+        request = adapter.request_bytes(case, row, "run-1", "a" * 64)
+        self.assertEqual(request, base + b"backend=fortran-compatible\n")
+
+    def test_v2_phase_roots_in_phase_tasks(self):
+        for phase in ("benchmark", "convergence", "holdout"):
+            self.assertEqual(adapter.PHASE_TASKS[f"22-{phase}"], phase)
+
+
 if __name__ == "__main__":
     unittest.main()

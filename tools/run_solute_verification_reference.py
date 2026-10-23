@@ -37,7 +37,14 @@ PRECISION_FLAGS = {
     "baseline": FLAGS,
     "promoted-real": FLAGS + ["-fdefault-real-8", "-fdefault-double-8"],
 }
-PHASE_TASKS = {"13.3.1": "benchmark", "13.4.1": "convergence", "13.6.1": "holdout"}
+PHASE_TASKS = {
+    "13.3.1": "benchmark",
+    "13.4.1": "convergence",
+    "13.6.1": "holdout",
+    "22-benchmark": "benchmark",
+    "22-convergence": "convergence",
+    "22-holdout": "holdout",
+}
 OUTPUTS = (
     "I_CHECK.OUT",
     "RUN_INF.OUT",
@@ -281,6 +288,8 @@ def request_bytes(case, row, run_id, cases_sha256):
         require(all(math.isfinite(v) for v in vector), "nonfinite request data")
         values[key] = ",".join(format(v, ".17g") for v in vector)
     values["species"] = ",".join(s["name"] for s in case["species"])
+    if "backend" in row:
+        values["backend"] = row["backend"]
     return "".join(f"{key}={value}\n" for key, value in values.items()).encode("ascii")
 
 
@@ -1074,7 +1083,7 @@ def verify_run(run_dir, book, cases_path):
     """Read-only verification; never stage, compile, execute or rewrite a manifest."""
     manifest = contract.load_cases(safe_path(run_dir, "manifest.json"))
     require(
-        set(manifest) == MANIFEST_KEYS and manifest["schema_version"] == "solute-manifest-v1",
+        set(manifest) - {"backend"} == MANIFEST_KEYS and manifest["schema_version"] == "solute-manifest-v1",
         "invalid manifest schema",
     )
     rows = [r for r in book["launches"] if r["id"] == manifest["launch_id"]]
