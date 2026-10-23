@@ -281,9 +281,13 @@ class BenchmarkBatch:
             )
             return
         require(self.recipe["stage"] == "benchmark", "explicit execution stage required")
-        receipt = bridge.require_bridges(
-            [Path(p) for p in self.recipe["bridge_reports"]], self.cases_path
-        )
+        if bridge.is_v2_casebook(self.cases_path):
+            require(not self.recipe["bridge_reports"], "v2 casebooks accept no bridge reports")
+            receipt = bridge.v2_gate_receipt(self.cases_path)
+        else:
+            receipt = bridge.require_bridges(
+                [Path(p) for p in self.recipe["bridge_reports"]], self.cases_path
+            )
         target = self.path / "bridge-gate.json"
         if write:
             write_artifact(target, receipt, self.book)
@@ -407,7 +411,15 @@ class BenchmarkBatch:
     def derive(self, row, run, reference=None, reference_receipt=None, *, write):
         self.runs.verify(run, require_complete=True)
         target = self.path / "results" / (row["id"] + ".json")
-        if row["role"] == "bridge":
+        if row["role"] == "bridge" and bridge.is_v2_casebook(self.cases_path):
+            result = {
+                "kind": "bridge",
+                "launch_id": row["id"],
+                "status": "recorded",
+                "run": run_binding(run),
+                "scientific_accuracy_accepted": False,
+            }
+        elif row["role"] == "bridge":
             report = self.path / "bridges" / row["id"] / "bridge.json"
             if not report.exists():
                 require(write, "bridge report missing")
@@ -682,7 +694,10 @@ def main(argv=None):
         if args.execute:
             lifecycle.validate_activation(manager.book, args.cases, "benchmark", rows, activation)
             if args.stage == "benchmark":
-                bridge.require_bridges(args.bridge_report, args.cases)
+                if bridge.is_v2_casebook(args.cases):
+                    require(not args.bridge_report, "v2 casebooks accept no bridge reports")
+                else:
+                    bridge.require_bridges(args.bridge_report, args.cases)
         path = args.resume_batch or manager.root / ("batch-" + uuid.uuid4().hex)
         batch = BenchmarkBatch(args.cases, args.output_root, path)
         if args.resume_batch:

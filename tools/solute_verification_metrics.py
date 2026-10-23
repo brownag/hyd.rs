@@ -215,7 +215,16 @@ def _request(path, manifest, case, launch, book):
         "theta rho q dispersion dt time_end sampling_interval analysis_times species kd rates "
         "inlet_concentration " + " ".join(f"initial_{j}" for j in range(count))
     )
+    # v2 requests add an optional trailing backend; v1 requests stay valid unchanged.
+    if "backend" in request:
+        expected_keys += " backend"
     keys(request, expected_keys, "request")
+    if "backend" in request:
+        require(
+            request["backend"] == "fortran-compatible"
+            and request["backend"] == manifest.get("backend"),
+            "request backend",
+        )
     require(request["schema"] == "flat-ascii-v1", "request schema")
     for key in ("run_id", "launch_id", "case_id", "cases_sha256", "case_sha256"):
         require(request[key] == manifest[key], f"request {key} mismatch")

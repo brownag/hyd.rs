@@ -250,8 +250,12 @@ class ConvergenceBatch:
         if not dependent:
             require(not self.recipe["bridge_reports"], "bridge-only activation cannot claim dependent reports")
             return
-        require(len(self.recipe["bridge_reports"]) == 2, "both bridge reports required")
-        payload = bridge.require_bridges([Path(p) for p in self.recipe["bridge_reports"]], self.cases_path)
+        if bridge.is_v2_casebook(self.cases_path):
+            require(not self.recipe["bridge_reports"], "v2 casebooks accept no bridge reports")
+            payload = bridge.v2_gate_receipt(self.cases_path)
+        else:
+            require(len(self.recipe["bridge_reports"]) == 2, "both bridge reports required")
+            payload = bridge.require_bridges([Path(p) for p in self.recipe["bridge_reports"]], self.cases_path)
         target = self.path / "bridge-gate.json"
         if write:
             batch_artifacts.write_artifact(target, payload, self.book)
@@ -453,7 +457,10 @@ def main(argv=None):
                                   "runs": [str(x) for x in paths]}, sort_keys=True))
                 return 0
             if any(row["role"] != "bridge" for row in rows):
-                bridge.require_bridges(args.bridge_report, args.cases)
+                if bridge.is_v2_casebook(args.cases):
+                    require(not args.bridge_report, "v2 casebooks accept no bridge reports")
+                else:
+                    bridge.require_bridges(args.bridge_report, args.cases)
         prior = _cache_roots(args.prior_cache_root)
         require(bool(args.bounds_source) == bool(args.bounds_review),
                 "bounds source and review must be supplied together")

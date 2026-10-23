@@ -4,6 +4,7 @@ Arithmetic bounds protect the identity of the discrete Rust calculation only.
 They are deliberately conservative and are not scientific accuracy tolerances.
 """
 
+import json
 import math
 import re
 from decimal import Decimal, ROUND_CEILING, ROUND_FLOOR, localcontext
@@ -636,6 +637,25 @@ def verify_report(report_path: Path, cases_path: Path) -> dict:
         "bridge report is stale, changed, or not reproducible",
     )
     return payload
+
+
+V2_REASON = (
+    "no Fortran rows in v2; source parity is covered by the 44/44 gate (21.4.1) and the "
+    "public-path analytical tests (22.3.5)"
+)
+
+
+def is_v2_casebook(cases_path: Path) -> bool:
+    return json.loads(Path(cases_path).read_text()).get("schema_version") == "solute-verification-v2"
+
+
+def v2_gate_receipt(cases_path: Path) -> dict:
+    return {
+        "status": "not_applicable_v2",
+        "cases_sha256": sha256(cases_path),
+        "reason": V2_REASON,
+        "scientific_accuracy_accepted": False,
+    }
 
 
 def require_bridges(report_paths: list, cases_path: Path) -> dict:

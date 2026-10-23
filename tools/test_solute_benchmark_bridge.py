@@ -364,5 +364,24 @@ class BridgeTests(unittest.TestCase):
             bridge._report_path(path / "report.json")
 
 
+V2_CASES = bridge.ROOT / "reference/solute_verification/CASES_V2.json"
+
+
+class V2GateTests(unittest.TestCase):
+    def test_v2_gate_receipt_records_reason(self):
+        self.assertTrue(bridge.is_v2_casebook(V2_CASES))
+        self.assertFalse(bridge.is_v2_casebook(CASES))
+        receipt = bridge.v2_gate_receipt(V2_CASES)
+        self.assertEqual(receipt["status"], "not_applicable_v2")
+        self.assertEqual(receipt["cases_sha256"], bridge.sha256(V2_CASES))
+        self.assertIn("44/44 gate (21.4.1)", receipt["reason"])
+        self.assertIn("22.3.5", receipt["reason"])
+        self.assertIs(receipt["scientific_accuracy_accepted"], False)
+
+    def test_v1_still_requires_both_bridge_reports(self):
+        with self.assertRaisesRegex(ValueError, "both bridge reports are required"):
+            bridge.require_bridges([], CASES)
+
+
 if __name__ == "__main__":
     unittest.main()

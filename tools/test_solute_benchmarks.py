@@ -484,5 +484,34 @@ class V2CapFreeTests(unittest.TestCase):
         self.assertEqual(cli.lifecycle.storage_cap(book), float("inf"))
 
 
+class V2BridgeGateTests(unittest.TestCase):
+    V2 = cli.bridge.ROOT / "reference/solute_verification/CASES_V2.json"
+
+    def batch(self, reports):
+        batch = object.__new__(cli.BenchmarkBatch)
+        batch.cases_path = self.V2
+        batch.recipe = {"stage": "benchmark", "bridge_reports": reports}
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        batch.path = Path(tmp.name)
+        batch.book = {}
+        return batch
+
+    def test_v2_benchmark_executes_without_bridge_reports(self):
+        batch = self.batch([])
+        with patch.object(cli, "write_artifact", lambda t, r, b: t.write_text(json.dumps(r))), \
+             patch.object(cli, "read_artifact", lambda t: json.loads(t.read_text())), \
+             patch.object(cli.bridge, "require_bridges", Mock(side_effect=AssertionError("v1 gate"))):
+            batch.gate(write=True)
+            batch.gate(write=False)
+        receipt = json.loads((batch.path / "bridge-gate.json").read_text())
+        self.assertEqual(receipt["status"], "not_applicable_v2")
+        self.assertEqual(receipt["cases_sha256"], cli.sha256(self.V2))
+
+    def test_v2_rejects_bridge_reports(self):
+        with self.assertRaisesRegex(ValueError, "accept no bridge reports"):
+            self.batch(["a.json", "b.json"]).gate(write=False)
+
+
 if __name__ == "__main__":
     unittest.main()

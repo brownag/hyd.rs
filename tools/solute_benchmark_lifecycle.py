@@ -198,6 +198,11 @@ def has_caps(book):
     return "launch_cap" in book["budgets"]
 
 
+def row_cap(book, row):
+    """v1 bounds a row at twice its estimate; v2 (ADR 0003) records estimates without a ceiling."""
+    return 2 * row["estimated_output_bytes"] if has_caps(book) else float("inf")
+
+
 def storage_cap(book):
     return book["budgets"]["storage_bytes_cap"] if has_caps(book) else float("inf")
 
@@ -446,6 +451,7 @@ def build_rust(task_root, book, sources):
         messages = [
             json.loads(line, object_pairs_hook=contract.unique_object)
             for line in (build_dir / "cargo.jsonl").read_text().splitlines()
+            if line.startswith("{")  # -vv also prints "[crate] cargo:..." build-script lines
         ]
         executables = [
             m["executable"]
@@ -589,7 +595,7 @@ class Lifecycle:
             "executable identity changed",
         )
         require(not (run_dir / "observations.json").exists(), "stale observations before start")
-        cap = 2 * row["estimated_output_bytes"]
+        cap = row_cap(self.book, row)
         size = fortran.directory_bytes(run_dir)
         require(
             size + row["estimated_output_bytes"] <= cap,
@@ -633,7 +639,7 @@ class Lifecycle:
             (json.dumps(manifest, indent=2, sort_keys=True, allow_nan=False) + "\n").encode()
         )
         require(
-            fortran.directory_bytes(run_dir) + added <= 2 * row["estimated_output_bytes"],
+            fortran.directory_bytes(run_dir) + added <= row_cap(self.book, row),
             "candidate manifest exceeds row storage",
         )
         require(
@@ -695,7 +701,7 @@ class Lifecycle:
                 run_dir,
                 run_dir,
                 row["timeout_seconds"],
-                2 * row["estimated_output_bytes"],
+                row_cap(self.book, row),
                 env,
                 run_dir / "stdout.txt",
                 run_dir / "stderr.txt",
@@ -707,7 +713,7 @@ class Lifecycle:
             manifest["ended_utc"] = fortran.utc()
             self._validate_rust(case, row, run_dir, manifest)
             require(
-                fortran.directory_bytes(run_dir) <= 2 * row["estimated_output_bytes"],
+                fortran.directory_bytes(run_dir) <= row_cap(self.book, row),
                 "validated run exceeds row storage",
             )
             require(
@@ -776,7 +782,7 @@ class Lifecycle:
             "status": "complete",
         }
         added = len(payload) + len(metrics.canonical(receipt)) + 1
-        cap = 2 * row["estimated_output_bytes"]
+        cap = row_cap(self.book, row)
         require(
             fortran.directory_bytes(run_dir) + added <= cap, "normalization exceeds row storage"
         )
