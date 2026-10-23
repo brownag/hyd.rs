@@ -34,7 +34,8 @@ POLICY_HASHES = {
     "crates/hydrus-core/tests/solute_fixture_parity.rs": "890bb77171f189402299cf9ceaf8b4809ffa15e3c52a82355016e92b6893bba9",
     # Re-pinned under Orchestration 22 (22.3.3): the harness selects its backend from the request;
     # requests without `backend` keep FV/BE behaviour.
-    "crates/hydrus-core/tests/solute_verification_harness.rs": "125466801ff4e19fe6b25dcd41cbdcd347c74c7595e6d5b08c60a8fae2517ade",
+    # Re-pinned again under Orchestration 22 (22.3.7): output_path allows the 22-* scratch roots.
+    "crates/hydrus-core/tests/solute_verification_harness.rs": "a6e15e0840106ecae04f2db83cb8ce1134f37479e10fa993cb3fb2cb8382216a",
 }
 COMPARATORS = (
     "tools/solute_benchmark_bridge.py",

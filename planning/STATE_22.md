@@ -1,7 +1,7 @@
 # State — Orchestration 22
 
 Plan status: **Approved by user on 2026-10-22 (“YES”).**
-Execution status: **Waves 1A, 1B, 2, 3A, 3B done; Wave 3C done; Wave 4A next.**
+Execution status: **Waves 1A, 1B, 2, 3A, 3B done; Wave 3C done (22.3.7 added); Wave 4A re-launching.**
 Plan: [EXECUTION_PLAN_22.md](EXECUTION_PLAN_22.md). Worker template: [PROMPT_TEMPLATE_22.md](PROMPT_TEMPLATE_22.md).
 Follows: Orchestration 21 (complete; [STATE_21.md](STATE_21.md) § Follow-ups).
 
@@ -33,6 +33,7 @@ Follows: Orchestration 21 (complete; [STATE_21.md](STATE_21.md) § Follow-ups).
 | 3B | 22.3.2 | v2 rows through reference and lifecycle tools | done |
 | 3B | 22.3.3 | Harness backend selection; public-API path check | done |
 | 3C | 22.3.5 | Fix public FortranCompatible step (added 2026-10-22, user-approved) | done |
+| 3C | 22.3.7 | v2 bridge gate waived; lifecycle/harness/metrics v2 execute fixes (added; user-approved) | done |
 | 3C | 22.3.6 | Allow `22-*` roots in the reference cache (added; 22.3.4 finding) | done |
 | 3C | 22.3.4 | Benchmark/convergence/holdout CLIs on v2; bug fixes | done |
 | 4A | 22.4.1 | Study: closed reactions | pending |
@@ -56,6 +57,9 @@ Follows: Orchestration 21 (complete; [STATE_21.md](STATE_21.md) § Follow-ups).
 - DECISION 2026-10-22 (user): 22.3.3 found the public FortranCompatible step wrong on harness inputs; add 22.3.5 (diagnose and fix in solute.rs) in parallel with 22.3.4. 22.3.2 found `solute_verification_metrics.py` `MANIFEST_KEYS` rejects the manifest `backend` key, so it was added to 22.3.4's scope; O13 `--verify-only` already fails (source identity moved), recorded as a known limit.
 
 - Wave 3C (merged 1fd285e + 22.3.5): cargo workspace 439/0/1; Python 342 OK; fmt, clippy, diff --check clean; parity `--backend fortran-compatible --fixture-group all` pass (44 fixtures, exit 0; log `.development/22-gate-3c/out.log`). `POLICY_HASHES` re-pinned for `solute.rs`.
+
+- 22.3.7 gate (merged): cargo workspace 440/0/1; Python 352 OK; fmt, clippy, diff --check clean. `POLICY_HASHES` harness hash re-pinned again.
+- DECISION 2026-10-22 (user): bridge gate waived for v2 (receipt `not_applicable_v2`). First 4A attempts (22.4.1-22.4.3) stopped on the bridge gate; 22.3.7 also had to fix cargo.jsonl parsing, the per-row reservation ceiling, the harness scratch-root allow-list and the metrics request key set before a v2 row could execute. Editing `solute_benchmark_bridge.py` changes `COMPARATORS`/`PRODUCERS` hashes, so retained O13 bridge reports no longer re-verify (O13 verify-only was already failing).
 
 ## Task reports
 
@@ -88,3 +92,6 @@ Public `FortranCompatible` step fixed in `solute.rs:~969-1130`: (A) D now goes t
 
 ### 22.3.6 — done (1fd285e)
 `ALLOWED_TASKS` in `tools/solute_reference_cache.py` gains the three `22-*` roots; test added (22 OK).
+
+### 22.3.7 — done
+v2 gate: `is_v2_casebook`/`v2_gate_receipt` in the bridge module, CLIs skip `require_bridges` for v2 and reject `--bridge-report`; v2 bridge row recorded (`recorded`). Lifecycle: `build_rust` parses only `{` lines; `row_cap()` skips the 2x ceiling for cap-free books. Harness `output_path` allows `22-benchmark/22-convergence/22-holdout` (19 tests). Metrics `_request` accepts optional `backend`. Proofs: v2 `reaction_zero` benchmark `batch-77236ebf…` and `diffusion_cosine` `space_17` convergence `batch-725c83ad…`, both evidence_complete, verify-only exit 0 (scratch only).
