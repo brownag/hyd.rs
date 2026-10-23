@@ -30,7 +30,15 @@ SOURCE_FILES = (
     "tools/check_solute_verification_spec.py",
     "planning/master/SOLUTE_VERIFICATION_SPEC.md",
 )
-ALLOWED_TASKS = ("13.3.5", "13.3.1", "13.4.1", "13.6.1")
+ALLOWED_TASKS = (
+    "13.3.5",
+    "13.3.1",
+    "13.4.1",
+    "13.6.1",
+    "22-benchmark",
+    "22-convergence",
+    "22-holdout",
+)
 require = analytical.require
 
 

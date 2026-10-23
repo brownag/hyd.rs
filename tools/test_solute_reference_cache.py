@@ -369,6 +369,12 @@ class CacheTests(unittest.TestCase):
                 self.store.reference(*self.arguments)
             calculation.assert_not_called()
 
+    def test_v2_phase_roots_allowed_and_others_rejected(self):
+        for task in ("22-benchmark", "22-convergence", "22-holdout"):
+            cache.ReferenceCache(cache.ROOT / ".development" / task / "cache")
+        with self.assertRaisesRegex(ValueError, "outside"):
+            cache.ReferenceCache(cache.ROOT / ".development/99-other/cache")
+
     def test_paths_exclusive_writes_and_lock_modes(self):
         with self.assertRaisesRegex(ValueError, "outside"):
             cache.ReferenceCache(Path(self.temp.name).parents[3] / "wrong")
