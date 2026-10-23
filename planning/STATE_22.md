@@ -1,7 +1,7 @@
 # State — Orchestration 22
 
 Plan status: **Approved by user on 2026-10-22 (“YES”).**
-Execution status: **Waves 1A, 1B, 2, 3A, 3B done; Wave 3C done (22.3.7, 22.3.8 added); Wave 4A being re-run on the fixed public path (first-pass reports 22.4.1-22.4.3 are superseded).**
+Execution status: **Waves 1A, 1B, 2, 3A, 3B done; Waves 3C and 4A done (4A re-run on the fixed public path after 22.3.8); Wave 4B (22.4.4) next.**
 Plan: [EXECUTION_PLAN_22.md](EXECUTION_PLAN_22.md). Worker template: [PROMPT_TEMPLATE_22.md](PROMPT_TEMPLATE_22.md).
 Follows: Orchestration 21 (complete; [STATE_21.md](STATE_21.md) § Follow-ups).
 
@@ -37,9 +37,9 @@ Follows: Orchestration 21 (complete; [STATE_21.md](STATE_21.md) § Follow-ups).
 | 3C | 22.3.7 | v2 bridge gate waived; lifecycle/harness/metrics v2 execute fixes (added; user-approved) | done |
 | 3C | 22.3.6 | Allow `22-*` roots in the reference cache (added; 22.3.4 finding) | done |
 | 3C | 22.3.4 | Benchmark/convergence/holdout CLIs on v2; bug fixes | done |
-| 4A | 22.4.1 | Study: closed reactions | pending |
-| 4A | 22.4.2 | Study: `diffusion_cosine` | pending |
-| 4A | 22.4.3 | Study: `scalar_robin` | pending |
+| 4A | 22.4.1 | Study: closed reactions | done |
+| 4A | 22.4.2 | Study: `diffusion_cosine` | done |
+| 4A | 22.4.3 | Study: `scalar_robin` | done |
 | 4B | 22.4.4 | Study: Example 3 chain | pending |
 | 5 | 22.5.1 | Error budgets, orders, proposed thresholds | pending |
 | 6 | — | User gate D10: thresholds | pending |
@@ -64,6 +64,8 @@ Follows: Orchestration 21 (complete; [STATE_21.md](STATE_21.md) § Follow-ups).
 
 - 22.3.8 gate (merged): cargo workspace 448/0/1; Python 352 OK; fmt, clippy, diff --check clean; parity `--backend fortran-compatible --fixture-group all` exit 0, 44 fixtures pass (`.development/22-gate-3c/out2.log`). `POLICY_HASHES` solute.rs re-pinned.
 - Study findings that triggered 22.3.8 (first-pass 4A, unmerged branches `orchestration/22.4.1-22.4.3`): daughters exactly 0 in the reaction chain (22.4.1); `diffusion_cosine` inventory not conserved; `scalar_robin` outlet 1.49 > c_in (22.4.3). Causes: chain production read from parent's slots; kernel has only a node-1 outflow closure (`SOLUTE.FOR:803-827`, top row `:895-915` no outflow term). `diffusion_cosine` inventory loss (first order in dx: -1.50e-2/-7.33e-3/-3.76e-3 at 17/33/65 nodes) is inherent to the kernel's end-row c1=c2 treatment of the pinned Fortran; not a public-path defect. To decide: whether to log as an SD in `docs/FORTRAN_SOURCE_DEFECTS.md`.
+
+- Wave 4A (merged 4b80416): reports `planning/master/M5V_STUDY_22_{REACTIONS,DIFFUSION,ROBIN}.md`; all batches `--verify-only` exit 0 (with `--batch`). Classifier is `inconclusive` for every finding: no bounds source (`solute-convergence-bounds-v1` + `-review-v1` with a root authorization) exists. Wave 5/6 needs a decision on producing them. First-pass runs (defective public path) are preserved under each worktree's `.development/<id>/superseded/` and in main `.development/22.4.N/`; v2 evidence in main `.development/22.4.N-v2/` (22.4.1) or `.development/22.4.N/` (22.4.2, 22.4.3). Workflow lessons: unset `CARGO_TARGET_DIR` for lifecycle runs; `--allow-reference-work` (no escalation); `--verify-only` needs `--batch`; the launch ledger is per phase root (archive whole roots per worktree, never edit ledgers; 22.4.1 renamed ledgers in place once before archiving, hashes recorded).
 
 ## Task reports
 
@@ -102,3 +104,6 @@ v2 gate: `is_v2_casebook`/`v2_gate_receipt` in the bridge module, CLIs skip `req
 
 ### 22.3.8 — done
 Chain: a species with a daughter carries its decay in `gam_l1/gam_s1`, the last in `gam_l/gam_s` (kernel reads production from the parent's slots, `driver.rs:1051-1070`). Flow direction: when summed face flux > 0 the kernel runs on the mirror image (node k = public N-1-k, velocities negated, boundaries swapped, results mapped back); nodal flux is now the endpoint face at the ends and the mean of adjacent faces inside (differs from the old lower-face rule only for non-uniform flux). 12 public-path tests, incl. 3 Bateman chain, 3 flux-inlet, 2 q<0. Limits: mirror chosen per step from the sign of the summed flux, a direction flip between steps is untested; the 22.3.5 comment that code -1 gives the natural row at v=0 is inaccurate (not corrected).
+
+### 22.4.1 / 22.4.2 / 22.4.3 — done (4b80416)
+Reactions: S1/S2/S3 time order ~1 (local 0.94-0.997 and rising), 17-node control equals 9-node, no floor, `reaction_zero` exact. Diffusion: space error ~2.2x per halving of dx, time axis not isolated (257-node spatial error swamps; 513-node control 3.265e-4 vs 6.96e-4), inventory loss is kernel-inherent (SOLUTE.FOR:803-827). Robin: values below c_in, space linf 2.43e-3/1.20e-3/8.41e-4 (33/65/129 nodes, rate 1.0 then 0.51), time axis non-monotone with control contamination. No orders fitted (no bounds source).
