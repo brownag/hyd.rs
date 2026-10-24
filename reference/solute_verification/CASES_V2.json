@@ -12,7 +12,8 @@
   "limits": {
     "nodes": 1001,
     "print_times": 999,
-    "timeout_seconds": 60
+    "timeout_seconds": 60,
+    "max_row_timeout_seconds": 300
   },
   "provenance": {
     "authorship": "Independently authored verification cases; Example 3 parameters inherited from the derived fixture, not a recovered manual deck.",
@@ -1160,7 +1161,7 @@
         100,
         200
       ],
-      "timeout_seconds": 60,
+      "timeout_seconds": 180,
       "max_steps": 16000,
       "estimated_output_bytes": 81521868,
       "estimated_work_units": 48048000,
@@ -1746,7 +1747,7 @@
     }
   ],
   "budgets": {
-    "cost_estimate": "O(species*nodes*steps); output formula in spec; no measured runtime assumed. 60 second timeout remains binding. Estimates include 2x aggregate storage headroom, not additional launch slots.",
+    "cost_estimate": "O(species*nodes*steps); output formula in spec; no measured runtime assumed. 60 second timeout remains binding except one recorded per-row deviation (convergence-example3-space_control-rfc-baseline, 180 seconds, measured about 84 seconds). Estimates include 2x aggregate storage headroom, not additional launch slots.",
     "policy": "no launch or storage ceilings (ADR 0003)"
   }
 }

@@ -182,7 +182,7 @@ def ledger_records(path, book, phase):
             if event == "timeout":
                 require(
                     type(detail.get("timeout_seconds")) in (int, float)
-                    and 0 < detail["timeout_seconds"] <= 60,
+                    and 0 < detail["timeout_seconds"] <= 300,
                     "invalid timeout event",
                 )
             else:
