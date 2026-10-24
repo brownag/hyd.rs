@@ -335,6 +335,31 @@ class LifecycleTests(unittest.TestCase):
                 runner.execute([RUST["id"]], self.activation())
         self.assertFalse(self.root.exists())
 
+    def test_ledger_timeout_event_bound_is_row_ceiling(self):
+        for seconds, valid in ((60, True), (300, True), (301, False)):
+            task_root = self.root / f"timeout-{seconds}"
+            task_root.mkdir(parents=True)
+            manifest = {"run_id": "run-timeout", "launch_id": RUST["id"]}
+            lifecycle.fortran.append_event(
+                task_root,
+                "start",
+                manifest,
+                {
+                    "timeout_seconds": RUST["timeout_seconds"],
+                    "precision": RUST["precision"],
+                    "estimated_output_bytes": RUST["estimated_output_bytes"],
+                },
+            )
+            lifecycle.fortran.append_event(
+                task_root, "timeout", manifest, {"stage": "solver", "timeout_seconds": seconds}
+            )
+            ledger = task_root / "launch-ledger.jsonl"
+            if valid:
+                lifecycle.ledger_records(ledger, BOOK, RUST["phase"])
+            else:
+                with self.assertRaisesRegex(ValueError, "invalid timeout event"):
+                    lifecycle.ledger_records(ledger, BOOK, RUST["phase"])
+
     def test_shared_fortran_rust_budget_and_ledger_corruption(self):
         self.runner.task_root.mkdir(parents=True)
         manifest = {"run_id": "prior-fortran", "launch_id": FORTRAN["id"]}

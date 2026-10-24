@@ -49,6 +49,17 @@ class SpecCheckerTests(unittest.TestCase):
         self.rejects(lambda d: d['budgets'].update(launch_cap=1))
         self.rejects(lambda d: d['limits'].update(automatic_retries=0))
 
+    def test_v2_row_timeout_exception(self):
+        sc = 'convergence-example3-space_control-rfc-baseline'
+        row = lambda d, i: next(r for r in d['launches'] if r['id'] == i)
+        self.assertEqual(180, row(self.v2, sc)['timeout_seconds'])
+        self.assertEqual(300, self.v2['limits']['max_row_timeout_seconds'])
+        self.rejects(lambda d: row(d, sc).update(timeout_seconds=60))
+        self.rejects(lambda d: row(d, sc).update(timeout_seconds=301))
+        self.rejects(lambda d: d['launches'][0].update(timeout_seconds=180))
+        self.rejects(lambda d: d['limits'].update(max_row_timeout_seconds=301))
+        self.rejects(lambda d: d['limits'].pop('max_row_timeout_seconds'))
+
     def test_v1_still_validates(self):
         spec.validate(self.v1)
         spec.self_test(self.v1)

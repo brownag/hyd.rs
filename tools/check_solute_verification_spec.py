@@ -14,6 +14,7 @@ DEFAULT_CASES = ROOT / 'reference/solute_verification/CASES.json'
 V1 = 'solute-verification-v1'
 V2 = 'solute-verification-v2'
 V2_BACKEND = 'fortran-compatible'
+V2_TIMEOUT_EXCEPTIONS = {'convergence-example3-space_control-rfc-baseline': 180}
 CEILING_KEYS = {'launch_cap', 'failed_attempts_consume_cap', 'storage_bytes_cap', 'phase_caps',
                 'automatic_retries'}
 METRICS = {
@@ -316,7 +317,8 @@ def validate_v2(data: dict, verify_hashes: bool = True) -> dict:
     require(isinstance(data['limits'], dict) and isinstance(data['budgets'], dict)
             and isinstance(data['provenance'], dict), 'malformed root sections')
     require(not (CEILING_KEYS & (set(data['limits']) | set(data['budgets']))), 'ceiling key present')
-    require(data['limits'] == {'nodes': 1001, 'print_times': 999, 'timeout_seconds': 60},
+    require(data['limits'] == {'nodes': 1001, 'print_times': 999, 'timeout_seconds': 60,
+                              'max_row_timeout_seconds': 300},
             'unsupported source capacity or timeout limit')
     keys(data['budgets'], 'cost_estimate policy', 'budgets')
     require(data['budgets']['policy'] == 'no launch or storage ceilings (ADR 0003)'
@@ -345,14 +347,19 @@ def validate_v2(data: dict, verify_hashes: bool = True) -> dict:
     for old in v1_rust:
         new = by_id.get(old['id'].replace('-rust-', '-rfc-'))
         require(new is not None, 'v1 rust row has no rfc counterpart')
+        # Recorded per-row timeout deviations; every other row keeps the v1 60 s.
+        old = {**old, 'timeout_seconds': V2_TIMEOUT_EXCEPTIONS.get(new['id'], old['timeout_seconds'])}
         require(row_signature(new) == row_signature(old), 'rfc row differs from v1 rust row')
     # Reuse every v1 row, matrix and case check on a v1-shaped view of the casebook.
     view = copy.deepcopy(data)
     view['schema_version'] = V1
     view['limits']['automatic_retries'] = 0
+    del view['limits']['max_row_timeout_seconds']
     del view['provenance']['derived_from']
     for row in view['launches']:
         del row['backend']
+        if row['id'] in V2_TIMEOUT_EXCEPTIONS:
+            row['timeout_seconds'] = 60  # v1 view: the deviation is validated above
         if row['status'] == 'reserved_until_threshold_gate':
             row['status'] = 'approved_pending_adapter_and_evaluator_gates'
     view['budgets'] = {
