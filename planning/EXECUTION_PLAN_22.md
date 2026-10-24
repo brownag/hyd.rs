@@ -419,6 +419,14 @@ Found by 22.4.1–22.4.3: `bridge.require_bridges` (`solute_benchmark_bridge.py:
 | 22.4.3 (4A) | `scalar_robin`: benchmark; space and time studies and controls | `planning/master/M5V_STUDY_22_ROBIN.md` |
 | 22.4.4 (4B) | `example3`: benchmark, bridge; space and time studies and controls; the Laplace reference uncertainty per spec `:169-300`. If temporal error cannot be isolated (the 501-node time control bounds spatial sensitivity only from below), record "inconclusive" (spec `:390-395`). Component-case successes do not replace this full-chain trajectory (spec `:594-595`). | `planning/master/M5V_STUDY_22_EXAMPLE3.md` |
 
+### 22.4.5 — Complete the Example 3 space control (added 2026-10-24, user-approved "authorize resume/longer ceiling")
+
+- **Why:** in 22.4.4 the `convergence-example3-space_control-rfc-baseline` row (1001 nodes, dt 0.0125, 16000 steps) hit the 60 s row timeout; the re-attempt was refused (`row already consumed; explicit authenticated resume required`). No space metrics or node-1 closure result exist for Example 3.
+- **Must edit (plan to confirm; STOP and report if more is needed):** `reference/solute_verification/CASES_V2.json` (that row's `timeout_seconds` only, plus a per-row cap field in `limits` if the checker needs one; re-derive the SHA-256), `tools/check_solute_verification_spec.py`, `tools/solute_benchmark_lifecycle.py` (the `<= 60` timeout checks near :182-186), `tools/solute_verification_metrics.py` (`timeout mismatch` check :328), their tests, and the harness test file if it checks the limit. Default 60 s must stay for every other row, including holdouts.
+- **Can create:** `planning/master/M5V_STUDY_22_EXAMPLE3_SPACE.md`, `planning/tasks/22.4.5.todo.md`, scratch `.development/22.4.5/`.
+- **Spec:** (1) measure how long the row actually needs; (2) choose the smallest per-row timeout (<= 300 s) with margin, record it as a recorded deviation from the 60 s limit; (3) run the row as a NEW attempt in a fresh phase root with the standard v2 flow (do not edit ledgers; do not resume the consumed batch); (4) classify, `--verify-only --batch`, compute the same metrics as 22.4.4 for the space axis (251/501/1001 + control, reusing the 22.4.4 batches by copy), report the node-1 outflow closure observation, fit nothing the spec forbids; (5) report sections as 22.4.4. Update the CASES_V2 SHA wherever it is pinned (grep) and say so. POLICY_HASHES re-pins are the orchestrator's: report the new hashes needed, do not edit `tools/solute_benchmark_bridge.py`.
+- **Verification:** A5 (with the Must-edit list above); python tests for the touched tools; `python3 tools/check_solute_verification_spec.py` passes on CASES_V2; every batch `--verify-only --batch` exit 0 (failures recorded); `git diff --check`.
+
 ---
 
 ## Wave 5 — Synthesis
