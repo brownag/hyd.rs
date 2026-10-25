@@ -47,6 +47,7 @@
 | 2026-10-25 | D7. (Default, not asked.) SD registration follows `docs/FORTRAN_SOURCE_DEFECTS.md` "Rules" and "Not defects". If another site in `SOLUTE.FOR` computes the same end-row quantity consistently, the item is logged under "Not defects" as a modelling choice, not as SD-005. Reachability is proven per ADR 0007 before any entry. |
 | 2026-10-25 | D8. (Default, not asked.) O13 `--verify-only` stays a documented known limit. Retained batches are not re-pinned. |
 | 2026-10-25 | D9. (Default, not asked.) Holdout guard: holdouts run only when `THRESHOLDS_V2.json` parses, has `schema_version: solute-thresholds-v2`, `holdout_run_permitted: true`, and `cases_sha256` equals the SHA-256 of the current `CASES_V2.json`. File presence alone is not enough. `holdout_run_permitted` is set to `true` only by the orchestrator after the threshold gate (Wave 6). |
+| 2026-10-25 | D11. (User decision, 2026-10-25: fold into 23.3.1.) Bridge row: its declared profile set is `analysis_times` [50,100,200]. The Rust harness prints the 150 profile because `crates/hydrus-core/tests/solute_verification_harness.rs:221-231` applies the legacy profile schedule only when `launch_id == benchmark-example3-bridge-rust-baseline`; the `-rfc-baseline` row falls through to every `sampling_interval`. The fix is a harness print-step rule keyed on `policy: legacy_bridge` and the row's `analysis_times`, landed in the Wave 3 tool batch before the freeze (D3). `CASES_V2.json` bridge rows are **not** edited, so the SHA change stays the isolating-row change only. 23.1.2 is closed with no tool edit: its hard-coded inventory list `[0,50,100,200]` already equals `[0]+analysis_times`. D5 is superseded for this row by D11. |
 | 2026-10-25 | D10. Execution setup: as Orchestration 22 (D9 there): ≤3 concurrent workers in `.development/23-worktrees/<id>` on branch `orchestration/<id>`, `inherit` model tier, one escalation retry, serial wave-end gates (A4), orchestrator-owned `POLICY_HASHES` re-pins. |
 
 ## Reconnaissance log (2026-10-25, branch `phase4-water-acceptance`, clean)
@@ -90,11 +91,11 @@
 |---|---|---|---|
 | 0 | — | Orchestrator: baseline, commit plan | `planning/{EXECUTION_PLAN,PROMPT_TEMPLATE,STATE}_23.md` |
 | 1A | 23.1.1 | Holdout guard reads the threshold file's status and SHA | `tools/run_solute_convergence.py`, `tools/test_solute_convergence_cli.py` |
-| 1A | 23.1.2 | Explain and fix the bridge row inventory mismatch | `tools/solute_verification_metrics.py`, `tools/test_solute_verification_metrics.py` |
+| 1A | 23.1.2 | **Closed (D11): diagnosis only, no tool edit.** Bridge row inventory mismatch | none (fix moved to 23.3.1) |
 | 1A | 23.1.3 | Register or log the diffusion end-row loss | `docs/FORTRAN_SOURCE_DEFECTS.md`; create `crates/hydrus-core/tests/source_defect_sd005.rs` (only if SD-005 is registered) |
 | 2 | 23.2.1 | Isolation study design (report only) | create `planning/master/M5V_ISOLATION_DESIGN_23.md` |
 | 2 | — | Orchestrator: tool-batch gate (A4) and `POLICY_HASHES` check | `planning/STATE_23.md` |
-| 3 | 23.3.1 | `CASES_V2` isolating rows, f32 relabel, checker update | `reference/solute_verification/CASES_V2.json`, `tools/check_solute_verification_spec.py`, `tools/test_check_solute_verification_spec.py` |
+| 3 | 23.3.1 | `CASES_V2` isolating rows, f32 relabel, checker update, bridge print rule | `reference/solute_verification/CASES_V2.json`, `tools/check_solute_verification_spec.py`, `tools/test_check_solute_verification_spec.py`, `crates/hydrus-core/tests/solute_verification_harness.rs` |
 | 3 | — | Orchestrator: tool freeze; record checker SHA; no later `tools/` edits | `planning/STATE_23.md` |
 | 4A | 23.4.1 | Isolating study: `diffusion_cosine` at holdout mesh and dt | create `planning/master/M5V_ISOLATION_23_DIFFUSION.md` |
 | 4A | 23.4.2 | Isolating study: `scalar_robin` at holdout mesh and dt | create `planning/master/M5V_ISOLATION_23_ROBIN.md` |
@@ -107,9 +108,9 @@
 | 7 | 23.7.1 | Holdout runs (three rows) against approved thresholds | create `planning/master/M5V_HOLDOUT_23.md` |
 | 8 | 23.8.1 | M5-V closure record (closed or partial) and the O13/f64 known limits | `planning/master/{PHASE_5_SOLUTE_EVIDENCE,VALIDATION_STRATEGY,ROADMAP_AND_RISKS,SOLUTE_CONVERGENCE_EVIDENCE}.md`, `docs/decisions/0020-*.md` (create) or `0019-*.md` status update, `docs/decisions/README.md` |
 
-**Dependency chain.** W0 → 1A (23.1.1–23.1.3) → W2 (design, orchestrator gate) → W3 (CASES change + tool freeze) → 4A → 4B → W5 (bounds → gate B) → W6 (classify → gate C) → W7 → W8.
+**Dependency chain.** W0 → 1A (23.1.1, 23.1.3; 23.1.2 closed, D11) → W2 (design, orchestrator gate) → W3 (CASES change + tool freeze) → 4A → 4B → W5 (bounds → gate B) → W6 (classify → gate C) → W7 → W8.
 
-- Wave 1A tasks are disjoint and run in parallel. The bridge fix (23.1.2) may need the CASES change only if the diagnosis says so. Under D5 it does not, so the stop-and-report rule applies.
+- Wave 1A tasks are disjoint and run in parallel. The bridge fix is no longer in 1A: under D11 it is part of 23.3.1's harness batch.
 - Wave 2 design fixes the isolating rows that Wave 3 adds. No CASES edit happens before the design is approved.
 - Wave 3 is the single SHA change. After its tool freeze, the bounds in Wave 5 bind to the frozen tool hashes.
 - Wave 4 is the Example 3 space re-run. It is authenticated through the normal classify path (D3).
@@ -215,14 +216,15 @@
   - Change every `precision: "f64"` on rfc rows to `"f32"` (D4). Keep v1 `CASES.json` unchanged.
   - Update the checker so the v2 checks still pass: every case still equals v1 by canonical hash (the relabel is a documented exception only if the checker currently compares `precision` on rfc rows; state which in the report), every v1 `rust` row has one rfc counterpart, every v2 row has `backend`, holdouts are reserved, no ceiling keys.
   - Record the new SHA-256 of `CASES_V2.json` and the derivation (generator under `.development/23.3.1/`).
-- **Tests:** `test_v2_relabel_f32_is_only_precision_change`; `test_v2_new_rows_have_backend_and_rfc_id`; `test_v2_holdout_rows_still_reserved`; `test_v2_new_rows_not_holdout`.
-- **Verification:** `python3 tools/check_solute_verification_spec.py reference/solute_verification/CASES_V2.json` exits 0; `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest tools.test_check_solute_verification_spec`; `git diff --exit-code -- reference/solute_verification/CASES.json`; `git diff --check`.
-- **Do not touch:** `CASES.json`, `THRESHOLDS_V2.json` (regenerated at gate C), other tools, Rust.
-- **Anchors:** `tools/check_solute_verification_spec.py:13,48,240-330,340,355,363`; `reference/solute_verification/CASES_V2.json` (`precision` at `:613,643,673`).
+- **Bridge print rule (D11).** In `crates/hydrus-core/tests/solute_verification_harness.rs:221-231`, select the legacy profile steps by the row's `policy == "legacy_bridge"` with `analysis_times == [50,100,200]`, `sampling_interval == 50` and `time_end == 200`, not by `launch_id`. The `benchmark-example3-bridge-rust-baseline` row must print the same profile steps as before (regression check). The `-rfc-baseline` row must print `[50,100,200]`, so its inventory is `[0,50,100,200]`. Do not edit the bridge rows in `CASES_V2.json`. Do not edit `solute_benchmark_bridge.py` (the orchestrator re-pins `POLICY_HASHES` at the freeze). The `crates/` edit is limited to that one test-harness file: no change to `solute_fortran_compat/**`, `solute.rs` or solver code.
+- **Tests:** `test_v2_relabel_f32_is_only_precision_change`; `test_v2_new_rows_have_backend_and_rfc_id`; `test_v2_holdout_rows_still_reserved`; `test_v2_new_rows_not_holdout`; and a harness test that the `rfc` bridge row prints `[50,100,200]` while the `rust-baseline` row is unchanged.
+- **Verification:** `cargo test -p hydrus-core --test solute_verification_harness`; `cargo fmt --all -- --check`; `cargo clippy --workspace --all-targets -- -D warnings`; `python3 tools/check_solute_verification_spec.py reference/solute_verification/CASES_V2.json` exits 0; `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest tools.test_check_solute_verification_spec`; `git diff --exit-code -- reference/solute_verification/CASES.json`; `git diff --check`.
+- **Do not touch:** `CASES.json`, `THRESHOLDS_V2.json` (regenerated at gate C), other tools, Rust beyond the one harness file above.
+- **Anchors:** `tools/check_solute_verification_spec.py:13,48,240-330,340,355,363`; `reference/solute_verification/CASES_V2.json` (`precision` at `:613,643,673`); `crates/hydrus-core/tests/solute_verification_harness.rs:202-231` (bridge print steps).
 
 ### Orchestrator: Wave 3 tool freeze
 
-1. Confirm `tools/` has no uncommitted changes after 23.3.1. Record the SHA-256 of every file the reference cache hashes (checker, metrics, lifecycle, convergence CLI) in `STATE_23.md`.
+1. Confirm `tools/` and the harness file have no uncommitted changes after 23.3.1. Record the SHA-256 of every file the reference cache hashes (checker, metrics, lifecycle, convergence CLI) in `STATE_23.md`.
 2. Re-pin `POLICY_HASHES` in `tools/solute_benchmark_bridge.py` for any file changed in Waves 1A and 3 that it pins. Justify in a comment. Run A4.
 3. Record the frozen SHA-256 of `CASES_V2.json` (the value `THRESHOLDS_V2.json` must carry at gate C).
 4. From here, no `tools/` change without a new orchestrator decision. Any change restarts this freeze.
@@ -248,11 +250,11 @@
 | 23.4.1 (4A) | `diffusion_cosine` at 97 nodes (space isolation) and dt 0.0078125 (time isolation) | `planning/master/M5V_ISOLATION_23_DIFFUSION.md` |
 | 23.4.2 (4A) | `scalar_robin` at 193 nodes and dt 0.0078125 | `planning/master/M5V_ISOLATION_23_ROBIN.md` |
 | 23.4.3 (4A) | `example3`: authenticated re-run of 251/501/1001 space rows through the normal classify path (D3), plus space isolation at 751 nodes | `planning/master/M5V_ISOLATION_23_EXAMPLE3.md` |
-| 23.4.4 (4B) | `example3` time isolation at dt 0.04; bridge row re-run after 23.1.2 | `planning/master/M5V_ISOLATION_23_EXAMPLE3_TIME.md` |
+| 23.4.4 (4B) | `example3` time isolation at dt 0.04; bridge row re-run after 23.3.1 (D11) | `planning/master/M5V_ISOLATION_23_EXAMPLE3_TIME.md` |
 
 **Notes for 23.4.3:** the 22.4.5 space rows were replayed in scratch because the normal path needed 3.5 h of reference recompute. Under D3 they are re-run once, from the frozen tools, through the normal classify path. Report old and new numbers side by side. If the new numbers differ, the new ones are the record.
 
-**Notes for 23.4.4:** the bridge row is re-run here only if 23.1.2 found a tool-side fix. If it still fails, the failure is recorded and stays open, and gate C decides.
+**Notes for 23.4.4:** the bridge row is re-run here (its print rule landed in 23.3.1, D11). If it still fails, the failure is recorded and stays open, and gate C decides.
 
 ---
 
