@@ -108,6 +108,29 @@ reproduces on purpose, so its output matches the reference program.
   - **Verdict:** untested
   - **Evidence:** untested
 
+### SD-005 — Node-1 row assembles `c1=c2` for total-flux inflow at zero velocity
+
+- **Source:** `SOLUTE.FOR:816-818` (`MatSet`, Level 2, `kBotCh.eq.-1` with
+  `vN(1).le.0`): `D(1)=-1.`, `E(1)=1.`, `F(1)=0.`.
+- **Expected:** the natural row of the same branch used when `vN(1).gt.0`
+  (`SOLUTE.FOR:811-814`, `D(1)=D1`, `E(1)=E1`, `F(1)=F1+F2+...`). The node-N
+  rows (`SOLUTE.FOR:894-915`) use the same natural form with no `c_N=c_{N-1}`
+  replacement.
+- **Effect:** with `kTopCh=0` and zero water flux, the `diffusion_cosine` case
+  reaches the `c1=c2` row on every step, and dissolved-plus-sorbed inventory
+  falls below the exact value (1.72). The 22.4.2 study measured an error of
+  -3.8e-3 at 17 nodes, t=1.0 (`planning/master/M5V_STUDY_22_DIFFUSION.md:115`).
+  The pinning test measures 3.66e-3 absolute (2.1e-3 relative).
+- **Port:** `solute_fortran_compat/boundary.rs` (`assemble_lower`).
+- **Pinning test:** `source_defect_sd005_diffusion_end_row_loses_inventory`
+  (`crates/hydrus-core/tests/source_defect_sd005.rs`).
+- **Status:** reproduced; not reported upstream.
+- **Modern HYDRUS:**
+  - **Version:** untested
+  - **Date:** untested
+  - **Verdict:** untested
+  - **Evidence:** untested
+
 ## Probe procedure
 
 To determine whether a source defect persists or has been resolved in modern or closed-source HYDRUS builds:
