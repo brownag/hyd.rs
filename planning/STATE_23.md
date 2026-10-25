@@ -54,7 +54,7 @@ Follows: Orchestration 22 (complete; M5-V partial/open; [STATE_22.md](STATE_22.m
   - `cargo test --workspace --no-fail-fast`: 448 passed, 0 failed, 1 ignored (matches 22.8.1).
   - `python3 -m unittest discover -s tools -p 'test_*.py'`: Ran 354 tests, OK.
   - `cargo fmt --all -- --check`: clean. `cargo clippy --workspace --all-targets -- -D warnings`: clean. `git diff --check`: clean.
-  - Parity `--fixture-group all --backend fortran-compatible`: _running (log `.development/23-gate-0/parity.log`)_.
+  - Parity `--fixture-group all --backend fortran-compatible`: 44/44 `status: pass`, exit 0 (log `.development/23-gate-0/parity.log`).
   - Disk: 211 GB free on `/` (≥10 GB ✓).
   - Holdout guard: no holdout row run (no `.development/23-holdout/` exists).
 
