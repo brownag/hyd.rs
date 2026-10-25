@@ -15,6 +15,35 @@ V1 = 'solute-verification-v1'
 V2 = 'solute-verification-v2'
 V2_BACKEND = 'fortran-compatible'
 V2_TIMEOUT_EXCEPTIONS = {'convergence-example3-space_control-rfc-baseline': 180}
+# v2 relabel (D4, 23.3.1): every rfc row is f32 except these four, which stay f64 by decision.
+# The bridge row is not edited (D11). The three holdouts are not touched.
+V2_PRECISION_F64_EXCEPTIONS = {
+    'benchmark-example3-bridge-rfc-baseline',
+    'holdout-diffusion_cosine-holdout-rfc-baseline',
+    'holdout-scalar_robin-holdout-rfc-baseline',
+    'holdout-example3-holdout-rfc-baseline',
+}
+V2_HOLDOUT_ID = {'diffusion_cosine': 'holdout-diffusion_cosine-holdout-rfc-baseline',
+                 'scalar_robin': 'holdout-scalar_robin-holdout-rfc-baseline',
+                 'example3': 'holdout-example3-holdout-rfc-baseline'}
+# 15 isolating study rows (M5V_ISOLATION_DESIGN_23.md): id -> (case_id, axis, nodes, dt).
+V2_ISOLATION = {
+    'convergence-diffusion_cosine-space_65-dt2e-7-rfc-baseline': ('diffusion_cosine', 'space', 65, 2**-7),
+    'convergence-diffusion_cosine-space_97-dt2e-7-rfc-baseline': ('diffusion_cosine', 'space', 97, 2**-7),
+    'convergence-diffusion_cosine-space_129-dt2e-7-rfc-baseline': ('diffusion_cosine', 'space', 129, 2**-7),
+    'convergence-diffusion_cosine-time_97-dt2e-6-rfc-baseline': ('diffusion_cosine', 'time', 97, 2**-6),
+    'convergence-diffusion_cosine-time_97-dt2e-8-rfc-baseline': ('diffusion_cosine', 'time', 97, 2**-8),
+    'convergence-scalar_robin-space_129-dt2e-7-rfc-baseline': ('scalar_robin', 'space', 129, 2**-7),
+    'convergence-scalar_robin-space_193-dt2e-7-rfc-baseline': ('scalar_robin', 'space', 193, 2**-7),
+    'convergence-scalar_robin-space_257-dt2e-7-rfc-baseline': ('scalar_robin', 'space', 257, 2**-7),
+    'convergence-scalar_robin-time_193-dt2e-6-rfc-baseline': ('scalar_robin', 'time', 193, 2**-6),
+    'convergence-scalar_robin-time_193-dt2e-8-rfc-baseline': ('scalar_robin', 'time', 193, 2**-8),
+    'convergence-example3-space_501-dt0.04-rfc-baseline': ('example3', 'space', 501, 0.04),
+    'convergence-example3-space_751-dt0.04-rfc-baseline': ('example3', 'space', 751, 0.04),
+    'convergence-example3-space_1001-dt0.04-rfc-baseline': ('example3', 'space', 1001, 0.04),
+    'convergence-example3-time_751-dt0.05-rfc-baseline': ('example3', 'time', 751, 0.05),
+    'convergence-example3-time_751-dt0.025-rfc-baseline': ('example3', 'time', 751, 0.025),
+}
 CEILING_KEYS = {'launch_cap', 'failed_attempts_consume_cap', 'storage_bytes_cap', 'phase_caps',
                 'automatic_retries'}
 METRICS = {
@@ -335,13 +364,16 @@ def validate_v2(data: dict, verify_hashes: bool = True) -> dict:
         require(row.get('solver') == 'rust', 'v2 rows must be solver rust')
         require(isinstance(row.get('id'), str) and '-rfc-' in row['id']
                 and '-rust-' not in row['id'], 'row id lacks rfc tag')
-        require(row.get('precision') == 'f64', 'precision label must stay f64')
+        expected_precision = 'f64' if row['id'] in V2_PRECISION_F64_EXCEPTIONS else 'f32'
+        require(row.get('precision') == expected_precision, f"{row['id']}: precision must be {expected_precision}")
         reserved = row.get('role') == 'holdout' or row.get('phase') == 'holdout'
         require(row.get('status') == ('reserved_until_threshold_gate' if reserved
                                       else 'approved_pending_adapter_and_evaluator_gates'),
                 'holdout rows must be reserved; others approved')
+    validate_isolation(rows)
+    base = [r for r in rows if r['id'] not in V2_ISOLATION]
     v1_rust = [r for r in v1['launches'] if r['solver'] == 'rust']
-    require(len(rows) == len(v1_rust), 'v2 rows do not cover v1 rust rows')
+    require(len(base) == len(v1_rust), 'v2 rows do not cover v1 rust rows')
     by_id = {r['id']: r for r in rows}
     require(len(by_id) == len(rows), 'duplicate launch')
     for old in v1_rust:
@@ -351,26 +383,59 @@ def validate_v2(data: dict, verify_hashes: bool = True) -> dict:
         old = {**old, 'timeout_seconds': V2_TIMEOUT_EXCEPTIONS.get(new['id'], old['timeout_seconds'])}
         require(row_signature(new) == row_signature(old), 'rfc row differs from v1 rust row')
     # Reuse every v1 row, matrix and case check on a v1-shaped view of the casebook.
+    # The isolating rows are validated above, not by the v1 group rules; the v1 view
+    # labels every rfc row f64 because the v1 validator accepts only f64 for rust rows.
     view = copy.deepcopy(data)
     view['schema_version'] = V1
     view['limits']['automatic_retries'] = 0
     del view['limits']['max_row_timeout_seconds']
     del view['provenance']['derived_from']
+    view['launches'] = [r for r in view['launches'] if r['id'] not in V2_ISOLATION]
     for row in view['launches']:
         del row['backend']
+        row['precision'] = 'f64'
         if row['id'] in V2_TIMEOUT_EXCEPTIONS:
             row['timeout_seconds'] = 60  # v1 view: the deviation is validated above
         if row['status'] == 'reserved_until_threshold_gate':
             row['status'] = 'approved_pending_adapter_and_evaluator_gates'
     view['budgets'] = {
-        'launch_cap': len(rows), 'failed_attempts_consume_cap': True,
-        'storage_bytes_cap': sum(r['estimated_output_bytes'] for r in rows),
+        'launch_cap': len(view['launches']), 'failed_attempts_consume_cap': True,
+        'storage_bytes_cap': sum(r['estimated_output_bytes'] for r in view['launches']),
         'cost_estimate': data['budgets']['cost_estimate'],
-        'phase_caps': {p: sum(r['phase'] == p for r in rows)
+        'phase_caps': {p: sum(r['phase'] == p for r in view['launches'])
                        for p in ('benchmark', 'convergence', 'holdout')},
     }
     validate_v1(view, verify_hashes)
     return data
+
+
+def validate_isolation(rows):
+    """The 15 isolating rows: table values, study role, and bracket-plus-centre geometry."""
+    by_id = {r['id']: r for r in rows}
+    for rid, (case, axis, nodes, dt) in V2_ISOLATION.items():
+        require(rid in by_id, f'missing isolating row {rid}')
+        row = by_id[rid]
+        require((row['case_id'], row['axis'], row['nodes'], row['dt']) == (case, axis, nodes, dt),
+                f'{rid}: values differ from the isolation table')
+        require(row['role'] == 'study' and row['phase'] == 'convergence' and row['solver'] == 'rust'
+                and row['precision'] == 'f32', f'{rid}: role, phase or precision')
+    for case, hold_id in V2_HOLDOUT_ID.items():
+        hold = by_id[hold_id]
+        group = [r for r in rows if r['id'] in V2_ISOLATION and r['case_id'] == case]
+        space = [r for r in group if r['axis'] == 'space']
+        temporal = [r for r in group if r['axis'] == 'time']
+        require(space and all(r['dt'] == hold['dt'] for r in space),
+                f'{case}: space rows must hold the holdout dt')
+        nodes = {r['nodes'] for r in space}
+        require(hold['nodes'] in nodes and any(n < hold['nodes'] for n in nodes)
+                and any(n > hold['nodes'] for n in nodes), f'{case}: space rows do not bracket holdout mesh')
+        require(temporal and all(r['nodes'] == hold['nodes'] for r in temporal),
+                f'{case}: time rows must hold the holdout mesh')
+        dts = {r['dt'] for r in temporal}
+        require(any(d < hold['dt'] for d in dts) and any(d > hold['dt'] for d in dts),
+                f'{case}: time rows do not bracket holdout dt')
+        require(any(r['nodes'] == hold['nodes'] and r['dt'] == hold['dt'] for r in space),
+                f'{case}: centre row missing')
 
 
 def validate_times(times, end):

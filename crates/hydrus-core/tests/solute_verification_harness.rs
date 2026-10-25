@@ -221,14 +221,18 @@ impl Request {
         // The retained bridge has irregular original profile events, despite its
         // sampling_interval=50. Preserve the requested analysis times as integer
         // step events; other launches print every sampling interval.
-        let print_steps = if get("launch_id")? == "benchmark-example3-bridge-rust-baseline" {
-            require(
-                get("case_id")? == "example3"
-                    && time_end == 200.0
-                    && sampling == 50.0
-                    && analysis == [50.0, 100.0, 200.0],
-                "bridge profile schedule differs from retained fixture",
-            )?;
+        // Selected by schedule, not launch_id (D11): this matches the Rust and rfc bridge
+        // rows and no other launch. The Python test checks the selection in both casebooks.
+        let is_bridge_schedule = get("case_id")? == "example3"
+            && time_end == 200.0
+            && sampling == 50.0
+            && analysis == [50.0, 100.0, 200.0];
+        // Guard kept from the launch_id rule: a bridge launch must carry the retained schedule.
+        require(
+            is_bridge_schedule || !get("launch_id")?.contains("-bridge-"),
+            "bridge profile schedule differs from retained fixture",
+        )?;
+        let print_steps = if is_bridge_schedule {
             analysis
                 .iter()
                 .map(|t| aligned_count(*t, dt))
@@ -992,11 +996,13 @@ fn schedules_reject_shortened_steps_and_missing_events() {
 
 #[test]
 fn bridge_keeps_original_profile_events_without_dropping_step_endpoints() {
-    let ordinary = small_request("example3");
-    let bridge = ordinary.replace(
+    let bridge_base = small_request("example3");
+    let bridge = bridge_base.replace(
         "launch_id=test-rust",
         "launch_id=benchmark-example3-bridge-rust-baseline",
     );
+    // A regular launch: analysis 150 keeps it off the bridge schedule (dt-independent sampling).
+    let ordinary = bridge_base.replace("analysis_times=50,100,200", "analysis_times=50,100,150");
     let request = Request::parse(bridge.as_bytes()).unwrap();
     // Four steps on three nodes exercise event selection without a study launch.
     assert_eq!(request.print_steps, [1, 2, 4]);
@@ -1030,6 +1036,35 @@ fn bridge_keeps_original_profile_events_without_dropping_step_endpoints() {
             .as_bytes()
     )
     .is_err());
+}
+
+#[test]
+fn bridge_rfc_row_prints_analysis_steps_like_rust_baseline() {
+    let ordinary = small_request("example3");
+    let with_launch =
+        |id: &str| ordinary.replace("launch_id=test-rust", &format!("launch_id={id}"));
+    let rfc =
+        Request::parse(with_launch("benchmark-example3-bridge-rfc-baseline").as_bytes()).unwrap();
+    let rust =
+        Request::parse(with_launch("benchmark-example3-bridge-rust-baseline").as_bytes()).unwrap();
+    // The rfc bridge prints the analysis times [50,100,200] as step events, like the rust row.
+    assert_eq!(rfc.print_steps, [1, 2, 4]);
+    assert_eq!(rust.print_steps, [1, 2, 4]);
+    let rfc_actual =
+        with_launch("benchmark-example3-bridge-rfc-baseline").replace("dt=50\n", "dt=0.1\n");
+    assert_eq!(
+        Request::parse(rfc_actual.as_bytes()).unwrap().print_steps,
+        [500, 1000, 2000]
+    );
+    let observations = simulate(&rfc).unwrap();
+    assert_eq!(
+        observations
+            .profiles
+            .iter()
+            .map(|p| p.time)
+            .collect::<Vec<_>>(),
+        [0.0, 50.0, 100.0, 200.0]
+    );
 }
 
 #[test]
