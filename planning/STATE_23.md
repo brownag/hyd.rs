@@ -27,7 +27,7 @@ Follows: Orchestration 22 (complete; M5-V partial/open; [STATE_22.md](STATE_22.m
 | 1A | 23.1.1 | Holdout guard reads status and SHA | done (f4990be; A4 gate pending wave end) |
 | 1A | 23.1.2 | Bridge row inventory mismatch: explain and fix | blocked (user decision A/B on bridge profile set) |
 | 1A | 23.1.3 | Diffusion end-row loss: SD-005 or "Not defects" | done (40b6593; SD-005 registered) |
-| 2 | 23.2.1 | Isolation study design | pending |
+| 2 | 23.2.1 | Isolation study design | in progress (plan revision requested: space at holdout dt, time at holdout mesh) |
 | 2 | — | Orchestrator gate; `POLICY_HASHES` check | pending |
 | 3 | 23.3.1 | CASES_V2 isolating rows, f32 relabel, checker | pending |
 | 3 | — | Tool freeze; record SHA-256 values | pending |
@@ -80,5 +80,9 @@ Follows: Orchestration 22 (complete; M5-V partial/open; [STATE_22.md](STATE_22.m
 - Discovered (not registered): free-drainage `SOLUTE.FOR:823-827` (`kBotCh=0`) uses the same `c1=c2` row; not reached by this case.
 - Gap: `solute_fortran_compat/boundary.rs` (`assemble_lower`) lacks an SD-005 tag comment (off-limits this task).
 
-### Wave 1A A4 gate
-- Pending: runs at wave end (after 23.1.2). crates/ changed, so full A4 (cargo workspace, Python, fmt, clippy, diff check, parity 44/44) is required.
+### Wave 1A A4 gate (2026-10-25, HEAD 5fb79fc, 23.1.2 closed per D11)
+- `cargo test --workspace --no-fail-fast`: 449 passed, 0 failed, 1 ignored (448 + SD-005 pinning test).
+- Python `unittest discover -s tools`: Ran 358, OK (354 + 4 holdout-guard tests).
+- fmt, clippy `-D warnings`, `git diff --check`: clean.
+- Parity `--fixture-group all --backend fortran-compatible`: exit 0, 44/44 pass (log `.development/23-gate-1a/parity.log`).
+- No `POLICY_HASHES` re-pin needed in Wave 1A (no edits to the hash-pinned files).
