@@ -1,5 +1,6 @@
 """Mocked contracts for the convergence batch CLI; no study work is started."""
 
+import hashlib
 import json
 import tempfile
 import unittest
@@ -334,12 +335,8 @@ class V2AndStateTests(unittest.TestCase):
         book = contract.validate(contract.load_cases(V2_CASES))
         rows = cli._rows(book, None, "holdout")
         self.assertTrue(all(r["status"] == "reserved_until_threshold_gate" for r in rows))
-        with mock.patch.object(cli, "THRESHOLDS_V2", cli.ROOT / "reference/absent-thresholds.json"):
-            with self.assertRaisesRegex(ValueError, "reserved until the threshold gate"):
-                cli._gate_holdout(rows)
-        with tempfile.NamedTemporaryFile() as lifted, \
-             mock.patch.object(cli, "THRESHOLDS_V2", Path(lifted.name)):
-            cli._gate_holdout(rows)  # committed thresholds lift the reservation
+        with self.assertRaisesRegex(ValueError, "reserved until the threshold gate"):
+            cli._gate_holdout(rows, thresholds=cli.ROOT / "reference/absent-thresholds.json")
 
         class Manager:
             phase = "holdout"
@@ -385,6 +382,39 @@ class V2BridgeGateTests(unittest.TestCase):
     def test_v2_rejects_bridge_reports(self):
         with self.assertRaisesRegex(ValueError, "accept no bridge reports"):
             self.batch(["a.json", "b.json"]).bridge_gate(write=False)
+
+
+class HoldoutGuardTests(unittest.TestCase):
+    def setUp(self):
+        book = contract.validate(contract.load_cases(V2_CASES))
+        self.rows = cli._rows(book, None, "holdout")
+        self.tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tmp.cleanup)
+        self.sha = hashlib.sha256(V2_CASES.read_bytes()).hexdigest()
+
+    def _thresholds(self, **overrides):
+        data = {"schema_version": "solute-thresholds-v2",
+                "holdout_run_permitted": True, "cases_sha256": self.sha}
+        data.update(overrides)
+        path = Path(self.tmp.name) / "THRESHOLDS_V2.json"
+        path.write_text(json.dumps(data))
+        return path
+
+    def test_holdout_refused_when_thresholds_file_absent(self):
+        absent = Path(self.tmp.name) / "absent.json"
+        with self.assertRaisesRegex(ValueError, "reserved until the threshold gate.*absent"):
+            cli._gate_holdout(self.rows, thresholds=absent)
+
+    def test_holdout_refused_when_not_permitted(self):
+        with self.assertRaisesRegex(ValueError, "reserved until the threshold gate.*not true"):
+            cli._gate_holdout(self.rows, thresholds=self._thresholds(holdout_run_permitted=False))
+
+    def test_holdout_refused_on_sha_mismatch(self):
+        with self.assertRaisesRegex(ValueError, "reserved until the threshold gate.*cases_sha256"):
+            cli._gate_holdout(self.rows, thresholds=self._thresholds(cases_sha256="0" * 64))
+
+    def test_holdout_allowed_when_permitted_and_sha_matches(self):
+        cli._gate_holdout(self.rows, thresholds=self._thresholds())
 
 
 if __name__ == "__main__":

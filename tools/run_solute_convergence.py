@@ -4,6 +4,7 @@
 import argparse
 import copy
 import fcntl
+import hashlib
 import json
 import sys
 import uuid
@@ -25,6 +26,7 @@ PHASE = "convergence"
 HOLDOUT_PHASE = "holdout"
 # Execution roots per phase come from lifecycle.PHASE_TASKS: v1 13.4.1/13.6.1, v2 22-convergence/22-holdout.
 THRESHOLDS_V2 = ROOT / "reference/solute_verification/THRESHOLDS_V2.json"
+CASES_V2 = ROOT / "reference/solute_verification/CASES_V2.json"
 
 
 def _path(path):
@@ -45,11 +47,30 @@ def _rows(book, ids=None, phase=PHASE):
     return lifecycle.selected_rows(book, phase, ids)
 
 
-def _gate_holdout(rows):
-    """Reserved holdout rows run only after THRESHOLDS_V2.json is committed (Wave 6)."""
+def _holdout_gate_reason(thresholds, cases):
+    """Return why the threshold file does not lift the holdout reservation, or None."""
+    try:
+        data = metrics.json_load(thresholds)
+    except FileNotFoundError:
+        return "file absent"
+    except (OSError, ValueError):
+        return "file unreadable or not JSON"
+    if not isinstance(data, dict) or data.get("schema_version") != "solute-thresholds-v2":
+        return "schema_version is not solute-thresholds-v2"
+    if data.get("holdout_run_permitted") is not True:
+        return "holdout_run_permitted is not true"
+    if data.get("cases_sha256") != hashlib.sha256(cases.read_bytes()).hexdigest():
+        return "cases_sha256 does not match CASES_V2.json"
+    return None
+
+
+def _gate_holdout(rows, thresholds=THRESHOLDS_V2, cases=CASES_V2):
+    """Reserved holdout rows run only after THRESHOLDS_V2.json permits them (Wave 6)."""
     if any(r.get("status") == "reserved_until_threshold_gate" for r in rows):
-        require(THRESHOLDS_V2.is_file(),
-                "holdout rows are reserved until the threshold gate (THRESHOLDS_V2.json); dry-run only")
+        reason = _holdout_gate_reason(thresholds, cases)
+        require(reason is None,
+                "holdout rows are reserved until the threshold gate (THRESHOLDS_V2.json); "
+                f"dry-run only: {reason}")
 
 
 def _launch_counts(book, starts):
