@@ -27,8 +27,8 @@ Follows: Orchestration 22 (complete; M5-V partial/open; [STATE_22.md](STATE_22.m
 | 1A | 23.1.1 | Holdout guard reads status and SHA | done (f4990be; A4 gate pending wave end) |
 | 1A | 23.1.2 | Bridge row inventory mismatch: explain and fix | blocked (user decision A/B on bridge profile set) |
 | 1A | 23.1.3 | Diffusion end-row loss: SD-005 or "Not defects" | done (40b6593; SD-005 registered) |
-| 2 | 23.2.1 | Isolation study design | in progress (plan revision requested: space at holdout dt, time at holdout mesh) |
-| 2 | — | Orchestrator gate; `POLICY_HASHES` check | pending |
+| 2 | 23.2.1 | Isolation study design | done (1650232; 15 study rows, 3 centre rows) |
+| 2 | — | Orchestrator gate; `POLICY_HASHES` check | done (all 15 rows inside the holdout bracket; no pinned file edited in 1A, no re-pin) |
 | 3 | 23.3.1 | CASES_V2 isolating rows, f32 relabel, checker | pending |
 | 3 | — | Tool freeze; record SHA-256 values | pending |
 | 4A | 23.4.1 | Isolating study: `diffusion_cosine` | pending |
@@ -79,6 +79,10 @@ Follows: Orchestration 22 (complete; M5-V partial/open; [STATE_22.md](STATE_22.m
 - `cargo test -p hydrus-core source_defect_`: 5 passed (SD-001..005). fmt clean, diff check clean.
 - Discovered (not registered): free-drainage `SOLUTE.FOR:823-827` (`kBotCh=0`) uses the same `c1=c2` row; not reached by this case.
 - Gap: `solute_fortran_compat/boundary.rs` (`assemble_lower`) lacks an SD-005 tag comment (off-limits this task).
+
+### Wave 2 gate (orchestrator)
+- Rows approved: 15 study rows (12 bracket + 3 centre), all inside the holdout bracket, so no user stop under the Wave 2 rule. Design: `planning/master/M5V_ISOLATION_DESIGN_23.md` (1650232).
+- `POLICY_HASHES`: `solute_verification_harness.rs` is pinned (`a6e15e08…`). 23.3.1 edits it under D11, so the re-pin happens at the Wave 3 freeze, not now.
 
 ### Wave 1A A4 gate (2026-10-25, HEAD 5fb79fc, 23.1.2 closed per D11)
 - `cargo test --workspace --no-fail-fast`: 449 passed, 0 failed, 1 ignored (448 + SD-005 pinning test).
