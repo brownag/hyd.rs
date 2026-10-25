@@ -29,8 +29,8 @@ Follows: Orchestration 22 (complete; M5-V partial/open; [STATE_22.md](STATE_22.m
 | 1A | 23.1.3 | Diffusion end-row loss: SD-005 or "Not defects" | done (40b6593; SD-005 registered) |
 | 2 | 23.2.1 | Isolation study design | done (1650232; 15 study rows, 3 centre rows) |
 | 2 | — | Orchestrator gate; `POLICY_HASHES` check | done (all 15 rows inside the holdout bracket; no pinned file edited in 1A, no re-pin) |
-| 3 | 23.3.1 | CASES_V2 isolating rows, f32 relabel, checker | pending |
-| 3 | — | Tool freeze; record SHA-256 values | pending |
+| 3 | 23.3.1 | CASES_V2 isolating rows, f32 relabel, checker, bridge print rule | done (0cd74a1; 15 rows, 34 relabels) |
+| 3 | — | Tool freeze; record SHA-256 values; `POLICY_HASHES` re-pin | done (freeze values below; harness pin re-pinned) |
 | 4A | 23.4.1 | Isolating study: `diffusion_cosine` | pending |
 | 4A | 23.4.2 | Isolating study: `scalar_robin` | pending |
 | 4A | 23.4.3 | Example 3 space re-run (authenticated); space isolation | pending |
@@ -44,9 +44,14 @@ Follows: Orchestration 22 (complete; M5-V partial/open; [STATE_22.md](STATE_22.m
 
 ## Frozen values (filled at the named gate)
 
-- CASES_V2.json SHA-256 (Wave 3 freeze): _pending_
-- Tool hashes at freeze (checker, metrics, lifecycle, convergence CLI): _pending_
-- `POLICY_HASHES` re-pins (Wave 1A and Wave 3): _pending_
+- CASES_V2.json SHA-256 (Wave 3 freeze): `ceddd59db73e1f54abbfd4198b0b5923ef9838b365bf8c96b691f5ad9718cab7` (was `c236eb7c…`; THRESHOLDS_V2 must carry this value at gate C)
+- Tool hashes at freeze (after 23.3.1):
+  - `tools/check_solute_verification_spec.py`: `04299ff41ff6f79148ad97155fc2585cce2aaa43d2083c75d15fd756fe0a921b`
+  - `tools/solute_verification_metrics.py`: `609a18e04b07cbaeff1b4c75fabcae4710b995bf742dceca0fcfaa94c451dac0`
+  - `tools/solute_benchmark_lifecycle.py`: `fcb9094e443670a7c0e736158de47ffe5e59f6c938ffefdb9a5be5ed794c0195`
+  - `tools/run_solute_convergence.py`: `f9e20b0eea24d618d464f5fbd1929de4be6840bdc9a59711baef496eeb3beec6`
+  - `crates/hydrus-core/tests/solute_verification_harness.rs`: `7bc1783b495ed08b019d05616b6f387a3413353253780fbd5056ba3b024db507`
+- `POLICY_HASHES` re-pins: Wave 1A none; Wave 3 `crates/hydrus-core/tests/solute_verification_harness.rs` re-pinned to `7bc1783b…` (D11 justification comment in `tools/solute_benchmark_bridge.py`).
 
 ## Verification log
 
@@ -79,6 +84,15 @@ Follows: Orchestration 22 (complete; M5-V partial/open; [STATE_22.md](STATE_22.m
 - `cargo test -p hydrus-core source_defect_`: 5 passed (SD-001..005). fmt clean, diff check clean.
 - Discovered (not registered): free-drainage `SOLUTE.FOR:823-827` (`kBotCh=0`) uses the same `c1=c2` row; not reached by this case.
 - Gap: `solute_fortran_compat/boundary.rs` (`assemble_lower`) lacks an SD-005 tag comment (off-limits this task).
+
+### Wave 3 gate and freeze (2026-10-25, after 0cd74a1)
+- `cargo test --workspace --no-fail-fast`: 450 passed, 0 failed, 1 ignored (449 + bridge-row harness test).
+- Python `unittest discover -s tools`: Ran 363, OK.
+- fmt, clippy `-D warnings`, `git diff --check`: clean.
+- Parity `--fixture-group all --backend fortran-compatible`: exit 0, 44/44 pass (log `.development/23-gate-3/parity.log`).
+- CASES.json (v1) unchanged. CASES_V2: 15 study rows added; 34 `f64` → `f32` on study/control/benchmark rows; the bridge rfc row and the three holdouts keep `f64` (known label limit; checker `V2_PRECISION_F64_EXCEPTIONS`). No holdout row touched.
+- 23.3.1 deviation accepted: the existing `bridge_keeps_original_profile_events…` test's ordinary request now uses analysis `[50,100,150]` so the schedule rule does not treat it as a bridge. Its assertions are unchanged.
+- Tool freeze: no `tools/` or harness edits after this point without a new orchestrator decision.
 
 ### Wave 2 gate (orchestrator)
 - Rows approved: 15 study rows (12 bracket + 3 centre), all inside the holdout bracket, so no user stop under the Wave 2 rule. Design: `planning/master/M5V_ISOLATION_DESIGN_23.md` (1650232).

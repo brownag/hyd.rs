@@ -37,7 +37,9 @@ POLICY_HASHES = {
     # Re-pinned under Orchestration 22 (22.3.3): the harness selects its backend from the request;
     # requests without `backend` keep FV/BE behaviour.
     # Re-pinned again under Orchestration 22 (22.3.7): output_path allows the 22-* scratch roots.
-    "crates/hydrus-core/tests/solute_verification_harness.rs": "a6e15e0840106ecae04f2db83cb8ce1134f37479e10fa993cb3fb2cb8382216a",
+    # Re-pinned under Orchestration 23 (23.3.1, D11): the print-step rule selects bridge profile
+    # steps by schedule instead of launch_id, so the rfc bridge row prints [50,100,200].
+    "crates/hydrus-core/tests/solute_verification_harness.rs": "7bc1783b495ed08b019d05616b6f387a3413353253780fbd5056ba3b024db507",
 }
 COMPARATORS = (
     "tools/solute_benchmark_bridge.py",
