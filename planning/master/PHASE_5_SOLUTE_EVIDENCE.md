@@ -109,6 +109,8 @@ The [fixture README](../../reference/fortran_reference/solute/example3/README.md
 
 M5-V remains open. Follow-up work must quantify endpoint and temporal-quadrature convergence, provide an independent analytical/manufactured reference on common coordinates/times, and review storage/flux/reaction error budgets including zero/near-zero balance cases before freezing thresholds. This handoff does not authorize Phase 6 or promote the precision variant to an oracle.
 
+> Superseded by [M5-V closure (22.x)](#m5-v-closure-22x--partial--open): M5-V is still partial / open.
+
 ## Complete 44-fixture Fortran parity suite execution (Orchestration 18 / Task 18.15.1) — 2026-10-15
 
 Task 18.15.1 completed full serial execution of all 44 parity fixtures across all six process groups (`transport`, `reactions`, `transport_properties`, `nonequilibrium`, `dual_exchange`, `biology`, `flux_concentration`), comparing the pinned Fortran reference executable (`GNU Fortran 13.3.0`, Linux x86_64) against the Rust Fortran-compatible solver (`SoluteBackend::FortranCompatible`).
@@ -193,3 +195,59 @@ Task 18.15.1 completed full serial execution of all 44 parity fixtures across al
   - The `NOD_INF` node depth sign at t=1: Rust prints `0.2500`, Fortran `-0.2500`.
   - `NodOut` recomputes `vi`/`vVi`, while Rust prints the solver's `v`/`vv`.
 - **Disclaimer:** `FortranCompatible` establishes pinned-source numerical parity, while continuum and mathematical accuracy are tracked separately by the FV/BE analytical and convergence suites.
+
+## M5-V closure (22.x) — partial / open
+
+M5-V is partial / open: study-level thresholds (`reference/solute_verification/THRESHOLDS_V2.json`, `cases_sha256` `c236eb7c…`, `holdout_run_permitted: false`) are approved under D10, holdouts were not run (no holdout-level thresholds assigned; holdout mesh/dt not isolated), and M6 planning is not unblocked by this record.
+
+Decisions: D2 (re-scope: source parity from the 44/44 gate, physical and analytical validation on the default `FortranCompatible` backend), D3 (four analytical families; FV/BE not re-studied), D8 (error budgets, user threshold gate, then holdouts), D10 (2026-10-24: approve study-level ceilings only, no holdouts). ADR: [0019](../../docs/decisions/0019-validate-scientific-accuracy-on-the-default-backend.md).
+
+### Claims
+
+Rows are copied from [SOLUTE_CONVERGENCE_EVIDENCE_22.md](SOLUTE_CONVERGENCE_EVIDENCE_22.md) "M5-V claims". The original column header ("Status if the proposals are approved") assumed holdouts pass; no holdout ran, so read each row as study-level only.
+
+| M5-V claim | Status under D10 (study-level only) |
+|---|---|
+| Independent analytical reference for closed reactions, time axis (distinct/equal/zero) | Would be **met for `profile_linf` at the listed species/times on `reaction_distinct`/`reaction_equal`** (one level for `equal`); no holdout row exists for it; inventory and reaction rates remain **unassigned** |
+| Diffusion cosine space accuracy (`linf`, `l2`) | **Conditionally met** at 65 nodes, dt 2.44e-4 only; the 97-node/dt 0.0078125 holdout candidate is **unassigned**, so the holdout cannot confirm it |
+| Diffusion cosine inventory / mass conservation | **Unmet: unassigned, known defect candidate** |
+| Scalar Robin space accuracy (`linf`, boundary outflow) | **Conditionally met** at 129 nodes, dt 2^-8 only; holdout candidate **unassigned**; `l1`, `l2`, inventory **unassigned** |
+| Temporal convergence (diffusion, Robin, Example 3) | **Unmet**: not isolated on any non-reaction case |
+| Example 3 full-chain NH4/NO2 concentration norms | **Conditionally met** at 1001 nodes, dt .025 (scratch-replay evidence); NO3, inventory, balance, node-1 closure, outlet tail, reaction rates **unassigned** |
+| Example 3 inventory, balance, node-1 closure, temporal error | **Unmet: unassigned** |
+| Classifier verdict (achieved/failed) | **Unmet**: no bounds source; every finding `inconclusive` |
+| M5-V overall | **Partial; open.** Unassigned fields remain unmet (`SOLUTE_VERIFICATION_SPEC.md:409`) and the roadmap does not unblock M6 |
+
+### Source-parity evidence (21.4.1)
+
+Rust `FortranCompatible` matched the pinned Fortran (GNU Fortran 13.3.0, Linux x86_64) on all 44 fixtures (`17d9d9c`; [SOLUTE_FORTRAN_PARITY_18.md](SOLUTE_FORTRAN_PARITY_18.md) section 21.4.1). This ties the 22.x evidence to the pinned Fortran; no 22.x row launched Fortran.
+
+### Analytical evidence (22.4.x, 22.5.1)
+
+- Closed reactions: [M5V_STUDY_22_REACTIONS.md](M5V_STUDY_22_REACTIONS.md).
+- `diffusion_cosine`: [M5V_STUDY_22_DIFFUSION.md](M5V_STUDY_22_DIFFUSION.md).
+- `scalar_robin`: [M5V_STUDY_22_ROBIN.md](M5V_STUDY_22_ROBIN.md).
+- Example 3 chain: [M5V_STUDY_22_EXAMPLE3.md](M5V_STUDY_22_EXAMPLE3.md) (22.4.4, partial) and [M5V_STUDY_22_EXAMPLE3_SPACE.md](M5V_STUDY_22_EXAMPLE3_SPACE.md) (22.4.5).
+- Error budgets, observed orders and proposed thresholds (22.5.1): [SOLUTE_CONVERGENCE_EVIDENCE_22.md](SOLUTE_CONVERGENCE_EVIDENCE_22.md).
+
+### Thresholds
+
+[`THRESHOLDS_V2.json`](../../reference/solute_verification/THRESHOLDS_V2.json): SHA-256 `c15a4dc0ba80e92994fea1f618774e1428a13c8f95c70261d0f04ee4967ca8ab`; `cases_sha256` `c236eb7cd42dee691a36787625865457df62c0bb4a72cb0388a786cbe1e1b43b` (`CASES_V2.json`); 33 entries; study-level ceilings only; `holdout_run_permitted: false`. Margin rule: 1.5 x observed error, 2 significant figures, applied once (ADR 0009).
+
+### Holdouts
+
+Not run (task 22.7.1 was not executed). Every combined holdout-level candidate is unassigned because no study isolated the holdout mesh or dt. The convergence CLI lifts its holdout guard when the thresholds file exists, so holdout rows must not be run against it.
+
+### Remaining honest gaps
+
+- Holdouts were not run.
+- Unassigned fields: diffusion inventory (known kernel end-row mass-loss defect candidate; no SD registered; reachability unproven); Robin `l1`/`l2`/inventory/balance; all temporal error; Example 3 inventory, balance, node-1 closure, NO3, outlet tail and reaction rates.
+- Example 3 space numbers are scratch replay, not authenticated batch evidence.
+- The bridge gate was waived for v2, and the v2 bridge row failed ("record inventory mismatch").
+- The precision label "f64" in `CASES_V2` is schema-only; the Fortran-compatible solver is f32.
+- O13 `--verify-only` limit: the copied 22.4.4 batches no longer verify under the new casebook (exit 2).
+- The classifier has no bounds source, so every finding is `inconclusive`.
+- The checker SHA is part of the reference-cache identity, so each checker edit forces a ~3 h reference recompute.
+- The v1 Fortran-only precision-sensitivity row was dropped and has no v2 counterpart.
+- The FV/BE study was not re-run; manufactured forcing is still blocked.
+- All claims hold for one compiler and platform (GNU Fortran 13.3.0, Linux x86_64).
