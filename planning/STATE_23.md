@@ -23,9 +23,9 @@ Follows: Orchestration 22 (complete; M5-V partial/open; [STATE_22.md](STATE_22.m
 
 | Wave | Task | Deliverable | Status |
 |---|---|---|---|
-| 0 | — | Baseline, commit plan | pending |
+| 0 | — | Baseline, commit plan | done (1c4e626, 6978756) |
 | 1A | 23.1.1 | Holdout guard reads status and SHA | done (f4990be; A4 gate pending wave end) |
-| 1A | 23.1.2 | Bridge row inventory mismatch: explain and fix | pending |
+| 1A | 23.1.2 | Bridge row inventory mismatch: explain and fix | blocked (user decision A/B on bridge profile set) |
 | 1A | 23.1.3 | Diffusion end-row loss: SD-005 or "Not defects" | done (40b6593; SD-005 registered) |
 | 2 | 23.2.1 | Isolation study design | pending |
 | 2 | — | Orchestrator gate; `POLICY_HASHES` check | pending |
