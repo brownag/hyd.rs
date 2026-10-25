@@ -6,6 +6,8 @@ The 13.4.1 wave is **incomplete and stopped at the storage ceiling**. Thirty-two
 
 This is retained numerical evidence, not scientific acceptance. Bounds and thresholds remain null, `scientific_accuracy_accepted` remains false, M5-V remains open, and the six holdout rows were not activated or used.
 
+Status update (Orchestration 22): see [SOLUTE_CONVERGENCE_EVIDENCE_22.md](SOLUTE_CONVERGENCE_EVIDENCE_22.md) and the [M5-V closure (22.x)](PHASE_5_SOLUTE_EVIDENCE.md#m5-v-closure-22x--partial--open). M5-V is partial / open: study-level thresholds (`reference/solute_verification/THRESHOLDS_V2.json`, `cases_sha256` `c236eb7c…`, `holdout_run_permitted: false`) are approved under D10, holdouts were not run (no holdout-level thresholds assigned; holdout mesh/dt not isolated), and M6 planning is not unblocked by this record.
+
 ## Activation and frozen scope
 
 The frozen `CASES.json` SHA-256 is `d3b06531c06545ca89956b95c487bb1616ace1470ba1a8c02a3f1209ff4e8acf`. Root reviewed the exact 57-row, 15-batch activation bundle in `.development/13.4.1/activation-review.json` (SHA-256 `41a7c3c3ed56fc2591bdacf3c0e164b42dc03dad1928fb6af8b2cd7db3ad4d03`). The storage amendment `.development/13.4.1/storage-amendment.json` raised only new evidence growth from 250,000,000 to 450,000,000 bytes above its recorded baseline of 214,850,214 bytes. It did not change launch identities, reference permissions, solver limits, global caps, or holdout reservation.
