@@ -24,9 +24,9 @@ Follows: Orchestration 22 (complete; M5-V partial/open; [STATE_22.md](STATE_22.m
 | Wave | Task | Deliverable | Status |
 |---|---|---|---|
 | 0 | — | Baseline, commit plan | pending |
-| 1A | 23.1.1 | Holdout guard reads status and SHA | pending |
+| 1A | 23.1.1 | Holdout guard reads status and SHA | done (f4990be; A4 gate pending wave end) |
 | 1A | 23.1.2 | Bridge row inventory mismatch: explain and fix | pending |
-| 1A | 23.1.3 | Diffusion end-row loss: SD-005 or "Not defects" | pending |
+| 1A | 23.1.3 | Diffusion end-row loss: SD-005 or "Not defects" | done (40b6593; SD-005 registered) |
 | 2 | 23.2.1 | Isolation study design | pending |
 | 2 | — | Orchestrator gate; `POLICY_HASHES` check | pending |
 | 3 | 23.3.1 | CASES_V2 isolating rows, f32 relabel, checker | pending |
@@ -60,4 +60,25 @@ Follows: Orchestration 22 (complete; M5-V partial/open; [STATE_22.md](STATE_22.m
 
 ## Task reports
 
-_Empty. Workers report to the orchestrator; the orchestrator distils each report here (≤15 lines)._
+### 23.1.1 — done (f4990be)
+- Holdout guard: `_gate_holdout(rows, thresholds, cases)` allows holdouts only if the thresholds file parses, is `solute-thresholds-v2`, has `holdout_run_permitted is True`, and `cases_sha256` matches CASES_V2.json. Reason appended to the refusal.
+- Tests: `tools.test_solute_convergence_cli` 25 OK (4 new in `HoldoutGuardTests`).
+- Deviation (approved): the empty-file "lift" branch of `test_holdout_rows_dry_run_only_in_v2_until_reserved_status_lifted` is removed; its absent-file check kept.
+- Gotcha: committed THRESHOLDS_V2.json still has `holdout_run_permitted: false`; holdouts stay refused until gate C.
+
+### 23.1.2 — blocked (not committed; worktree `.development/23-worktrees/23.1.2`)
+- Diagnosis: first disagreeing field is `profile_times`: manifest `[0,50,100,150,200]` (Rust-written) vs schedule `[0,50,100,200]` (`solute_verification_metrics.py:185`).
+- Row `benchmark-example3-bridge-rfc-baseline` has `sampling_interval: 50` but `analysis_times` `[50,100,200]`. Reference-side rules (`solute_verification_metrics.py:1286-1288`, `solute_convergence_evidence.py:183`) treat `analysis_times` as the profile set.
+- User decision needed: A = `analysis_times` governs (row/CASES change, forbidden here except as a Wave 3 fold-in); B = `sampling_interval` governs (tool scope change plus Rust harness check).
+- `solute_benchmark_bridge.py:48,540-543` (TIMES, orchestrator-owned) flagged for review.
+
+### 23.1.3 — done (40b6593)
+- Reachability: `kBotCh=-1` (TotalFlux 0), `kTopCh=0` (advective outflow), `q=0`, `lVapor` false, `Level=2`, identity mapping. Branch `SOLUTE.FOR:816-818` reached (`D=-1,E=1,F=0`).
+- Cross-site: `:811-814` natural row for the same BC when `vN(1)>0`; node-N rows `:894-915` natural. Inconsistent, so SD-005 (not "Not defects").
+- Pinning test `source_defect_sd005_diffusion_end_row_loses_inventory` (`crates/hydrus-core/tests/source_defect_sd005.rs`): 3.66e-3 absolute, 2.13e-3 relative loss vs 22.4.2 -3.8e-3 (same order).
+- `cargo test -p hydrus-core source_defect_`: 5 passed (SD-001..005). fmt clean, diff check clean.
+- Discovered (not registered): free-drainage `SOLUTE.FOR:823-827` (`kBotCh=0`) uses the same `c1=c2` row; not reached by this case.
+- Gap: `solute_fortran_compat/boundary.rs` (`assemble_lower`) lacks an SD-005 tag comment (off-limits this task).
+
+### Wave 1A A4 gate
+- Pending: runs at wave end (after 23.1.2). crates/ changed, so full A4 (cargo workspace, Python, fmt, clippy, diff check, parity 44/44) is required.
