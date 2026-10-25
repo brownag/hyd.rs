@@ -1,0 +1,503 @@
+{
+ "schema_version": "solute-thresholds-v2",
+ "status": "approved_study_level_only",
+ "cases_sha256": "c236eb7cd42dee691a36787625865457df62c0bb4a72cb0388a786cbe1e1b43b",
+ "approval": {
+  "date": "2026-10-24",
+  "by": "user (D10)",
+  "basis": "planning/master/SOLUTE_CONVERGENCE_EVIDENCE_22.md",
+  "margin_rule": "1.5 x observed error, rounded up to 2 significant figures, applied once (ADR 0009)"
+ },
+ "holdout_run_permitted": false,
+ "holdout_note": "No holdout-level threshold is assigned (holdout mesh/dt not isolated by any study). The existence of this file lifts the CLI's file-presence guard on reserved rows; do NOT run holdout rows until holdout-level thresholds are approved.",
+ "zero_expected": {
+  "reaction_zero": "exact 0 for profile_linf and inventory (proposed derivation: analytic m'=0)",
+  "diffusion_cosine": "boundary and reaction fields exact 0 (see evidence report)"
+ },
+ "unassigned": "see 'Metrics lacking a resolved error' in the evidence report; unassigned fields remain unmet (SOLUTE_VERIFICATION_SPEC.md:409)",
+ "thresholds": {
+  "reaction_distinct": {
+   "profile": [
+    {
+     "metric": "profile_linf",
+     "species": "S1",
+     "time": 1.0,
+     "level": "dt=0.03125, 9 nodes",
+     "max_abs_error": 0.00078,
+     "basis": "absolute",
+     "source": "R:109,94,34"
+    },
+    {
+     "metric": "profile_linf",
+     "species": "S1",
+     "time": 2.0,
+     "level": "dt=0.03125, 9 nodes",
+     "max_abs_error": 0.0013,
+     "basis": "absolute",
+     "source": "R:110,95,35"
+    },
+    {
+     "metric": "profile_linf",
+     "species": "S1",
+     "time": 4.0,
+     "level": "dt=0.03125, 9 nodes",
+     "max_abs_error": 0.0018,
+     "basis": "absolute",
+     "source": "R:111,96,36"
+    },
+    {
+     "metric": "profile_linf",
+     "species": "S2",
+     "time": 1.0,
+     "level": "dt=0.03125, 9 nodes",
+     "max_abs_error": 0.0036,
+     "basis": "absolute",
+     "source": "R:114,99,39"
+    },
+    {
+     "metric": "profile_linf",
+     "species": "S2",
+     "time": 2.0,
+     "level": "dt=0.03125, 9 nodes",
+     "max_abs_error": 0.0042,
+     "basis": "absolute",
+     "source": "R:115,100,40"
+    },
+    {
+     "metric": "profile_linf",
+     "species": "S2",
+     "time": 4.0,
+     "level": "dt=0.03125, 9 nodes",
+     "max_abs_error": 0.0027,
+     "basis": "absolute",
+     "source": "R:116,101,41"
+    },
+    {
+     "metric": "profile_linf",
+     "species": "S3",
+     "time": 1.0,
+     "level": "dt=0.03125, 9 nodes",
+     "max_abs_error": 0.0012,
+     "basis": "absolute",
+     "source": "R:119,104,44"
+    },
+    {
+     "metric": "profile_linf",
+     "species": "S3",
+     "time": 2.0,
+     "level": "dt=0.03125, 9 nodes",
+     "max_abs_error": 0.00065,
+     "basis": "absolute",
+     "source": "R:120,105,45"
+    },
+    {
+     "metric": "profile_linf",
+     "species": "S3",
+     "time": 4.0,
+     "level": "dt=0.03125, 9 nodes",
+     "max_abs_error": 0.0014,
+     "basis": "absolute",
+     "source": "R:121,106,46"
+    }
+   ],
+   "inventory": [
+    {
+     "metric": "inventory.total",
+     "species": "S1",
+     "time": 1.0,
+     "level": "dt=0.03125, 9 nodes",
+     "max_abs_error": 0.0014,
+     "basis": "absolute",
+     "source": "R:34"
+    },
+    {
+     "metric": "inventory.total",
+     "species": "S1",
+     "time": 2.0,
+     "level": "dt=0.03125, 9 nodes",
+     "max_abs_error": 0.0023,
+     "basis": "absolute",
+     "source": "R:35"
+    },
+    {
+     "metric": "inventory.total",
+     "species": "S1",
+     "time": 4.0,
+     "level": "dt=0.03125, 9 nodes",
+     "max_abs_error": 0.003,
+     "basis": "absolute",
+     "source": "R:36"
+    },
+    {
+     "metric": "inventory.total",
+     "species": "S2",
+     "time": 1.0,
+     "level": "dt=0.03125, 9 nodes",
+     "max_abs_error": 0.003,
+     "basis": "absolute",
+     "source": "R:39"
+    },
+    {
+     "metric": "inventory.total",
+     "species": "S2",
+     "time": 2.0,
+     "level": "dt=0.03125, 9 nodes",
+     "max_abs_error": 0.0038,
+     "basis": "absolute",
+     "source": "R:40"
+    },
+    {
+     "metric": "inventory.total",
+     "species": "S2",
+     "time": 4.0,
+     "level": "dt=0.03125, 9 nodes",
+     "max_abs_error": 0.0024,
+     "basis": "absolute",
+     "source": "R:41"
+    },
+    {
+     "metric": "inventory.total",
+     "species": "S3",
+     "time": 1.0,
+     "level": "dt=0.03125, 9 nodes",
+     "max_abs_error": 0.0015,
+     "basis": "absolute",
+     "source": "R:44"
+    },
+    {
+     "metric": "inventory.total",
+     "species": "S3",
+     "time": 2.0,
+     "level": "dt=0.03125, 9 nodes",
+     "max_abs_error": 0.00083,
+     "basis": "absolute",
+     "source": "R:45"
+    },
+    {
+     "metric": "inventory.total",
+     "species": "S3",
+     "time": 4.0,
+     "level": "dt=0.03125, 9 nodes",
+     "max_abs_error": 0.0018,
+     "basis": "absolute",
+     "source": "R:46"
+    }
+   ]
+  },
+  "reaction_equal": {
+   "profile": [
+    {
+     "metric": "profile_linf",
+     "species": "S1",
+     "time": 1.0,
+     "level": "dt=0.03125, 9 nodes",
+     "max_abs_error": 0.00078,
+     "basis": "absolute",
+     "source": "R:49"
+    },
+    {
+     "metric": "profile_linf",
+     "species": "S1",
+     "time": 2.0,
+     "level": "dt=0.03125, 9 nodes",
+     "max_abs_error": 0.0013,
+     "basis": "absolute",
+     "source": "R:50"
+    },
+    {
+     "metric": "profile_linf",
+     "species": "S1",
+     "time": 4.0,
+     "level": "dt=0.03125, 9 nodes",
+     "max_abs_error": 0.0018,
+     "basis": "absolute",
+     "source": "R:51"
+    },
+    {
+     "metric": "profile_linf",
+     "species": "S2",
+     "time": 1.0,
+     "level": "dt=0.03125, 9 nodes",
+     "max_abs_error": 0.0029,
+     "basis": "absolute",
+     "source": "R:54"
+    },
+    {
+     "metric": "profile_linf",
+     "species": "S2",
+     "time": 2.0,
+     "level": "dt=0.03125, 9 nodes",
+     "max_abs_error": 0.0041,
+     "basis": "absolute",
+     "source": "R:55"
+    },
+    {
+     "metric": "profile_linf",
+     "species": "S2",
+     "time": 4.0,
+     "level": "dt=0.03125, 9 nodes",
+     "max_abs_error": 0.0041,
+     "basis": "absolute",
+     "source": "R:56"
+    },
+    {
+     "metric": "profile_linf",
+     "species": "S3",
+     "time": 1.0,
+     "level": "dt=0.03125, 9 nodes",
+     "max_abs_error": 0.00083,
+     "basis": "absolute",
+     "source": "R:59"
+    },
+    {
+     "metric": "profile_linf",
+     "species": "S3",
+     "time": 2.0,
+     "level": "dt=0.03125, 9 nodes",
+     "max_abs_error": 0.0011,
+     "basis": "absolute",
+     "source": "R:60"
+    },
+    {
+     "metric": "profile_linf",
+     "species": "S3",
+     "time": 4.0,
+     "level": "dt=0.03125, 9 nodes",
+     "max_abs_error": 0.00045,
+     "basis": "absolute",
+     "source": "R:61"
+    }
+   ]
+  },
+  "diffusion_cosine": {
+   "profile": [
+    {
+     "metric": "profile_linf",
+     "species": "u",
+     "time": 0.25,
+     "level": "65 nodes, dt=2.44e-4",
+     "max_abs_error": 0.0027,
+     "basis": "absolute",
+     "source": "D:44,47,50"
+    },
+    {
+     "metric": "profile_l2",
+     "species": "u",
+     "time": 0.25,
+     "level": "65 nodes, dt=2.44e-4",
+     "max_abs_error": 0.00054,
+     "basis": "absolute",
+     "source": "D:44,47,50"
+    },
+    {
+     "metric": "profile_linf",
+     "species": "u",
+     "time": 0.5,
+     "level": "65 nodes, dt=2.44e-4",
+     "max_abs_error": 0.0036,
+     "basis": "absolute",
+     "source": "D:45,48,51"
+    },
+    {
+     "metric": "profile_l2",
+     "species": "u",
+     "time": 0.5,
+     "level": "65 nodes, dt=2.44e-4",
+     "max_abs_error": 0.00083,
+     "basis": "absolute",
+     "source": "D:45,48,51"
+    },
+    {
+     "metric": "profile_linf",
+     "species": "u",
+     "time": 1.0,
+     "level": "65 nodes, dt=2.44e-4",
+     "max_abs_error": 0.0044,
+     "basis": "absolute",
+     "source": "D:46,49,52"
+    },
+    {
+     "metric": "profile_l2",
+     "species": "u",
+     "time": 1.0,
+     "level": "65 nodes, dt=2.44e-4",
+     "max_abs_error": 0.0013,
+     "basis": "absolute",
+     "source": "D:46,49,52"
+    }
+   ]
+  },
+  "scalar_robin": {
+   "profile": [
+    {
+     "metric": "concentration.linf",
+     "species": "u",
+     "time": 0.25,
+     "level": "129 nodes, dt=2^-8",
+     "max_abs_error": 0.00057,
+     "basis": "absolute",
+     "source": "B:60"
+    },
+    {
+     "metric": "concentration.linf",
+     "species": "u",
+     "time": 0.5,
+     "level": "129 nodes, dt=2^-8",
+     "max_abs_error": 0.00086,
+     "basis": "absolute",
+     "source": "B:61"
+    },
+    {
+     "metric": "concentration.linf",
+     "species": "u",
+     "time": 1.0,
+     "level": "129 nodes, dt=2^-8",
+     "max_abs_error": 0.0013,
+     "basis": "absolute",
+     "source": "B:62"
+    }
+   ],
+   "boundary": [
+    {
+     "metric": "boundary.cumulative.1",
+     "species": "u",
+     "time": 0.25,
+     "level": "129 nodes, dt=2^-8",
+     "max_abs_error": 3.9e-05,
+     "basis": "absolute",
+     "source": "B:45"
+    },
+    {
+     "metric": "boundary.cumulative.1",
+     "species": "u",
+     "time": 0.5,
+     "level": "129 nodes, dt=2^-8",
+     "max_abs_error": 0.00012,
+     "basis": "absolute",
+     "source": "B:46"
+    },
+    {
+     "metric": "boundary.cumulative.1",
+     "species": "u",
+     "time": 1.0,
+     "level": "129 nodes, dt=2^-8",
+     "max_abs_error": 0.00035,
+     "basis": "absolute",
+     "source": "B:47"
+    }
+   ]
+  },
+  "example3": {
+   "profile": [
+    {
+     "metric": "concentration.linf",
+     "species": "NH4",
+     "time": 50.0,
+     "level": "1001 nodes, dt=0.025",
+     "max_abs_error": 0.0066,
+     "basis": "absolute",
+     "source": "S:90"
+    },
+    {
+     "metric": "concentration.linf",
+     "species": "NH4",
+     "time": 100.0,
+     "level": "1001 nodes, dt=0.025",
+     "max_abs_error": 0.0042,
+     "basis": "absolute",
+     "source": "S:91"
+    },
+    {
+     "metric": "concentration.linf",
+     "species": "NH4",
+     "time": 200.0,
+     "level": "1001 nodes, dt=0.025",
+     "max_abs_error": 0.0023,
+     "basis": "absolute",
+     "source": "S:92"
+    },
+    {
+     "metric": "concentration.linf",
+     "species": "NO2",
+     "time": 50.0,
+     "level": "1001 nodes, dt=0.025",
+     "max_abs_error": 0.00027,
+     "basis": "absolute",
+     "source": "S:93"
+    },
+    {
+     "metric": "concentration.linf",
+     "species": "NO2",
+     "time": 100.0,
+     "level": "1001 nodes, dt=0.025",
+     "max_abs_error": 0.00024,
+     "basis": "absolute",
+     "source": "S:94"
+    },
+    {
+     "metric": "concentration.linf",
+     "species": "NO2",
+     "time": 200.0,
+     "level": "1001 nodes, dt=0.025",
+     "max_abs_error": 0.00017,
+     "basis": "absolute",
+     "source": "S:95"
+    },
+    {
+     "metric": "concentration.l2",
+     "species": "NH4",
+     "time": 50.0,
+     "level": "1001 nodes, dt=0.025",
+     "max_abs_error": 0.0009,
+     "basis": "absolute",
+     "source": "S:81"
+    },
+    {
+     "metric": "concentration.l2",
+     "species": "NH4",
+     "time": 100.0,
+     "level": "1001 nodes, dt=0.025",
+     "max_abs_error": 0.00071,
+     "basis": "absolute",
+     "source": "S:82"
+    },
+    {
+     "metric": "concentration.l2",
+     "species": "NH4",
+     "time": 200.0,
+     "level": "1001 nodes, dt=0.025",
+     "max_abs_error": 0.00048,
+     "basis": "absolute",
+     "source": "S:83"
+    },
+    {
+     "metric": "concentration.l2",
+     "species": "NO2",
+     "time": 50.0,
+     "level": "1001 nodes, dt=0.025",
+     "max_abs_error": 3.8e-05,
+     "basis": "absolute",
+     "source": "S:84"
+    },
+    {
+     "metric": "concentration.l2",
+     "species": "NO2",
+     "time": 100.0,
+     "level": "1001 nodes, dt=0.025",
+     "max_abs_error": 4.1e-05,
+     "basis": "absolute",
+     "source": "S:85"
+    },
+    {
+     "metric": "concentration.l2",
+     "species": "NO2",
+     "time": 200.0,
+     "level": "1001 nodes, dt=0.025",
+     "max_abs_error": 3.6e-05,
+     "basis": "absolute",
+     "source": "S:86"
+    }
+   ]
+  }
+ }
+}
