@@ -89,3 +89,10 @@ No threshold is proposed. Inputs for a later decision: the missing arithmetic an
 - Batch-ID naming: the runner assigns batch IDs. The first B1 batch is `batch-8756…` (incomplete); its rerun is `batch-36f7…`; the first B2 batch is `batch-50d6…` (refused); its retry is `batch-9b46…`; the 251 rerun is `batch-17ae…`.
 - Retry conflict: the 251 row's first attempt failed the environment check, and the rerun was started after the check was clear. The B2 retry used the reference-work flag, which the first B2 attempt omitted against the plan.
 - Activation path: the first 251 rerun execute used an activation file outside the worktree and exited 2 with `path outside checkout`. No batch was created and no launch was consumed. The rerun used the copy inside the worktree.
+
+## Decisions (user, 2026-10-27)
+
+- **Gate B (bounds review):** signed off by the user.
+- **Gate C (holdout-level thresholds):** approved by the user. The exact threshold values are not yet confirmed. `THRESHOLDS_V2.json` has not been regenerated, and holdout rows stay refused until it is.
+- **B2 deviation:** accepted as recorded. The first B2 attempt omitted `--allow-reference-work`, which TODO steps 5 and 6 specify. It was refused before any solver ran, consumed no launch, and the retry's references and batch verified. A fresh output root was rejected because it would re-run everything and break the no-retry rule. A clearer refusal message that names the flag is deferred until after M5-V closes, because `tools/run_solute_convergence.py` has a pinned producer hash.
+- **Receipt flag mismatch:** documented, not changed. The top-level `filesystem_receipts_authenticated: true` is authoritative. The analysis block's `false` is by design (`tools/solute_convergence_analysis.py:760`), because the analysis module reads no files. A test asserts this split (`tools/test_solute_convergence_evidence.py:654-655`). Renaming the analysis field is deferred until after M5-V closes, because it changes the pinned analysis-module hash and would require re-verifying every batch.
