@@ -73,3 +73,9 @@ The user reviews the derivations above by launch and observable, and then decide
 3. Accept the 50 null quadrature keys as unclassifiable, or ask for them to be filled.
 
 Once the user signs, the review file is written against this bounds SHA. Classification (23.6.1) happens only after that.
+
+## Gate B: signed (2026-10-27)
+
+- User accepted all three points: the arithmetic method with scale S, the empirical quadrature sensitivities, and the 50 null quadrature keys as unclassifiable.
+- Review file: `.development/23-bounds/review.json`, SHA-256 `b33508c633a1bc938fe39ae1f5575cf9265589ae502ee8c789758fc1e19c83a1`. It binds to the bounds SHA `234333512ffee95b620c97b34f365419f7307dd15348d6c0af62a69421fa32cf` and to the frozen CASES_V2 and producer hashes.
+- Classification (23.6.1) has not run. The runner writes a classification only during an execute, and a fresh execute makes a new batch. See the TODO status.
