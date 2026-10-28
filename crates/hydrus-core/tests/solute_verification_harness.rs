@@ -444,6 +444,7 @@ fn output_path(root: &Path, destination: &Path) -> Result<PathBuf> {
         "22-benchmark",
         "22-convergence",
         "22-holdout",
+        "23-classify",
     ];
     require(
         allowed
@@ -1267,7 +1268,7 @@ fn output_confinement_and_exclusive_creation() {
 #[test]
 fn output_path_accepts_v2_scratch_roots_and_rejects_others() {
     let output = |root: &Path| root.join("batch/observations.json");
-    for task in ["22-benchmark", "22-convergence", "22-holdout"] {
+    for task in ["22-benchmark", "22-convergence", "22-holdout", "23-classify"] {
         let root = repo_root()
             .join(".development")
             .join(task)
