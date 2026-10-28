@@ -296,7 +296,7 @@ class ConvergenceBatch:
         return values, receipts
 
     def reconcile(self, *, resume):
-        all_rows = lifecycle.all_records(self.book)
+        all_rows = lifecycle.all_records(self.book, lifecycle.scope_task(self.path.parent.name))
         starts = [r for r in all_rows if r["event"] == "start"]
         by_id = {r["launch_id"]: r for r in starts}
         activation = self.recipe["activation"]

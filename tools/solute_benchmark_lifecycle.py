@@ -213,14 +213,21 @@ def book_tasks(book):
     return {t: p for t, p in PHASE_TASKS.items() if t.startswith(("22-", "23-")) == v2}
 
 
-def all_records(book):
+def scope_task(task):
+    """Campaign roots (23-*) consume launch rows only within their own ledger."""
+    return task if task.startswith("23-") else None
+
+
+def all_records(book, task=None):
     records = []
-    for task, phase in book_tasks(book).items():
+    tasks = book_tasks(book) if task is None else {task: PHASE_TASKS[task]}
+    for name, phase in tasks.items():
         records.extend(
-            ledger_records(safe(ROOT, f".development/{task}/launch-ledger.jsonl"), book, phase)
+            ledger_records(safe(ROOT, f".development/{name}/launch-ledger.jsonl"), book, phase)
         )
-    adapter = safe(ROOT, ".development/13.2.1/launch-ledger.jsonl")
-    require(not fortran.ledger_records(adapter), "producer task has unexpected scientific ledger")
+    if task is None:
+        adapter = safe(ROOT, ".development/13.2.1/launch-ledger.jsonl")
+        require(not fortran.ledger_records(adapter), "producer task has unexpected scientific ledger")
     starts = [r for r in records if r["event"] == "start"]
     require(len({r["launch_id"] for r in starts}) == len(starts), "duplicate global launch row")
     require(len({r["run_id"] for r in starts}) == len(starts), "duplicate global run id")
@@ -232,8 +239,8 @@ def total_storage(book=None):
     return sum(fortran.directory_bytes(safe(ROOT, f".development/{task}")) for task in tasks)
 
 
-def check_budget(book, row):
-    records = all_records(book)
+def check_budget(book, row, task=None):
+    records = all_records(book, task)
     starts = [r for r in records if r["event"] == "start"]
     by_id = {r["id"]: r for r in book["launches"]}
     require(not any(r["launch_id"] == row["id"] for r in starts), "launch row already consumed")
@@ -580,7 +587,7 @@ class Lifecycle:
         return paths
 
     def _preflight(self, row, run_dir, manifest, snapshot):
-        check_budget(self.book, row)
+        check_budget(self.book, row, scope_task(self.task_root.name))
         fortran.check_preserved(snapshot)
         require(manifest["cases_sha256"] == sha256(self.cases_path), "casebook changed")
         provenance = manifest["provenance"]
@@ -655,7 +662,7 @@ class Lifecycle:
     def _execute_rust(self, case, row, run_dir, manifest, snapshot):
         started = False
         try:
-            check_budget(self.book, row)
+            check_budget(self.book, row, scope_task(self.task_root.name))
             build_dir, receipt = build_rust(
                 self.task_root, self.book, manifest["provenance"]["source_sha256"]
             )
@@ -807,7 +814,7 @@ class Lifecycle:
         results = []
         with self._lock():
             for row in rows:
-                check_budget(self.book, row)
+                check_budget(self.book, row, scope_task(self.task_root.name))
                 require(
                     total_storage() + 2 * row["estimated_output_bytes"]
                     <= storage_cap(self.book),
