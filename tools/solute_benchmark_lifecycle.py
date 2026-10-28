@@ -208,9 +208,9 @@ def storage_cap(book):
 
 
 def book_tasks(book):
-    """Phase roots belonging to the casebook generation (v1 13.x, v2 22-*)."""
+    """Phase roots belonging to the casebook generation (v1 13.x, v2 22-*, 23-*)."""
     v2 = not has_caps(book)
-    return {t: p for t, p in PHASE_TASKS.items() if t.startswith("22-") == v2}
+    return {t: p for t, p in PHASE_TASKS.items() if t.startswith(("22-", "23-")) == v2}
 
 
 def all_records(book):
