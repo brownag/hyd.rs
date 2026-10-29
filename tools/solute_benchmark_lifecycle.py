@@ -577,7 +577,7 @@ class Lifecycle:
         rows = selected_rows(self.book, self.phase, launch_ids)
         paths = []
         with self._lock():
-            all_records(self.book)
+            all_records(self.book, scope_task(self.task_root.name))
             for row in rows:
                 _, run_dir, manifest, snapshot = self._prepare(row)
                 manifest["artifacts"] = fortran.artifact_inventory(run_dir)
@@ -860,7 +860,7 @@ class Lifecycle:
             manifest = metrics.json_load(run_dir / "manifest.json")
             require(set(manifest) - {"backend"} == fortran.MANIFEST_KEYS, "manifest schema mismatch")
             row = selected_rows(self.book, self.phase, [manifest["launch_id"]])[0]
-            records = all_records(self.book)
+            records = all_records(self.book, scope_task(self.task_root.name))
             if row["solver"] == "fortran":
                 result = fortran.verify_run(run_dir, self.book, self.cases_path)
                 if result["status"] == "raw_complete":

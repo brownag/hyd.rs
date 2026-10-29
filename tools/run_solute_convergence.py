@@ -114,7 +114,7 @@ def _counts_from_snapshot(book, snapshots):
 
 def _verify_budget_receipt(path, book, expected_batch=None):
     """Authenticate historical counts by proving each saved ledger is a current prefix."""
-    lifecycle.all_records(book)
+    lifecycle.all_records(book, lifecycle.scope_task(expected_batch.parent.name) if expected_batch else None)
     payload = batch_artifacts.read_artifact(path)
     require(set(payload) == {"schema_version", "batch", "launches", "ledgers"}
             and payload["schema_version"] == "solute-convergence-ledger-receipt-v1",
