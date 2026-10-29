@@ -39,6 +39,7 @@ ALLOWED_TASKS = (
     "22-convergence",
     "22-holdout",
     "23-classify-3",
+    "23-controls",
 )
 require = analytical.require
 
