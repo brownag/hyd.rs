@@ -344,3 +344,108 @@
 - A worker that needs a CASES_V2 row change outside 23.3.1, or a tool edit after the freeze, stops and reports (rule 4). The orchestrator decides with the user before any edit.
 - If a bounds derivation is unsound (for example, it relies on a floor), the worker reports it. The field is recorded as unclassifiable and blocks closure. The bound is not loosened.
 - If gate B or gate C is not given, the orchestrator stops and does not start the next wave.
+
+---
+
+## Continuation after the blocker reconciliation (2026-11-07)
+
+User decisions: **D12** add the five control rows; **D13** drop the Example 3 `dt .025`
+re-run from the critical path. Basis: `planning/master/M5V_BLOCKERS_23.md`.
+
+### Task 23R.1 — Add the five control rows and register the final campaign root
+
+- **Repo:** `/home/andrew/AI/hyd.rs`.
+- **Must edit:** `reference/solute_verification/CASES_V2.json`,
+  `tools/check_solute_verification_spec.py`,
+  `tools/test_check_solute_verification_spec.py`,
+  `tools/test_timeout_overrides.py`.
+- **Can edit:** `tools/run_solute_verification_reference.py`,
+  `tools/solute_convergence_evidence.py`, `tools/solute_reference_cache.py`,
+  `crates/hydrus-core/tests/solute_verification_harness.rs`,
+  `tools/test_solute_convergence_cli.py` (only to register `23-final` as a campaign root,
+  following the `23-controls-8` pattern).
+- **Can create:** `planning/tasks/23R.1.todo.md`; scratch `.development/23R.1/`.
+- **Depends on:** D12 and D13 (given 2026-11-07).
+- **Spec:**
+  - Add exactly these control rows, all `backend: "fortran-compatible"`, `solver: "rust"`,
+    `precision: "f32"`, `role: "control"`, `phase: "convergence"`, `status:
+    "approved_pending_adapter_and_evaluator_gates"`, `time_controls` policy `fixed`,
+    `timeout_seconds` 60 unless noted:
+    | ID | Axis | Nodes | dt | Analysis | Sampling | Max steps |
+    |---|---|---|---|---|---|---|
+    | `convergence-diffusion_cosine-space_control-129-dt2e-8-rfc-baseline` | space | 129 | `2^-8` | 0.25, 0.5, 1 | 0.0625 | 256 |
+    | `convergence-diffusion_cosine-time_control-193-dt2e-8-rfc-baseline` | time | 193 | `2^-8` | 0.25, 0.5, 1 | 0.0625 | 256 |
+    | `convergence-scalar_robin-space_control-257-dt2e-8-rfc-baseline` | space | 257 | `2^-8` | 0.25, 0.5, 1 | 0.0625 | 256 |
+    | `convergence-scalar_robin-time_control-257-dt2e-8-rfc-baseline` | time | 257 | `2^-8` | 0.25, 0.5, 1 | 0.0625 | 256 |
+    | `convergence-example3-time_control-1001-dt0.025-rfc-baseline` | time | 1001 | 0.025 | 50, 100, 200 | 1 | 8000 |
+  - Example 3 time control: `timeout_seconds` 180, added to
+    `APPROVED_TIMEOUT_OVERRIDES` with a recorded reason. It shares the 1001/0.025
+    configuration with the space study row and needs the same approved override.
+  - Use the existing `estimated_work_units` and `estimated_output_bytes` formulas.
+  - Do not edit `CASES.json`, `THRESHOLDS_V2.json`, any holdout row, or any bounds file.
+  - Register `23-final` as a convergence campaign root using the same pattern as
+    `23-controls-8` (task maps, allowlists, harness, and the test that pins the set).
+  - Add tests: all five rows exist with the given role/axis/nodes/dt; none is holdout;
+    no ceiling keys; the new timeout override is approved; the v2 checker still passes;
+    v1 is unchanged.
+- **Verification:** `python3 tools/check_solute_verification_spec.py
+  reference/solute_verification/CASES_V2.json` exits 0;
+  `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest
+  tools.test_check_solute_verification_spec tools.test_timeout_overrides` passes;
+  `cargo test -p hydrus-core --test solute_verification_harness` if the harness changes;
+  `git diff --check`.
+- **Do not:** run solvers, references, or any `holdout` row.
+
+### Task 23R.2 — Regenerate and merge the bounds; prepare Gate B
+
+- **Must edit:** none in shipped code.
+- **Can create:** a combined bounds file, a review draft, and scripts under
+  `.development/23-bounds/`; `planning/master/M5V_BOUNDS_23.md` update;
+  `planning/tasks/23R.2.todo.md`.
+- **Depends on:** 23R.1.
+- **Spec:**
+  - Copy the signed control bounds out of `/tmp` to a durable `.development/23-bounds/` path.
+  - Regenerate the 18 study-bound `producer_sha256` values with the current tools; bound
+    values stay unchanged.
+  - Merge the study and control entries into one `solute-convergence-bounds-v1` source
+    covering all 18 study rows and the five new control rows.
+  - Write a draft review bound to the new CASES_V2 SHA, combined bounds SHA, and current
+    producer hashes. Do not sign it; Gate B is the user's.
+  - Verify every launch appears, the cases SHA matches, and the producer hashes match HEAD.
+- **Gate B:** user reviews and signs the combined review. No final campaign runs before it.
+
+### Task 23R.3 — Final six-batch campaign
+
+- **Must edit:** none.
+- **Can create:** reports under `.development/23R.3/`; `planning/master/M5V_FINAL_23.md`;
+  `planning/tasks/23R.3.todo.md`.
+- **Depends on:** 23R.2 and signed Gate B.
+- **Spec:**
+  - One batch per fixed-axis group in the `23-final` root:
+    diffusion space, diffusion time, scalar_robin space, scalar_robin time,
+    example3 space at `dt .04`, example3 time.
+  - Each batch includes its control row. Example 3 space at `.04` uses
+    `convergence-example3-space_control-rfc-baseline`; the other groups use the new rows.
+  - Execute with `--bounds-source` and `--bounds-review`; verify every batch with
+    `--verify-only`.
+  - Never run a `holdout` row. Do not edit tools or cases after this point.
+- **Verification:** every batch execute and verify exit 0; batch IDs and hashes recorded.
+
+### Task 23R.4 — Classification, error budgets, thresholds; Gate C
+
+- **Must edit:** none.
+- **Can create:** `planning/master/SOLUTE_CONVERGENCE_EVIDENCE_23.md` update;
+  `planning/tasks/23R.4.todo.md`; scratch `.development/23R.4/`.
+- **Depends on:** 23R.3.
+- **Spec:** read the verified classifications; report achieved/failed/inconclusive with
+  reasons; propose per-field holdout ceilings with the ADR 0009 margin rule; list
+  unassigned fields and why. Do not tune on holdout data.
+- **Gate C:** user approves, edits, or refuses each field. Only then regenerate
+  `THRESHOLDS_V2.json` with the new CASES SHA and `holdout_run_permitted: true`.
+
+### Task 23R.5 — Holdouts and closure
+
+- **Must edit:** the closure docs named in 23.8.1.
+- **Depends on:** Gate C.
+- **Spec:** run the three reserved holdout rows once, compare with the approved
+  thresholds, and record closure or partial status. No threshold changes after the run.
