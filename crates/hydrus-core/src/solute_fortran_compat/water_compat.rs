@@ -1529,9 +1529,7 @@ pub(crate) fn wat_flow(
             let mut it_crit = true;
             for i in 0..inputs.num_np {
                 let m = inputs.mat_num[i] - 1;
-                let eps_th;
-                let eps_h;
-                if state.h_temp[i] < inputs.tables.h_sat[m]
+                let (eps_th, eps_h) = if state.h_temp[i] < inputs.tables.h_sat[m]
                     && state.h_new[i] < inputs.tables.h_sat[m]
                 {
                     let th = state.th_new[i]
@@ -1539,12 +1537,10 @@ pub(crate) fn wat_flow(
                             / (inputs.tables.ths[m] - inputs.tables.thr[m])
                             / inputs.ath[i]
                             * rate;
-                    eps_th = (state.th_new[i] - th).abs();
-                    eps_h = 0.0;
+                    ((state.th_new[i] - th).abs(), 0.0)
                 } else {
-                    eps_th = 0.0;
-                    eps_h = (state.h_new[i] - state.h_temp[i]).abs();
-                }
+                    (0.0, (state.h_new[i] - state.h_temp[i]).abs())
+                };
 
                 if eps_th > inputs.tol_th
                     || eps_h > inputs.tol_h
