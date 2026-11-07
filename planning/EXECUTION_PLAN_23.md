@@ -401,14 +401,27 @@ re-run from the critical path. Basis: `planning/master/M5V_BLOCKERS_23.md`.
 - **Must edit:** none in shipped code.
 - **Can create:** a combined bounds file, a review draft, and scripts under
   `.development/23-bounds/`; `planning/master/M5V_BOUNDS_23.md` update;
-  `planning/tasks/23R.2.todo.md`.
+  `planning/tasks/23R.2.todo.md`; pre-run evidence under `.development/23-controls-8/`.
 - **Depends on:** 23R.1.
 - **Spec:**
   - Copy the signed control bounds out of `/tmp` to a durable `.development/23-bounds/` path.
+    That file covers the six *old* controls, not the five new rows.
+  - Pre-run the four inexpensive new controls bounds-free in the registered
+    `.development/23-controls-8/` root: diffusion space 129 at `2^-8`, diffusion time 193
+    at `2^-8`, Robin space 257 at `2^-8`, Robin time 257 at `2^-8`. Verify each batch.
+    These runs exist only to derive the arithmetic control bounds; the final campaign
+    re-runs them with bounds.
+  - Derive the Example 3 time control (1001 at `0.025`) bounds from the already
+    authenticated `23-controls-8` example3 space run at the same 1001/0.025 configuration
+    (batch `batch-980de4772e034c2baac25f34a9465818`). Do not re-run that configuration.
+  - Derive arithmetic bounds for the four pre-run controls with the same formula and
+    scale rule as `build_bounds.py`. Quadrature stays null for control rows, as signed
+    for the old controls; keys that need it remain unclassifiable.
   - Regenerate the 18 study-bound `producer_sha256` values with the current tools; bound
-    values stay unchanged.
+    values stay unchanged. Update `cases_sha256` to the new CASES_V2 SHA.
   - Merge the study and control entries into one `solute-convergence-bounds-v1` source
-    covering all 18 study rows and the five new control rows.
+    covering all 18 study rows and the five new control rows, plus the existing Example 3
+    space control.
   - Write a draft review bound to the new CASES_V2 SHA, combined bounds SHA, and current
     producer hashes. Do not sign it; Gate B is the user's.
   - Verify every launch appears, the cases SHA matches, and the producer hashes match HEAD.

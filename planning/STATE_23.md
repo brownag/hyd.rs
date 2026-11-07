@@ -137,7 +137,7 @@ Full report: [M5V_BLOCKERS_23.md](master/M5V_BLOCKERS_23.md).
 | R1 | Blocker report and reconciliation | done (this report) |
 | R2 | User decisions D12 (add controls or accept partial) and D13 (drop or retain Example 3 `dt .025` re-run) | done 2026-11-07: add controls; drop the `dt .025` re-run |
 | R3 | Add control rows, update v2 checker/tests, freeze tools | done (`0c3f486`; gate below) |
-| R4 | Regenerate combined study+control bounds; Gate B re-sign | pending |
+| R4 | Regenerate combined study+control bounds; Gate B re-sign | draft ready; awaiting Gate B |
 | R5 | Execute and verify six final batches (one per fixed-axis group) | pending |
 | R6 | Classify, error budgets, threshold proposals; Gate C | pending |
 | R7 | Holdout runs and M5-V closure record | pending |
@@ -163,3 +163,11 @@ Full report: [M5V_BLOCKERS_23.md](master/M5V_BLOCKERS_23.md).
   - `tools/solute_reference_cache.py` `c5acd63dd44390f76d8152c448ed2bdfc5aa8f8f739dcdde4ee77ed0627bff46`
   - `tools/solute_verification_metrics.py` `609a18e04b07cbaeff1b4c75fabcae4710b995bf742dceca0fcfaa94c451dac0`
 - **Next:** 23R.2 regenerates the 18 study-bound producer hashes, merges the five control bounds plus the existing Example 3 space control into one source, copies the control bounds out of `/tmp`, and prepares the Gate B review. No final campaign runs before Gate B.
+
+### 23R.2 gate (2026-11-07)
+
+- **Pre-run:** four cheap new controls executed bounds-free in main `.development/23-controls-8/`, batch `batch-222c1bdaa1c244acbdeb9c42ccd5df0b`, verify exit 0 (`evidence_verified`). The Example 3 time control was not re-run; its bounds derive from the authenticated space 1001/0.025 run in `batch-980de4772e034c2baac25f34a9465818`.
+- **Combined bounds:** `.development/23-bounds/combined_bounds_23.json`, SHA-256 `3ac9fd8a45018d850da20fefc2877093f8fcf73910b4a7133a54ec8a039a6ee4`. 24 launches, 63,560 entries (18 study + 5 new controls + the existing Example 3 space control). Study entries are byte-identical to the 2026-10-27 values; only `cases_sha256` and `producer_sha256` changed. Every control quadrature is null.
+- **Durable control copy:** `.development/23-bounds/control_bounds_controls8.json`, SHA-256 `4289b507bc2be32544be03043a92d5885147c876a464244a6d48dd14c346d2cf` (copied from `/tmp`, byte-identical).
+- **Review draft:** `.development/23-bounds/review-combined-draft.json`, SHA-256 `1948c0d1196525991dc43f697854a6e1a23d15748fbb4fc1bd89c121f25af761`, authorization `DRAFT — NOT SIGNED; awaiting Gate B user sign-off`. Not usable for classification until signed.
+- **Gate B:** user reviews the derivations and signs. No final campaign runs before the signature.
