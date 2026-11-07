@@ -135,9 +135,31 @@ Full report: [M5V_BLOCKERS_23.md](master/M5V_BLOCKERS_23.md).
 | Phase | Task | Status |
 |---|---|---|
 | R1 | Blocker report and reconciliation | done (this report) |
-| R2 | User decisions D12 (add controls or accept partial) and D13 (drop or retain Example 3 `dt .025` re-run) | pending |
-| R3 | Add control rows, update v2 checker/tests, freeze tools | pending |
+| R2 | User decisions D12 (add controls or accept partial) and D13 (drop or retain Example 3 `dt .025` re-run) | done 2026-11-07: add controls; drop the `dt .025` re-run |
+| R3 | Add control rows, update v2 checker/tests, freeze tools | done (`0c3f486`; gate below) |
 | R4 | Regenerate combined study+control bounds; Gate B re-sign | pending |
 | R5 | Execute and verify six final batches (one per fixed-axis group) | pending |
 | R6 | Classify, error budgets, threshold proposals; Gate C | pending |
 | R7 | Holdout runs and M5-V closure record | pending |
+
+### 23R.1 gate (2026-11-07)
+
+- **Control rows added** (`0c3f486`): diffusion space control 129 at `2^-8`, diffusion time control 193 at `2^-8`, Robin space control 257 at `2^-8`, Robin time control 257 at `2^-8`, Example 3 time control 1001 at `0.025` (180 s). Example 3 space at `dt .04` uses the existing 1001 at `.0125` control.
+- **New CASES_V2 SHA-256:** `420af7c0085f3ad5cf3335ca036ca5360d7abd370807451d8d479e653a215df7` (58 launches, 7 cases). `THRESHOLDS_V2.json` and the study-bounds review are stale by design.
+- **Campaign root:** `23-final` registered in the reference, evidence, cache, harness and CLI test maps.
+- **Baseline Clippy fix** (`f798762`): a pre-existing `needless_late_init` in `water_compat.rs`, exposed by the current toolchain. Behavior unchanged; water tests pass.
+- **Orchestrator `POLICY_HASHES` re-pin:** `tools/solute_benchmark_bridge.py` now pins the harness at `32d1f6888b0808d71506f01ccbc3e48fcd94557fa11b7648ffde80d1ec892c26`; bridge arithmetic unchanged.
+- **Gates:** `cargo test --workspace --no-fail-fast` 450 passed, 0 failed; Python `unittest discover -s tools` 370 OK; `cargo fmt --all -- --check` clean; `cargo clippy --workspace --all-targets -- -D warnings` clean; `git diff --check` clean; parity `--fixture-group all --backend fortran-compatible` 44/44 pass (`.development/23R.1/parity.log`).
+- **Freeze values for 23R.2** (`producer_sha256`, current HEAD):
+  - `tools/check_solute_benchmarks.py` `6e69b5adcdea925fbecb7e9c4741a64d1d354f326ba6d475087e79f3f580f68f`
+  - `tools/check_solute_verification_spec.py` `fa8adcf78dee760f84df510781b3cba098dec0eb0bfa3bb3d824fd397aea6c33`
+  - `tools/run_solute_convergence.py` `a0871cda8001af19ff8b4586a7f86b43b4ac5c889a029766409688552d4b6170`
+  - `tools/run_solute_verification_reference.py` `27cbafd86d11ac9e37a6c4cea8034385bcafeef181204ddb88b6be8be9cf5b56`
+  - `tools/solute_analytical_reference.py` `873d0df6ae69d40c432dd0b39c7cf401f9ff04f3069fb9187e321bc36e219b06`
+  - `tools/solute_benchmark_bridge.py` `caa9cad3661286047a3d2a5f6bbd5f3c1b11044489273e1c38d1007ee5f4d0fa`
+  - `tools/solute_benchmark_lifecycle.py` `325935bf31add8a5e7edf40d18f0aa25d4b7525871368d87d099bb1f80123d73`
+  - `tools/solute_convergence_analysis.py` `bd905699036d826e4b04f713a2a4a553f3562257a872888413d648abc3a348d4`
+  - `tools/solute_convergence_evidence.py` `87bc4ba4e474ea2372b89f4e77d6575cdd02250258ab4d96765a68dbac8de86e`
+  - `tools/solute_reference_cache.py` `c5acd63dd44390f76d8152c448ed2bdfc5aa8f8f739dcdde4ee77ed0627bff46`
+  - `tools/solute_verification_metrics.py` `609a18e04b07cbaeff1b4c75fabcae4710b995bf742dceca0fcfaa94c451dac0`
+- **Next:** 23R.2 regenerates the 18 study-bound producer hashes, merges the five control bounds plus the existing Example 3 space control into one source, copies the control bounds out of `/tmp`, and prepares the Gate B review. No final campaign runs before Gate B.

@@ -39,7 +39,9 @@ POLICY_HASHES = {
     # Re-pinned again under Orchestration 22 (22.3.7): output_path allows the 22-* scratch roots.
     # Re-pinned under Orchestration 23 (23.3.1, D11): the print-step rule selects bridge profile
     # steps by schedule instead of launch_id, so the rfc bridge row prints [50,100,200].
-    "crates/hydrus-core/tests/solute_verification_harness.rs": "7bc1783b495ed08b019d05616b6f387a3413353253780fbd5056ba3b024db507",
+    # Re-pinned under the 23R.1 control-row continuation: output_path allows the 23-final
+    # campaign root; bridge arithmetic and solver behavior are unchanged.
+    "crates/hydrus-core/tests/solute_verification_harness.rs": "32d1f6888b0808d71506f01ccbc3e48fcd94557fa11b7648ffde80d1ec892c26",
 }
 COMPARATORS = (
     "tools/solute_benchmark_bridge.py",
