@@ -40,6 +40,13 @@ ALLOWED_TASKS = (
     "22-holdout",
     "23-classify-3",
     "23-controls",
+    "23-controls-2",
+    "23-controls-3",
+    "23-controls-4",
+    "23-controls-5",
+    "23-controls-6",
+    "23-controls-7",
+    "23-controls-8",
 )
 require = analytical.require
 

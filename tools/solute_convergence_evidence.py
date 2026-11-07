@@ -22,7 +22,7 @@ PRODUCERS = (
     "tools/solute_convergence_evidence.py",
 )
 CLI_PRODUCER = "tools/run_solute_convergence.py"
-CONVERGENCE_TASKS = ("13.4.1", "22-convergence", "23-classify-3", "23-controls")
+CONVERGENCE_TASKS = ("13.4.1", "22-convergence", "23-classify-3", "23-controls", "23-controls-2", "23-controls-3", "23-controls-4", "23-controls-5", "23-controls-6", "23-controls-7", "23-controls-8")
 OBSERVABLES = {
     *("concentration." + name for name in ("l1", "l2", "linf", "endpoint_linf", "interior_linf")),
     *("inventory." + name for name in ("dissolved", "equilibrium_sorbed", "total")),
@@ -101,6 +101,7 @@ class ConvergenceEvidence:
         self.cases_path = _path(cases_path, ROOT)
         self.cases_sha256 = sha256(self.cases_path)
         self.book = lifecycle.contract.validate(lifecycle.contract.load_cases(self.cases_path))
+        lifecycle.apply_timeout_overrides(self.book, lifecycle.TIMEOUT_OVERRIDES)
         self.book_sha256 = digest(self.book)
         self.root = _scratch(artifact_root, CONVERGENCE_TASKS)
         require(self.root.name.startswith("batch-"), "evidence needs an original batch root")

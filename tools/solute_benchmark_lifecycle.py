@@ -83,10 +83,33 @@ def selected_rows(book, phase, launch_ids=None):
     return rows
 
 
+BASE_ACTIVATION_KEYS = frozenset({"cases_sha256", "phase", "launch_ids", "kind", "authorization"})
+TIMEOUT_OVERRIDE_RANGE = (60, 300)
+# Same object as the casebook loader's overrides; the CLI updates it in place.
+TIMEOUT_OVERRIDES = contract.TIMEOUT_OVERRIDES
+
+
+def validate_timeout_overrides(overrides, launch_ids):
+    require(isinstance(overrides, dict), "timeout overrides must be a mapping")
+    require(set(overrides) <= set(launch_ids), "timeout override outside activation rows")
+    for launch_id, seconds in overrides.items():
+        require(
+            type(seconds) is int and TIMEOUT_OVERRIDE_RANGE[0] <= seconds <= TIMEOUT_OVERRIDE_RANGE[1],
+            "invalid timeout override",
+        )
+
+
+def apply_timeout_overrides(book, overrides):
+    launches = {row["id"]: row for row in book["launches"]}
+    for launch_id, seconds in overrides.items():
+        require(launch_id in launches, "timeout override for unknown launch")
+        launches[launch_id]["timeout_seconds"] = seconds
+
+
 def validate_activation(book, cases_path, phase, rows, activation):
     require(
         isinstance(activation, dict)
-        and set(activation) == {"cases_sha256", "phase", "launch_ids", "kind", "authorization"},
+        and set(activation) in (BASE_ACTIVATION_KEYS, BASE_ACTIVATION_KEYS | {"timeout_overrides"}),
         "explicit activation required",
     )
     require(
@@ -103,6 +126,7 @@ def validate_activation(book, cases_path, phase, rows, activation):
     require(len(roles) == 1, "bridge and dependent rows need separate activation")
     kind = "bridge" if True in roles else phase
     require(activation["kind"] == kind, "activation kind mismatch")
+    validate_timeout_overrides(activation.get("timeout_overrides", {}), activation["launch_ids"])
 
 
 def ledger_records(path, book, phase):
@@ -140,9 +164,14 @@ def ledger_records(path, book, phase):
             require(
                 detail
                 == {
-                    "timeout_seconds": by_id[launch]["timeout_seconds"],
+                    "timeout_seconds": detail.get("timeout_seconds"),
                     "precision": by_id[launch]["precision"],
                     "estimated_output_bytes": by_id[launch]["estimated_output_bytes"],
+                }
+                and detail.get("timeout_seconds") in {
+                    by_id[launch]["timeout_seconds"],
+                    contract.BASE_TIMEOUTS.get(launch, by_id[launch]["timeout_seconds"]),
+                    contract.APPROVED_TIMEOUT_OVERRIDES.get(launch),
                 },
                 "ledger start controls mismatch",
             )
@@ -492,6 +521,7 @@ class Lifecycle:
     def __init__(self, cases_path, root):
         self.cases_path = Path(cases_path).absolute()
         self.book = contract.validate(contract.load_cases(self.cases_path))
+        apply_timeout_overrides(self.book, TIMEOUT_OVERRIDES)
         self.root, self.task_root = output_root(root)
         self.phase = PHASE_TASKS[self.task_root.name]
 

@@ -46,6 +46,13 @@ PHASE_TASKS = {
     "22-holdout": "holdout",
     "23-classify-3": "convergence",
     "23-controls": "convergence",
+    "23-controls-2": "convergence",
+    "23-controls-3": "convergence",
+    "23-controls-4": "convergence",
+    "23-controls-5": "convergence",
+    "23-controls-6": "convergence",
+    "23-controls-7": "convergence",
+    "23-controls-8": "convergence",
 }
 OUTPUTS = (
     "I_CHECK.OUT",

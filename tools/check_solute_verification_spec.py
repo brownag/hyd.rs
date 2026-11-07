@@ -90,11 +90,39 @@ def aligned(time, dt):
     return abs(ratio - round(ratio)) <= 1e-9
 
 
+# Recorded per-row timeout overrides. Set in place by the CLI from an activation (execute)
+# or a frozen recipe (verify/resume). Applied in validate(), the one loader every path uses,
+# so no path can see the casebook timeout while another sees the override.
+TIMEOUT_OVERRIDES = {}
+TIMEOUT_OVERRIDE_RANGE = (60, 300)
+# Approved, recorded overrides. An activation may only request these values, and the
+# ledger accepts a start timeout equal to the casebook default or to the approved value.
+# Casebook timeouts before any override, kept outside the book so validate_v2's exact key sets still hold.
+BASE_TIMEOUTS = {}
+APPROVED_TIMEOUT_OVERRIDES = {"convergence-example3-space_1001-rfc-baseline": 180}
+
+
+def apply_timeout_overrides(book: dict, overrides: dict) -> dict:
+    launches = {row['id']: row for row in book.get('launches', [])}
+    for launch_id, seconds in overrides.items():
+        if launch_id not in launches:
+            raise ValueError('timeout override for unknown launch')
+        if type(seconds) is not int or not TIMEOUT_OVERRIDE_RANGE[0] <= seconds <= TIMEOUT_OVERRIDE_RANGE[1]:
+            raise ValueError('invalid timeout override')
+        if APPROVED_TIMEOUT_OVERRIDES.get(launch_id) != seconds:
+            raise ValueError('timeout override not approved')
+        BASE_TIMEOUTS.setdefault(launch_id, launches[launch_id]['timeout_seconds'])
+        launches[launch_id]['timeout_seconds'] = seconds
+    return book
+
+
 def validate(data: dict, verify_hashes: bool = True) -> dict:
     """Validate a casebook, dispatching on its schema version."""
     if isinstance(data, dict) and data.get('schema_version') == V2:
-        return validate_v2(data, verify_hashes)
-    return validate_v1(data, verify_hashes)
+        book = validate_v2(data, verify_hashes)
+    else:
+        book = validate_v1(data, verify_hashes)
+    return apply_timeout_overrides(book, TIMEOUT_OVERRIDES)
 
 
 def validate_v1(data: dict, verify_hashes: bool = True) -> dict:
@@ -381,7 +409,9 @@ def validate_v2(data: dict, verify_hashes: bool = True) -> dict:
         require(new is not None, 'v1 rust row has no rfc counterpart')
         # Recorded per-row timeout deviations; every other row keeps the v1 60 s.
         old = {**old, 'timeout_seconds': V2_TIMEOUT_EXCEPTIONS.get(new['id'], old['timeout_seconds'])}
-        require(row_signature(new) == row_signature(old), 'rfc row differs from v1 rust row')
+        # Compare the casebook value, not an in-memory approved override applied to this row.
+        casebook_new = {**new, 'timeout_seconds': BASE_TIMEOUTS.get(new['id'], new['timeout_seconds'])}
+        require(row_signature(casebook_new) == row_signature(old), 'rfc row differs from v1 rust row')
     # Reuse every v1 row, matrix and case check on a v1-shaped view of the casebook.
     # The isolating rows are validated above, not by the v1 group rules; the v1 view
     # labels every rfc row f64 because the v1 validator accepts only f64 for rust rows.
@@ -394,6 +424,7 @@ def validate_v2(data: dict, verify_hashes: bool = True) -> dict:
     for row in view['launches']:
         del row['backend']
         row['precision'] = 'f64'
+        row['timeout_seconds'] = BASE_TIMEOUTS.get(row['id'], row['timeout_seconds'])
         if row['id'] in V2_TIMEOUT_EXCEPTIONS:
             row['timeout_seconds'] = 60  # v1 view: the deviation is validated above
         if row['status'] == 'reserved_until_threshold_gate':

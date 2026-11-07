@@ -211,6 +211,7 @@ class ConvergenceBatch:
             "activation_sha256": cache.hashlib.sha256(activation_bytes).hexdigest() if activation_bytes else None,
             "activation": activation, "bridge_reports": bridge_paths,
             "prior_cache_roots": [str(p) for p in prior_caches],
+            "timeout_overrides": dict(lifecycle.TIMEOUT_OVERRIDES),
             "bounds_source": bounds_source,
             "current_cache_root": str(self.root / "reference-cache"),
             "allow_reference_work": allow_work, "allow_reference_escalation": allow_escalation,
@@ -233,6 +234,8 @@ class ConvergenceBatch:
                 "batch recipe identity changed")
         require(recipe["producer_sha256"] == _producer_hashes(), "producer provenance changed")
         require(recipe["budgets"] == self.book["budgets"], "batch budgets changed")
+        require(recipe.get("timeout_overrides", {}) == lifecycle.TIMEOUT_OVERRIDES,
+                "timeout overrides changed")
         ids = [row["id"] for row in recipe["rows"]]
         require(recipe["rows"] == _rows(self.book, ids, self.phase), "frozen rows changed")
         require(recipe["mode"] in ("dry-run", "execute")
@@ -432,11 +435,23 @@ def parser():
     return result
 
 
+def requested_timeout_overrides(args):
+    """Overrides come only from the activation (execute) or the frozen recipe (verify/resume)."""
+    if args.activation_file:
+        return dict(metrics.json_load(_path(args.activation_file)).get("timeout_overrides", {}))
+    if args.batch or args.resume_batch:
+        recipe = batch_artifacts.read_artifact(_path(args.batch or args.resume_batch) / "recipe.json")
+        return dict(recipe.get("timeout_overrides", {}))
+    return {}
+
+
 def main(argv=None):
     args = parser().parse_args(argv)
     batch = None
     try:
         phase = HOLDOUT_PHASE if args.holdout else PHASE
+        lifecycle.TIMEOUT_OVERRIDES.clear()
+        lifecycle.TIMEOUT_OVERRIDES.update(requested_timeout_overrides(args))
         manager = lifecycle.Lifecycle(args.cases, args.output_root)
         require(manager.phase == phase,
                 "wrong execution phase")
