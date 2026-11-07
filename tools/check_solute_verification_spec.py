@@ -14,7 +14,10 @@ DEFAULT_CASES = ROOT / 'reference/solute_verification/CASES.json'
 V1 = 'solute-verification-v1'
 V2 = 'solute-verification-v2'
 V2_BACKEND = 'fortran-compatible'
-V2_TIMEOUT_EXCEPTIONS = {'convergence-example3-space_control-rfc-baseline': 180}
+V2_TIMEOUT_EXCEPTIONS = {
+    'convergence-example3-space_control-rfc-baseline': 180,
+    'convergence-example3-time_control-1001-dt0.025-rfc-baseline': 180,
+}
 # v2 relabel (D4, 23.3.1): every rfc row is f32 except these four, which stay f64 by decision.
 # The bridge row is not edited (D11). The three holdouts are not touched.
 V2_PRECISION_F64_EXCEPTIONS = {
@@ -44,6 +47,20 @@ V2_ISOLATION = {
     'convergence-example3-time_751-dt0.05-rfc-baseline': ('example3', 'time', 751, 0.05),
     'convergence-example3-time_751-dt0.025-rfc-baseline': ('example3', 'time', 751, 0.025),
 }
+# Five other-axis control rows (23R.1): id -> (case_id, axis, nodes, dt).
+V2_CONTROLS = {
+    'convergence-diffusion_cosine-space_control-129-dt2e-8-rfc-baseline':
+        ('diffusion_cosine', 'space', 129, 2**-8),
+    'convergence-diffusion_cosine-time_control-193-dt2e-8-rfc-baseline':
+        ('diffusion_cosine', 'time', 193, 2**-8),
+    'convergence-scalar_robin-space_control-257-dt2e-8-rfc-baseline':
+        ('scalar_robin', 'space', 257, 2**-8),
+    'convergence-scalar_robin-time_control-257-dt2e-8-rfc-baseline':
+        ('scalar_robin', 'time', 257, 2**-8),
+    'convergence-example3-time_control-1001-dt0.025-rfc-baseline':
+        ('example3', 'time', 1001, 0.025),
+}
+V2_ADDED_ROWS = set(V2_ISOLATION) | set(V2_CONTROLS)
 CEILING_KEYS = {'launch_cap', 'failed_attempts_consume_cap', 'storage_bytes_cap', 'phase_caps',
                 'automatic_retries'}
 METRICS = {
@@ -99,7 +116,12 @@ TIMEOUT_OVERRIDE_RANGE = (60, 300)
 # ledger accepts a start timeout equal to the casebook default or to the approved value.
 # Casebook timeouts before any override, kept outside the book so validate_v2's exact key sets still hold.
 BASE_TIMEOUTS = {}
-APPROVED_TIMEOUT_OVERRIDES = {"convergence-example3-space_1001-rfc-baseline": 180}
+APPROVED_TIMEOUT_OVERRIDES = {
+    "convergence-example3-space_1001-rfc-baseline": 180,
+    # Same 1001-node / 0.025 dt configuration as the space study row; the time control
+    # needs the same approved deviation (23R.1).
+    "convergence-example3-time_control-1001-dt0.025-rfc-baseline": 180,
+}
 
 
 def apply_timeout_overrides(book: dict, overrides: dict) -> dict:
@@ -399,7 +421,8 @@ def validate_v2(data: dict, verify_hashes: bool = True) -> dict:
                                       else 'approved_pending_adapter_and_evaluator_gates'),
                 'holdout rows must be reserved; others approved')
     validate_isolation(rows)
-    base = [r for r in rows if r['id'] not in V2_ISOLATION]
+    validate_controls(rows)
+    base = [r for r in rows if r['id'] not in V2_ADDED_ROWS]
     v1_rust = [r for r in v1['launches'] if r['solver'] == 'rust']
     require(len(base) == len(v1_rust), 'v2 rows do not cover v1 rust rows')
     by_id = {r['id']: r for r in rows}
@@ -420,7 +443,7 @@ def validate_v2(data: dict, verify_hashes: bool = True) -> dict:
     view['limits']['automatic_retries'] = 0
     del view['limits']['max_row_timeout_seconds']
     del view['provenance']['derived_from']
-    view['launches'] = [r for r in view['launches'] if r['id'] not in V2_ISOLATION]
+    view['launches'] = [r for r in view['launches'] if r['id'] not in V2_ADDED_ROWS]
     for row in view['launches']:
         del row['backend']
         row['precision'] = 'f64'
@@ -467,6 +490,42 @@ def validate_isolation(rows):
                 f'{case}: time rows do not bracket holdout dt')
         require(any(r['nodes'] == hold['nodes'] and r['dt'] == hold['dt'] for r in space),
                 f'{case}: centre row missing')
+
+
+def validate_controls(rows):
+    """The five 23R.1 other-axis controls: table values and fixed schedule."""
+    by_id = {r['id']: r for r in rows}
+    expected_keys = ('id phase case_id solver precision role axis nodes dt sampling_interval '
+                     'analysis_times timeout_seconds max_steps estimated_output_bytes '
+                     'estimated_work_units status time_controls backend')
+    schedule = {
+        'diffusion_cosine': ([0.25, 0.5, 1], 0.0625),
+        'scalar_robin': ([0.25, 0.5, 1], 0.0625),
+        'example3': ([50, 100, 200], 1),
+    }
+    time_end = {'diffusion_cosine': 1, 'scalar_robin': 1, 'example3': 200}
+    for rid, (case, axis, nodes, dt) in V2_CONTROLS.items():
+        require(rid in by_id, f'missing control row {rid}')
+        row = by_id[rid]
+        keys(row, expected_keys, f'control row {rid}')
+        require((row['case_id'], row['axis'], row['nodes'], row['dt']) == (case, axis, nodes, dt),
+                f'{rid}: values differ from the control table')
+        require(row['role'] == 'control' and row['phase'] == 'convergence'
+                and row['solver'] == 'rust' and row['precision'] == 'f32'
+                and row['backend'] == V2_BACKEND, f'{rid}: role, phase, precision or backend')
+        require(row['status'] == 'approved_pending_adapter_and_evaluator_gates',
+                f'{rid}: invalid launch gate')
+        require(row['timeout_seconds'] == V2_TIMEOUT_EXCEPTIONS.get(rid, 60),
+                f'{rid}: unapproved timeout')
+        analysis, sampling = schedule[case]
+        require(row['analysis_times'] == analysis and row['sampling_interval'] == sampling,
+                f'{rid}: schedule differs from the study siblings')
+        require(row['time_controls'] == {'policy': 'fixed', 'dt_min': dt, 'dt_max': dt,
+                                         'increase': 1, 'decrease': 1},
+                f'{rid}: time controls differ from approved policy')
+        require(row['max_steps'] == round(time_end[case] / dt), f'{rid}: step count mismatch')
+        for field in ('estimated_output_bytes', 'estimated_work_units'):
+            integer(row[field], field, 1, 10**12)
 
 
 def validate_times(times, end):

@@ -53,6 +53,7 @@ PHASE_TASKS = {
     "23-controls-6": "convergence",
     "23-controls-7": "convergence",
     "23-controls-8": "convergence",
+    "23-final": "convergence",
 }
 OUTPUTS = (
     "I_CHECK.OUT",

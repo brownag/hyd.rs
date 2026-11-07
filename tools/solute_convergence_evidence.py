@@ -22,7 +22,7 @@ PRODUCERS = (
     "tools/solute_convergence_evidence.py",
 )
 CLI_PRODUCER = "tools/run_solute_convergence.py"
-CONVERGENCE_TASKS = ("13.4.1", "22-convergence", "23-classify-3", "23-controls", "23-controls-2", "23-controls-3", "23-controls-4", "23-controls-5", "23-controls-6", "23-controls-7", "23-controls-8")
+CONVERGENCE_TASKS = ("13.4.1", "22-convergence", "23-classify-3", "23-controls", "23-controls-2", "23-controls-3", "23-controls-4", "23-controls-5", "23-controls-6", "23-controls-7", "23-controls-8", "23-final")
 OBSERVABLES = {
     *("concentration." + name for name in ("l1", "l2", "linf", "endpoint_linf", "interior_linf")),
     *("inventory." + name for name in ("dissolved", "equilibrium_sorbed", "total")),

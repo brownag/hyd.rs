@@ -28,7 +28,7 @@ class SpecCheckerTests(unittest.TestCase):
 
     def test_v2_launch_rows_cover_v1_rust_rows(self):
         rust = [r for r in self.v1['launches'] if r['solver'] == 'rust']
-        base = [r for r in self.v2['launches'] if r['id'] not in spec.V2_ISOLATION]
+        base = [r for r in self.v2['launches'] if r['id'] not in spec.V2_ADDED_ROWS]
         self.assertEqual(len(rust), len(base))
         ids = {r['id'] for r in self.v2['launches']}
         self.assertTrue(all(r['id'].replace('-rust-', '-rfc-') in ids for r in rust))
@@ -52,11 +52,16 @@ class SpecCheckerTests(unittest.TestCase):
 
     def test_v2_row_timeout_exception(self):
         sc = 'convergence-example3-space_control-rfc-baseline'
+        tc = 'convergence-example3-time_control-1001-dt0.025-rfc-baseline'
         row = lambda d, i: next(r for r in d['launches'] if r['id'] == i)
         self.assertEqual(180, row(self.v2, sc)['timeout_seconds'])
+        self.assertEqual(180, row(self.v2, tc)['timeout_seconds'])
+        self.assertEqual(180, spec.APPROVED_TIMEOUT_OVERRIDES.get(tc))
         self.assertEqual(300, self.v2['limits']['max_row_timeout_seconds'])
         self.rejects(lambda d: row(d, sc).update(timeout_seconds=60))
+        self.rejects(lambda d: row(d, tc).update(timeout_seconds=60))
         self.rejects(lambda d: row(d, sc).update(timeout_seconds=301))
+        self.rejects(lambda d: row(d, tc).update(timeout_seconds=301))
         self.rejects(lambda d: d['launches'][0].update(timeout_seconds=180))
         self.rejects(lambda d: d['limits'].update(max_row_timeout_seconds=301))
         self.rejects(lambda d: d['limits'].pop('max_row_timeout_seconds'))
@@ -64,7 +69,7 @@ class SpecCheckerTests(unittest.TestCase):
     def test_v2_relabel_f32_is_only_precision_change(self):
         v1_rust = {r['id']: r for r in self.v1['launches'] if r['solver'] == 'rust'}
         for row in self.v2['launches']:
-            if row['id'] in spec.V2_ISOLATION:
+            if row['id'] in spec.V2_ADDED_ROWS:
                 continue
             old = v1_rust[row['id'].replace('-rfc-', '-rust-')]
             fields = {k for k in set(row) | set(old) if row.get(k) != old.get(k)}
@@ -75,7 +80,7 @@ class SpecCheckerTests(unittest.TestCase):
             expected = 'f64' if row['id'] in spec.V2_PRECISION_F64_EXCEPTIONS else 'f32'
             self.assertEqual(expected, row['precision'], row['id'])
             self.assertEqual(old['precision'], 'f64', row['id'])
-        self.assertEqual(34, sum(r['precision'] == 'f32' and r['id'] not in spec.V2_ISOLATION
+        self.assertEqual(34, sum(r['precision'] == 'f32' and r['id'] not in spec.V2_ADDED_ROWS
                                  for r in self.v2['launches']))
         self.assertEqual(spec.V2_PRECISION_F64_EXCEPTIONS,
                          {r['id'] for r in self.v2['launches'] if r['precision'] == 'f64'})
@@ -108,6 +113,41 @@ class SpecCheckerTests(unittest.TestCase):
                 self.assertNotEqual('holdout', row['role'])
         self.rejects(lambda d: next(r for r in d['launches']
                                     if r['id'] in spec.V2_ISOLATION).update(role='holdout'))
+
+    def test_v2_control_rows_present(self):
+        expected = {
+            'convergence-diffusion_cosine-space_control-129-dt2e-8-rfc-baseline':
+                ('diffusion_cosine', 'space', 129, 2**-8),
+            'convergence-diffusion_cosine-time_control-193-dt2e-8-rfc-baseline':
+                ('diffusion_cosine', 'time', 193, 2**-8),
+            'convergence-scalar_robin-space_control-257-dt2e-8-rfc-baseline':
+                ('scalar_robin', 'space', 257, 2**-8),
+            'convergence-scalar_robin-time_control-257-dt2e-8-rfc-baseline':
+                ('scalar_robin', 'time', 257, 2**-8),
+            'convergence-example3-time_control-1001-dt0.025-rfc-baseline':
+                ('example3', 'time', 1001, 0.025),
+        }
+        self.assertEqual(expected, spec.V2_CONTROLS)
+        by_id = {r['id']: r for r in self.v2['launches']}
+        for rid, (case, axis, nodes, dt) in expected.items():
+            row = by_id[rid]
+            self.assertEqual((case, axis, nodes, dt), (row['case_id'], row['axis'],
+                                                       row['nodes'], row['dt']), rid)
+            self.assertEqual(('fortran-compatible', 'rust', 'f32', 'control', 'convergence'),
+                             (row['backend'], row['solver'], row['precision'], row['role'],
+                              row['phase']), rid)
+            self.assertEqual({'policy': 'fixed', 'dt_min': dt, 'dt_max': dt,
+                              'increase': 1, 'decrease': 1}, row['time_controls'], rid)
+
+    def test_v2_control_rows_not_holdout_or_ceiling(self):
+        for row in self.v2['launches']:
+            if row['id'] in spec.V2_CONTROLS:
+                self.assertNotEqual('holdout', row['role'])
+                self.assertNotEqual('holdout', row['phase'])
+        for key in spec.CEILING_KEYS:
+            self.rejects(lambda d, key=key: d['limits'].update({key: 0}))
+        self.rejects(lambda d: next(r for r in d['launches']
+                                    if r['id'] in spec.V2_CONTROLS).update(role='holdout'))
 
     def test_bridge_print_rule_selects_only_bridge_rows(self):
         # Harness rule (23.3.1): case example3, time_end 200, sampling 50, analysis [50,100,200].

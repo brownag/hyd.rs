@@ -453,6 +453,7 @@ fn output_path(root: &Path, destination: &Path) -> Result<PathBuf> {
         "23-controls-6",
         "23-controls-7",
         "23-controls-8",
+        "23-final",
     ];
     require(
         allowed
@@ -1276,7 +1277,21 @@ fn output_confinement_and_exclusive_creation() {
 #[test]
 fn output_path_accepts_v2_scratch_roots_and_rejects_others() {
     let output = |root: &Path| root.join("batch/observations.json");
-    for task in ["22-benchmark", "22-convergence", "22-holdout", "23-classify-3", "23-controls", "23-controls-2", "23-controls-3", "23-controls-4", "23-controls-5", "23-controls-6", "23-controls-7", "23-controls-8"] {
+    for task in [
+        "22-benchmark",
+        "22-convergence",
+        "22-holdout",
+        "23-classify-3",
+        "23-controls",
+        "23-controls-2",
+        "23-controls-3",
+        "23-controls-4",
+        "23-controls-5",
+        "23-controls-6",
+        "23-controls-7",
+        "23-controls-8",
+        "23-final",
+    ] {
         let root = repo_root()
             .join(".development")
             .join(task)

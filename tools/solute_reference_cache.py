@@ -47,6 +47,7 @@ ALLOWED_TASKS = (
     "23-controls-6",
     "23-controls-7",
     "23-controls-8",
+    "23-final",
 )
 require = analytical.require
 

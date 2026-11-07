@@ -318,7 +318,7 @@ class V2AndStateTests(unittest.TestCase):
     def test_v2_roots_per_phase(self):
         book = contract.validate(contract.load_cases(V2_CASES))
         self.assertEqual(set(lifecycle.book_tasks(book)),
-                         {"22-benchmark", "22-convergence", "22-holdout", "23-classify-3", "23-controls", "23-controls-2", "23-controls-3", "23-controls-4", "23-controls-5", "23-controls-6", "23-controls-7", "23-controls-8"})
+                         {"22-benchmark", "22-convergence", "22-holdout", "23-classify-3", "23-controls", "23-controls-2", "23-controls-3", "23-controls-4", "23-controls-5", "23-controls-6", "23-controls-7", "23-controls-8", "23-final"})
         self.assertEqual(cli._launch_counts(book, [{"event": "start"}] * 5),
                          {"consumed": 5, "remaining": None, "cap": None})
         for task, phase in (("22-benchmark", "benchmark"), ("22-convergence", "convergence"),

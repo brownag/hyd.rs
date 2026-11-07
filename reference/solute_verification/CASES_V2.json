@@ -2106,6 +2106,156 @@
       "backend": "fortran-compatible"
     },
     {
+      "id": "convergence-diffusion_cosine-space_control-129-dt2e-8-rfc-baseline",
+      "phase": "convergence",
+      "case_id": "diffusion_cosine",
+      "solver": "rust",
+      "precision": "f32",
+      "role": "control",
+      "axis": "space",
+      "nodes": 129,
+      "dt": 0.00390625,
+      "sampling_interval": 0.0625,
+      "analysis_times": [
+        0.25,
+        0.5,
+        1
+      ],
+      "timeout_seconds": 60,
+      "max_steps": 256,
+      "estimated_output_bytes": 2685828,
+      "estimated_work_units": 33024,
+      "status": "approved_pending_adapter_and_evaluator_gates",
+      "time_controls": {
+        "policy": "fixed",
+        "dt_min": 0.00390625,
+        "dt_max": 0.00390625,
+        "increase": 1,
+        "decrease": 1
+      },
+      "backend": "fortran-compatible"
+    },
+    {
+      "id": "convergence-diffusion_cosine-time_control-193-dt2e-8-rfc-baseline",
+      "phase": "convergence",
+      "case_id": "diffusion_cosine",
+      "solver": "rust",
+      "precision": "f32",
+      "role": "control",
+      "axis": "time",
+      "nodes": 193,
+      "dt": 0.00390625,
+      "sampling_interval": 0.0625,
+      "analysis_times": [
+        0.25,
+        0.5,
+        1
+      ],
+      "timeout_seconds": 60,
+      "max_steps": 256,
+      "estimated_output_bytes": 2899076,
+      "estimated_work_units": 49408,
+      "status": "approved_pending_adapter_and_evaluator_gates",
+      "time_controls": {
+        "policy": "fixed",
+        "dt_min": 0.00390625,
+        "dt_max": 0.00390625,
+        "increase": 1,
+        "decrease": 1
+      },
+      "backend": "fortran-compatible"
+    },
+    {
+      "id": "convergence-scalar_robin-space_control-257-dt2e-8-rfc-baseline",
+      "phase": "convergence",
+      "case_id": "scalar_robin",
+      "solver": "rust",
+      "precision": "f32",
+      "role": "control",
+      "axis": "space",
+      "nodes": 257,
+      "dt": 0.00390625,
+      "sampling_interval": 0.0625,
+      "analysis_times": [
+        0.25,
+        0.5,
+        1
+      ],
+      "timeout_seconds": 60,
+      "max_steps": 256,
+      "estimated_output_bytes": 3112324,
+      "estimated_work_units": 65792,
+      "status": "approved_pending_adapter_and_evaluator_gates",
+      "time_controls": {
+        "policy": "fixed",
+        "dt_min": 0.00390625,
+        "dt_max": 0.00390625,
+        "increase": 1,
+        "decrease": 1
+      },
+      "backend": "fortran-compatible"
+    },
+    {
+      "id": "convergence-scalar_robin-time_control-257-dt2e-8-rfc-baseline",
+      "phase": "convergence",
+      "case_id": "scalar_robin",
+      "solver": "rust",
+      "precision": "f32",
+      "role": "control",
+      "axis": "time",
+      "nodes": 257,
+      "dt": 0.00390625,
+      "sampling_interval": 0.0625,
+      "analysis_times": [
+        0.25,
+        0.5,
+        1
+      ],
+      "timeout_seconds": 60,
+      "max_steps": 256,
+      "estimated_output_bytes": 3112324,
+      "estimated_work_units": 65792,
+      "status": "approved_pending_adapter_and_evaluator_gates",
+      "time_controls": {
+        "policy": "fixed",
+        "dt_min": 0.00390625,
+        "dt_max": 0.00390625,
+        "increase": 1,
+        "decrease": 1
+      },
+      "backend": "fortran-compatible"
+    },
+    {
+      "id": "convergence-example3-time_control-1001-dt0.025-rfc-baseline",
+      "phase": "convergence",
+      "case_id": "example3",
+      "solver": "rust",
+      "precision": "f32",
+      "role": "control",
+      "axis": "time",
+      "nodes": 1001,
+      "dt": 0.025,
+      "sampling_interval": 1,
+      "analysis_times": [
+        50,
+        100,
+        200
+      ],
+      "timeout_seconds": 180,
+      "max_steps": 8000,
+      "estimated_output_bytes": 68721868,
+      "estimated_work_units": 24024000,
+      "status": "approved_pending_adapter_and_evaluator_gates",
+      "time_controls": {
+        "policy": "fixed",
+        "dt_min": 0.025,
+        "dt_max": 0.025,
+        "increase": 1,
+        "decrease": 1
+      },
+      "backend": "fortran-compatible"
+    },
+    {
       "id": "holdout-diffusion_cosine-holdout-rfc-baseline",
       "phase": "holdout",
       "case_id": "diffusion_cosine",
@@ -2197,7 +2347,7 @@
     }
   ],
   "budgets": {
-    "cost_estimate": "O(species*nodes*steps); output formula in spec; no measured runtime assumed. 60 second timeout remains binding except one recorded per-row deviation (convergence-example3-space_control-rfc-baseline, 180 seconds, measured about 84 seconds). Estimates include 2x aggregate storage headroom, not additional launch slots.",
+    "cost_estimate": "O(species*nodes*steps); output formula in spec; no measured runtime assumed. 60 second timeout remains binding except two recorded per-row deviations (convergence-example3-space_control-rfc-baseline, 180 seconds, measured about 84 seconds; convergence-example3-time_control-1001-dt0.025-rfc-baseline, 180 seconds, approved for the shared 1001-node/0.025 dt configuration). Estimates include 2x aggregate storage headroom, not additional launch slots.",
     "policy": "no launch or storage ceilings (ADR 0003)"
   }
 }
