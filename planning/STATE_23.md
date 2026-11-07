@@ -116,3 +116,28 @@ Follows: Orchestration 22 (complete; M5-V partial/open; [STATE_22.md](STATE_22.m
 - **Scratch evidence caution:** `.development/23-bounds/classify-run.log` records eight original execute attempts exiting 2; `.development/23-bounds/fresh-run.log` records four fresh attempts exiting 2. The separate `.development/23-worktrees/23.4.4/.development/23-controls-5/` tree contains multiple planned, incomplete, and classified batch directories; this scratch inventory alone does not establish a verified, complete control campaign. Preserve it and reconcile batch lifecycle/verify receipts in a new tracked report before marking classification complete.
 - **Gate C / holdouts:** not approved. `reference/solute_verification/THRESHOLDS_V2.json` still has `holdout_run_permitted: false`; no holdout row is authorized or recorded as run. M5-V remains open and M6 is not unblocked.
 - **Next action:** reconcile the latest controls campaign's approval, batch receipts, verification results, bounds coverage, and classification output; then update this state report and `planning/master/SOLUTE_CONVERGENCE_EVIDENCE_23.md` before proposing Gate C thresholds.
+
+## Blocker reconciliation (2026-11-07, HEAD 2165eb9)
+
+Full report: [M5V_BLOCKERS_23.md](master/M5V_BLOCKERS_23.md).
+
+- **Controls reconciled.** The six executable `23-controls-8` batches re-verified at HEAD with exit 0 (`evidence_verified`). They cover the original 22 study levels, not the 23 holdout-bracket levels, and were run without bounds.
+- **B1 — stale study batches.** The `23-classify-3` recipes differ from current producer hashes in six tool files, so those batches cannot verify or replay at HEAD. The study rows must run again after the final freeze.
+- **B2 — stale bounds review.** The signed study-bounds review binds to the old producer hashes. The values are unchanged, but the review must be regenerated and re-signed. The signed control-bounds review matches current hashes; its bounds file currently lives only under `/tmp` and must be copied to a durable path.
+- **B3 — control gap.** Matching controls exist only for the Example 3 space groups (1001 nodes at `.0125`). Diffusion space/time, scalar_robin space/time, and Example 3 time have no valid other-axis control. Without new rows, every new-level finding stays `control_missing` and `inconclusive`.
+- **B4 — one more CASES change.** Adding controls changes the CASES_V2 SHA; thresholds and reference caches must be regenerated. The study re-run is already forced by B1, so the incremental cost is small.
+- **B5 — grouping.** The analyzer still groups by `(case, solver, axis, precision)`. The proposed fixed-axis grouping change does not by itself pair a control row with the study group. Run one batch per fixed-axis value instead.
+- **B6 — freeze.** The tool freeze is not in force. Any edit after the final freeze restarts B1/B2.
+- **Gates.** Gate C is still not approved. `THRESHOLDS_V2.json` still pins the old CASES SHA and `holdout_run_permitted: false`; no holdout row has run.
+
+### Continuation board
+
+| Phase | Task | Status |
+|---|---|---|
+| R1 | Blocker report and reconciliation | done (this report) |
+| R2 | User decisions D12 (add controls or accept partial) and D13 (drop or retain Example 3 `dt .025` re-run) | pending |
+| R3 | Add control rows, update v2 checker/tests, freeze tools | pending |
+| R4 | Regenerate combined study+control bounds; Gate B re-sign | pending |
+| R5 | Execute and verify six final batches (one per fixed-axis group) | pending |
+| R6 | Classify, error budgets, threshold proposals; Gate C | pending |
+| R7 | Holdout runs and M5-V closure record | pending |
