@@ -137,7 +137,7 @@ Full report: [M5V_BLOCKERS_23.md](master/M5V_BLOCKERS_23.md).
 | R1 | Blocker report and reconciliation | done (this report) |
 | R2 | User decisions D12 (add controls or accept partial) and D13 (drop or retain Example 3 `dt .025` re-run) | done 2026-11-07: add controls; drop the `dt .025` re-run |
 | R3 | Add control rows, update v2 checker/tests, freeze tools | done (`0c3f486`; gate below) |
-| R4 | Regenerate combined study+control bounds; Gate B re-sign | draft ready; awaiting Gate B |
+| R4 | Regenerate combined study+control bounds; Gate B re-sign | done; Gate B signed 2026-11-09 |
 | R5 | Execute and verify six final batches (one per fixed-axis group) | pending |
 | R6 | Classify, error budgets, threshold proposals; Gate C | pending |
 | R7 | Holdout runs and M5-V closure record | pending |
@@ -171,3 +171,5 @@ Full report: [M5V_BLOCKERS_23.md](master/M5V_BLOCKERS_23.md).
 - **Durable control copy:** `.development/23-bounds/control_bounds_controls8.json`, SHA-256 `4289b507bc2be32544be03043a92d5885147c876a464244a6d48dd14c346d2cf` (copied from `/tmp`, byte-identical).
 - **Review draft:** `.development/23-bounds/review-combined-draft.json`, SHA-256 `1948c0d1196525991dc43f697854a6e1a23d15748fbb4fc1bd89c121f25af761`, authorization `DRAFT — NOT SIGNED; awaiting Gate B user sign-off`. Not usable for classification until signed.
 - **Gate B:** user reviews the derivations and signs. No final campaign runs before the signature.
+- **Gate B signed 2026-11-09:** `.development/23-bounds/review-combined.json`, SHA-256 `93db9cfceadb55eedd33b54771bc78d60d79bed553763d09e72fab8c3f2e15b1`, bound to the combined bounds SHA `3ac9fd8a...a6ee4`, the new CASES SHA `420af7c0...15df7`, and the current producer hashes. Authorization: user accepted the combined study and control bounds; control quadrature remains null; the 50 null study quadrature keys remain unclassifiable.
+- **Next:** 23R.3 runs the six final batches in `.development/23-final/`, one per fixed-axis group, with `--bounds-source .development/23-bounds/combined_bounds_23.json --bounds-review .development/23-bounds/review-combined.json`, then verifies each. No holdout row.
