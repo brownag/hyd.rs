@@ -173,3 +173,23 @@ proposed, but M5-V can only be recorded as partial with an explicit control gap.
 - [ ] Classifications, error budgets, and threshold proposals written.
 - [ ] Gate C approved; `THRESHOLDS_V2.json` regenerated with the new CASES SHA.
 - [ ] Holdouts run once; closure record written.
+
+## Temporal design gap discovered during the final campaign (2026-11-09)
+
+The final campaign exposed a design/classifier mismatch:
+
+- The 23.2.1 design has two time-axis study rows per case, bracketing the holdout `dt`
+  (`2^-6` and `2^-8` for diffusion/Robin; `.05` and `.025` for Example 3).
+- It intended the space-centre row to serve as the middle time level. The centre rows are
+  `axis: space`, and the classifier groups levels by the row's `axis`, so the centre row
+  never enters the time group.
+- Every time group therefore has only two study levels and reports
+  `fewer_than_three_levels`; temporal claims cannot be `achieved` in this campaign.
+
+Decision **D14** (user, 2026-11-09): finish the current campaign and record the temporal
+fields as inconclusive. Do not restart with new time-centre rows or a classifier change.
+M5-V will be recorded partial if the remaining evidence cannot support those claims.
+
+A future time-axis study needs either three time-axis study rows (including a centre row)
+or a tested dual-axis centre-reuse rule. Either change alters the casebook or tools and
+requires a fresh campaign.

@@ -173,3 +173,15 @@ Full report: [M5V_BLOCKERS_23.md](master/M5V_BLOCKERS_23.md).
 - **Gate B:** user reviews the derivations and signs. No final campaign runs before the signature.
 - **Gate B signed 2026-11-09:** `.development/23-bounds/review-combined.json`, SHA-256 `93db9cfceadb55eedd33b54771bc78d60d79bed553763d09e72fab8c3f2e15b1`, bound to the combined bounds SHA `3ac9fd8a...a6ee4`, the new CASES SHA `420af7c0...15df7`, and the current producer hashes. Authorization: user accepted the combined study and control bounds; control quadrature remains null; the 50 null study quadrature keys remain unclassifiable.
 - **Next:** 23R.3 runs the six final batches in `.development/23-final/`, one per fixed-axis group, with `--bounds-source .development/23-bounds/combined_bounds_23.json --bounds-review .development/23-bounds/review-combined.json`, then verifies each. No holdout row.
+
+### 23R.3 progress and temporal-gap decision (2026-11-09)
+
+- **D14 (user):** finish the current six-batch campaign and record the time-axis fields as inconclusive (`fewer_than_three_levels`). Do not restart with new time-centre rows or a classifier change. M5-V will be recorded partial if the remaining evidence cannot support those claims.
+- **Cause:** the 23.2.1 design's three centre rows are `axis: space`; the classifier groups by the row's axis, so each time group has only two study levels (`2^-6`, `2^-8` for diffusion/Robin; `.05`, `.025` for Example 3). The centre configuration exists only as a space row and cannot serve as a time level under the current grouping.
+- **Verified batches so far** (all `--verify-only` exit 0):
+  - diffusion space `batch-0793968d793e45ddb498c7c6d884bd9c`: 12 achieved, 178 inconclusive; 174 control assessments inconclusive (mostly `control_contamination`), 111 `arithmetic_floor`.
+  - diffusion time `batch-293141b4667e42ed8c6686e79abf713c`: 190 inconclusive, all `fewer_than_three_levels`.
+  - Robin space `batch-ad3ac50b1a8243b9836b99ffcd6e2f9f`: 40 failed, 150 inconclusive; 40 control assessments bounded.
+  - Robin time `batch-0bc52085e3c84ab0a1bf416c881ca950`: 190 inconclusive, all `fewer_than_three_levels`.
+- **Example 3:** space `dt .04` and time batches are still running/waiting in `.development/23-final/`; the time batch will also report `fewer_than_three_levels`. No holdout row has run.
+- **Next:** finish and verify the Example 3 batches, then write `planning/master/M5V_FINAL_23.md`, classify all six groups, and prepare the Gate C threshold proposal with the temporal fields explicitly unassigned.
