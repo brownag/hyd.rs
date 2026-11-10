@@ -7,7 +7,7 @@ authors:
   - "Andrew G. Brown"
 supersedes: null
 superseded_by: null
-source_context: "planning/EXECUTION_PLAN_22.md D2, D3, D8, D10 and task 22.8.1; planning/master/SOLUTE_CONVERGENCE_EVIDENCE_22.md"
+source_context: "planning/EXECUTION_PLAN_22.md D2, D3, D8, D10 and task 22.8.1; planning/master/SOLUTE_CONVERGENCE_EVIDENCE_22.md; planning/EXECUTION_PLAN_23.md task 23R.3; planning/master/M5V_FINAL_23.md"
 ---
 
 # 19. Validate scientific accuracy on the default backend
@@ -38,11 +38,14 @@ Chosen option: 1. Physical and analytical validation runs on the default `Fortra
 
 Partial outcome (D10, 2026-10-24): M5-V is partial / open: study-level thresholds (`reference/solute_verification/THRESHOLDS_V2.json`, `cases_sha256` `c236eb7c…`, `holdout_run_permitted: false`) are approved under D10, holdouts were not run (no holdout-level thresholds assigned; holdout mesh/dt not isolated), and M6 planning is not unblocked by this record.
 
+Orchestration 23 outcome (2026-11-10): the final campaign ran six verified batches with a signed combined bounds source. It produced 12 `achieved` diffusion-space concentration fields and 40 `failed` Robin-space fields (non-monotone between the fine pair); every time group and every Example 3 group is inconclusive. The time groups have only two study levels because the design's centre rows are space-axis only, so they report `fewer_than_three_levels` (decision D14 accepts the partial outcome). No holdout-level threshold was defensible, Gate C was not requested, and no holdout row ran. M5-V remains open and M6 stays blocked.
+
 ### Consequences
 
 - **Positive:** The accuracy evidence now covers the default backend: closed reactions (time order about 1), diffusion and Robin space error, and Example 3 NH4/NO2 norms, with study-level ceilings approved.
 - **Negative:** M5-V is not closed. Unassigned fields remain unmet: diffusion inventory (known kernel end-row mass-loss defect candidate, no SD registered), Robin `l1`/`l2`/inventory/balance, all temporal error, and Example 3 inventory, balance, node-1 closure, NO3, outlet tail and reaction rates.
 - **Negative:** The classifier has no bounds source, so every finding is `inconclusive`. The bridge gate was waived for v2 and the v2 bridge row failed. The FV/BE study was not re-run, manufactured forcing is still blocked, and claims hold for one compiler and platform.
+- **Negative (23.x):** The final campaign found 40 failed Robin-space fields and could not classify any time or Example 3 field. A future time study needs three time-axis levels or a tested dual-axis centre-reuse rule.
 - **Follow-up:** Closing M5-V needs holdout-level mesh/dt isolation, thresholds for the unassigned fields, a bounds source, and a user decision before any holdout runs.
 
 ## Validation

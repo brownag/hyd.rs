@@ -251,3 +251,14 @@ Not run (task 22.7.1 was not executed). Every combined holdout-level candidate i
 - The v1 Fortran-only precision-sensitivity row was dropped and has no v2 counterpart.
 - The FV/BE study was not re-run; manufactured forcing is still blocked.
 - All claims hold for one compiler and platform (GNU Fortran 13.3.0, Linux x86_64).
+
+## M5-V final campaign (23.x) — partial / open
+
+M5-V remains partial / open after the Orchestration 23 final campaign. The campaign ran six verified batches with a signed combined bounds source; no holdout row was run and Gate C was not requested.
+
+- Diffusion space: 12 `achieved` concentration fields, 178 inconclusive.
+- Scalar Robin space: 40 `failed` S1 fields (`nonmonotonicity` between the fine pair), 150 inconclusive.
+- Diffusion time, Robin time, Example 3 space `dt .04`, and Example 3 time: all inconclusive (13,568 findings). Every time finding reports `fewer_than_three_levels`; the design's centre rows are space-axis only.
+- Example 3 space is dominated by control contamination and arithmetic floors; it does not establish the claimed norms.
+- No holdout-level threshold is defensible from these results. `THRESHOLDS_V2.json` remains the stale study-level file (`cases_sha256` `c236eb7c…`, `holdout_run_permitted: false`) and no holdout row ran. M6 is not unblocked.
+- Evidence: [M5V_FINAL_23.md](M5V_FINAL_23.md). ADR [0019](../../docs/decisions/0019-validate-scientific-accuracy-on-the-default-backend.md) remains "Accepted; M5-V open".

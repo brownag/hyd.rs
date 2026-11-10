@@ -140,7 +140,7 @@ Full report: [M5V_BLOCKERS_23.md](master/M5V_BLOCKERS_23.md).
 | R4 | Regenerate combined study+control bounds; Gate B re-sign | done; Gate B signed 2026-11-09 |
 | R5 | Execute and verify six final batches (one per fixed-axis group) | done 2026-11-10; all six verified |
 | R6 | Classify, error budgets, threshold proposals; Gate C | done; no threshold proposal, Gate C not requested |
-| R7 | Holdout runs and M5-V closure record | holdouts not run; partial closure pending |
+| R7 | Holdout runs and M5-V closure record | holdouts not run; partial closure recorded 2026-11-10 |
 
 ### 23R.1 gate (2026-11-07)
 
@@ -195,3 +195,9 @@ Full report: [M5V_BLOCKERS_23.md](master/M5V_BLOCKERS_23.md).
 - **Report:** `planning/master/M5V_FINAL_23.md` records the batches, counts, achieved/failed fields, floors, and the no-threshold-proposal handoff.
 - **Gate C:** not requested. No holdout-level threshold is defensible from this campaign; `THRESHOLDS_V2.json` stays the stale study-level file and no holdout row runs.
 - **Next:** 23R.5 records the partial closure with the exact unmet and failed fields, and keeps ADR 0019 open.
+
+### 23R.5 partial-closure record (2026-11-10)
+
+- Updated `planning/master/PHASE_5_SOLUTE_EVIDENCE.md` and `VALIDATION_STRATEGY.md` with the 23.x final-campaign section: 12 achieved, 40 failed, all time and Example 3 groups inconclusive, no Gate C, no holdout.
+- Updated `ROADMAP_AND_RISKS.md` M5-V and risk rows; `SOLUTE_CONVERGENCE_EVIDENCE.md` status line; ADR 0019 status remains `Accepted; M5-V open` with the 23 outcome; `docs/decisions/README.md` note.
+- No ADR 0020 is created. M6 remains blocked. `THRESHOLDS_V2.json` is unchanged and stale; `holdout_run_permitted` is still false.
