@@ -5,10 +5,8 @@ Source State: [STATE_23.md](STATE_23.md)
 
 ## Circled Goal (Active)
 
-- **[G6]** M5-V has an accurate partial-closure record listing the failed, inconclusive, and unassigned fields, with the holdout decision and the M6 gate stated correctly.
-  - Why now: The final campaign is complete; it produced 12 achieved, 40 failed, and the rest inconclusive findings, so a closure claim is not supportable.
-  - Exit criteria: `PHASE_5_SOLUTE_EVIDENCE.md`, `VALIDATION_STRATEGY.md`, `ROADMAP_AND_RISKS.md`, `SOLUTE_CONVERGENCE_EVIDENCE.md`, and ADR 0019 state M5-V partial/open; no holdout was run; the Robin-space failures and temporal design gap are named; M6 is not unblocked.
-  - First action: Write the partial-closure section and update the roadmap/ADR status lines without claiming a pass.
+- None. M5-V's partial closure is recorded; the next choice is a bounded temporal follow-up
+  or M6 planning. M6 stays blocked until the user accepts the M5-V status.
 
 ## Completed
 
@@ -18,15 +16,18 @@ Source State: [STATE_23.md](STATE_23.md)
   - Result: all six verified 2026-11-10; batch IDs and counts are in `M5V_FINAL_23.md`.
 - **[G3]** The study findings have verified classifications and documented error budgets.
   - Result: 12 achieved, 40 failed, 13,568 inconclusive across six groups; the temporal gap and floors are recorded.
+- **[G6]** M5-V has an accurate partial-closure record listing the failed, inconclusive, and unassigned fields.
+  - Result: `PHASE_5_SOLUTE_EVIDENCE.md`, `VALIDATION_STRATEGY.md`, `ROADMAP_AND_RISKS.md`, `SOLUTE_CONVERGENCE_EVIDENCE.md`, ADR 0019, and the decisions index record partial/open; no holdout ran; M6 is not unblocked.
 
 ## Deferred
 
 - **[G9]** Time-axis convergence is re-validated with three time-axis study levels or dual-axis centre reuse.
-  - Trigger: after the partial-closure record, or if the user prioritises the temporal claims.
+  - Trigger: after the M5-V partial closure, or if the user prioritises the temporal claims.
 
 ## Independent Backlog
 
 - **[G7]** The free-drainage end-row behavior is assessed against the source-defect register rules and recorded as a defect or modeling choice.
+- **[G10]** The 40 failed Robin-space fields are investigated as a solver or formulation issue.
 
 ## Blocked / Pruned
 
