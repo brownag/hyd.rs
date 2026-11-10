@@ -138,9 +138,9 @@ Full report: [M5V_BLOCKERS_23.md](master/M5V_BLOCKERS_23.md).
 | R2 | User decisions D12 (add controls or accept partial) and D13 (drop or retain Example 3 `dt .025` re-run) | done 2026-11-07: add controls; drop the `dt .025` re-run |
 | R3 | Add control rows, update v2 checker/tests, freeze tools | done (`0c3f486`; gate below) |
 | R4 | Regenerate combined study+control bounds; Gate B re-sign | done; Gate B signed 2026-11-09 |
-| R5 | Execute and verify six final batches (one per fixed-axis group) | pending |
-| R6 | Classify, error budgets, threshold proposals; Gate C | pending |
-| R7 | Holdout runs and M5-V closure record | pending |
+| R5 | Execute and verify six final batches (one per fixed-axis group) | done 2026-11-10; all six verified |
+| R6 | Classify, error budgets, threshold proposals; Gate C | done; no threshold proposal, Gate C not requested |
+| R7 | Holdout runs and M5-V closure record | holdouts not run; partial closure pending |
 
 ### 23R.1 gate (2026-11-07)
 
@@ -185,3 +185,13 @@ Full report: [M5V_BLOCKERS_23.md](master/M5V_BLOCKERS_23.md).
   - Robin time `batch-0bc52085e3c84ab0a1bf416c881ca950`: 190 inconclusive, all `fewer_than_three_levels`.
 - **Example 3:** space `dt .04` and time batches are still running/waiting in `.development/23-final/`; the time batch will also report `fewer_than_three_levels`. No holdout row has run.
 - **Next:** finish and verify the Example 3 batches, then write `planning/master/M5V_FINAL_23.md`, classify all six groups, and prepare the Gate C threshold proposal with the temporal fields explicitly unassigned.
+
+### 23R.3 gate (2026-11-10)
+
+- **All six batches verified** (`--verify-only` exit 0, `evidence_verified`): diffusion space `batch-0793968d793e45ddb498c7c6d884bd9c`; diffusion time `batch-293141b4667e42ed8c6686e79abf713c`; Robin space `batch-ad3ac50b1a8243b9836b99ffcd6e2f9f`; Robin time `batch-0bc52085e3c84ab0a1bf416c881ca950`; Example 3 space `dt .04` `batch-e22e8c92d1564f81b357396d6768a9bf`; Example 3 time `batch-652a978c087a4039bc388604df5fed59`.
+- **Findings:** diffusion space 12 achieved / 178 inconclusive; diffusion time 190 inconclusive; Robin space 40 failed / 150 inconclusive; Robin time 190 inconclusive; Example 3 space 6,090 inconclusive; Example 3 time 6,090 inconclusive.
+- **Temporal gap:** every time finding reports `fewer_than_three_levels`; accepted under D14. No time-centre restart.
+- **Failed fields:** 40 Robin-space S1 fields, all `nonmonotonicity` between the fine pair (positive then strongly negative observed rates). This is a real failed refinement, not an inconclusive result.
+- **Report:** `planning/master/M5V_FINAL_23.md` records the batches, counts, achieved/failed fields, floors, and the no-threshold-proposal handoff.
+- **Gate C:** not requested. No holdout-level threshold is defensible from this campaign; `THRESHOLDS_V2.json` stays the stale study-level file and no holdout row runs.
+- **Next:** 23R.5 records the partial closure with the exact unmet and failed fields, and keeps ADR 0019 open.
