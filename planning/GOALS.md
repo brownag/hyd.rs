@@ -15,7 +15,7 @@ Source State: [STATE_23.md](STATE_23.md)
 - **[G2]** Six final batches execute and verify with the frozen tools and combined bounds.
   - Result: all six verified 2026-11-10; batch IDs and counts are in `M5V_FINAL_23.md`.
 - **[G3]** The study findings have verified classifications and documented error budgets.
-  - Result: 12 achieved, 40 failed, 13,568 inconclusive across six groups; the temporal gap and floors are recorded.
+  - Result: 12 achieved, 40 failed, 12,888 inconclusive across six groups; the temporal gap and floors are recorded.
 - **[G6]** M5-V has an accurate partial-closure record listing the failed, inconclusive, and unassigned fields.
   - Result: `PHASE_5_SOLUTE_EVIDENCE.md`, `VALIDATION_STRATEGY.md`, `ROADMAP_AND_RISKS.md`, `SOLUTE_CONVERGENCE_EVIDENCE.md`, ADR 0019, and the decisions index record partial/open; no holdout ran; M6 is not unblocked.
 
