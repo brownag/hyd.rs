@@ -16,6 +16,8 @@ pub(crate) mod iteration;
 mod nonequilibrium;
 pub(crate) mod output_compat;
 mod processes;
+#[cfg(test)]
+mod robin_diagnostic;
 mod source_coupling;
 mod transport;
 pub(crate) mod water_compat;

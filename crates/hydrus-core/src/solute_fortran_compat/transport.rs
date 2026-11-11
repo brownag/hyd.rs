@@ -3,6 +3,45 @@
 //! default REAL kind. Process contributions are inputs/seams, not implemented
 //! by this module.
 
+/// Test-only switch for the bounded Robin coefficient audit. It is absent from
+/// non-test builds and defaults to the source-parity expression.
+#[cfg(test)]
+pub(crate) mod diagnostic {
+    use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+
+    static STABLE_WEIGHTS: AtomicBool = AtomicBool::new(false);
+    static FORCE_UPSTREAM_WEIGHT: AtomicBool = AtomicBool::new(false);
+    static WEIGHT_CALLS: AtomicUsize = AtomicUsize::new(0);
+
+    pub(crate) fn set_stable_weights(value: bool) {
+        STABLE_WEIGHTS.store(value, Ordering::SeqCst);
+    }
+
+    pub(crate) fn stable_weights() -> bool {
+        STABLE_WEIGHTS.load(Ordering::SeqCst)
+    }
+
+    pub(crate) fn set_force_upstream_weight(value: bool) {
+        FORCE_UPSTREAM_WEIGHT.store(value, Ordering::SeqCst);
+    }
+
+    pub(crate) fn force_upstream_weight() -> bool {
+        FORCE_UPSTREAM_WEIGHT.load(Ordering::SeqCst)
+    }
+
+    pub(crate) fn reset_weight_calls() {
+        WEIGHT_CALLS.store(0, Ordering::SeqCst);
+    }
+
+    pub(crate) fn record_weight_call() {
+        WEIGHT_CALLS.fetch_add(1, Ordering::SeqCst);
+    }
+
+    pub(crate) fn weight_calls() -> usize {
+        WEIGHT_CALLS.load(Ordering::SeqCst)
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub(crate) struct TransportNode {
     pub water: f32,
@@ -176,9 +215,20 @@ pub(crate) struct PecletResult {
     pub weight: Option<f32>,
 }
 
+/// Source-ordered upstream weight at `SOLUTE.FOR:972` and the `wc` chain at
+/// `1011-13`. The two f32 subtractions are intentionally preserved.
+fn source_upstream_weight(pe2: f32) -> f32 {
+    let tanh = (pe2.exp() - (-pe2).exp()) / (pe2.exp() + (-pe2).exp());
+    (1.0 / tanh - 1.0 / pe2).clamp(-1.0, 1.0)
+}
+
 /// Source `PeCour` for a node with a forward neighbor. Callers aggregate the
 /// maxima across nodes in the same descending source traversal.
 pub(crate) fn pecour(input: PecletInputs) -> PecletResult {
+    #[cfg(test)]
+    let upstream_weighting = input.upstream_weighting || diagnostic::force_upstream_weight();
+    #[cfg(not(test))]
+    let upstream_weighting = input.upstream_weighting;
     let vv = if input.water > 1.0e-6 && input.neighbor_water > 1.0e-6 {
         (input.velocity.abs() / input.water + input.neighbor_velocity.abs() / input.neighbor_water)
             / 2.0
@@ -204,13 +254,15 @@ pub(crate) fn pecour(input: PecletInputs) -> PecletResult {
         }
         courant = v_max * input.dt / input.dx / r_min;
         let mut courant_limit = 1.0_f32;
-        if !input.upstream_weighting && !input.artificial_dispersion && peclet != 99999.0 {
+        if !upstream_weighting && !input.artificial_dispersion && peclet != 99999.0 {
             courant_limit = (input.threshold / 0.5_f32.max(peclet)).min(1.0);
         }
         if input.epsi < 1.0 && v_max > 1.0e-20 {
             dt_max = courant_limit * input.dx * r_min / v_max;
         }
-    } else if input.upstream_weighting && input.iteration == 1 {
+    } else if upstream_weighting && input.iteration == 1 {
+        #[cfg(test)]
+        diagnostic::record_weight_call();
         let pe2 = if dd > 0.0 {
             input.dx * vv1 / dd / 2.0
         } else {
@@ -227,9 +279,19 @@ pub(crate) fn pecour(input: PecletInputs) -> PecletResult {
                 0.0
             }
         } else {
-            // Matches TanH at SOLUTE.FOR:972 and wc chain at 1011-13.
-            let tanh = (pe2.exp() - (-pe2).exp()) / (pe2.exp() + (-pe2).exp());
-            (1.0 / tanh - 1.0 / pe2).clamp(-1.0, 1.0)
+            #[cfg(test)]
+            {
+                if diagnostic::stable_weights() {
+                    let pe = pe2 as f64;
+                    (1.0 / pe.tanh() - 1.0 / pe).clamp(-1.0, 1.0) as f32
+                } else {
+                    source_upstream_weight(pe2)
+                }
+            }
+            #[cfg(not(test))]
+            {
+                source_upstream_weight(pe2)
+            }
         };
         weight = Some(wc);
     }
