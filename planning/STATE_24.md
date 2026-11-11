@@ -35,8 +35,8 @@ Prior reference (from STATE_23 / ADR 0019, not re-run here): parity 44/44; M5-V 
 | 1 | 24.1.2 | Heat module skeleton and TempCap kernel | done (15d7f99) |
 | 2 | 24.2.1 | Heat-only configuration and rejection | done (ef41a44) |
 | 2 | 24.2.2 | SetUpHeat boundary kernel | done (9634b4e) |
-| 3 | 24.3.1 | Temper transport solve (heat-only) | pending |
-| 3 | 24.3.2 | Heat state and accepted-step snapshot | pending |
+| 3 | 24.3.1 | Temper transport solve (heat-only) | done (9426aa7) |
+| 3 | 24.3.2 | Heat state and accepted-step snapshot | done (d5f8f11) |
 | 4 | 24.4.1 | Coupled water→heat step driver | pending |
 | 4 | 24.4.2 | Heat-energy balance accounting | pending |
 | 4 | 24.4.3 | Pinned-Fortran heat decks and fixture producer | pending |
@@ -49,6 +49,12 @@ Prior reference (from STATE_23 / ADR 0019, not re-run here): parity 44/44; M5-V 
 Wave-end gate after each wave: serial AGENTS.md Quick Start suite; counts recorded in the wave's section below.
 
 ## Wave gates
+
+### Wave 3 (2026-11-11, HEAD after `9426aa7`)
+- Build: pass. Clippy `--workspace --all-targets -D warnings`: pass. fmt check: pass.
+- Workspace tests: 501 passed, 0 failed (Wave 2: 490; +4 `heat::transport`, +7 `heat_state`).
+- Python: 372 OK.
+- Verdict: pass for the wave.
 
 ### Wave 2 (2026-11-11, HEAD after `9634b4e`)
 - Build: pass. Clippy `--workspace --all-targets -D warnings`: pass. fmt check: pass.
@@ -73,6 +79,12 @@ Wave-end gate after each wave: serial AGENTS.md Quick Start suite; counts record
 - Discovered: none.
 - Gotchas: `temp_cap(input: TempCapInput, cap: &mut [f64], cond: &mut [f64]) -> Result<(), TempCapError>`. Material indices are zero-based. `TempMaterial::from_tpar([f64; 9])`. Rows 2, 3, 7, 8 of TPar are inferred from usage. Outputs are unspecified after an error.
 - `TempCapError` variants: LengthMismatch, MaterialIndexOutOfRange, NonFiniteInput, NonFiniteParameter, InvalidConversion, NegativeWaterContent, NonPositiveCapacity.
+
+## 24.3.1
+- Status: done. Commit `5cd9647`, cherry-picked to `feat/heat1` as `9426aa7`.
+- Files: `heat/transport.rs` (+569). Tests: `heat::transport` 4/4. Clippy pass. fmt pass after one formatting fix.
+- Deviations: `HeatTransportInput` has an extra `temp_old` field (TempO), needed by SetUpHeat for the level-1 F row. Accepted. `HeatBoundaryError` has no Display, so transport formats it with Debug.
+- Gotchas for 24.4.1: `solve_heat_transport(config: HeatConfig, input: HeatTransportInput<'_>, temp_new: &mut [f64]) -> Result<HeatTransportReport, HeatTransportError>`. `HeatTransportReport { heat_flux, minimum_absolute_pivot }`. dtMaxT is not used in heat-only mode (one solve per call). The driver must check the mesh length against N. t_period is passed as 0.0, relying on HeatConfig rejecting tPeriod > 0. TempN is stored as f64 without sngl rounding (TEMPER.FOR:55).
 
 ## 24.2.1
 - Status: done. Commit `ef41a44` (`feat(heat): add heat-only configuration validation`), fast-forwarded into `feat/heat1`.
