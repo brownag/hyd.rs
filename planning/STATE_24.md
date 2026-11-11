@@ -33,8 +33,8 @@ Prior reference (from STATE_23 / ADR 0019, not re-run here): parity 44/44; M5-V 
 |---|---|---|---|
 | 1 | 24.1.1 | Heat source contract | done (9d199a1; Campbell scope amended d2df282) |
 | 1 | 24.1.2 | Heat module skeleton and TempCap kernel | done (15d7f99) |
-| 2 | 24.2.1 | Heat-only configuration and rejection | pending |
-| 2 | 24.2.2 | SetUpHeat boundary kernel | pending |
+| 2 | 24.2.1 | Heat-only configuration and rejection | done (ef41a44) |
+| 2 | 24.2.2 | SetUpHeat boundary kernel | done (9634b4e) |
 | 3 | 24.3.1 | Temper transport solve (heat-only) | pending |
 | 3 | 24.3.2 | Heat state and accepted-step snapshot | pending |
 | 4 | 24.4.1 | Coupled water→heat step driver | pending |
@@ -49,6 +49,12 @@ Prior reference (from STATE_23 / ADR 0019, not re-run here): parity 44/44; M5-V 
 Wave-end gate after each wave: serial AGENTS.md Quick Start suite; counts recorded in the wave's section below.
 
 ## Wave gates
+
+### Wave 2 (2026-11-11, HEAD after `9634b4e`)
+- Build: pass. Clippy `--workspace --all-targets -D warnings`: pass. fmt check: pass.
+- Workspace tests: 490 passed, 0 failed (Wave 1: 462; +12 `heat_config_contract`, +16 `heat_boundary`).
+- Python: 372 OK.
+- Verdict: pass for the wave.
 
 ### Wave 1 (2026-11-11, HEAD after `d2df282`)
 - Build: pass. Clippy `--workspace --all-targets -D warnings`: pass. fmt check: pass.
@@ -67,6 +73,20 @@ Wave-end gate after each wave: serial AGENTS.md Quick Start suite; counts record
 - Discovered: none.
 - Gotchas: `temp_cap(input: TempCapInput, cap: &mut [f64], cond: &mut [f64]) -> Result<(), TempCapError>`. Material indices are zero-based. `TempMaterial::from_tpar([f64; 9])`. Rows 2, 3, 7, 8 of TPar are inferred from usage. Outputs are unspecified after an error.
 - `TempCapError` variants: LengthMismatch, MaterialIndexOutOfRange, NonFiniteInput, NonFiniteParameter, InvalidConversion, NegativeWaterContent, NonPositiveCapacity.
+
+## 24.2.1
+- Status: done. Commit `ef41a44` (`feat(heat): add heat-only configuration validation`), fast-forwarded into `feat/heat1`.
+- Files: `heat/config.rs` (+193), `tests/heat_config_contract.rs` (new, 12 tests), `planning/tasks/24.2.1.todo.md`.
+- Tests: `heat_config_contract` 12/12. Clippy pass. fmt pass after one formatting fix.
+- Deviations: none. `BoundaryKindNotSupported` is a catch-all with its reject test waived (documented in the test header). `campbell: bool`; the caller maps iCampbell 0/1 and rejects other values.
+- Gotchas: `HeatConfig::new(input: HeatConfigInput) -> Result<HeatConfig, HeatConfigError>`. `HeatConfigError` variants are the contract names. Accessors: `top_boundary()`, `bottom_boundary()`, `campbell()`. `HeatConfig` is `Copy`.
+
+## 24.2.2
+- Status: done. Commit `f0ab4ef` (`feat(heat): add SetUpHeat boundary kernel`), cherry-picked to `feat/heat1` as `9634b4e` (branch had moved past its base).
+- Files: `heat/boundary.rs` (+277), `tests/heat_boundary.rs` (new, 16 tests).
+- Tests: `heat_boundary` 16/16. Clippy pass. fmt pass after one formatting fix.
+- Deviations: none. Guards beyond the Fortran (documented): N>=2, dt>0 for all kinds, positive spacing, finite inputs.
+- Gotchas: `set_up_heat_boundary(level: HeatLevel, input: HeatBoundaryInput<'_>) -> Result<HeatBoundaryRows, HeatBoundaryError>`. `HeatBoundaryRows { bottom, top: BoundaryCoefficients }`, `BoundaryCoefficients { b, d, e, f: Option<f64> }`. Apply only `Some` entries. Level 1 supplies `f`; Level 2 supplies `b`, `d`, `e`. `kTopT == 0` and `tPeriod > 0` return typed errors.
 
 ## 24.1.1
 - Status: done. Commit `0190035` (`docs: add heat source contract`), cherry-picked to `feat/heat1` as `9d199a1` (branch had moved past its base).
