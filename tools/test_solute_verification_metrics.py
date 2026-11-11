@@ -601,6 +601,40 @@ class MetricsTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "request backend"):
             fixture.load()
 
+    def test_request_upstream_weighting_matches_case_and_accepts_legacy_omission(self):
+        fixture = RunFixture(self.root, case_id="scalar_robin")
+        path = self.root / "request.txt"
+
+        def rebind(path):
+            digest = metrics.digest_file(path)
+            fixture.manifest["request_sha256"] = digest
+            fixture.manifest["provenance"]["input_sha256"]["request.txt"] = digest
+            obs = metrics.json_load(self.root / "observations.json")
+            obs["request_sha256"] = digest
+            (self.root / "observations.json").write_text(json.dumps(obs))
+
+        old_request = path.read_text()
+        fixture.manifest["backend"] = "fortran-compatible"
+        path.write_text(old_request + "backend=fortran-compatible\n")
+        rebind(path)
+        fixture.refresh()
+        fixture.load()
+
+        path.write_text(
+            old_request + "backend=fortran-compatible\nupstream_weighting=true\n"
+        )
+        rebind(path)
+        fixture.refresh()
+        fixture.load()
+
+        path.write_text(
+            old_request + "backend=fortran-compatible\nupstream_weighting=false\n"
+        )
+        rebind(path)
+        fixture.refresh()
+        with self.assertRaisesRegex(ValueError, "request upstream weighting"):
+            fixture.load()
+
     def test_json_duplicate_nonfinite_and_symlink(self):
         path = self.root / "bad.json"
         for text in ('{"a":1,"a":2}', '{"a":NaN}'):

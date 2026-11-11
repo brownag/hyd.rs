@@ -267,7 +267,7 @@ def schedule(case, row):
     return steps, [0.0] + prints
 
 
-def request_bytes(case, row, run_id, cases_sha256):
+def request_bytes(case, row, run_id, cases_sha256, *, include_upstream_weighting=None):
     """Create the flat-ascii-v1 shared request with round-trip decimal numbers."""
     require(re.fullmatch(r"[A-Za-z0-9_.-]+", run_id), "unsafe run id")
     schedule(case, row)
@@ -300,6 +300,12 @@ def request_bytes(case, row, run_id, cases_sha256):
     values["species"] = ",".join(s["name"] for s in case["species"])
     if "backend" in row:
         values["backend"] = row["backend"]
+    if include_upstream_weighting is None:
+        include_upstream_weighting = "backend" in row
+    if include_upstream_weighting:
+        weighting = case["chemistry"].get("upstream_weighting")
+        require(type(weighting) is bool, "invalid upstream-weighting selector")
+        values["upstream_weighting"] = "true" if weighting else "false"
     return "".join(f"{key}={value}\n" for key, value in values.items()).encode("ascii")
 
 

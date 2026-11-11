@@ -599,8 +599,22 @@ class V2RequestTests(unittest.TestCase):
         case = next(c for c in book["cases"] if c["id"] == row["case_id"])
         legacy = {k: v for k, v in row.items() if k != "backend"}
         base = adapter.request_bytes(case, legacy, "run-1", "a" * 64)
+        old_v2 = adapter.request_bytes(
+            case, row, "run-1", "a" * 64, include_upstream_weighting=False
+        )
         request = adapter.request_bytes(case, row, "run-1", "a" * 64)
-        self.assertEqual(request, base + b"backend=fortran-compatible\n")
+        self.assertEqual(old_v2, base + b"backend=fortran-compatible\n")
+        self.assertEqual(
+            request,
+            base + b"backend=fortran-compatible\nupstream_weighting=false\n",
+        )
+
+    def test_v2_request_carries_case_upstream_weighting(self):
+        book = self.book(self.V2)
+        row = next(r for r in book["launches"] if r["case_id"] == "scalar_robin")
+        case = next(c for c in book["cases"] if c["id"] == row["case_id"])
+        request = adapter.request_bytes(case, row, "run-1", "a" * 64)
+        self.assertTrue(request.endswith(b"backend=fortran-compatible\nupstream_weighting=true\n"))
 
     def test_v2_phase_roots_in_phase_tasks(self):
         for phase in ("benchmark", "convergence", "holdout"):

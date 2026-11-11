@@ -913,11 +913,18 @@ class Lifecycle:
                     and manifest["case_sha256"] == fortran.canonical_hash(case),
                     "manifest case identity mismatch",
                 )
-                require(
-                    (run_dir / "request.txt").read_bytes()
-                    == fortran.request_bytes(case, row, run_dir.name, sha256(self.cases_path)),
-                    "request differs from approved mapping",
-                )
+                request_bytes = (run_dir / "request.txt").read_bytes()
+                approved_requests = {
+                    fortran.request_bytes(case, row, run_dir.name, sha256(self.cases_path)),
+                    fortran.request_bytes(
+                        case,
+                        row,
+                        run_dir.name,
+                        sha256(self.cases_path),
+                        include_upstream_weighting=False,
+                    ),
+                }
+                require(request_bytes in approved_requests, "request differs from approved mapping")
                 require(
                     manifest["request_sha256"] == sha256(run_dir / "request.txt"),
                     "request hash mismatch",

@@ -218,12 +218,22 @@ def _request(path, manifest, case, launch, book):
     # v2 requests add an optional trailing backend; v1 requests stay valid unchanged.
     if "backend" in request:
         expected_keys += " backend"
+    if "upstream_weighting" in request:
+        expected_keys += " upstream_weighting"
     keys(request, expected_keys, "request")
     if "backend" in request:
         require(
             request["backend"] == "fortran-compatible"
             and request["backend"] == manifest.get("backend"),
             "request backend",
+        )
+    if "upstream_weighting" in request:
+        require("backend" in request, "upstream weighting requires v2 backend")
+        require(
+            request["upstream_weighting"] in ("true", "false")
+            and (request["upstream_weighting"] == "true")
+            == case["chemistry"]["upstream_weighting"],
+            "request upstream weighting",
         )
     require(request["schema"] == "flat-ascii-v1", "request schema")
     for key in ("run_id", "launch_id", "case_id", "cases_sha256", "case_sha256"):

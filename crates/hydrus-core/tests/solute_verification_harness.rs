@@ -50,6 +50,7 @@ struct Request {
     steps: usize,
     print_steps: Vec<usize>,
     backend: SoluteBackend,
+    upstream_weighting: bool,
 }
 
 fn require(condition: bool, message: &str) -> Result<()> {
@@ -146,6 +147,15 @@ impl Request {
             Some("fortran-compatible") => SoluteBackend::FortranCompatible,
             Some(_) => return Err("unknown backend".into()),
         };
+        require(
+            !fields.contains_key("upstream_weighting") || fields.contains_key("backend"),
+            "upstream weighting requires v2 backend",
+        )?;
+        let upstream_weighting = match fields.get("upstream_weighting").copied() {
+            None | Some("false") => false,
+            Some("true") => true,
+            Some(_) => return Err("invalid upstream weighting".into()),
+        };
         let count = integer(get("species_count")?)?;
         require((1..=3).contains(&count), "unsupported species count")?;
         let mut expected: BTreeSet<String> = "schema run_id launch_id case_id cases_sha256 case_sha256 nodes species_count length theta rho q dispersion dt time_end sampling_interval analysis_times species kd rates inlet_concentration"
@@ -155,6 +165,9 @@ impl Request {
         }
         if fields.contains_key("backend") {
             expected.insert("backend".to_owned());
+        }
+        if fields.contains_key("upstream_weighting") {
+            expected.insert("upstream_weighting".to_owned());
         }
         require(
             fields
@@ -262,6 +275,7 @@ impl Request {
             steps,
             print_steps,
             backend,
+            upstream_weighting,
         };
         request.validate_mapping()?;
         Ok(request)
@@ -567,7 +581,8 @@ fn simulate(request: &Request) -> Result<Observation> {
         &[],
     )
     .map_err(|e| e.to_string())?
-    .with_backend(request.backend);
+    .with_backend(request.backend)
+    .with_upstream_weighting(request.upstream_weighting);
     let count = request.species.len();
     let mut state = SoluteState::new(
         &config,
@@ -927,6 +942,43 @@ fn request_backend_selects_fortran_compatible() {
     assert!(!json.contains("backward Euler") && !json.contains("Linear equilibrium process"));
     assert!(json.contains("\"solver\":\"rust\""));
     assert!(!json.contains("\"backend\""));
+}
+
+#[test]
+fn upstream_weighting_request_reaches_public_fortran_path() {
+    let base = small_request("scalar_robin");
+    let off = Request::parse(
+        format!("{base}backend=fortran-compatible\nupstream_weighting=false\n").as_bytes(),
+    )
+    .unwrap();
+    let on = Request::parse(
+        format!("{base}backend=fortran-compatible\nupstream_weighting=true\n").as_bytes(),
+    )
+    .unwrap();
+    assert!(!off.upstream_weighting);
+    assert!(on.upstream_weighting);
+
+    let off_observation = simulate(&off).unwrap();
+    let on_observation = simulate(&on).unwrap();
+    assert!(off_observation
+        .profiles
+        .iter()
+        .zip(&on_observation.profiles)
+        .any(|(off, on)| off
+            .concentration
+            .iter()
+            .zip(&on.concentration)
+            .any(|(off, on)| off != on)));
+}
+
+#[test]
+fn legacy_request_defaults_upstream_weighting_off() {
+    let request = Request::parse(small_request("scalar_robin").as_bytes()).unwrap();
+    assert!(!request.upstream_weighting);
+    assert!(Request::parse(
+        format!("{}upstream_weighting=true\n", small_request("scalar_robin")).as_bytes()
+    )
+    .is_err());
 }
 
 #[test]

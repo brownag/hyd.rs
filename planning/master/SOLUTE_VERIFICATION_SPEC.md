@@ -423,7 +423,7 @@ must validate CASES using `check_solute_verification_spec.validate` (and
 
 The dependency-free Rust input channel is a flat ASCII request file, one
 `key=value` line, terminating newline, no whitespace around delimiters.
-Unknown, duplicate or missing keys fail. Scalar numbers use round-trip
+Unknown, duplicate or missing required keys fail. Scalar numbers use round-trip
 17-significant-digit decimal formatting; numeric vectors are comma-separated.
 No quoting, nested JSON or locale-dependent formatting is used. Required keys:
 
@@ -438,6 +438,15 @@ No quoting, nested JSON or locale-dependent formatting is used. Required keys:
 | species | ordered safe species names, comma-separated |
 | kd, rates, inlet_concentration | one value per species |
 | initial_0 through initial_(species_count-1) | N dissolved values, increasing s |
+| backend (V2 Rust launches) | `fortran-compatible` |
+| upstream_weighting (new V2 Rust requests) | lowercase `true`/`false`, copied from `chemistry.upstream_weighting`; controls the pinned Fortran `lUpW` switch on `FortranCompatible` |
+
+V1 requests retain their original bytes and omit both V2 fields. V2 requests
+created with the upstream-weighting mapping include the selector. Earlier V2
+requests that omit it remain valid as historical `false` settings; omission
+does not mean that newly created V2 requests may drop the case's declared value.
+The selector has no effect on the FV/BE backend's independent face-flux
+upwinding.
 
 The request contains explicit initial arrays sampled from the specified
 closed-form IC; both adapters consume the same values. No solver output is

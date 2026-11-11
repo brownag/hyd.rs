@@ -151,6 +151,7 @@ pub struct SoluteConfig {
     species: Vec<SoluteSpecies>,
     boundaries: Vec<SoluteBoundaries>,
     backend: SoluteBackend,
+    upstream_weighting: bool,
 }
 
 impl SoluteConfig {
@@ -285,12 +286,25 @@ impl SoluteConfig {
             species,
             boundaries,
             backend: SoluteBackend::FortranCompatible,
+            upstream_weighting: false,
         })
     }
 
     /// Select the transport backend; the default is [`SoluteBackend::FortranCompatible`].
     pub fn with_backend(mut self, backend: SoluteBackend) -> Self {
         self.backend = backend;
+        self
+    }
+
+    /// Select the pinned Fortran upstream-weighting switch for the
+    /// [`SoluteBackend::FortranCompatible`] backend.
+    ///
+    /// Defaults to `false`. This reproduces the source `lUpW` switch, which
+    /// affects coefficient and timestep handling as well as `wc` generation.
+    /// [`SoluteBackend::FiniteVolumeBackwardEuler`] uses its own upwinded
+    /// face-flux formulation and ignores this setting.
+    pub fn with_upstream_weighting(mut self, enabled: bool) -> Self {
+        self.upstream_weighting = enabled;
         self
     }
 
@@ -1192,6 +1206,7 @@ fn advance_fortran_compatible_step(
             workspace.compat_cfg.linear[js] = is_linear;
         }
         workspace.compat_cfg.equil = equil;
+        workspace.compat_cfg.upwind = config.upstream_weighting;
         workspace.compat_cfg.dt_min = (input.timestep * 1e-4) as f32;
         workspace.compat_cfg.k_bot = k_bot;
         workspace.compat_cfg.k_top = k_top;

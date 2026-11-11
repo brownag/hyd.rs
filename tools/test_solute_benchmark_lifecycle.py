@@ -678,8 +678,12 @@ class V2LifecycleTests(unittest.TestCase):
         with patch.object(lifecycle, "total_storage", return_value=10**15):
             lifecycle.check_budget(self.book, row)
 
-    def test_v2_dry_run_manifest_records_backend(self):
-        for phase, case_id in (("benchmark", "reaction_zero"), ("convergence", "diffusion_cosine")):
+    def test_v2_dry_run_manifest_records_backend_and_upstream_weighting(self):
+        for phase, case_id, upstream in (
+            ("benchmark", "reaction_zero", False),
+            ("convergence", "diffusion_cosine", False),
+            ("benchmark", "scalar_robin", True),
+        ):
             row = next(
                 r for r in self.book["launches"] if r["phase"] == phase and r["case_id"] == case_id
             )
@@ -690,6 +694,8 @@ class V2LifecycleTests(unittest.TestCase):
             manifest = json.loads((path / "manifest.json").read_text())
             self.assertEqual(manifest["backend"], "fortran-compatible")
             self.assertIn(b"backend=fortran-compatible\n", (path / "request.txt").read_bytes())
+            expected = b"upstream_weighting=true\n" if upstream else b"upstream_weighting=false\n"
+            self.assertIn(expected, (path / "request.txt").read_bytes())
 
     def test_v1_budget_caps_still_enforced(self):
         book = copy.deepcopy(BOOK)
