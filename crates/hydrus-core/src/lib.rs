@@ -7,6 +7,7 @@
 pub mod atmospheric;
 pub mod error;
 pub mod forcing;
+pub mod heat;
 pub mod hydraulics;
 pub mod lower_boundary;
 pub mod root_uptake;
