@@ -103,7 +103,7 @@ crates/hydrus-core/src/heat/
 - Wave 3: `heat/transport.rs` vs `heat/state.rs` + `tests/heat_state.rs`. Disjoint.
 - Wave 4: `heat/driver.rs` + `tests/heat_driver_order.rs` vs `heat/balance.rs` vs `reference/heat_fortran/**`, `tools/run_heat_reference.py`, `tools/test_run_heat_reference.py`. Disjoint.
 - Wave 5: `tests/heat_analytical.rs` vs `tests/heat_fortran_parity.rs` + `tools/compare_heat_reference.py` + `tools/test_compare_heat_reference.py` vs `tests/heat_balance.rs`. Disjoint.
-- Wave 6: `planning/master/M6_HEAT_ACCEPTANCE.md` vs `docs/decisions/0020-*.md` + `docs/decisions/README.md`. Disjoint.
+- Wave 6: `planning/master/M6_HEAT_ACCEPTANCE.md` vs `docs/decisions/0021-*.md` + `docs/decisions/README.md`. Disjoint.
 
 **Hidden-coupling check.** `lib.rs` is single-owner (24.1.2). `Cargo.toml` is untouched. Tests use only the public `heat` module. Tools use only their own new files and read `tools/run_fortran_reference.py` / `tools/stage_fortran_reference.py` by import only (no edits).
 
@@ -330,13 +330,13 @@ Record counts in `planning/STATE_24.md`. Any failure stops the wave (escalation 
 - **Repo:** hyd.rs
 - **Depends on:** 24.6.1.
 - **Must edit:** `docs/decisions/README.md` (add one row).
-- **Can create:** `docs/decisions/0020-<slug>.md` (slug chosen by the worker from the title "Couple heat transport one-way after the accepted water step and reject unsupported heat configurations").
+- **Can create:** `docs/decisions/0021-<slug>.md` (0020 is taken by "Keep architecture decisions distinct from project policy", accepted 2026-11-11) (slug chosen by the worker from the title "Couple heat transport one-way after the accepted water step and reject unsupported heat configurations").
 - **Temp / scratch:** `.development/24.6.2/`.
 - **Spec.** Use adr-distillation to write one ADR recording D9 (one-way coupling after the accepted water step) and D7 (typed rejection of unsupported heat configurations), with the Fortran lines that establish each. Status **Proposed**. State that no existing ADR is superseded. The README row gets the same status.
 - **Anchors.** `planning/master/M6_HEAT_CONTRACT.md`; `docs/decisions/0019-*.md` (format); `docs/decisions/README.md`.
 - **Reference implementation.** `docs/decisions/0018-default-to-the-fortran-compatible-solute-backend.md` (format and supersession wording).
 - **Constraints.** Do not edit other ADRs. Do not mark the ADR Accepted.
-- **Acceptance.** `ls docs/decisions/0020-*.md` exists; `grep -n '0020' docs/decisions/README.md` matches; `grep -n 'Proposed' docs/decisions/0020-*.md` matches.
+- **Acceptance.** `ls docs/decisions/0021-*.md` exists; `grep -n '0021' docs/decisions/README.md` matches; `grep -n 'Proposed' docs/decisions/0021-*.md` matches.
 - **Targeted test:** none (doc task).
 
 ---
