@@ -201,3 +201,16 @@ Full report: [M5V_BLOCKERS_23.md](master/M5V_BLOCKERS_23.md).
 - Updated `planning/master/PHASE_5_SOLUTE_EVIDENCE.md` and `VALIDATION_STRATEGY.md` with the 23.x final-campaign section: 12 achieved, 40 failed, all time and Example 3 groups inconclusive, no Gate C, no holdout.
 - Updated `ROADMAP_AND_RISKS.md` M5-V and risk rows; `SOLUTE_CONVERGENCE_EVIDENCE.md` status line; ADR 0019 status remains `Accepted; M5-V open` with the 23 outcome; `docs/decisions/README.md` note.
 - No ADR 0020 is created. M6 remains blocked. `THRESHOLDS_V2.json` is unchanged and stale; `holdout_run_permitted` is still false.
+
+### Authorized post-fix Robin-space rerun (2026-11-11)
+
+- User authorized the affected Robin spatial-refinement rerun; the plan and scoped Gate B bounds/review were approved before execution. The pre-fix campaign record and artifacts remain unchanged.
+- New batch `.development/23-classify-3/batch-25a12c50ed6a48b7a80d896512de505e` ran only the 129/193/257-node Robin-space study rows and 257-node `dt=2^-8` control. All four solver runs completed; fixed-step inventories matched; current-identity scalar-Robin references were admitted. No Robin-time, other case, holdout, or threshold run occurred.
+- New results: 39 failed (`nonmonotonicity`), 151 inconclusive, 0 achieved. The 151 inconclusive findings include missing quadrature bounds, control contamination, and arithmetic/reference floors. At the time of this rerun report, M5-V remained partial/open; Gate C was not requested. See the later user disposition update below.
+- `--verify-only --batch` returned exit 0 / `evidence_verified`. Classification SHA-256 `0f0ccf30d6b173959b958fc7ddf1bca32854e1075c2a18404ab5bfeb0686e21a`; signed bounds SHA `d29475495cbc147675857155feaef9d1db2b2d64a97c03d1385164c001490ae3`; signed review SHA `d476498ec4cdf58bfbf053922cac2db45f269d8b205c31a8f3514953060970f1`.
+- Full run identity, artifact hashes, commands, classification, and limitations: `planning/master/M5V_ROBIN_RERUN_23.md`. The historical pre-fix batch remains the source of the earlier 40 failed / 150 inconclusive findings; these are not reclassified or replaced.
+
+## User disposition update (2026-11-11)
+
+- The user accepted the M5-V result as-is with limitations and unblocked M6 planning and implementation. M5-V is accepted for project progression; individual classifications, absent holdouts, thresholds, and all run artifacts remain unchanged.
+- No further M5 campaign, holdout, or diagnostic is required by default. Precision and timestep interactions remain caveats; revisit only if a real supported-use case shows a decision-relevant discrepancy. See [M5V_M6_HANDOFF_DECISION.md](master/M5V_M6_HANDOFF_DECISION.md).

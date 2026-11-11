@@ -10,6 +10,11 @@ Status update (Orchestration 22): see [SOLUTE_CONVERGENCE_EVIDENCE_22.md](SOLUTE
 
 Status update (Orchestration 23): the final campaign verified six batches with signed combined bounds, but produced 12 achieved and 40 failed findings; every time group and Example 3 group is inconclusive. No holdout-level threshold was defensible, Gate C was not requested, and no holdout row ran. M5-V remains partial / open. See [M5V_FINAL_23.md](M5V_FINAL_23.md) and the [M5-V final campaign](PHASE_5_SOLUTE_EVIDENCE.md#m5-v-final-campaign-23x--partial--open).
 
+Current disposition (2026-11-11): the user accepted the M5-V result with
+limitations and unblocked M6 planning and implementation. The campaign facts
+above and the underlying classifications remain unchanged. See the
+[M5-V/M6 decision](M5V_M6_HANDOFF_DECISION.md).
+
 ## Activation and frozen scope
 
 The frozen `CASES.json` SHA-256 is `d3b06531c06545ca89956b95c487bb1616ace1470ba1a8c02a3f1209ff4e8acf`. Root reviewed the exact 57-row, 15-batch activation bundle in `.development/13.4.1/activation-review.json` (SHA-256 `41a7c3c3ed56fc2591bdacf3c0e164b42dc03dad1928fb6af8b2cd7db3ad4d03`). The storage amendment `.development/13.4.1/storage-amendment.json` raised only new evidence growth from 250,000,000 to 450,000,000 bytes above its recorded baseline of 214,850,214 bytes. It did not change launch identities, reference permissions, solver limits, global caps, or holdout reservation.

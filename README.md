@@ -78,11 +78,22 @@ The Orchestration 23 scientific-validation campaign produced six verified batche
 | Temporal refinement | Inconclusive: the time groups contain only two study levels |
 | Example 3 reaction chain | Inconclusive: control and uncertainty/floor limitations |
 
-The solute scientific-comparison milestone (**M5-V**) remains **partial/open**.
-No reserved holdout row was run in that campaign, and the heat milestone (**M6**)
-has not been unblocked. See the [campaign report](planning/master/M5V_FINAL_23.md)
-for the exact claims and the [next-step review](planning/master/M5V_REVIEW_23_NEXT_STEPS.md)
-for interpretation, limitations, and recommended diagnostics.
+The original 40 Robin failures are from pre-fix runs that did not propagate the
+declared upstream-weighting selector to the public `FortranCompatible` path;
+they remain historical findings. The authorized post-fix rerun completed under
+a new signed Gate B review: it produced 39 failed and 151 inconclusive findings,
+with no achieved fields. The new results do not replace or reclassify the old
+batch. See the [post-fix rerun report](planning/master/M5V_ROBIN_RERUN_23.md)
+and [state record](planning/STATE_23.md). The findings remain unchanged; see the
+[M5-V acceptance decision](planning/master/M5V_M6_HANDOFF_DECISION.md).
+
+The solute scientific-comparison result (**M5-V**) is **accepted with
+limitations**; no reserved holdout row was run, and campaign classifications
+remain unchanged. M6 is unblocked for planning and implementation by the
+user-approved [M5-V/M6 decision](planning/master/M5V_M6_HANDOFF_DECISION.md).
+See the [campaign report](planning/master/M5V_FINAL_23.md) for the findings and
+the [next-step review](planning/master/M5V_REVIEW_23_NEXT_STEPS.md) for the
+diagnostic history and limitations.
 
 ## Development
 

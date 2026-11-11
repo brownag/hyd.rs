@@ -1,5 +1,28 @@
 # M5-V next-step decision memo
 
+## Disposition update — 2026-11-11
+
+The user accepted the M5-V result with limitations and unblocked M6 planning and
+implementation. The diagnostic and campaign options below are historical
+recommendations, not prerequisites for M6 or required follow-up. Preserve all
+reported findings; revisit a numerical issue only if a real supported-use case
+shows it could affect a decision. See the [M5-V/M6 decision](M5V_M6_HANDOFF_DECISION.md).
+
+## Follow-up — 2026-11-11
+
+The later Robin upstream-mapping investigation confirmed and fixed a separate
+translation defect: the V2 `chemistry.upstream_weighting` selector was previously
+omitted from the public `FortranCompatible` Rust request/config path. The saved
+40 Robin failures and the numerical-conditioning assessment below describe
+pre-fix runs; they have not been rerun with the corrected mapping. The fix does
+not establish the cause of those failures or change their historical
+classification. **A rerun of the affected Robin spatial-refinement campaign is
+authorized and is the next step**, using the corrected mapping and the campaign's
+existing approval, pin, bounds, and evidence gates. Keep the saved pre-fix
+artifacts as historical evidence; do not overwrite or reclassify them. See
+[`ROBIN_UPSTREAM_MAPPING_INVESTIGATION.md`](ROBIN_UPSTREAM_MAPPING_INVESTIGATION.md)
+and the [verification request contract](SOLUTE_VERIFICATION_SPEC.md).
+
 Review date: 2026-11-11. Reviewed HEAD: `11239935c3d4a275db4fe7f557fc987a29b34ea2`.
 Scope: read-only evaluation of Orchestration 23; this memo is the only added artifact.
 No solver or holdout was launched, gate signed, or threshold/bound changed.

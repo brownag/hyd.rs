@@ -1,5 +1,12 @@
 # Validation and performance strategy
 
+> **Current disposition (2026-11-11):** M5-V is accepted with limitations for
+> project progression, and M6 is unblocked. No further M5 campaign work is
+> required by default. Preserve the observed classifications and revisit a
+> numerical anomaly only if a real supported-use case shows that it could
+> change an implementation or use decision. See the
+> [M5-V/M6 decision](M5V_M6_HANDOFF_DECISION.md).
+
 > [!WARNING]
 > **Orchestration 20 Correction Banner:**
 > The `18.15.1` parity run invoked the Fortran reference runner inside `tools/solute_rust_candidate_adapter.py` rather than the Rust compatibility solver (`crates/hydrus-core/src/solute_fortran_compat/**`).
@@ -33,7 +40,7 @@ Input recovery or construction must preserve the source of every value: manual p
 
 ## M5 solute scientific-comparison gate
 
-M5's contract and invariant tests do not complete its scientific validation. Orchestration 12 delivered the derived comparison fixture and repeatability/precision review; further M5 evidence is required before Phase 6 heat/temperature planning. Use [SCIENTIFIC_COMPARISON_RESEARCH.md](SCIENTIFIC_COMPARISON_RESEARCH.md) as the evidence and fixture-selection brief. The first candidate is 4.08 manual Example 3 (sequential decay) because its process maps most directly to the selected Rust chain and the manual reports an analytical CHAIN comparison; a clearly labeled derived deck now supplies executable input, while independent analytical output arrays remain missing.
+M5's contract and invariant tests do not complete all possible scientific claims. Orchestration 12 delivered the derived comparison fixture and repeatability/precision review. The user accepted the M5-V result with limitations for M6 progression; the remaining evidence gaps are follow-up caveats, not a requirement for another M5 campaign before M6. Use [SCIENTIFIC_COMPARISON_RESEARCH.md](SCIENTIFIC_COMPARISON_RESEARCH.md) for historical evidence and fixture context. The first candidate is 4.08 manual Example 3 (sequential decay) because its process maps most directly to the selected Rust chain and the manual reports an analytical CHAIN comparison; a clearly labeled derived deck supplies executable input, while independent analytical output arrays remain missing.
 
 The catch-up must establish a complete, provenance-reviewed fixture; solute-specific reference execution with output inventory/completion checks; normalized Rust/reference observables at matching space and time points; independent inventory/balance checks and an analytical cross-check where feasible; and reviewed field-specific tolerances. Preserve source-snapshot parity, independent analytical/physical validation, text-layout compatibility, and release compatibility as separate evidence claims. If any prerequisite remains unavailable, report the blocker and keep the M5 scientific gate open. Do not use the noncanonical Phase 0 smoke as an M5 baseline.
 
@@ -51,7 +58,7 @@ Use absolute residual criteria when a mass-balance denominator is zero or near z
 
 The [2026-09-26 tolerance review](SCIENTIFIC_COMPARISON_RESEARCH.md#repeatability-precision-and-tolerance-review--2026-09-26) found exact baseline repeatability at printed precision, but precision changes up to `1e-4` in dissolved profiles and `0.00665` in reported balance. No field-specific scientific thresholds were approved. The comparator remains diagnostic (`tolerances_assigned: false`); its schema/invariant checks are not calibrated trajectory tolerances. Missing paired mesh/time convergence and an independent finite-domain analytical cross-check prevent treating current residual maxima as acceptable error bounds.
 
-For balance reporting, retain dimensional residual and the explicitly defined normalization denominator. At exactly zero denominator, relative error is undefined: report an absolute residual and identify the absolute branch, never substitute zero percent or divide by an arbitrary epsilon. A scientifically justified absolute acceptance bound and near-zero transition scale remain unassigned; zero/near-zero independent cases and precision/refinement error budgets must establish them. This reporting rule introduces no new regression acceptance threshold.
+For balance reporting, retain dimensional residual and the explicitly defined normalization denominator. At exactly zero denominator, relative error is undefined: report an absolute residual and identify the absolute branch, never substitute zero percent or divide by an arbitrary epsilon. Do not turn every recorded metric into a gate. Select outputs relevant to the real use case, use limits only when justified for that use, and run further tests only when their result could change the claim or implementation. A numerical anomaly or nonmonotone refinement is not automatically a failure if it has no demonstrated practical consequence. This guidance introduces no universal threshold.
 
 Text-layout checks are separate: verify filenames, headers, column count, delimiters, units, end markers, line endings, numeric width/precision, and deterministic ordering. A text mismatch does not by itself prove scientific mismatch; a text match does not prove numerical correctness.
 
@@ -182,7 +189,7 @@ Recommendations become implementation commitments only after the corresponding g
 
 ## M5-V closure (22.x) — partial / open
 
-M5-V is partial / open: study-level thresholds (`reference/solute_verification/THRESHOLDS_V2.json`, `cases_sha256` `c236eb7c…`, `holdout_run_permitted: false`) are approved under D10, holdouts were not run (no holdout-level thresholds assigned; holdout mesh/dt not isolated), and M6 planning is not unblocked by this record.
+At the time of the 22.x closure, M5-V was partial/open: study-level thresholds (`reference/solute_verification/THRESHOLDS_V2.json`, `cases_sha256` `c236eb7c…`, `holdout_run_permitted: false`) were approved under D10, holdouts were not run (no holdout-level thresholds assigned; holdout mesh/dt not isolated), and that record did not unblock M6. See the current disposition at the top of this document.
 
 Decisions: D2 (re-scope: source parity from the 44/44 gate, physical and analytical validation on the default `FortranCompatible` backend), D3 (four analytical families; FV/BE not re-studied), D8 (error budgets, user threshold gate, then holdouts), D10 (2026-10-24: approve study-level ceilings only, no holdouts). ADR: [0019](../../docs/decisions/0019-validate-scientific-accuracy-on-the-default-backend.md).
 
@@ -200,7 +207,7 @@ Rows are copied from [SOLUTE_CONVERGENCE_EVIDENCE_22.md](SOLUTE_CONVERGENCE_EVID
 | Example 3 full-chain NH4/NO2 concentration norms | **Conditionally met** at 1001 nodes, dt .025 (scratch-replay evidence); NO3, inventory, balance, node-1 closure, outlet tail, reaction rates **unassigned** |
 | Example 3 inventory, balance, node-1 closure, temporal error | **Unmet: unassigned** |
 | Classifier verdict (achieved/failed) | **Unmet**: no bounds source; every finding `inconclusive` |
-| M5-V overall | **Partial; open.** Unassigned fields remain unmet (`SOLUTE_VERIFICATION_SPEC.md:409`) and the roadmap does not unblock M6 |
+| M5-V at 22.x closure | **Partial; open.** Unassigned fields remained unmet (`SOLUTE_VERIFICATION_SPEC.md:409`); the later user decision accepts the result with limitations and unblocks M6 progression. |
 
 ### Source-parity evidence (21.4.1)
 
@@ -238,11 +245,11 @@ Not run (task 22.7.1 was not executed). Every combined holdout-level candidate i
 
 ## M5-V final campaign (23.x) — partial / open
 
-M5-V remains partial / open after the Orchestration 23 final campaign. The campaign ran six verified batches with a signed combined bounds source; no holdout row was run and Gate C was not requested.
+At campaign close, M5-V was recorded partial / open. The campaign ran six verified batches with a signed combined bounds source; no holdout row was run and Gate C was not requested. See the current disposition at the top of this document.
 
 - Diffusion space: 12 `achieved` concentration fields, 178 inconclusive.
 - Scalar Robin space: 40 `failed` S1 fields (`nonmonotonicity` between the fine pair), 150 inconclusive.
 - Diffusion time, Robin time, Example 3 space `dt .04`, and Example 3 time: all inconclusive (12,560 findings in these four groups; 12,888 across all six). Every time finding reports `fewer_than_three_levels`; the design's centre rows are space-axis only.
 - Example 3 space is dominated by control contamination and arithmetic floors; it does not establish the claimed norms.
-- No holdout-level threshold is defensible from these results. `THRESHOLDS_V2.json` remains the stale study-level file (`cases_sha256` `c236eb7c…`, `holdout_run_permitted: false`) and no holdout row ran. M6 is not unblocked.
+- No holdout-level threshold was defensible from these results. `THRESHOLDS_V2.json` remains the stale study-level file (`cases_sha256` `c236eb7c…`, `holdout_run_permitted: false`) and no holdout row ran. At campaign close, M6 was not unblocked; the later decision accepts the result with limitations and unblocks M6 progression.
 - Evidence: [M5V_FINAL_23.md](M5V_FINAL_23.md). ADR [0019](../../docs/decisions/0019-validate-scientific-accuracy-on-the-default-backend.md) remains "Accepted; M5-V open".

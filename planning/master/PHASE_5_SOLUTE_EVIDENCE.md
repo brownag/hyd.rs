@@ -1,5 +1,10 @@
 # Phase 5 solute acceptance evidence
 
+> **Current disposition (2026-11-11):** The user accepted the M5-V result with
+> limitations and unblocked M6 planning and implementation. Original campaign
+> classifications and holdout status are unchanged. See the
+> [M5-V/M6 decision](M5V_M6_HANDOFF_DECISION.md).
+
 > [!WARNING]
 > **Orchestration 20 Correction Banner:**
 > The `18.15.1` parity run invoked the Fortran reference runner inside `tools/solute_rust_candidate_adapter.py` rather than the Rust compatibility solver (`crates/hydrus-core/src/solute_fortran_compat/**`).
@@ -77,7 +82,7 @@ M5 reaches its planned implementation and contract-evidence endpoint for the sel
 
 The largest evidence limits are absent manual decks/analytical outputs and paired mesh/time convergence evidence; caller-declared rather than universally fixed unit bases; and a concentration-boundary exchange inferred from the same closure equation. Interval accounting now takes caller-owned start-of-interval water contents and the accepted end snapshot explicitly; start-water values are dimension, finiteness, and positivity checked before trial mutation, and are contractually associated with the current solute-state time. Test tolerances are invariant-check thresholds, not calibrated physical tolerances. The nonlinear solver's caller-selected tolerance is not calibrated. The source snapshot's lineage and release compatibility remain unverified.
 
-The M5 scientific-comparison gate is still open. Per the [comparison research](SCIENTIFIC_COMPARISON_RESEARCH.md), Orchestration 12 delivered a derived fixture, solute reference-run support, diagnostic paired observables, and a tolerance review that leaves thresholds unassigned. The missing analytical/refinement evidence must be addressed before Phase 6 heat/temperature work. Phase 0's noncanonical smoke output is not a solute oracle.
+The M5 scientific-comparison work retains limitations. Per the [comparison research](SCIENTIFIC_COMPARISON_RESEARCH.md), Orchestration 12 delivered a derived fixture, solute reference-run support, diagnostic paired observables, and a tolerance review that leaves thresholds unassigned. The user accepted the existing result for M6 progression; no additional M5 campaign is required by that decision. Phase 0's noncanonical smoke output is not a solute oracle.
 
 The next physics milestones remain distinct and are not authorized by this evidence:
 
@@ -198,7 +203,7 @@ Task 18.15.1 completed full serial execution of all 44 parity fixtures across al
 
 ## M5-V closure (22.x) — partial / open
 
-M5-V is partial / open: study-level thresholds (`reference/solute_verification/THRESHOLDS_V2.json`, `cases_sha256` `c236eb7c…`, `holdout_run_permitted: false`) are approved under D10, holdouts were not run (no holdout-level thresholds assigned; holdout mesh/dt not isolated), and M6 planning is not unblocked by this record.
+At the time of the 22.x closure, M5-V was recorded partial/open: study-level thresholds (`reference/solute_verification/THRESHOLDS_V2.json`, `cases_sha256` `c236eb7c…`, `holdout_run_permitted: false`) were approved under D10, holdouts were not run (no holdout-level thresholds assigned; holdout mesh/dt not isolated), and that record did not unblock M6. The later [2026-11-11 decision](M5V_M6_HANDOFF_DECISION.md) accepts the result with limitations for project progression.
 
 Decisions: D2 (re-scope: source parity from the 44/44 gate, physical and analytical validation on the default `FortranCompatible` backend), D3 (four analytical families; FV/BE not re-studied), D8 (error budgets, user threshold gate, then holdouts), D10 (2026-10-24: approve study-level ceilings only, no holdouts). ADR: [0019](../../docs/decisions/0019-validate-scientific-accuracy-on-the-default-backend.md).
 
@@ -216,7 +221,7 @@ Rows are copied from [SOLUTE_CONVERGENCE_EVIDENCE_22.md](SOLUTE_CONVERGENCE_EVID
 | Example 3 full-chain NH4/NO2 concentration norms | **Conditionally met** at 1001 nodes, dt .025 (scratch-replay evidence); NO3, inventory, balance, node-1 closure, outlet tail, reaction rates **unassigned** |
 | Example 3 inventory, balance, node-1 closure, temporal error | **Unmet: unassigned** |
 | Classifier verdict (achieved/failed) | **Unmet**: no bounds source; every finding `inconclusive` |
-| M5-V overall | **Partial; open.** Unassigned fields remain unmet (`SOLUTE_VERIFICATION_SPEC.md:409`) and the roadmap does not unblock M6 |
+| M5-V at 22.x closure | **Partial; open.** Unassigned fields remained unmet (`SOLUTE_VERIFICATION_SPEC.md:409`); see the later disposition update at the top of this document. |
 
 ### Source-parity evidence (21.4.1)
 
@@ -254,11 +259,11 @@ Not run (task 22.7.1 was not executed). Every combined holdout-level candidate i
 
 ## M5-V final campaign (23.x) — partial / open
 
-M5-V remains partial / open after the Orchestration 23 final campaign. The campaign ran six verified batches with a signed combined bounds source; no holdout row was run and Gate C was not requested.
+At campaign close, M5-V was recorded partial / open. The campaign ran six verified batches with a signed combined bounds source; no holdout row was run and Gate C was not requested. See the current disposition at the top of this document.
 
 - Diffusion space: 12 `achieved` concentration fields, 178 inconclusive.
 - Scalar Robin space: 40 `failed` S1 fields (`nonmonotonicity` between the fine pair), 150 inconclusive.
 - Diffusion time, Robin time, Example 3 space `dt .04`, and Example 3 time: all inconclusive (12,560 findings in these four groups; 12,888 across all six). Every time finding reports `fewer_than_three_levels`; the design's centre rows are space-axis only.
 - Example 3 space is dominated by control contamination and arithmetic floors; it does not establish the claimed norms.
-- No holdout-level threshold is defensible from these results. `THRESHOLDS_V2.json` remains the stale study-level file (`cases_sha256` `c236eb7c…`, `holdout_run_permitted: false`) and no holdout row ran. M6 is not unblocked.
+- No holdout-level threshold was defensible from these results. `THRESHOLDS_V2.json` remains the stale study-level file (`cases_sha256` `c236eb7c…`, `holdout_run_permitted: false`) and no holdout row ran. At campaign close, M6 was not unblocked; the later decision accepts the result with limitations and unblocks M6 progression.
 - Evidence: [M5V_FINAL_23.md](M5V_FINAL_23.md). ADR [0019](../../docs/decisions/0019-validate-scientific-accuracy-on-the-default-backend.md) remains "Accepted; M5-V open".

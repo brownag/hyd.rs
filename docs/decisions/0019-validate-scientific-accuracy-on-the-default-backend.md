@@ -1,7 +1,7 @@
 ---
 id: "0019"
 title: "Validate scientific accuracy on the default backend"
-status: "Accepted; M5-V open"
+status: "Accepted; M5-V accepted with limitations"
 date: 2026-10-24
 authors:
   - "Andrew G. Brown"
@@ -40,13 +40,24 @@ Partial outcome (D10, 2026-10-24): M5-V is partial / open: study-level threshold
 
 Orchestration 23 outcome (2026-11-10): the final campaign ran six verified batches with a signed combined bounds source. It produced 12 `achieved` diffusion-space concentration fields and 40 `failed` Robin-space fields (non-monotone between the fine pair); every time group and every Example 3 group is inconclusive. The time groups have only two study levels because the design's centre rows are space-axis only, so they report `fewer_than_three_levels` (decision D14 accepts the partial outcome). No holdout-level threshold was defensible, Gate C was not requested, and no holdout row ran. M5-V remains open and M6 stays blocked.
 
+### Dated policy clarification — 2026-11-11
+
+The preceding Orchestration 23 statement records the status at campaign close.
+By explicit user decision, [M5V_M6_HANDOFF_DECISION.md](../../planning/master/M5V_M6_HANDOFF_DECISION.md)
+accepts the M5-V results as they stand, with limitations, and unblocks M6
+planning and implementation. This supersedes the holdout-dependent M5-V closure
+and unconditional M6-blocking consequences in this ADR. The campaign's original
+failed/inconclusive classifications and caveats remain unchanged; no holdout or
+new threshold is authorized. M6 acceptance remains separate, and this decision
+does not claim universal solute accuracy or M6 acceptance.
+
 ### Consequences
 
 - **Positive:** The accuracy evidence now covers the default backend: closed reactions (time order about 1), diffusion and Robin space error, and Example 3 NH4/NO2 norms, with study-level ceilings approved.
-- **Negative:** M5-V is not closed. Unassigned fields remain unmet: diffusion inventory (known kernel end-row mass-loss defect candidate, no SD registered), Robin `l1`/`l2`/inventory/balance, all temporal error, and Example 3 inventory, balance, node-1 closure, NO3, outlet tail and reaction rates.
+- **Negative:** The campaign did not resolve every field: diffusion inventory (known kernel end-row mass-loss defect candidate, no SD registered), Robin `l1`/`l2`/inventory/balance, all temporal error, and Example 3 inventory, balance, node-1 closure, NO3, outlet tail and reaction rates remain caveats to the accepted result.
 - **Negative:** The classifier has no bounds source, so every finding is `inconclusive`. The bridge gate was waived for v2 and the v2 bridge row failed. The FV/BE study was not re-run, manufactured forcing is still blocked, and claims hold for one compiler and platform.
 - **Negative (23.x):** The final campaign found 40 failed Robin-space fields and could not classify any time or Example 3 field. A future time study needs three time-axis levels or a tested dual-axis centre-reuse rule.
-- **Follow-up:** Closing M5-V needs holdout-level mesh/dt isolation, thresholds for the unassigned fields, a bounds source, and a user decision before any holdout runs.
+- **Historical follow-up:** Under the original closure policy, closing M5-V would have required holdout-level mesh/dt isolation, thresholds for unassigned fields, a bounds source, and a user decision before holdouts. The 2026-11-11 decision accepts the existing result with limitations; this further campaign work is not required for M6 progression.
 
 ## Validation
 
