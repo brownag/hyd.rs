@@ -23,7 +23,7 @@ Run 2026-11-11 on `feat/heat1` at `a155e06`, serial.
 | Clippy | `cargo clippy --workspace --all-targets -- -D warnings` | pass (exit 0) |
 | Python tools | `python3 -m unittest discover -s tools -p 'test_*.py'` | **FAIL: 372 run, 4 errors, all in `tools/test_solute_benchmark_bridge.py`** (`ValueError: hash mismatch: crates/hydrus-core/src/solute.rs`) |
 
-Pre-existing Python failure: the four `test_solute_benchmark_bridge` errors predate orchestration 24 and are not caused by it. They are a source-hash binding for `solute.rs` that no longer matches its recorded value. Orchestration 24 does not touch `solute.rs` or the bridge. Each wave-end Python gate must show exactly these four errors and no others. Any new error is a regression. Recording it here does not make it acceptable: it needs its own fix or a campaign re-bind outside orchestration 24.
+Python baseline failure (four `test_solute_benchmark_bridge` hash errors) was a stale `POLICY_HASHES` pin left by commit `075dd71`, which changed `solute.rs` and the harness without a re-pin. Fixed on `feat/heat1` (see Wave 1 gate below): both pins re-pinned with a justification comment. Python suite now passes (372 OK).
 
 Prior reference (from STATE_23 / ADR 0019, not re-run here): parity 44/44; M5-V accepted with limitations 2026-11-11.
 
@@ -53,7 +53,7 @@ Wave-end gate after each wave: serial AGENTS.md Quick Start suite; counts record
 ### Wave 1 (2026-11-11, HEAD after `d2df282`)
 - Build: pass. Clippy `--workspace --all-targets -D warnings`: pass. fmt check: pass.
 - Workspace tests: 462 passed, 0 failed (baseline 452; +10 from `heat_capacity`).
-- Python: 372 run, 4 errors, the same four known `test_solute_benchmark_bridge` hash errors as baseline. No new failures.
+- Python: 372 run, 4 errors from the stale `solute.rs` pin (baseline). Re-pinned `solute.rs` and `solute_verification_harness.rs` in `tools/solute_benchmark_bridge.py` after `075dd71`. Re-run: 372 OK.
 - Verdict: pass for the wave.
 
 ## Task reports

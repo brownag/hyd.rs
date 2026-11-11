@@ -31,7 +31,10 @@ POLICY_HASHES = {
     # the deck runner uses; FV/BE unchanged.
     # Re-pinned again under Orchestration 22 (22.3.8): chain production slots and flow-direction
     # mirroring in the public FortranCompatible step; FV/BE unchanged.
-    "crates/hydrus-core/src/solute.rs": "30b84ce2d758e56cf8b4011936df29e004f4574d695b2c2374900f38da5e388b",
+    # Re-pinned after commit 075dd71 (2026-11-11, upstream weighting propagated to verification):
+    # it changed solute.rs and solute_verification_harness.rs without a re-pin, so both pins were
+    # stale and four bridge tests failed with a hash mismatch. Values are the current file hashes.
+    "crates/hydrus-core/src/solute.rs": "4f1385c268b610eaafb4ab30537ad359c0fb093ba170ffbf77d04b7fd2810ea2",
     "crates/hydrus-core/src/hydraulics/linear.rs": "6b5649011b1c605e77d55500fa08bd5bfbb708d3548abd225c3dbc11f3e0196e",
     "crates/hydrus-core/tests/solute_fixture_parity.rs": "890bb77171f189402299cf9ceaf8b4809ffa15e3c52a82355016e92b6893bba9",
     # Re-pinned under Orchestration 22 (22.3.3): the harness selects its backend from the request;
@@ -41,7 +44,7 @@ POLICY_HASHES = {
     # steps by schedule instead of launch_id, so the rfc bridge row prints [50,100,200].
     # Re-pinned under the 23R.1 control-row continuation: output_path allows the 23-final
     # campaign root; bridge arithmetic and solver behavior are unchanged.
-    "crates/hydrus-core/tests/solute_verification_harness.rs": "32d1f6888b0808d71506f01ccbc3e48fcd94557fa11b7648ffde80d1ec892c26",
+    "crates/hydrus-core/tests/solute_verification_harness.rs": "11ed5e425e1750b71722d06b1443f958e18e3b3c6af93dd326f5c169900ebcc8",
 }
 COMPARATORS = (
     "tools/solute_benchmark_bridge.py",
