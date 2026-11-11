@@ -93,6 +93,7 @@ Heat-only selection. Every item must hold; each is checked on the effective valu
 | `lEnBal` | `false` (after `MeteoIn`) | `INPUT.FOR:966`, `:1673`; `HYDRUS.FOR:268` |
 | `lWDep` | `false` | `INPUT.FOR:31`; `WATFLOW.FOR:404-405`, `:458-464` (see `## Rejected`) |
 | `iDualPor` | `0` | `HYDRUS.FOR:278` |
+| `iCampbell` | `0` (default conductivity) or `1` (Campbell conductivity) | `TEMPER.FOR:279-300`; both branches are in scope for M6 (user decision 2026-11-11) |
 | `iModel` | `0` (van Genuchten) | `INPUT.FOR:552`; reuse `WaterProductConfig::new` |
 | Domains | one | `WaterProductConfig::new` (`water_solver.rs:24`) |
 
@@ -127,7 +128,6 @@ Every combination not listed in `## Supported` is rejected. The rule is a catch-
 | `lWDep = true` | Temperature dependence of water flow: `ConLT` and `TempN` enter water flux (`WATFLOW.FOR:224-227`, `:257-263`, `:287-290`, `:404-405`) and surface tension and density (`:458-464`). This is a heat-to-water feedback that D9 forbids. Beyond D7's list. Added at the coordinator's direction | `TemperatureDependentWaterNotSupported` | D9 (addition beyond D7) |
 | `kTopT == 0` | `SetUpHeat` (`TEMPER.FOR:144-162`) has `if(kTopT.gt.0)` and `else if(kTopT.lt.0)` and no `else`. Node N's row is never assigned, so the source uses a stale row. Not reproduced | `TopBoundaryKindNotSupported` | Coordinator decision, Question 2 answer |
 | `tPeriod > 0` (sinusoidal top boundary) | `tTopA = tTop + Ampl*sin(...)` (`TEMPER.FOR:19-22`) with `sngl(t)` (`:21`). Not in the M6 selection. Coordinator decision | `SinusoidalTopNotSupported` | Coordinator decision, Question 3 answer |
-| `iCampbell = 1` | Campbell conductivity branch (`TEMPER.FOR:279-300`). Not in `## Supported`. No fixture or tolerance exists for it in M6 | `ConductivityModelNotSupported` | Catch-all rule |
 | `kTopT` or `kBotT` outside the Supported sign classes | Not listed in `## Supported` | `BoundaryKindNotSupported` | Catch-all rule |
 | Runtime: `Cap(i) == 0` | `TEMPER.FOR:281-284` prints, reads stdin and calls `stop`. This is a runtime error, not a config rejection | `HeatCapacityZero` | Port must return an error, not stop |
 
