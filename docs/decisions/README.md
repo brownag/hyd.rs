@@ -21,6 +21,7 @@
 | [0017](0017-propagate-nonfinite-endpoint-primitives-as-fortran-does.md) | Propagate non-finite endpoint primitives as the pinned Fortran does | Accepted | 2026-10-19 | - | - | Orch 20 (20.6.1) |
 | [0018](0018-default-to-the-fortran-compatible-solute-backend.md) | Default to the Fortran-compatible solute backend | Accepted | 2026-10-22 | 0013 (default clause) | - | Orch 22 (22.1.3) |
 | [0019](0019-validate-scientific-accuracy-on-the-default-backend.md) | Validate scientific accuracy on the default backend | Accepted; M5-V accepted with limitations | 2026-10-24 | - | - | Orch 22; 2026-11-11 handoff decision |
+| [0020](0020-keep-architecture-decisions-distinct-from-project-policy.md) | Keep architecture decisions distinct from project policy | Accepted | 2026-11-11 | - | - | 2026-11-11 policy review |
 
 ## Scope and Status Notes
 
