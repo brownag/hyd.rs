@@ -94,6 +94,11 @@ pub struct VaporStepReport {
     pub liquid_thermal_conductivities: Vec<f64>,
     pub vapor_head_conductivities: Vec<f64>,
     pub vapor_thermal_conductivities: Vec<f64>,
+    /// Pass-two last iterate (`hTemp` before the final Gauss solve) and the liquid content
+    /// and vapor-adjusted hydraulic capacity evaluated there; the solved water rows use these.
+    pub pre_solve_heads: Vec<f64>,
+    pub pre_solve_liquid_water_contents: Vec<f64>,
+    pub effective_hydraulic_capacities: Vec<f64>,
     pub liquid_velocities: Vec<f64>,
     pub vapor_velocities: Vec<f64>,
     pub liquid_face_fluxes: Vec<f64>,
@@ -265,6 +270,8 @@ impl VaporWaterHeatDriver {
             liquid_face_fluxes,
             vapor_face_fluxes,
             total_face_fluxes,
+            pre_solve_heads,
+            pre_solve_liquid_water_contents,
             ..
         } = trial2;
         let liquid_contents_new = candidate.water_contents.clone();
@@ -288,6 +295,9 @@ impl VaporWaterHeatDriver {
             liquid_thermal_conductivities: properties.liquid_thermal_conductivities,
             vapor_head_conductivities: properties.vapor_head_conductivities,
             vapor_thermal_conductivities: properties.vapor_thermal_conductivities,
+            pre_solve_heads,
+            pre_solve_liquid_water_contents,
+            effective_hydraulic_capacities: properties.effective_hydraulic_capacities,
             liquid_velocities,
             vapor_velocities,
             liquid_face_fluxes,
