@@ -1,7 +1,7 @@
 # Orchestration 24 state — G12 M6 heat/temperature (through G18)
 
 Plan: [EXECUTION_PLAN_24.md](EXECUTION_PLAN_24.md) · Worker template: [PROMPT_TEMPLATE_24.md](PROMPT_TEMPLATE_24.md)
-Status: **RUNNING — approved by user 2026-11-11 ("run plan 24"). Wave 1 done; Wave 2 next. Tolerances (contract `## Tolerances`) await user review before 24.5.2.**
+Status: **WAVES 1–6 COMPLETE (2026-11-11). Acceptance document and draft ADR 0021 (Proposed) merged. Open items: see Wave 5 and Wave 6 notes. Follow-on goals G19 (vapor) and G20 (energy balance) to log in GOALS.md; not executed here.**
 Created: 2026-11-11 · Source goal: [G12 in GOALS.md](GOALS.md)
 
 ## Pre-wave-1 gate (must clear before Wave 1)
@@ -43,12 +43,19 @@ Prior reference (from STATE_23 / ADR 0019, not re-run here): parity 44/44; M5-V 
 | 5 | 24.5.1 | Analytical comparisons | done (fd2bdb0 → 5770a7e) |
 | 5 | 24.5.2 | Source-matched Fortran parity | done (6a18626 → 31b9ad0; rounded verdict pass, strict 2e-4 fails at 20–36 nodes; table water model) |
 | 5 | 24.5.3 | Balance and invariant properties | done (5dfdf20 → c94c808; reservoir convention) |
-| 6 | 24.6.1 | Capability acceptance document | pending |
-| 6 | 24.6.2 | Draft ADR for heat coupling and rejection | pending |
+| 6 | 24.6.1 | Capability acceptance document | done (c2ff854 → 8389226) |
+| 6 | 24.6.2 | Draft ADR for heat coupling and rejection | done (12dfaca → d3020f9; ADR 0021 Proposed) |
 
 Wave-end gate after each wave: serial AGENTS.md Quick Start suite; counts recorded in the wave's section below.
 
 ## Wave gates
+
+### Wave 6 (2026-11-11)
+- 24.6.1: `planning/master/M6_HEAT_ACCEPTANCE.md` (8389226). Grep check: all named tests and fixtures exist. Evidence counts recorded in the document.
+- 24.6.2: `docs/decisions/0021-*.md` (Proposed), README row added (d3020f9). No other ADR superseded.
+- No code changed in Wave 6; the Wave 5 gate covers the code.
+- Discovered: contract and spec cite `WATFLOW.FOR:404-405` for the lWTDep term; the correct range is 403-404 (405 is lVapor). ADR cites 403-404; the contract is not edited.
+- Discovered: worktree `target` symlinks to a directory that does not exist for 24.6.1 (built with CARGO_TARGET_DIR elsewhere).
 
 ### Wave 5 (2026-11-11, HEAD after `31b9ad0`)
 - Build, clippy `--workspace --all-targets -D warnings`, fmt: pass.
