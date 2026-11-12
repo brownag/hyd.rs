@@ -6,12 +6,18 @@ Source State: [STATE_24.md](STATE_24.md)
 ## Circled Goal (Active)
 
 - **[G19]** Vapor flow is added to the coupled heat capability: `lVapor` terms (`TempAdj`, `ConVapor`, `VaporContent`, `ConVh`, vapor output `NOD_INF_V.OUT`) are implemented with explicit coupling contracts, rejected combinations preserved until supported, provenance-backed fixtures, and capability-specific validation.
+  - Planning update (2026-11-11): [orchestration 25](EXECUTION_PLAN_25.md) is approved for the first increment: default thermal conductivity, enhancement on (`iEnhanc=1`, pinned executable default), fixed water heads and temperatures at both ends, two source-ordered coupling passes, atomic acceptance. Full vapor breadth is G22, not silently abandoned after this increment. Approved-scope [source contract](master/M6_VAPOR_CONTRACT.md) and [coverage matrix](master/M6_VAPOR_COVERAGE.md); numerical thresholds remain a separate approval gate; implementation not started.
   - Why now: G12's M6 heat scope is delivered; vapor is the first deferred physics, and energy balance (G20) depends on the vapor path for evaporation terms.
   - Boundary: vapor only. Energy balance (`lEnBal`, `UpdateEnergy`, `Evap`, `Rn`, `Rns`, `Rnl`) stays out. Heat-to-water feedback (`lWDep`) stays rejected unless separately approved. Hysteresis, dual porosity and root uptake with heat stay out.
   - Exit criteria: a vapor source contract (`TEMPER.FOR:48` `TempAdj`, `TEMPER.FOR:180-268`, vapor output `HYDRUS.FOR:174`) is recorded; the heat-only config accepts `lVapor=true` only for the supported vapor selection; source-matched fixtures exist for each supported vapor case; analytical or balance checks pass at tolerances approved for vapor; the acceptance document states what is not claimed.
   - First action: write the vapor source contract (`planning/master/M6_VAPOR_CONTRACT.md`) by reading `TEMPER.FOR:180-268` (`TempAdj`), `TEMPER.FOR:48`, the vapor conductivity and content code in `WATFLOW.FOR` (`:919-922`, `:995`), and the vapor output in `HYDRUS.FOR:174`; list the vapor variables and their precision. Hand the contract to plan-wave for the execution plan.
 
 ## Sequenced Goals (Dependency DAG)
+
+- **[G22]** All valid vapor capabilities and supported interactions are implemented and capability-specifically validated, rather than stopping at G19's restricted first increment.
+  - Depends on: G19 initial acceptance; individual rows may also depend on G20, G23 or separately accepted optional physics.
+  - Scope and exit: every active vapor branch and valid interaction has a contract, implementation, discriminating source evidence, independent/balance checks and acceptance status in [M6_VAPOR_COVERAGE.md](master/M6_VAPOR_COVERAGE.md). Invalid combinations are distinguished from deferred capabilities. Campbell, enhancement-off, remaining heat/water boundaries and related interactions remain explicit work, not claims inherited from G19.
+  - Trigger to plan the next increment: G19 accepted; select the next dependency-ready coverage row. No execution authorized by the current plan.
 
 - **[G20]** Energy balance (`lEnBal`, `UpdateEnergy`, surface energy terms `Evap`, `Rn`, `Rns`, `Rnl`) is added to the coupled capability with its own contract, fixtures and acceptance gate.
   - Depends on: G19 (evaporation uses the vapor path), and on the atmospheric boundary path with meteorological input (`lMeteo`, `MeteoIn`, `INPUT.FOR:966`, `HYDRUS.FOR:243-244`), which the Rust crate does not yet have.
@@ -40,6 +46,9 @@ Source State: [STATE_24.md](STATE_24.md)
   - Trigger: only if a real supported-use case needs a stronger temporal claim or an observed timestep effect could change a decision.
 
 ## Independent Backlog
+
+- **[G23]** Temperature-dependent liquid-water coupling (`lWDep` / `lWTDep`, including `ConLT` in water flux and liquid material temperature adjustments) is separately contracted, implemented and validated when selected.
+  - Trigger: separate user scope approval after G19. Remains rejected in orchestration 25; not conflated with vapor's thermal-gradient terms or G20 energy balance.
 
 - **[G7]** The free-drainage end-row behavior is assessed against the source-defect register rules and recorded as a defect or modeling choice.
 - **[G10]** Investigate the Robin refinement anomaly only if a real supported-use case shows it could change a decision; the current finding is nonblocking.
