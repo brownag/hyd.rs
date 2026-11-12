@@ -80,7 +80,9 @@ pub enum HeatTransportError {
 impl fmt::Display for HeatTransportError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::VaporNotSupported => write!(formatter, "heat-only transport rejects vapor selection"),
+            Self::VaporNotSupported => {
+                write!(formatter, "heat-only transport rejects vapor selection")
+            }
             Self::TooFewNodes { count } => {
                 write!(
                     formatter,

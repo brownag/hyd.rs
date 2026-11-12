@@ -93,9 +93,9 @@ impl HeatWaterDriver {
     ) -> Result<Self, HeatDriverError> {
         let config = HeatConfig::new(config_input).map_err(HeatDriverError::Config)?;
         if config.vapor_enabled() {
-            return Err(HeatDriverError::Config(HeatConfigError::VaporNotSupported {
-                value: true,
-            }));
+            return Err(HeatDriverError::Config(
+                HeatConfigError::VaporNotSupported { value: true },
+            ));
         }
         let n = x.len();
         if n < 3 {

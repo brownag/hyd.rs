@@ -16,8 +16,8 @@ use std::fmt;
 use crate::heat::config::{HeatConfig, HeatConfigError, HeatConfigInput};
 use crate::hydraulics::{HydraulicTables, VanGenuchtenModel};
 use crate::{
-    HydraulicError, LowerBoundaryMode, UpperBoundary, WaterState, WaterStepInput,
-    WaterStepPolicy, WaterWorkspace,
+    HydraulicError, LowerBoundaryMode, UpperBoundary, WaterState, WaterStepInput, WaterStepPolicy,
+    WaterWorkspace,
 };
 
 /// Raw inputs for the closed supported vapor selection.
@@ -113,13 +113,27 @@ impl VaporConfig {
         })
     }
 
-    pub fn heat(&self) -> HeatConfig { self.heat }
-    pub fn top_temperature(&self) -> f64 { self.top_temperature }
-    pub fn bottom_temperature(&self) -> f64 { self.bottom_temperature }
-    pub fn x_conv(&self) -> f64 { self.x_conv }
-    pub fn t_conv(&self) -> f64 { self.t_conv }
-    pub fn enhancement(&self) -> i32 { 1 }
-    pub fn hydraulic_model(&self) -> i32 { 0 }
+    pub fn heat(&self) -> HeatConfig {
+        self.heat
+    }
+    pub fn top_temperature(&self) -> f64 {
+        self.top_temperature
+    }
+    pub fn bottom_temperature(&self) -> f64 {
+        self.bottom_temperature
+    }
+    pub fn x_conv(&self) -> f64 {
+        self.x_conv
+    }
+    pub fn t_conv(&self) -> f64 {
+        self.t_conv
+    }
+    pub fn enhancement(&self) -> i32 {
+        1
+    }
+    pub fn hydraulic_model(&self) -> i32 {
+        0
+    }
 
     /// Validates all caller water inputs without mutating state or workspace.
     pub fn validate_water_input(
@@ -133,21 +147,28 @@ impl VaporConfig {
         if n < 3 {
             return Err(VaporError::TooFewNodes { count: n });
         }
-        if !accepted_time.is_finite() || !input.target_time.is_finite()
+        if !accepted_time.is_finite()
+            || !input.target_time.is_finite()
             || input.target_time <= accepted_time
         {
             return Err(VaporError::InvalidTime);
         }
-        if !input.timestep.is_finite() || input.timestep <= 0.0
+        if !input.timestep.is_finite()
+            || input.timestep <= 0.0
             || input.timestep < policy.minimum_timestep
         {
             return Err(VaporError::InvalidTime);
         }
-        if policy.max_iterations == 0 || !policy.head_tolerance.is_finite()
-            || policy.head_tolerance <= 0.0 || !policy.water_tolerance.is_finite()
-            || policy.water_tolerance <= 0.0 || !policy.minimum_timestep.is_finite()
-            || policy.minimum_timestep <= 0.0 || !policy.retry_factor.is_finite()
-            || policy.retry_factor <= 1.0 || !policy.minimum_pivot.is_finite()
+        if policy.max_iterations == 0
+            || !policy.head_tolerance.is_finite()
+            || policy.head_tolerance <= 0.0
+            || !policy.water_tolerance.is_finite()
+            || policy.water_tolerance <= 0.0
+            || !policy.minimum_timestep.is_finite()
+            || policy.minimum_timestep <= 0.0
+            || !policy.retry_factor.is_finite()
+            || policy.retry_factor <= 1.0
+            || !policy.minimum_pivot.is_finite()
             || policy.minimum_pivot <= 0.0
         {
             return Err(VaporError::InvalidPolicy);
@@ -181,7 +202,10 @@ impl VaporConfig {
         for (i, &x) in mesh.coordinates().iter().enumerate() {
             validate_finite_index("coordinates", i, x)?;
             if i > 0 && x <= mesh.coordinates()[i - 1] {
-                return Err(VaporError::InvalidValue { name: "coordinates", value: x });
+                return Err(VaporError::InvalidValue {
+                    name: "coordinates",
+                    value: x,
+                });
             }
         }
         match input.lower {
@@ -208,25 +232,52 @@ impl VaporConfig {
 #[derive(Clone, Debug, PartialEq)]
 pub enum VaporError {
     Heat(HeatConfigError),
-    UnsupportedBoolean { name: &'static str, value: bool },
-    UnsupportedInteger { name: &'static str, value: i32 },
+    UnsupportedBoolean {
+        name: &'static str,
+        value: bool,
+    },
+    UnsupportedInteger {
+        name: &'static str,
+        value: i32,
+    },
     UnsupportedLowerBoundary(LowerBoundaryMode),
     UnsupportedUpperBoundary(UpperBoundary),
     UnsupportedAveraging,
     RootUptake,
-    NonzeroSink { index: usize, value: f64 },
-    TooFewNodes { count: usize },
-    LengthMismatch { name: &'static str, expected: usize, actual: usize },
-    MaterialIndex { index: usize, material: usize },
-    NonFinite { name: &'static str, index: Option<usize>, value: f64 },
-    InvalidValue { name: &'static str, value: f64 },
+    NonzeroSink {
+        index: usize,
+        value: f64,
+    },
+    TooFewNodes {
+        count: usize,
+    },
+    LengthMismatch {
+        name: &'static str,
+        expected: usize,
+        actual: usize,
+    },
+    MaterialIndex {
+        index: usize,
+        material: usize,
+    },
+    NonFinite {
+        name: &'static str,
+        index: Option<usize>,
+        value: f64,
+    },
+    InvalidValue {
+        name: &'static str,
+        value: f64,
+    },
     InvalidTime,
     InvalidPolicy,
     Hydraulic(HydraulicError),
 }
 
 impl fmt::Display for VaporError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result { write!(f, "vapor contract error: {self:?}") }
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "vapor contract error: {self:?}")
+    }
 }
 impl std::error::Error for VaporError {}
 
@@ -247,18 +298,70 @@ pub struct VaporPrimitiveInput<'a> {
 impl VaporPrimitiveInput<'_> {
     pub fn validate(&self) -> Result<(), VaporError> {
         let n = self.heads.len();
-        if n < 3 { return Err(VaporError::TooFewNodes { count: n }); }
-        for (name, len) in [("temperatures", self.temperatures.len()), ("liquid_water_contents", self.liquid_water_contents.len()), ("liquid_conductivities", self.liquid_conductivities.len()), ("liquid_capacities", self.liquid_capacities.len()), ("material_indices", self.material_indices.len())] { check_len(name, n, len)?; }
-        for (name, values) in [("heads", self.heads), ("temperatures", self.temperatures), ("liquid_water_contents", self.liquid_water_contents), ("liquid_conductivities", self.liquid_conductivities), ("liquid_capacities", self.liquid_capacities), ("saturated_water_contents", self.saturated_water_contents)] {
-            for (i, &v) in values.iter().enumerate() { validate_finite_index(name, i, v)?; }
+        if n < 3 {
+            return Err(VaporError::TooFewNodes { count: n });
         }
-        for (name, value) in [("xConv", self.x_conv), ("tConv", self.t_conv)] { validate_finite(name, value)?; if value <= 0.0 { return Err(VaporError::InvalidValue { name, value }); } }
-        for (i, (&theta, &material)) in self.liquid_water_contents.iter().zip(self.material_indices).enumerate() {
-            let theta_s = *self.saturated_water_contents.get(material).ok_or(VaporError::MaterialIndex { index: i, material })?;
-            if theta < 0.0 || theta > theta_s || theta_s <= 0.0 { return Err(VaporError::InvalidValue { name: "water_content/porosity", value: theta }); }
-            if self.liquid_conductivities[i] < 0.0 { return Err(VaporError::InvalidValue { name: "liquid_conductivity", value: self.liquid_conductivities[i] }); }
-            if self.liquid_capacities[i] < 0.0 { return Err(VaporError::InvalidValue { name: "liquid_capacity", value: self.liquid_capacities[i] }); }
-            if self.temperatures[i] + 273.15 <= 0.0 { return Err(VaporError::InvalidValue { name: "absolute_temperature", value: self.temperatures[i] }); }
+        for (name, len) in [
+            ("temperatures", self.temperatures.len()),
+            ("liquid_water_contents", self.liquid_water_contents.len()),
+            ("liquid_conductivities", self.liquid_conductivities.len()),
+            ("liquid_capacities", self.liquid_capacities.len()),
+            ("material_indices", self.material_indices.len()),
+        ] {
+            check_len(name, n, len)?;
+        }
+        for (name, values) in [
+            ("heads", self.heads),
+            ("temperatures", self.temperatures),
+            ("liquid_water_contents", self.liquid_water_contents),
+            ("liquid_conductivities", self.liquid_conductivities),
+            ("liquid_capacities", self.liquid_capacities),
+            ("saturated_water_contents", self.saturated_water_contents),
+        ] {
+            for (i, &v) in values.iter().enumerate() {
+                validate_finite_index(name, i, v)?;
+            }
+        }
+        for (name, value) in [("xConv", self.x_conv), ("tConv", self.t_conv)] {
+            validate_finite(name, value)?;
+            if value <= 0.0 {
+                return Err(VaporError::InvalidValue { name, value });
+            }
+        }
+        for (i, (&theta, &material)) in self
+            .liquid_water_contents
+            .iter()
+            .zip(self.material_indices)
+            .enumerate()
+        {
+            let theta_s = *self
+                .saturated_water_contents
+                .get(material)
+                .ok_or(VaporError::MaterialIndex { index: i, material })?;
+            if theta < 0.0 || theta > theta_s || theta_s <= 0.0 {
+                return Err(VaporError::InvalidValue {
+                    name: "water_content/porosity",
+                    value: theta,
+                });
+            }
+            if self.liquid_conductivities[i] < 0.0 {
+                return Err(VaporError::InvalidValue {
+                    name: "liquid_conductivity",
+                    value: self.liquid_conductivities[i],
+                });
+            }
+            if self.liquid_capacities[i] < 0.0 {
+                return Err(VaporError::InvalidValue {
+                    name: "liquid_capacity",
+                    value: self.liquid_capacities[i],
+                });
+            }
+            if self.temperatures[i] + 273.15 <= 0.0 {
+                return Err(VaporError::InvalidValue {
+                    name: "absolute_temperature",
+                    value: self.temperatures[i],
+                });
+            }
         }
         Ok(())
     }
@@ -277,7 +380,10 @@ pub struct VaporProperties {
 
 /// Explicit concrete model/table choice for later source-matched evaluation.
 #[derive(Clone, Copy)]
-pub struct VaporSourceMaterial<'a> { pub model: &'a VanGenuchtenModel, pub table: Option<&'a HydraulicTables> }
+pub struct VaporSourceMaterial<'a> {
+    pub model: &'a VanGenuchtenModel,
+    pub table: Option<&'a HydraulicTables>,
+}
 
 /// Immutable accepted physical history and separately retained predictor.
 #[derive(Clone, Copy, Debug)]
@@ -296,11 +402,49 @@ pub struct VaporHistoryView<'a> {
 impl VaporHistoryView<'_> {
     pub fn validate(&self) -> Result<(), VaporError> {
         validate_finite("history time", self.time)?;
-        if let Some(dt) = self.previous_timestep { validate_finite("previous timestep", dt)?; if dt <= 0.0 { return Err(VaporError::InvalidValue { name: "previous timestep", value: dt }); } }
-        let n = self.heads.len(); if n < 3 { return Err(VaporError::TooFewNodes { count: n }); }
-        for (name, values) in [("liquid_water_contents", self.liquid_water_contents), ("temperatures", self.temperatures), ("vapor_contents", self.vapor_contents), ("liquid_velocities", self.liquid_velocities), ("vapor_velocities", self.vapor_velocities), ("head_predictor", self.head_predictor)] { check_len(name, n, values.len())?; for (i, &v) in values.iter().enumerate() { validate_finite_index(name, i, v)?; } }
-        for (i, &t) in self.temperatures.iter().enumerate() { if t + 273.15 <= 0.0 { return Err(VaporError::InvalidValue { name: "absolute_temperature", value: t }); } if self.vapor_contents[i] < 0.0 { return Err(VaporError::InvalidValue { name: "vapor_contents", value: self.vapor_contents[i] }); } }
-        for (i, &h) in self.heads.iter().enumerate() { validate_finite_index("heads", i, h)?; }
+        if let Some(dt) = self.previous_timestep {
+            validate_finite("previous timestep", dt)?;
+            if dt <= 0.0 {
+                return Err(VaporError::InvalidValue {
+                    name: "previous timestep",
+                    value: dt,
+                });
+            }
+        }
+        let n = self.heads.len();
+        if n < 3 {
+            return Err(VaporError::TooFewNodes { count: n });
+        }
+        for (name, values) in [
+            ("liquid_water_contents", self.liquid_water_contents),
+            ("temperatures", self.temperatures),
+            ("vapor_contents", self.vapor_contents),
+            ("liquid_velocities", self.liquid_velocities),
+            ("vapor_velocities", self.vapor_velocities),
+            ("head_predictor", self.head_predictor),
+        ] {
+            check_len(name, n, values.len())?;
+            for (i, &v) in values.iter().enumerate() {
+                validate_finite_index(name, i, v)?;
+            }
+        }
+        for (i, &t) in self.temperatures.iter().enumerate() {
+            if t + 273.15 <= 0.0 {
+                return Err(VaporError::InvalidValue {
+                    name: "absolute_temperature",
+                    value: t,
+                });
+            }
+            if self.vapor_contents[i] < 0.0 {
+                return Err(VaporError::InvalidValue {
+                    name: "vapor_contents",
+                    value: self.vapor_contents[i],
+                });
+            }
+        }
+        for (i, &h) in self.heads.iter().enumerate() {
+            validate_finite_index("heads", i, h)?;
+        }
         Ok(())
     }
 }
@@ -346,15 +490,47 @@ pub struct VaporHeatInput<'a> {
 }
 
 fn validate_finite(name: &'static str, value: f64) -> Result<(), VaporError> {
-    if !value.is_finite() { Err(VaporError::NonFinite { name, index: None, value }) } else { Ok(()) }
+    if !value.is_finite() {
+        Err(VaporError::NonFinite {
+            name,
+            index: None,
+            value,
+        })
+    } else {
+        Ok(())
+    }
 }
 fn validate_finite_index(name: &'static str, index: usize, value: f64) -> Result<(), VaporError> {
-    if !value.is_finite() { Err(VaporError::NonFinite { name, index: Some(index), value }) } else { Ok(()) }
+    if !value.is_finite() {
+        Err(VaporError::NonFinite {
+            name,
+            index: Some(index),
+            value,
+        })
+    } else {
+        Ok(())
+    }
 }
 fn check_len(name: &'static str, expected: usize, actual: usize) -> Result<(), VaporError> {
-    if expected != actual { Err(VaporError::LengthMismatch { name, expected, actual }) } else { Ok(()) }
+    if expected != actual {
+        Err(VaporError::LengthMismatch {
+            name,
+            expected,
+            actual,
+        })
+    } else {
+        Ok(())
+    }
 }
-fn validate_row(name: &'static str, lower: f64, diagonal: f64, upper: f64, rhs: f64) -> Result<(), VaporError> {
-    for value in [lower, diagonal, upper, rhs] { validate_finite(name, value)?; }
+fn validate_row(
+    name: &'static str,
+    lower: f64,
+    diagonal: f64,
+    upper: f64,
+    rhs: f64,
+) -> Result<(), VaporError> {
+    for value in [lower, diagonal, upper, rhs] {
+        validate_finite(name, value)?;
+    }
     Ok(())
 }
