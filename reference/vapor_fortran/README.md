@@ -4,7 +4,13 @@ The three case decks under `cases/` are source-matched inputs for the unchanged,
 staged HYDRUS reference executable. `vapor_isothermal_head_gradient` uses constant
 initial/boundary temperature with a fixed water-head gradient; `vapor_thermal_gradient`
 uses a temperature gradient and fixed water heads; `vapor_off_control` repeats the
-thermal deck with only `lVapor` disabled. Vapor-enabled decks set `lWDep=false`.
+thermal deck with only `lVapor` disabled. `vapor_dry_thermal_gradient` and `vapor_dry_off_control` (also differing only by
+`lVapor`) use the same loamy row with dry heads (uniform -1e4 cm, fixed at both
+ends, analytic retention branch outside the unchanged `hTab` span), a linear
+45 C to 5 C temperature profile, and 240 h with prints at 6, 24, 72, 240 h;
+`fixtures/dry_discrimination.json` is the reference-only on/off report against
+print half-resolution (the wet pair above is not discriminating at print precision).
+Vapor-enabled decks set `lWDep=false`.
 All decks use `LUnit=cm`, `TUnit=hours`, `MUnit=kg`, and `iCampbell=0`. The
 isothermal case uses the illustrative sandy row; the thermal/off-control pair uses
 the identical illustrative loamy row. Exact parameter values, source basis, and

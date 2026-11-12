@@ -1,0 +1,117 @@
+{
+  "best_ratio": {
+    "head": 17157866.0,
+    "liquid_moisture": 391.99999999999983,
+    "temperature_c": 575.9999999999998
+  },
+  "cases": {
+    "off": "vapor_dry_off_control",
+    "on": "vapor_dry_thermal_gradient"
+  },
+  "deck_attempts": {
+    "a1": "accepted; heads uniform -1e4 cm fixed both ends, T 45->5 C linear initial and fixed, tMax 240 h, TPrint 6 24 72 240, dt controls unchanged; analytic (non-table) retention branch since hTabN=100"
+  },
+  "evidence_class": "pinned-fortran-trajectory",
+  "executable_sha256": "824179ab353a41f373f4d601cba370071a092a1dfb194b702dfd498ff12a9f1c",
+  "per_time": [
+    {
+      "head": {
+        "max_abs_diff": 0.0,
+        "print_half_resolution": 0.0005,
+        "ratio": 0.0
+      },
+      "liquid_moisture": {
+        "max_abs_diff": 0.0,
+        "print_half_resolution": 5e-05,
+        "ratio": 0.0
+      },
+      "temperature_c": {
+        "max_abs_diff": 0.0,
+        "print_half_resolution": 0.005,
+        "ratio": 0.0
+      },
+      "time_h": 0.0
+    },
+    {
+      "head": {
+        "max_abs_diff": 1697.6399999999994,
+        "print_half_resolution": 0.0005,
+        "ratio": 3395279.9999999986
+      },
+      "liquid_moisture": {
+        "max_abs_diff": 0.0006999999999999923,
+        "print_half_resolution": 5e-05,
+        "ratio": 13.999999999999845
+      },
+      "temperature_c": {
+        "max_abs_diff": 1.7300000000000004,
+        "print_half_resolution": 0.005,
+        "ratio": 346.00000000000006
+      },
+      "time_h": 6.0
+    },
+    {
+      "head": {
+        "max_abs_diff": 3927.5060000000003,
+        "print_half_resolution": 0.0005,
+        "ratio": 7855012.0
+      },
+      "liquid_moisture": {
+        "max_abs_diff": 0.0023999999999999994,
+        "print_half_resolution": 5e-05,
+        "ratio": 47.999999999999986
+      },
+      "temperature_c": {
+        "max_abs_diff": 2.870000000000001,
+        "print_half_resolution": 0.005,
+        "ratio": 574.0000000000002
+      },
+      "time_h": 24.0
+    },
+    {
+      "head": {
+        "max_abs_diff": 6661.357,
+        "print_half_resolution": 0.0005,
+        "ratio": 13322714.0
+      },
+      "liquid_moisture": {
+        "max_abs_diff": 0.006999999999999992,
+        "print_half_resolution": 5e-05,
+        "ratio": 139.99999999999983
+      },
+      "temperature_c": {
+        "max_abs_diff": 2.879999999999999,
+        "print_half_resolution": 0.005,
+        "ratio": 575.9999999999998
+      },
+      "time_h": 72.0
+    },
+    {
+      "head": {
+        "max_abs_diff": 8578.933,
+        "print_half_resolution": 0.0005,
+        "ratio": 17157866.0
+      },
+      "liquid_moisture": {
+        "max_abs_diff": 0.019599999999999992,
+        "print_half_resolution": 5e-05,
+        "ratio": 391.99999999999983
+      },
+      "temperature_c": {
+        "max_abs_diff": 2.6099999999999994,
+        "print_half_resolution": 0.005,
+        "ratio": 521.9999999999999
+      },
+      "time_h": 240.0
+    }
+  ],
+  "print_half_resolution_note": "head f11.3 -> 5e-4 cm (no e11.4 rows occurred; all |h|<1e5), moisture f6.4 -> 5e-5, temperature f8.2 -> 5e-3 C",
+  "schema_version": 1,
+  "scope": "reference-only Fortran-vs-Fortran vapor on/off discrimination; no Rust comparison, tolerance or acceptance",
+  "source_fixture_sha256": {
+    "off": "faf63999d0b19d9732d12e03ca5d94aedc107444d6248ba3a1e7cc9bedc6ee06",
+    "on": "df9333d6cfe83101d0c2c032381b75edbcef1a4dc218acbd5ec8d9c5fa277474"
+  },
+  "target_met": true,
+  "target_ratio": 10
+}

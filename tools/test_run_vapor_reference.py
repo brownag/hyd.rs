@@ -1,5 +1,9 @@
 """Focused parser and format tests for the full vapor reference producer."""
+import io
 import unittest
+from contextlib import redirect_stderr
+from pathlib import Path
+from unittest import mock
 
 from tools import run_vapor_reference as vapor
 
@@ -68,6 +72,23 @@ class FixedWidthParserTests(unittest.TestCase):
     def test_rejects_overflow_in_vapor_output(self):
         with self.assertRaisesRegex(ValueError, "overflow"):
             vapor.parse_blocks(blocks([vapor_row(1, 0)[:-13] + "*************"]), vapor=True)
+
+
+class CaseSelectionTests(unittest.TestCase):
+    BASE = str(vapor.ROOT / ".development/25.6.3/unit-test-never-created")
+
+    def run_main(self, *cases):
+        argv = [a for c in cases for a in ("--case", c)] + ["--build-dir", "unused", "--task-base", self.BASE]
+        with mock.patch.object(vapor, "run_case", side_effect=lambda c, *a: Path(c)), mock.patch.object(Path, "mkdir"):
+            return vapor.main(argv)
+
+    def test_rejects_unknown_case_id(self):
+        with redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
+            self.run_main("vapor_unknown")
+
+    def test_accepts_new_dry_cases_alone(self):
+        with redirect_stderr(io.StringIO()), mock.patch("builtins.print"):
+            self.assertEqual(self.run_main("vapor_dry_thermal_gradient", "vapor_dry_off_control"), 0)
 
 
 if __name__ == "__main__":
