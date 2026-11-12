@@ -7,7 +7,11 @@ pub struct VanGenuchtenParameters {
     alpha: f64,
     n: f64,
     saturated_conductivity: f64,
+    pore_connectivity: f64,
 }
+
+/// Mualem pore-connectivity exponent `l` (MATERIAL.FOR `BPar`, default 0.5).
+const DEFAULT_PORE_CONNECTIVITY: f64 = 0.5;
 
 impl VanGenuchtenParameters {
     pub fn new(
@@ -23,6 +27,17 @@ impl VanGenuchtenParameters {
             alpha,
             n,
             saturated_conductivity,
+            pore_connectivity: DEFAULT_PORE_CONNECTIVITY,
+        };
+        parameters.validate()?;
+        Ok(parameters)
+    }
+
+    /// Returns a copy with pore-connectivity exponent `l`, validated in `[0, 10]`.
+    pub fn with_pore_connectivity(self, pore_connectivity: f64) -> Result<Self, HydraulicError> {
+        let parameters = Self {
+            pore_connectivity,
+            ..self
         };
         parameters.validate()?;
         Ok(parameters)
@@ -35,6 +50,7 @@ impl VanGenuchtenParameters {
             ("alpha", self.alpha),
             ("n", self.n),
             ("saturated_conductivity", self.saturated_conductivity),
+            ("pore_connectivity", self.pore_connectivity),
         ] {
             if !value.is_finite() {
                 return Err(HydraulicError::NonFiniteParameter { name });
@@ -64,6 +80,12 @@ impl VanGenuchtenParameters {
                 reason: "must be non-negative",
             });
         }
+        if !(0.0..=10.0).contains(&self.pore_connectivity) {
+            return Err(HydraulicError::InvalidParameter {
+                name: "pore_connectivity",
+                reason: "must be in [0, 10]",
+            });
+        }
         Ok(())
     }
 
@@ -85,6 +107,10 @@ impl VanGenuchtenParameters {
 
     pub fn saturated_conductivity(&self) -> f64 {
         self.saturated_conductivity
+    }
+
+    pub fn pore_connectivity(&self) -> f64 {
+        self.pore_connectivity
     }
 }
 

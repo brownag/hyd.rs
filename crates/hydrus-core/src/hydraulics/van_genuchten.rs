@@ -45,10 +45,11 @@ pub(super) fn evaluate_model_zero(
         m * parameters.n() * parameters.alpha() * x.powf(parameters.n() - 1.0) * a.powf(-m - 1.0);
     let capacity = delta * dse_dhead;
 
-    let root = se.sqrt();
+    // Mualem pore-connectivity exponent `l` (MATERIAL.FOR `Kr=Qe**Bpar*FFQ**PPar`, PPar=2).
+    let pore_connectivity = parameters.pore_connectivity();
     let inner = (1.0 - se.powf(1.0 / m)).max(0.0);
     let bend = 1.0 - inner.powf(m);
-    let relative = se * root * bend * bend;
+    let relative = se.powf(pore_connectivity) * bend * bend;
     // MATERIAL.FOR applies `sngl` at FK/FC/FQ/FH returns; this port keeps f64
     // throughout, while retaining the source's 1.e-37 floor semantics.
     let conductivity = (parameters.saturated_conductivity() * relative).max(SOURCE_VALUE_FLOOR);
@@ -56,12 +57,14 @@ pub(super) fn evaluate_model_zero(
     let dcapacity_dhead = capacity
         * (-(parameters.n() - 1.0) / x
             + (m + 1.0) * parameters.n() * parameters.alpha() * x.powf(parameters.n() - 1.0) / a);
-    let dconductivity_dhead = if parameters.saturated_conductivity() == 0.0 {
+    // Guard: at Se underflow to 0 the `l*Se^(l-1)` term diverges while bend -> 0, so the
+    // product has no usable limit here; the conductivity term is taken as zero.
+    let dconductivity_dhead = if parameters.saturated_conductivity() == 0.0 || se <= 0.0 {
         0.0
     } else {
         let d_bend_dse = inner.powf(m - 1.0) * se.powf(1.0 / m - 1.0);
-        let d_relative_dse =
-            relative * (1.5 / se + 2.0 * d_bend_dse / bend.max(SOURCE_VALUE_FLOOR));
+        let d_relative_dse = pore_connectivity * se.powf(pore_connectivity - 1.0) * bend * bend
+            + se.powf(pore_connectivity) * 2.0 * bend * d_bend_dse;
         (parameters.saturated_conductivity() * d_relative_dse * dse_dhead).max(0.0)
     };
 
