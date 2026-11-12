@@ -139,6 +139,7 @@ Every task is in `hyd.rs`. Same-wave product scopes are pairwise disjoint.
 | 6 | 25.6.4 | Water-trial iteration semantics correction (amendment 2026-11-12) | 25.4.1, 25.5.1 |
 | 7 | 25.7.1 | Rust candidate runs and parity test (split 2026-11-12) | 25.1.2, 25.2.2, 25.6.1, 25.6.2, 25.6.3, 25.6.4; numeric gate |
 | 7 | 25.7.2 | Standalone Python vapor comparator (split 2026-11-12) | numeric gate; candidate schema below |
+| 7 | 25.7.3 | Isothermal vapor-flux discrepancy diagnosis (amendment 2026-11-12) | 25.7.1 candidate run |
 | 8 | 25.8.1 | Capability acceptance and full-coverage handoff | All prior tasks |
 
 Numeric gate precedes **any** candidate-vs-reference check, including kernel
@@ -714,6 +715,34 @@ error/bound/verdict, and the criteria SHA-256.
   hash, unknown/missing criterion, wrong unit/class, zero-floor behavior,
   capacity-correction semantics, discrimination fail. Do not run a Rust candidate.
 - **Targeted test:** `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest tools.test_compare_vapor_reference`.
+
+### 25.7.3 — Isothermal vapor-flux discrepancy diagnosis
+
+Amendment 2026-11-12, user-chosen "diagnose first". Under criteria v2, isothermal
+`v_vapor`/`v_vap_term` fail at 9 points each (err/bound <= 1.76). The Rust
+latent-heat temperature disturbance (~1e-4 C) decays more slowly than the
+source's: the candidate/reference ratio is ~1.1-1.3 at t=12 h across the
+profile. All other fields pass.
+
+- **Question:** is this a Rust coupling difference, or the source's own
+  single-precision artifact (REAL `TempN`, `ThVNew`/`ThVOld` cancellation)?
+- **Experiments** (diagnostic only, untracked, staged copies; never edit
+  `src_reference/` or the committed patch):
+  E1, a full-precision trace build that adds output statements only (no
+  arithmetic change) for `TempN`, `ThVNew`, `ThVOld` and `dt` at print times.
+  Confirm the normal outputs are byte-identical to the 25.2.2 fixture outputs.
+  E2, a precision-sensitivity build of the same staged source with
+  `-fdefault-real-8` (or the narrowest equivalent that compiles) that runs the
+  isothermal deck. Compare E1, E2 and the Rust candidate temperature
+  disturbance and `v_vap_term` at t=6/12/24 h. Do further experiments only if
+  E1/E2 are inconclusive, and keep them bounded.
+- **Files:** create only under `.development/25.7.3/`. No tracked edits, no
+  criteria/fixture changes, no Rust production changes. A Python analysis
+  script is allowed in scratch.
+- **Deliverable:** a report (<=40 lines) in `.development/25.7.3/REPORT.md` with
+  hashes, commands, the comparison table and a verdict: source-precision
+  artifact, Rust discrepancy (with the suspected term/site), or inconclusive.
+  The orchestrator brings the verdict to the user.
 
 ### 25.8.1 — Acceptance and coverage handoff
 

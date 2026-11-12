@@ -1,6 +1,6 @@
 # Orchestration 25 state — G19 first vapor increment
 
-Created: 2026-11-11. Status: **PLAN APPROVED 2026-11-11; Waves 1–6 complete.**
+Created: 2026-11-11. Status: **PLAN APPROVED 2026-11-11; Waves 1–7 complete.**
 Plan: [EXECUTION_PLAN_25.md](EXECUTION_PLAN_25.md).
 Worker: [PROMPT_TEMPLATE_25.md](PROMPT_TEMPLATE_25.md).
 Contract: [M6_VAPOR_CONTRACT.md](master/M6_VAPOR_CONTRACT.md).
@@ -92,8 +92,9 @@ criteria. Plan approval does not open this numeric gate.
 | 6 | 25.6.2 | Independent mathematics/balances | done |
 | 6 | 25.6.3 | Dry-soil discriminating fixtures | done |
 | 6 | 25.6.4 | Water-trial iteration semantics | done |
-| 7 | 25.7.1 | Rust candidate runs and parity test | in progress |
-| 7 | 25.7.2 | Standalone Python comparator | in progress |
+| 7 | 25.7.1 | Rust candidate runs and parity test | done |
+| 7 | 25.7.2 | Standalone Python comparator | done |
+| 7 | 25.7.3 | Isothermal discrepancy diagnosis | done |
 | 8 | 25.8.1 | Acceptance and coverage handoff | pending |
 
 Max two workers; separate worktrees and absolute target/run roots. Orchestrator
@@ -300,6 +301,32 @@ unphysical heat and were rejected by staging — tests use cm/day conversions.
 - 25.6.2 bounds are temporarily single named test constants citing the gate
   approval; the orchestrator migrates them to `criteria.json` `checks` when the
   artifact is created.
+
+### Wave 7 — complete
+
+- 25.7.1 split into 25.7.1 (Rust) / 25.7.2 (Python) with orchestrator-defined
+  `vapor-candidate-v1` schema; kernel candidate later gained `requests_sha256`.
+- 25.7.2 integrated as `1a57124` and `4560583` (one retry: zero floor was
+  global, not per time; kernel requests hash). 35 tests.
+- 25.7.1 v1 run: all fields pass except isothermal v_vapor/v_vap_term (29-31
+  rows). User approved post-failure criteria v2 (precision floor); v2 run still
+  failed 9+9 rows near the cold end (err/bound <= 1.76). Python and Rust
+  consumers agree exactly on failing rows.
+- 25.7.3 diagnosis (Opus worker; staged E1 trace build byte-identical to fixture
+  outputs after Date masking; E2 `-fdefault-real-8 -fdefault-double-8`): Rust
+  matches E2 to <=1e-9 relative dT and 3e-5 v_vap_term; pinned REAL `TempN`
+  distorts its own latent transient (12% at 12 h). Verdict: source-precision
+  artifact; no Rust discrepancy. Recorded in `M6_VAPOR_PRECISION_DIAGNOSIS.md`
+  (`b4913c3`). Not a source-defect register entry (Rust does not reproduce it).
+- User decision: record as explained. 25.7.1 integrated as `95ee096`: 10 tests;
+  the isothermal test passes only if the failing set equals the 18 pinned
+  `KNOWN_SOURCE_PRECISION_FAILURES` rows (not claimed as matched); all other
+  fields/cases/kernel pass (worst err/bound <= 0.10). Dry discrimination
+  reference and candidate ratios to 2x tolerance: head 21.4, moisture 9.3,
+  temperature 28.8. Second pass changes temperature by up to 6.3e-3 C (dry).
+- Wave 7 serial gates (after `95ee096`): build PASS; workspace tests PASS (51
+  suites, 584 passed, 0 failed, 2 ignored); fmt PASS; Clippy PASS;
+  `hydraulic_curves` 9 passed; Python PASS (447 tests).
 
 ## Planning review
 
