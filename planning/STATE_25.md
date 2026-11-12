@@ -38,13 +38,17 @@ This baseline is not vapor numerical acceptance.
 
 ## Numeric approval gate
 
-- [ ] After reference-only evidence, propose field-specific source/independent
-  criteria including print intervals, zero handling and discrimination floors.
-- [ ] User approves values **before any candidate/reference comparison**.
-- [ ] Record exact table/date in the contract and approval here; no widening.
-- [ ] Orchestrator creates canonical `reference/vapor_fortran/criteria.json`
-  (`vapor-criteria-v1`) with approved fields/checks/discrimination values; record
-  SHA-256 here. Rust/Python consumers read it, never separate hardcoded limits.
+- [x] After reference-only evidence (wet + dry fixtures, kernel harness),
+  proposed field-specific criteria with print rules, zero floor, discrimination.
+- [x] User approved values 2026-11-12, before any candidate/reference comparison.
+- [x] Table/date recorded in the contract ("Approved numeric criteria"); frozen
+  at contract revision `8e561a5`, contract SHA-256
+  `2cd1f8b9d952fb15edddd23942dd32d10dbe1ca415e223a7e5ae81aea38cf79f`. No widening.
+- [x] Orchestrator created `reference/vapor_fortran/criteria.json`
+  (`vapor-criteria-v1`), SHA-256
+  `d645cae2a0ba44219eed7b53185abb09a1815ee481041f4e7a3b9fbc0cbbf008`. Rust/Python
+  consumers read it, never separate hardcoded limits. Migrate 25.6.2 balance
+  constants to its `checks` after 25.6.2 lands.
 
 - [x] 2026-11-12 user approved independent-check bounds for 25.6.2 discrete
   water/heat balance: per-step residual <= 1e-9 relative to the largest absolute

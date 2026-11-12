@@ -1,0 +1,250 @@
+{
+  "approved_at": "2026-11-12",
+  "approved_by": "user (repository owner)",
+  "checks": {
+    "heat_balance_interior": {
+      "absolute": 1e-15,
+      "assumptions": [
+        "interior nodes only; Dirichlet reservoir bookkeeping reported, never asserted",
+        "solver's published pass-two last-iteration coefficients (pre-final-solve heads, contents, C_eff, Con/ConVh/ConVT)",
+        "per accepted step; fresh-coefficient closure reported only (limited by TolTh/TolH)"
+      ],
+      "relative": 1e-09,
+      "scale": "max_abs_row_term",
+      "unit": "model"
+    },
+    "water_balance_interior": {
+      "absolute": 1e-15,
+      "assumptions": [
+        "interior nodes only; Dirichlet reservoir bookkeeping reported, never asserted",
+        "solver's published pass-two last-iteration coefficients (pre-final-solve heads, contents, C_eff, Con/ConVh/ConVT)",
+        "per accepted step; fresh-coefficient closure reported only (limited by TolTh/TolH)"
+      ],
+      "relative": 1e-09,
+      "scale": "max_abs_row_term",
+      "unit": "model"
+    }
+  },
+  "contract_revision": "8e561a570b9873695330fa7448fe8d16368609d5",
+  "contract_sha256": "2cd1f8b9d952fb15edddd23942dd32d10dbe1ca415e223a7e5ae81aea38cf79f",
+  "discrimination": {
+    "dry_on_off_head": {
+      "case": "vapor_dry_thermal_gradient",
+      "control": "vapor_dry_off_control",
+      "factor_of_tolerance": 2.0,
+      "field": "head",
+      "rule": "any_print_time_after_initial",
+      "unit": "cm"
+    },
+    "dry_on_off_liquid_moisture": {
+      "case": "vapor_dry_thermal_gradient",
+      "control": "vapor_dry_off_control",
+      "factor_of_tolerance": 2.0,
+      "field": "liquid_moisture",
+      "rule": "any_print_time_after_initial",
+      "unit": "cm3/cm3"
+    },
+    "dry_on_off_temperature_c": {
+      "case": "vapor_dry_thermal_gradient",
+      "control": "vapor_dry_off_control",
+      "factor_of_tolerance": 2.0,
+      "field": "temperature_c",
+      "rule": "any_print_time_after_initial",
+      "unit": "degC"
+    },
+    "vapor_fields_nonzero": {
+      "cases": [
+        "vapor_isothermal_head_gradient",
+        "vapor_thermal_gradient",
+        "vapor_dry_thermal_gradient"
+      ],
+      "factor_of_tolerance": 1.0,
+      "fields": [
+        "con_vh",
+        "con_vt",
+        "v_vapor",
+        "v_vap_iso",
+        "v_vap_term"
+      ],
+      "rule": "max_abs_exceeds_zero_floor_each_case",
+      "unit": "field"
+    }
+  },
+  "fields": {
+    "con": {
+      "absolute": 0.0,
+      "evidence_class": "pinned-fortran-trajectory",
+      "print_rule": "nod_inf_v_e13.5",
+      "relative": 0.02,
+      "scale": "abs_reference",
+      "unit": "cm/h",
+      "zero_rule": {
+        "fraction": 0.001,
+        "name": "case_time_field_max_fraction"
+      }
+    },
+    "con_lt": {
+      "absolute": 0.0,
+      "evidence_class": "pinned-fortran-trajectory",
+      "print_rule": "nod_inf_v_e13.5",
+      "relative": 0.02,
+      "scale": "abs_reference",
+      "unit": "cm2/K/h",
+      "zero_rule": {
+        "fraction": 0.001,
+        "name": "case_time_field_max_fraction"
+      }
+    },
+    "con_vh": {
+      "absolute": 0.0,
+      "evidence_class": "pinned-fortran-trajectory",
+      "print_rule": "nod_inf_v_e13.5",
+      "relative": 0.02,
+      "scale": "abs_reference",
+      "unit": "cm/h",
+      "zero_rule": {
+        "fraction": 0.001,
+        "name": "case_time_field_max_fraction"
+      }
+    },
+    "con_vt": {
+      "absolute": 0.0,
+      "evidence_class": "pinned-fortran-trajectory",
+      "print_rule": "nod_inf_v_e13.5",
+      "relative": 0.02,
+      "scale": "abs_reference",
+      "unit": "cm2/K/h",
+      "zero_rule": {
+        "fraction": 0.001,
+        "name": "case_time_field_max_fraction"
+      }
+    },
+    "head": {
+      "absolute": 0.5,
+      "evidence_class": "pinned-fortran-trajectory",
+      "print_rule": "nod_inf_head_f11.3_or_e11.4",
+      "relative": 0.02,
+      "scale": "abs_reference",
+      "unit": "cm",
+      "zero_rule": {
+        "name": "none"
+      }
+    },
+    "kernel_adjusted_hydraulic_capacity": {
+      "absolute": 0.0,
+      "evidence_class": "pinned-fortran-kernel",
+      "print_rule": "harness_real_repr",
+      "relative": 1e-06,
+      "scale": "abs_reference",
+      "unit": "1/cm",
+      "zero_rule": {
+        "name": "none"
+      }
+    },
+    "kernel_capacity_correction": {
+      "absolute": 0.0,
+      "evidence_class": "pinned-fortran-kernel",
+      "print_rule": "harness_real_repr_difference_input_minus_adjusted",
+      "relative": 0.01,
+      "scale": "abs_reference",
+      "unit": "1/cm",
+      "zero_rule": {
+        "name": "none"
+      }
+    },
+    "kernel_vapor_content": {
+      "absolute": 0.0,
+      "evidence_class": "pinned-fortran-kernel",
+      "print_rule": "harness_real_repr",
+      "relative": 1e-05,
+      "scale": "abs_reference",
+      "unit": "cm3/cm3",
+      "zero_rule": {
+        "name": "none"
+      }
+    },
+    "liquid_moisture": {
+      "absolute": 0.00105,
+      "evidence_class": "pinned-fortran-trajectory",
+      "print_rule": "nod_inf_moisture_f6.4",
+      "relative": 0.0,
+      "scale": "none",
+      "unit": "cm3/cm3",
+      "zero_rule": {
+        "name": "none"
+      }
+    },
+    "temperature_c": {
+      "absolute": 0.05,
+      "evidence_class": "pinned-fortran-trajectory",
+      "print_rule": "nod_inf_temperature_f8.2",
+      "relative": 0.0,
+      "scale": "none",
+      "unit": "degC",
+      "zero_rule": {
+        "name": "none"
+      }
+    },
+    "v_liquid": {
+      "absolute": 0.0,
+      "evidence_class": "pinned-fortran-trajectory",
+      "print_rule": "nod_inf_v_e13.5",
+      "relative": 0.02,
+      "scale": "abs_reference",
+      "unit": "cm/h",
+      "zero_rule": {
+        "fraction": 0.001,
+        "name": "case_time_field_max_fraction"
+      }
+    },
+    "v_total": {
+      "absolute": 0.0,
+      "evidence_class": "pinned-fortran-trajectory",
+      "print_rule": "nod_inf_v_e13.5",
+      "relative": 0.02,
+      "scale": "abs_reference",
+      "unit": "cm/h",
+      "zero_rule": {
+        "fraction": 0.001,
+        "name": "case_time_field_max_fraction"
+      }
+    },
+    "v_vap_iso": {
+      "absolute": 0.0,
+      "evidence_class": "pinned-fortran-trajectory",
+      "print_rule": "nod_inf_v_e13.5",
+      "relative": 0.02,
+      "scale": "abs_reference",
+      "unit": "cm/h",
+      "zero_rule": {
+        "fraction": 0.001,
+        "name": "case_time_field_max_fraction"
+      }
+    },
+    "v_vap_term": {
+      "absolute": 0.0,
+      "evidence_class": "pinned-fortran-trajectory",
+      "print_rule": "nod_inf_v_e13.5",
+      "relative": 0.02,
+      "scale": "abs_reference",
+      "unit": "cm/h",
+      "zero_rule": {
+        "fraction": 0.001,
+        "name": "case_time_field_max_fraction"
+      }
+    },
+    "v_vapor": {
+      "absolute": 0.0,
+      "evidence_class": "pinned-fortran-trajectory",
+      "print_rule": "nod_inf_v_e13.5",
+      "relative": 0.02,
+      "scale": "abs_reference",
+      "unit": "cm/h",
+      "zero_rule": {
+        "fraction": 0.001,
+        "name": "case_time_field_max_fraction"
+      }
+    }
+  },
+  "schema_version": "vapor-criteria-v1"
+}
