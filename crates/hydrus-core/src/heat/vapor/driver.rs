@@ -88,6 +88,12 @@ pub struct VaporStepReport {
     pub liquid_contents_new: Vec<f64>,
     pub vapor_contents_old: Vec<f64>,
     pub vapor_contents_new: Vec<f64>,
+    /// Stored pass-two coefficients (`Con`, `ConLT`, `ConVh`, `ConVT`) from the last
+    /// pre-final-solve evaluation, at the first heat result; source `NodOut` reads these.
+    pub liquid_conductivities: Vec<f64>,
+    pub liquid_thermal_conductivities: Vec<f64>,
+    pub vapor_head_conductivities: Vec<f64>,
+    pub vapor_thermal_conductivities: Vec<f64>,
     pub liquid_velocities: Vec<f64>,
     pub vapor_velocities: Vec<f64>,
     pub liquid_face_fluxes: Vec<f64>,
@@ -278,6 +284,10 @@ impl VaporWaterHeatDriver {
             liquid_contents_new,
             vapor_contents_old,
             vapor_contents_new: properties.vapor_contents,
+            liquid_conductivities: properties.liquid_conductivities,
+            liquid_thermal_conductivities: properties.liquid_thermal_conductivities,
+            vapor_head_conductivities: properties.vapor_head_conductivities,
+            vapor_thermal_conductivities: properties.vapor_thermal_conductivities,
             liquid_velocities,
             vapor_velocities,
             liquid_face_fluxes,
