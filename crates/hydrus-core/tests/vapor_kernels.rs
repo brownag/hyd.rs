@@ -1,6 +1,7 @@
 use hydrus_core::heat::vapor::kernels::{evaluate, x_latent};
 use hydrus_core::heat::vapor::{VaporError, VaporPrimitiveInput};
 
+#[allow(clippy::too_many_arguments)]
 fn input<'a>(
     heads: &'a [f64],
     temperatures: &'a [f64],
@@ -27,7 +28,7 @@ fn input<'a>(
 
 #[test]
 fn latent_heat_and_material_values_match_independent_points() {
-    let hand_calculated = 2_500_699_015.6544;
+    let hand_calculated = 2_500_699_015.654_4;
     // Allow only a few f64 rounding ULPs; this is not a scientific tolerance.
     assert!(
         (x_latent(0.0).unwrap() - hand_calculated).abs() <= 2.0 * f64::EPSILON * hand_calculated
