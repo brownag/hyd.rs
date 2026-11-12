@@ -137,7 +137,8 @@ Every task is in `hyd.rs`. Same-wave product scopes are pairwise disjoint.
 | 6 | 25.6.2 | Independent mathematics and vapor balance checks | 25.5.1 |
 | 6 | 25.6.3 | Dry-soil discriminating vapor fixtures (amendment 2026-11-12) | 25.2.2 |
 | 6 | 25.6.4 | Water-trial iteration semantics correction (amendment 2026-11-12) | 25.4.1, 25.5.1 |
-| 7 | 25.7.1 | Approved-criteria coupled and kernel parity | 25.1.2, 25.2.2, 25.6.1, 25.6.2, 25.6.3, 25.6.4; numeric gate |
+| 7 | 25.7.1 | Rust candidate runs and parity test (split 2026-11-12) | 25.1.2, 25.2.2, 25.6.1, 25.6.2, 25.6.3, 25.6.4; numeric gate |
+| 7 | 25.7.2 | Standalone Python vapor comparator (split 2026-11-12) | numeric gate; candidate schema below |
 | 8 | 25.8.1 | Capability acceptance and full-coverage handoff | All prior tasks |
 
 Numeric gate precedes **any** candidate-vs-reference check, including kernel
@@ -638,6 +639,81 @@ path; ordinary liquid-only entries stay unchanged.
   `.development/25.7.1/<attempt>/` roots; never overwrite earlier evidence.
 - **Targeted tests:** `cargo test -p hydrus-core --test vapor_fortran_parity -- --nocapture --test-threads=1`;
   `python3 -m unittest tools.test_compare_vapor_reference`.
+
+#### Split of 25.7.1 (amendment 2026-11-12)
+
+The original 25.7.1 exceeds one small-model task. It is split into 25.7.1 (Rust)
+and 25.7.2 (Python), which run in parallel with disjoint files and share the
+orchestrator-defined candidate schema below. The spec above still governs both;
+the parts below narrow scope and files.
+
+**Candidate schema `vapor-candidate-v1`** (JSON, one file per case). Keys:
+`schema_version`, `case_id`, `evidence_class` = `"rust-candidate"`,
+`criteria_sha256`, `fixture_sha256`, `input_sha256` (`SELECTOR.IN`,
+`PROFILE.DAT`), `schedule` (`kind` = `"constant_dt"`, `dt`, `retry_factor`,
+`note`), `time_points`, `node_numbers`, `node_depths`, `head`,
+`liquid_moisture`, `temperature_c` (time-major, top-first source node order,
+the same layout as the fixtures), `vapor_output_available`, and `vapor_fields`
+(the nine fixture names, the same layout) or `null` when vapor is off. Values
+are unrounded f64. Kernel candidates use a separate file with
+`schema_version` = `"vapor-kernel-candidate-v1"`, `evidence_class`, `criteria_sha256`,
+`fixture_sha256`, `requests_sha256` (SHA-256 of `R/kernel_harness/requests.json`;
+added 2026-11-12) and per-observation
+`request_id`, `node`, `vapor_content`, `adjusted_hydraulic_capacity`,
+`input_capacity`.
+
+**Comparison rule** (both consumers, from `criteria.json`): pass when
+`|c-r| <= absolute + relative*|r|`. For `case_time_field_max_fraction`
+fields the bound is raised to at least `fraction*max|r|` over that
+case/time/field. `kernel_capacity_correction` compares
+`input_capacity - adjusted` values. Unknown or missing fields, classes, units,
+scales or rule names reject. Report case/field/time/node/candidate/reference/
+error/bound/verdict, and the criteria SHA-256.
+
+### 25.7.1 — Rust candidate runs and parity test
+
+- **Must edit:** none. **Can create:** `T/vapor_fortran_parity.rs`.
+- **Spec:** follow the `T/heat_fortran_parity.rs` deck/profile parsing and
+  input-hash pattern (copy what is needed; do not edit that file). Build every
+  case only from its authenticated `SELECTOR.IN`/`PROFILE.DAT`; never read
+  trajectory outputs into the candidate. Use the `INPUT.FOR` unit conversion
+  (cm: `x_conv=100`; hours: `t_conv=1/3600`), the deck's table span (`hTab1`/
+  `hTabN`, 100 log-spaced knots, as heat parity) for `VaporSourceMaterial.table`,
+  `retry_factor=3` (source `dt/3`), deck `MaxIt`/`TolTh`/`TolH`/`dtMin`, and a
+  constant declared `dt` = deck initial `dt`, landing exactly on print times.
+  Disclose that the source's adaptive `TmCont` schedule is not reproduced.
+  Vapor cases run `VaporWaterHeatDriver`; off-controls run the existing
+  `HeatWaterDriver`. Observe vapor fields with `observe_step` at each print time.
+  At t=0, observe from the initial state with coefficients from the vapor
+  kernels at the initial heads and temperatures (source initial `SetMat`,
+  `HYDRUS.FOR:224`), with a zero storage term (`HYDRUS.FOR:365`). Write
+  candidates under a new unique `.development/25.7.1/<attempt>/` root, never
+  overwriting. Compare in Rust against the fixtures using `criteria.json`,
+  print the full verdict table, and fail on any violation. Also run kernel
+  parity against `R/kernel_fixtures/vapor_content.json` requests, and check the
+  dry-case reference on/off discrimination floors. Controls: candidate vapor-on
+  vs vapor-off differs in the dry case; pass-two temperatures differ from
+  pass-one in at least one step (second pass matters). No tolerance edits; a
+  failure is reported, not tuned.
+- **Targeted test:** `cargo test -p hydrus-core --test vapor_fortran_parity -- --nocapture --test-threads=1`.
+
+### 25.7.2 — Standalone Python vapor comparator
+
+- **Must edit:** none. **Can create:** `tools/compare_vapor_reference.py`,
+  `tools/test_compare_vapor_reference.py`.
+- **Spec:** a stdlib-only CLI that reads `criteria.json`, a fixture and a
+  `vapor-candidate-v1` file (or the kernel fixture and kernel candidate) and
+  emits the verdict table and a JSON result to a caller-supplied new output
+  path (refuse to overwrite). Validate the criteria schema fully (keys, finite
+  nonnegative values, known rule names, evidence class/unit match) and
+  candidate/fixture identity: case id, fixture hash, node numbers, depths, time
+  points and shapes. Missing vapor output is "unavailable" only when the
+  fixture says so; otherwise it fails. Compute the dry on/off discrimination
+  from the two reference fixtures. Tests use synthetic fixtures/candidates in
+  temp dirs: pass, tolerance-edge, NaN, missing node/time, tampered fixture
+  hash, unknown/missing criterion, wrong unit/class, zero-floor behavior,
+  capacity-correction semantics, discrimination fail. Do not run a Rust candidate.
+- **Targeted test:** `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest tools.test_compare_vapor_reference`.
 
 ### 25.8.1 — Acceptance and coverage handoff
 

@@ -258,6 +258,24 @@ one or more printed times after the initial one; every vapor-only field is
 nonzero above its zero floor in every vapor-enabled case. Wet cases remain
 non-discriminating regression evidence for head/moisture/temperature.
 
+### Criteria revision v2 (user, 2026-11-12, post-failure)
+
+**This revision was approved after seeing Wave 7 failures.** It is an explicit
+owner override of the no-widening rule, recorded as such. Cause: in the wet
+isothermal case, failing `v_vapor`/`v_vap_term` errors (1e-14..1.4e-13) lay
+within the vapor thermal flux produced by a single float32 step in the
+source's single-precision `TempN` (`TEMPER.FOR:55`), 2e-15..5.6e-13, which
+exceeded the v1 per-time zero floor.
+
+Change (only): for `v_vapor`, `v_vap_term` and `v_total`, the bound is raised to
+at least `2 * ulp32(|T_ref,t,n|) * ConVT_max,t,n / dx_min,n`, where
+`ConVT_max` is the largest reference `con_vt` at node `n` and its mesh
+neighbours at the same time, `dx_min` is the smallest adjacent node spacing,
+and `ulp32` is the float32 spacing. The multiple 2 bounds two adjacent
+half-ulp roundings with a factor-two margin. It is fixed from source precision,
+not from candidate errors. All other v1 values are unchanged. Wave 7 is rerun
+under v2; the v1 verdicts are retained as evidence.
+
 Required, separate evidence classes:
 
 1. Independent hand-worked kernel values, gradient/storage zero limits, density
