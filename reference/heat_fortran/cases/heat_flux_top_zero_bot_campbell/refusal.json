@@ -1,0 +1,5 @@
+{
+  "case_id": "heat_flux_top_zero_bot_campbell",
+  "refused": true,
+  "reason": "heat_flux_top_zero_bot_campbell: refused fixture; non-finite Temp at time 6.0 node 1 (value nan); Fortran output is not a valid parity target"
+}

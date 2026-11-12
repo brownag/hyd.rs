@@ -217,5 +217,48 @@ fn campbell_conductivity(m: &TempMaterial, theta: f64, x_conv: f64, t_conv: f64)
     let dd = 0.03 + 0.7 * (s * s);
     // Fortran `-(CC*th)**EE` with EE = 4.: the minus applies to the power.
     let xlamb = aa + bb * theta - (aa - dd) * (-(cc * theta).powf(4.0)).exp();
+    // SD-006 (docs/FORTRAN_SOURCE_DEFECTS.md): the Fortran unit factor `xConv/tConv**3`
+    // (TEMPER.FOR:300) is kept on purpose. The default branch has no such factor.
     (xlamb * x_conv / t_conv / t_conv / t_conv).max(0.0)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// SD-006 pinning test (docs/FORTRAN_SOURCE_DEFECTS.md). Fails if the Campbell
+    /// unit factor `xConv/tConv**3` (TEMPER.FOR:300) is removed or changed.
+    ///
+    /// Hand computation: s=0.5, q=0, o=0, clay=0.25, th=0 gives xc=0.25, DD=0.03+0.7*0.25=0.205,
+    /// and the exp term is exactly 1, so XLamb = DD = 0.205. With cm and hours
+    /// (`Conversion`, INPUT.FOR:190 and :197): xConv=100, tConv=1/3600, so the factor is
+    /// 100*3600^3 = 4.6656e12 and Cond = 0.205 * 4.6656e12 = 9.56448e11 (advective term 0 at v=0).
+    #[test]
+    fn source_defect_sd006_campbell_scale_applies_xconv_tconv_cubed() {
+        let material = TempMaterial::from_tpar([0.5, 0.0, 0.0, 0.0, 0.0, 0.25, 2.0, 0.0, 4.0]);
+        let mut cap = [0.0];
+        let mut cond = [0.0];
+        temp_cap(
+            TempCapInput {
+                material_indices: &[0],
+                water_content: &[0.0],
+                velocity: &[0.0],
+                materials: &[material],
+                campbell: true,
+                x_conv: 100.0,
+                t_conv: 1.0 / 3600.0,
+            },
+            &mut cap,
+            &mut cond,
+        )
+        .expect("finite cm/hour inputs");
+        let expected = 0.205 * 100.0 * 3600.0_f64.powi(3);
+        assert!(
+            ((cond[0] - expected) / expected).abs() < 1e-12,
+            "Campbell cond {} != SD-006 value {}",
+            cond[0],
+            expected
+        );
+        assert!((expected - 9.56448e11).abs() / expected < 1e-6);
+    }
 }

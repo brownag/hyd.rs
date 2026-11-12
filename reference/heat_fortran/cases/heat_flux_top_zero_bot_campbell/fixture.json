@@ -1,0 +1,21 @@
+{
+  "case_id": "heat_flux_top_zero_bot_campbell",
+  "runner": {
+    "inputs": [
+      "LEVEL_01.DIR",
+      "SELECTOR.IN",
+      "PROFILE.DAT"
+    ],
+    "outputs": [
+      {
+        "name": "NOD_INF.OUT",
+        "marker": "end"
+      }
+    ],
+    "aliases": {
+      "SELECTOR.IN": "Selector.in",
+      "PROFILE.DAT": "Profile.dat"
+    },
+    "data_prefix": "heat-input"
+  }
+}

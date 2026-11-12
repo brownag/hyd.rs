@@ -131,6 +131,41 @@ reproduces on purpose, so its output matches the reference program.
   - **Verdict:** untested
   - **Evidence:** untested
 
+### SD-006 — Campbell thermal conductivity carries an `xConv/tConv**3` factor the default branch lacks
+
+- **Source:** `TEMPER.FOR:300` (`TempCap`, Campbell branch):
+  `Cond(i)=amax1(0.,XLamb*xConv/tConv/tConv/tConv)`. The default branch at
+  `TEMPER.FOR:286` (`Cond(i)=amax1(0.,TPar(4,M)+TPar(5,M)*th+TPar(6,M)*sqrt(th))`)
+  applies no unit factor. Conversion factors come from `Conversion` (`INPUT.FOR:182-201`):
+  `xConv=100` for `LUnit="cm"`, `tConv=1/3600` for `TUnit="hours"`.
+- **Expected:** the two branches of one conductivity routine on the same unit basis.
+  The source does not settle which basis is intended: the default branch (`:286`) is
+  unscaled and the Campbell branch (`:300`) is scaled by about 4.7e12 at cm and hours. The
+  manual that would decide is absent. Other conductivities are scaled, e.g. the water
+  conductivity `WATFLOW.FOR:880` (`Con/xConv*tConv`) and the vapor conductivities
+  `WATFLOW.FOR:919-922` and `:995`, so the unscaled default branch is the outlier. The
+  pinning test uses the Fortran value with the factor.
+- **Effect:** at cm and hours, Campbell conductivity is about 4.7e12 times the default
+  branch for the same material. With a flux top (`kTopT<0`), a zero-gradient bottom
+  (`kBotT==0`, `TEMPER.FOR:108-111`) and `iCampbell=1`, the unpivoted tridiagonal solve
+  (`SOLUTE.FOR:949-957`, `BanSol`, called from `TEMPER.FOR:53`) produces Inf and then NaN from
+  the first print at `t=6` (node 1). Reproduced on the pinned build with the case
+  `reference/heat_fortran/cases/heat_flux_top_zero_bot_campbell`; the producer refuses it
+  (`refusal.json` in that case directory; no fixture written). Removing only the factor
+  in a scratch build removes the NaN. Each of these also removes the NaN, one at a time:
+  `iCampbell=0`, `kBotT=1`, `kTopT=1`. Campbell with a Dirichlet bottom and a flux top
+  stays finite (`heat_flux_top_dir_bot_campbell`).
+- **Port:** `heat/capacity.rs` (`campbell_conductivity`, the factor kept as written).
+- **Pinning test:** `heat::capacity::tests::source_defect_sd006_campbell_scale_applies_xconv_tconv_cubed`.
+  Expected `0.205 * 100 * 3600^3 = 9.56448e11` (the test asserts this at `th=0`, `clay=0.25`,
+  `xConv=100`, `tConv=1/3600`). Without the factor it returns `0.205`.
+- **Status:** reproduced; not reported upstream.
+- **Modern HYDRUS:**
+  - **Version:** untested
+  - **Date:** untested
+  - **Verdict:** untested
+  - **Evidence:** untested
+
 ## Probe procedure
 
 To determine whether a source defect persists or has been resolved in modern or closed-source HYDRUS builds:
