@@ -12,6 +12,7 @@ from pathlib import Path
 
 import tools.compare_vapor_reference as cmp
 
+REQ_SHA = "e" * 64
 DECK_HASH = {"SELECTOR.IN": "a" * 64, "PROFILE.DAT": "b" * 64}
 
 
@@ -76,6 +77,23 @@ class CriteriaTests(Base):
         fn(data)
         with self.assertRaises(cmp.Reject):
             cmp.validate_criteria(data)
+
+    def test_v1_and_revision_note(self):
+        self.mutate(lambda d: d.update(schema_version="vapor-criteria-v1"))
+        self.mutate(lambda d: d.update(revision_note=5))
+        ok = copy.deepcopy(self.criteria)
+        ok["revision_note"] = "note"
+        cmp.validate_criteria(ok)
+
+    def test_precision_rule_keys(self):
+        z = lambda d: d["fields"]["v_vapor"]["zero_rule"]
+        self.mutate(lambda d: z(d).update(temperature_precision="float64"))
+        self.mutate(lambda d: z(d).update(spacing="other"))
+        self.mutate(lambda d: z(d).update(conductivity_field="con"))
+        self.mutate(lambda d: z(d).update(ulp_multiple=0.0))
+        self.mutate(lambda d: z(d).pop("ulp_multiple"))
+        self.mutate(lambda d: z(d).update(extra=1))
+        self.mutate(lambda d: d["fields"]["head"].update(zero_rule=dict(z(d))))
 
     def test_unknown_missing_wrong(self):
         self.mutate(lambda d: d["fields"].pop("head"))
@@ -178,6 +196,49 @@ class TrajectoryTests(Base):
         res = self.run_traj(fx, fsha, cand)
         self.assertEqual(res["summary"]["con"]["failures"], 2)
 
+    def test_zero_floor_is_per_time(self):
+        # t=0 max 10 (floor 0.01), t=1 max 0.01 (floor 1e-5). A global floor would pass 0.001 at t=1.
+        fx, fsha, cand = self.setup_case()
+        fx["vapor_fields"]["con"] = [[0.0, 10.0, 0.0], [0.0, 0.01, 0.0]]
+        cand["vapor_fields"]["con"] = [[0.009, 10.0, 0.0], [0.001, 0.01, 0.0]]
+        res = self.run_traj(fx, fsha, cand)
+        rows = {(r["time"], r["node"]): r for r in res["rows"] if r["field"] == "con"}
+        self.assertEqual(rows[(0.0, 1)]["verdict"], "PASS")
+        self.assertAlmostEqual(rows[(6.0, 1)]["bound"], 1e-5)
+        self.assertEqual(rows[(6.0, 1)]["verdict"], "FAIL")
+
+    def test_precision_term_dominates(self):
+        # T=15 -> ulp32 = 2**-20; ConVT neighbourhood max 1e6, dx=1 -> term = 2*2**-20*1e6
+        fx, fsha, cand = self.setup_case()
+        fx["vapor_fields"]["v_vapor"] = matrix(0.0)
+        fx["vapor_fields"]["con_vt"] = [[0.0, 1e6, 0.0], [0.0, 0.0, 0.0]]
+        cand["vapor_fields"]["v_vapor"] = matrix(1.0)
+        res = self.run_traj(fx, fsha, cand)
+        rows = {(r["time"], r["node"]): r for r in res["rows"] if r["field"] == "v_vapor"}
+        term = 2.0 * 2.0 ** -20 * 1e6
+        for node in (1, 2, 3):  # neighbours of node 2 share its ConVT
+            self.assertAlmostEqual(rows[(0.0, node)]["bound"], term, places=9)
+            self.assertEqual(rows[(0.0, node)]["verdict"], "PASS")
+        self.assertEqual(rows[(6.0, 1)]["bound"], 0.0)  # same-time neighbourhood only
+        self.assertEqual(rows[(6.0, 1)]["verdict"], "FAIL")
+        self.assertEqual(self.run_traj(fx, fsha, cand)["summary"]["v_vapor"]["failures"], 3)
+        # other vapor fields keep the plain rule
+        self.assertEqual(res["summary"]["con"]["failures"], 0)
+
+    def test_precision_term_requires_con_vt(self):
+        fx, fsha, cand = self.setup_case()
+        fx["vapor_fields"].pop("con_vt")
+        with self.assertRaises(cmp.Reject):
+            self.run_traj(fx, fsha, cand)
+        with self.assertRaises(cmp.Reject):
+            cmp.precision_terms(fx, 0, 0)
+
+    def test_ulp32(self):
+        self.assertEqual(cmp.ulp32(25.0), 2.0 ** -19)
+        self.assertEqual(cmp.ulp32(-25.0), 2.0 ** -19)
+        self.assertEqual(cmp.ulp32(1.0), 2.0 ** -23)
+        self.assertAlmostEqual(cmp.ulp32(25.0), 1.9073486e-06, places=12)
+
     def test_vapor_unavailable_vs_missing(self):
         fx, fsha, cand = self.setup_case(available=False)
         res = self.run_traj(fx, fsha, cand)
@@ -218,11 +279,23 @@ class KernelTests(Base):
         fx = cmp.load_json(path)
         fsha = cmp.sha256_file(path)
         cand = {"schema_version": cmp.KERNEL_CANDIDATE_SCHEMA, "criteria_sha256": self.csha,
+                "evidence_class": "rust-candidate", "requests_sha256": REQ_SHA,
                 "fixture_sha256": fsha, "observations": copy.deepcopy(fx["observations"])}
         return fx, fsha, cand
 
     def run_kernel(self, fx, fsha, cand):
-        return cmp.compare_kernel(self.criteria, self.csha, fx, fsha, cand)
+        return cmp.compare_kernel(self.criteria, self.csha, fx, fsha, cand, REQ_SHA)
+
+    def test_requests_hash_and_evidence_class(self):
+        for key, value in (("requests_sha256", "0" * 64), ("evidence_class", "other")):
+            fx, fsha, cand = self.setup_kernel()
+            cand[key] = value
+            with self.assertRaises(cmp.Reject):
+                self.run_kernel(fx, fsha, cand)
+        fx, fsha, cand = self.setup_kernel()
+        cand.pop("requests_sha256")
+        with self.assertRaises(cmp.Reject):
+            self.run_kernel(fx, fsha, cand)
 
     def test_pass(self):
         self.assertEqual(self.run_kernel(*self.setup_kernel())["verdict"], "PASS")
@@ -262,8 +335,10 @@ class KernelTests(Base):
         path = cmp.VAPOR_DIR / "kernel_fixtures/vapor_content.json"
         fx = cmp.load_json(path)
         cand = {"schema_version": cmp.KERNEL_CANDIDATE_SCHEMA, "criteria_sha256": self.csha,
+                "evidence_class": "rust-candidate", "requests_sha256": cmp.sha256_file(cmp.DEFAULT_REQUESTS),
                 "fixture_sha256": cmp.sha256_file(path), "observations": fx["observations"]}
-        self.assertEqual(self.run_kernel(fx, cmp.sha256_file(path), cand)["verdict"], "PASS")
+        res = cmp.compare_kernel(self.criteria, self.csha, fx, cmp.sha256_file(path), cand)
+        self.assertEqual(res["verdict"], "PASS")
 
 
 class DiscriminationTests(Base):
@@ -315,6 +390,15 @@ class DiscriminationTests(Base):
         res = self.disc(self.fixtures(vapor=0.0))
         nz = [c for c in res["checks"] if c["rule"] == "max_abs_exceeds_zero_floor_each_case"]
         self.assertTrue(all(c["verdict"] == "FAIL" for c in nz))
+
+    def test_nonzero_floor_is_per_time(self):
+        fixtures = self.fixtures(vapor=0.0)
+        # t=0 huge, t=1 tiny but its own max point is above its own per-time floor
+        fixtures["vapor_thermal_gradient"]["vapor_fields"]["con_vh"] = [[5.0, 0.0, 0.0], [1e-9, 0.0, 0.0]]
+        res = self.disc(fixtures)
+        c = [c for c in res["checks"] if c["case_id"] == "vapor_thermal_gradient" and c["field"] == "con_vh"][0]
+        self.assertEqual(c["verdict"], "PASS")
+        self.assertEqual(c["floor_semantics"], "per_time_fraction_of_max_over_nodes")
 
     def test_nonzero_requires_point_after_initial(self):
         fixtures = self.fixtures(vapor=0.0)

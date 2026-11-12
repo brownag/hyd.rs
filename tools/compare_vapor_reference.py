@@ -3,8 +3,8 @@
 
 Compares `vapor-candidate-v1` / `vapor-kernel-candidate-v1` files with the pinned-Fortran
 fixtures under reference/vapor_fortran/ using the approved table in criteria.json
-(`vapor-criteria-v1`). Pass rule: |c - r| <= absolute + relative*|r|, raised to at least
-fraction*max|r| (over the case/field) for `case_time_field_max_fraction` fields.
+(`vapor-criteria-v2`). Pass rule: |c - r| <= absolute + relative*|r|, raised to at least
+fraction*max_n|r_t,n| (per print time t) for `case_time_field_max_fraction` fields.
 
 Usage:
   compare_vapor_reference.py trajectory --fixture F --candidate X --output OUT.json
@@ -17,6 +17,7 @@ import argparse
 import hashlib
 import json
 import math
+import struct
 import sys
 from pathlib import Path
 
@@ -24,7 +25,8 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 VAPOR_DIR = REPO_ROOT / "reference/vapor_fortran"
 DEFAULT_CRITERIA = VAPOR_DIR / "criteria.json"
 DEFAULT_FIXTURE_DIR = VAPOR_DIR / "fixtures"
-CRITERIA_SCHEMA = "vapor-criteria-v1"
+DEFAULT_REQUESTS = VAPOR_DIR / "kernel_harness/requests.json"
+CRITERIA_SCHEMA = "vapor-criteria-v2"
 CANDIDATE_SCHEMA = "vapor-candidate-v1"
 KERNEL_CANDIDATE_SCHEMA = "vapor-kernel-candidate-v1"
 RESULT_SCHEMA = "vapor-comparison-result-v1"
@@ -47,10 +49,16 @@ TRAJ_FIELDS = ("head", "liquid_moisture", "temperature_c") + VAPOR_FIELDS
 KERNEL_FIELDS = ("kernel_vapor_content", "kernel_adjusted_hydraulic_capacity",
                  "kernel_capacity_correction")
 SCALES = ("abs_reference", "none")
-ZERO_RULES = ("none", "case_time_field_max_fraction")
+PRECISION_RULE = "case_time_field_max_fraction_with_temperature_precision"
+ZERO_RULES = ("none", "case_time_field_max_fraction", PRECISION_RULE)
+PRECISION_KEYS = {"name": PRECISION_RULE, "temperature_precision": "float32",
+                  "conductivity_field": "con_vt",
+                  "conductivity_neighbourhood": "node_and_mesh_neighbours_same_time",
+                  "spacing": "min_adjacent_dx"}
 DISC_RULES = ("any_print_time_after_initial", "max_abs_exceeds_zero_floor_each_case")
 FIELD_KEYS = {"absolute", "evidence_class", "print_rule", "relative", "scale", "unit", "zero_rule"}
 CHECK_KEYS = {"absolute", "assumptions", "relative", "scale", "unit"}
+OPTIONAL_TOP_KEYS = {"revision_note"}
 TOP_KEYS = {"approved_at", "approved_by", "checks", "contract_revision", "contract_sha256",
             "discrimination", "fields", "schema_version"}
 CANDIDATE_KEYS = {"schema_version", "case_id", "evidence_class", "criteria_sha256",
@@ -99,6 +107,10 @@ def _keys(obj, expected, label):
 
 
 def validate_criteria(criteria):
+    if isinstance(criteria, dict) and "revision_note" in criteria:
+        if not isinstance(criteria["revision_note"], str):
+            raise Reject("criteria.revision_note: expected string")
+        criteria = {k: v for k, v in criteria.items() if k != "revision_note"}
     _keys(criteria, TOP_KEYS, "criteria")
     if criteria["schema_version"] != CRITERIA_SCHEMA:
         raise Reject("criteria: unknown schema_version")
@@ -126,7 +138,18 @@ def validate_criteria(criteria):
         if zero["name"] == "none":
             _keys(zero, {"name"}, f"{label}.zero_rule")
         else:
-            _keys(zero, {"name", "fraction"}, f"{label}.zero_rule")
+            extra = {"name", "fraction"}
+            if zero["name"] == PRECISION_RULE:
+                extra |= set(PRECISION_KEYS) | {"ulp_multiple"}
+                if name not in ("v_vapor", "v_vap_term", "v_total"):
+                    raise Reject(f"{label}: precision zero_rule not allowed here")
+            _keys(zero, extra, f"{label}.zero_rule")
+            if zero["name"] == PRECISION_RULE:
+                for key, allowed in PRECISION_KEYS.items():
+                    if zero[key] != allowed:
+                        raise Reject(f"{label}.zero_rule.{key}: expected {allowed!r}")
+                if not is_num(zero["ulp_multiple"]) or zero["ulp_multiple"] <= 0:
+                    raise Reject(f"{label}.zero_rule.ulp_multiple: expected positive number")
             if not is_num(zero["fraction"]) or not 0 < zero["fraction"] <= 1:
                 raise Reject(f"{label}.zero_rule.fraction: expected (0, 1]")
     checks = criteria["checks"]
@@ -160,7 +183,7 @@ def validate_criteria(criteria):
             if not spec["fields"] or any(f not in VAPOR_FIELDS for f in spec["fields"]):
                 raise Reject(f"{label}: fields must be vapor fields")
             for f in spec["fields"]:
-                if fields[f]["zero_rule"]["name"] != "case_time_field_max_fraction":
+                if fields[f]["zero_rule"]["name"] not in ZERO_RULES[1:]:
                     raise Reject(f"{label}: field {f} has no zero floor")
     return criteria
 
@@ -271,16 +294,43 @@ def _row(case, field, time, node, c, r, bound):
             "reference": r, "error": err, "bound": bound, "verdict": "PASS" if err <= bound else "FAIL"}
 
 
-def compare_matrix(case, field, spec, times, nodes, cand, ref):
+def ulp32(x):
+    """float32 spacing at |x| (next float32 above |x| minus float32(|x|))."""
+    try:
+        base = struct.unpack("<f", struct.pack("<f", abs(x)))[0]
+        bits = struct.unpack("<I", struct.pack("<f", base))[0]
+        return struct.unpack("<f", struct.pack("<I", bits + 1))[0] - base
+    except (OverflowError, struct.error) as error:
+        raise Reject(f"ulp32({x}) not representable") from error
+
+
+def precision_terms(fixture, t, n):
+    """2-ulp temperature term factor: ulp32(|T_ref|) * ConVT_max / dx_min at (t, n)."""
+    vf = fixture.get("vapor_fields")
+    if not isinstance(vf, dict) or "con_vt" not in vf:
+        raise Reject("fixture: con_vt required for temperature-precision zero rule")
+    depths = fixture["node_depths"]
+    gaps = [abs(depths[m] - depths[n]) for m in (n - 1, n + 1) if 0 <= m < len(depths)]
+    if not gaps or min(gaps) <= 0:
+        raise Reject("fixture: node_depths give no positive adjacent spacing")
+    row = vf["con_vt"][t]
+    convt = max(abs(row[m]) for m in (n - 1, n, n + 1) if 0 <= m < len(row))
+    return ulp32(fixture["temperature_c"][t][n]) * convt / min(gaps)
+
+
+def compare_matrix(case, field, spec, times, nodes, cand, ref, fixture=None):
     zero = spec["zero_rule"]
-    floor = 0.0
-    if zero["name"] == "case_time_field_max_fraction":
-        floor = zero["fraction"] * max(abs(v) for row in ref for v in row)
     rows = []
     for t, (crow, rrow) in enumerate(zip(cand, ref)):
+        floor = 0.0  # per-time floor: fraction * max_n |r_t,n|
+        if zero["name"] != "none":
+            floor = zero["fraction"] * max(abs(v) for v in rrow)
         for n, (c, r) in enumerate(zip(crow, rrow)):
             rel = spec["relative"] * abs(r) if spec["scale"] == "abs_reference" else 0.0
-            rows.append(_row(case, field, times[t], nodes[n], c, r, max(spec["absolute"] + rel, floor)))
+            bound = max(spec["absolute"] + rel, floor)
+            if zero["name"] == PRECISION_RULE:
+                bound = max(bound, zero["ulp_multiple"] * precision_terms(fixture, t, n))
+            rows.append(_row(case, field, times[t], nodes[n], c, r, bound))
     return rows
 
 
@@ -298,6 +348,7 @@ def summarize(rows):
 
 
 def compare_trajectory(criteria, crit_sha, fixture, fix_sha, cand):
+    validate_trajectory(fixture, "fixture")
     validate_candidate(cand, fixture, crit_sha, fix_sha)
     case, times, nodes = fixture["case_id"], fixture["time_points"], fixture["node_numbers"]
     rows, unavailable = [], []
@@ -309,7 +360,7 @@ def compare_trajectory(criteria, crit_sha, fixture, fix_sha, cand):
             c, r = cand["vapor_fields"][name], fixture["vapor_fields"][name]
         else:
             c, r = cand[name], fixture[name]
-        rows += compare_matrix(case, name, criteria["fields"][name], times, nodes, c, r)
+        rows += compare_matrix(case, name, criteria["fields"][name], times, nodes, c, r, fixture)
     return result_dict("trajectory", crit_sha, rows, case_id=case, fixture_sha256=fix_sha,
                        unavailable=unavailable)
 
@@ -339,12 +390,18 @@ def _kernel_index(observations, label):
     return index
 
 
-def compare_kernel(criteria, crit_sha, fixture, fix_sha, cand):
+def compare_kernel(criteria, crit_sha, fixture, fix_sha, cand, requests_sha=None):
     if fixture.get("evidence_class") != KERN:
         raise Reject("kernel fixture: evidence_class")
     ref = _kernel_index(fixture.get("observations"), "fixture")
-    _keys(cand, {"schema_version", "criteria_sha256", "fixture_sha256", "observations"}
-          | ({"evidence_class"} if "evidence_class" in cand else set()), "kernel candidate")
+    _keys(cand, {"schema_version", "evidence_class", "criteria_sha256", "fixture_sha256",
+                 "requests_sha256", "observations"}, "kernel candidate")
+    if cand["evidence_class"] != "rust-candidate":
+        raise Reject("kernel candidate: evidence_class must be rust-candidate")
+    if requests_sha is None:
+        requests_sha = sha256_file(DEFAULT_REQUESTS)
+    if cand["requests_sha256"] != requests_sha:
+        raise Reject("kernel candidate: requests_sha256 mismatch")
     if cand["schema_version"] != KERNEL_CANDIDATE_SCHEMA:
         raise Reject("kernel candidate: schema_version")
     if cand["criteria_sha256"] != crit_sha or cand["fixture_sha256"] != fix_sha:
@@ -412,10 +469,12 @@ def _nonzero_checks(name, spec, criteria, fixtures):
             frac = criteria["fields"][field]["zero_rule"]["fraction"] * spec["factor_of_tolerance"]
             data = fx["vapor_fields"][field]
             peak = max(abs(v) for row in data for v in row)
-            floor = frac * peak
-            above = sum(abs(v) > floor for row in data[1:] for v in row)
+            # per-time floor: point (t, n) is above iff |r_t,n| > frac * max_n |r_t,n|
+            above = sum(abs(v) > frac * max(abs(x) for x in row)
+                        for row in data[1:] for v in row)
             out.append({"name": name, "rule": spec["rule"], "case_id": case, "field": field,
-                        "max_abs": peak, "floor": floor, "points_above_floor": above,
+                        "max_abs": peak, "floor_semantics": "per_time_fraction_of_max_over_nodes",
+                        "fraction": frac, "points_above_floor": above,
                         "verdict": "PASS" if peak > 0 and above > 0 else "FAIL"})
     return out
 
@@ -478,7 +537,7 @@ def run(args):
         result = compare_trajectory(criteria, crit_sha, fixture, fix_sha, load_json(args.candidate))
     else:
         result = compare_kernel(criteria, crit_sha, load_json(args.fixture), sha256_file(args.fixture),
-                                load_json(args.candidate))
+                                load_json(args.candidate), sha256_file(args.requests))
     if Path(args.output).exists():
         raise Reject(f"refusing to overwrite {args.output}")
     print_table(result, getattr(args, "detail", False))
@@ -498,6 +557,8 @@ def build_parser():
         else:
             p.add_argument("--fixture", required=True)
             p.add_argument("--candidate", required=True)
+        if name == "kernel":
+            p.add_argument("--requests", default=str(DEFAULT_REQUESTS))
         if name == "trajectory":
             p.add_argument("--detail", action="store_true")
     return parser
