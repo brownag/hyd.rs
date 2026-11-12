@@ -1,6 +1,6 @@
 # Orchestration 25 state — G19 first vapor increment
 
-Created: 2026-11-11. Status: **PLAN APPROVED 2026-11-11; Waves 1–5 complete.**
+Created: 2026-11-11. Status: **PLAN APPROVED 2026-11-11; Waves 1–6 complete.**
 Plan: [EXECUTION_PLAN_25.md](EXECUTION_PLAN_25.md).
 Worker: [PROMPT_TEMPLATE_25.md](PROMPT_TEMPLATE_25.md).
 Contract: [M6_VAPOR_CONTRACT.md](master/M6_VAPOR_CONTRACT.md).
@@ -79,8 +79,9 @@ criteria. Plan approval does not open this numeric gate.
 | 4 | 25.4.2 | Accepted vapor history | done |
 | 5 | 25.5.1 | Atomic two-pass driver | done |
 | 6 | 25.6.1 | Observation view | done |
-| 6 | 25.6.2 | Independent mathematics/balances | in progress |
-| 6 | 25.6.3 | Dry-soil discriminating fixtures | in progress |
+| 6 | 25.6.2 | Independent mathematics/balances | done |
+| 6 | 25.6.3 | Dry-soil discriminating fixtures | done |
+| 6 | 25.6.4 | Water-trial iteration semantics | done |
 | 7 | 25.7.1 | Coupled and kernel parity | pending |
 | 8 | 25.8.1 | Acceptance and coverage handoff | pending |
 
@@ -240,7 +241,7 @@ Wave 6: accepted temperatures live only in `VaporState`; preflight requires a
 positive `previous_timestep`; fixtures with `x_conv=t_conv=1` and h=-100 gave
 unphysical heat and were rejected by staging — tests use cm/day conversions.
 
-### Wave 6 — in progress
+### Wave 6 — complete
 
 - Seam amendment (orchestrator, serial) `2f6a94c`: `VaporStepReport` publishes
   stored pass-two Con/ConLT/ConVh/ConVT (pre-final-solve, at first heat result)
@@ -255,6 +256,36 @@ unphysical heat and were rejected by staging — tests use cm/day conversions.
 - 25.6.3 approved: reuse the 25.2.2 executable read-only (found by hash in the
   earlier worktree), keep `hTabN=100` so dry heads use the analytic FK/FC/FQ
   branch, linear initial temperature, subset expected-case check.
+- 25.6.3 integrated as `b8e0544`: dry loamy deck (h=-1e4 cm fixed ends, linear
+  45->5 C, 240 h, prints 6/24/72/240 h) and vapor-off control from the 25.2.2
+  executable `824179ab...` read-only; first attempt met the >=10x target
+  (moisture 14-392x, temperature 346-576x, head ~1.7e7x print half-resolution).
+  Existing fixtures byte-identical; producer test 12 passed. Discovered: the
+  committed 25.2.2 case dirs lack `LEVEL_01.DIR`, which the producer now
+  requires, so the existing three cases cannot be rerun as committed.
+- Numeric gate closed (see checklist): contract `8e561a5`, criteria `bde9c7f`.
+- Second seam amendment `49fc1b8`: report publishes pass-two `pre_solve_heads`,
+  `pre_solve_liquid_water_contents`, `effective_hydraulic_capacities`.
+- 25.6.2 integrated as `9a864c2` after one retry (test `tConv` was inverted,
+  3600 instead of 1/3600, making vapor ~1e7 too small; bounds moved to a
+  `criteria.json` loader). Interior water max 3.4e-16, heat 2.6e-16 relative
+  (bound 1e-9); fresh-coefficient closure 6.1e-13 reported only; vapor/liquid
+  transport ~1.06e3 and storage ~1.66e-3 asserted >= 1e-6. Tests 6 + 3 passed.
+- Orchestrator review found 25.4.1 iteration deviations from `WatFlow` (mixed
+  head, convergence rule, minimum iterations, correction reference); plan
+  amended with correction task 25.6.4. 25.5.1 driver tests use `t_conv=86400`
+  for days (source 1/86400); fixed in 25.6.4.
+- 25.6.4 integrated as `494c040` (D1 previous-iterate mixed head, D2 source
+  per-node EpsTh/TolH/rMax convergence with inline f64 `hSat=FH(Se=1)`, D3 no
+  acceptance after one solve, D4 correction vs pre-solve iterate) and
+  `366566f` (driver tests: days `t_conv=1/86400`, SI-scaled heat materials).
+  One existing test moved to `max_iterations: 2` with hand re-derived values
+  plus a `max_iterations: 1` NonConverged assertion. Disclose for 25.8.1: source
+  accepts non-converged at `dt<=dtMin`; Rust errors. The D2 saturated-branch
+  test cannot separate the saturated rule from EpsTh (weak).
+- Wave 6 serial gates (after `366566f`): build PASS; workspace tests PASS (50
+  suites, 574 passed, 0 failed, 2 ignored); fmt PASS; Clippy PASS;
+  `hydraulic_curves` 9 passed; Python PASS (412 tests).
 - 25.6.2 bounds are temporarily single named test constants citing the gate
   approval; the orchestrator migrates them to `criteria.json` `checks` when the
   artifact is created.

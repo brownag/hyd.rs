@@ -136,7 +136,8 @@ Every task is in `hyd.rs`. Same-wave product scopes are pairwise disjoint.
 | 6 | 25.6.1 | Source output observation view and vapor field mapping | 25.2.2, 25.5.1 |
 | 6 | 25.6.2 | Independent mathematics and vapor balance checks | 25.5.1 |
 | 6 | 25.6.3 | Dry-soil discriminating vapor fixtures (amendment 2026-11-12) | 25.2.2 |
-| 7 | 25.7.1 | Approved-criteria coupled and kernel parity | 25.1.2, 25.2.2, 25.6.1, 25.6.2, 25.6.3; numeric gate |
+| 6 | 25.6.4 | Water-trial iteration semantics correction (amendment 2026-11-12) | 25.4.1, 25.5.1 |
+| 7 | 25.7.1 | Approved-criteria coupled and kernel parity | 25.1.2, 25.2.2, 25.6.1, 25.6.2, 25.6.3, 25.6.4; numeric gate |
 | 8 | 25.8.1 | Capability acceptance and full-coverage handoff | All prior tasks |
 
 Numeric gate precedes **any** candidate-vs-reference check, including kernel
@@ -560,6 +561,51 @@ the selected vapor effect at source print precision" stop condition.
   discrimination report meets the target or the task stops with the measured
   ratios; existing three fixtures byte-identical.
 - **Targeted tests:** `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest tools.test_run_vapor_reference`.
+
+### 25.6.4 — Water-trial iteration semantics correction
+
+Amendment 2026-11-12 (orchestrator review of the 25.6.2 report against source).
+The committed 25.4.1 trial differs from `WatFlow` in four ways that affect
+parity. All are corrections toward source behavior inside the opt-in vapor
+path; ordinary liquid-only entries stay unchanged.
+
+- D1 mixed head: source `SetMat` evaluates liquid properties at
+  `0.1*hTemp+0.9*hNew`, where `hTemp` is the iterate before the previous Gauss
+  solve (`WATFLOW.FOR:94-96`, `:470-476`). The trial sets
+  `material_heads = solved_heads`, so from iteration 2 the mixed head equals the
+  current iterate. It must carry the previous iterate.
+- D2 convergence (`WATFLOW.FOR:105-127`): per node, when `hTemp<hSat` and
+  `hNew<hSat`, `EpsTh=|Cap*(hNew-hTemp)/(ths-thr)/ATh*Rate| <= TolTh` with
+  the assembled vapor-adjusted `Cap`; otherwise `|hNew-hTemp| <= TolH`; any
+  `|hNew|>0.999*rMax` fails. The trial requires every node's head change to be
+  within TolH and also checks a total-storage change. This replaces the plan's
+  earlier "total-storage convergence" wording, which was not source behavior.
+- D3 minimum iterations: source never accepts after the first solve
+  (`Iter.le.1` forces another iteration, `:128`).
+- D4 correction reference: `ThNew += Cap*(hNew-hTemp)*Rate` (`:152-155`) uses
+  the pre-final-Gauss iterate (`pre_solve_heads`), not the material-evaluation
+  head.
+- Disclosed but not changed: at `dt<=dtMin` the source accepts a non-converged
+  solution (`ConvgF=.false.`). Rust keeps a typed error; 25.8.1 must disclose this.
+
+- **Repo:** hyd.rs. **Depends on:** 25.4.1, 25.5.1.
+- **Must edit:** `crates/hydrus-core/src/water_solver.rs` (`solve_vapor_water_trial`
+  and its inline `vapor_trial_tests` only); `T/vapor_driver_order.rs` and the
+  inline tests in `V/driver.rs`, only to correct `t_conv` to the source value
+  (`INPUT.FOR:186-197`, `1/3600` for hours, `1/86400` for days; the tests use
+  `86400`) and any expectation that changes as a consequence.
+- **Can create:** none.
+- **Do not touch:** liquid-only solver paths, hydraulic models, the driver's
+  production logic, balance/output modules or criteria.
+- **Acceptance:** hand-worked 3-node regression tests distinguishing D1 (the mixed
+  head uses the previous iterate), D2 (a dry unsaturated node with head change
+  > TolH but EpsTh <= TolTh converges; a saturated node uses TolH), D3 (no
+  acceptance after one solve) and D4 (correction uses the pre-solve iterate).
+  Existing water solver, transaction, hydraulic, driver, output and balance
+  tests pass unchanged apart from the documented unit correction.
+- **Targeted tests:** `cargo test -p hydrus-core --lib water_solver::vapor_trial_tests`;
+  `cargo test -p hydrus-core --lib heat::vapor::driver`;
+  `cargo test -p hydrus-core --test water_solver --test water_transaction --test hydraulic_curves --test vapor_driver_order --test vapor_output --test vapor_balance`.
 
 ### 25.7.1 — Paired source comparisons
 
