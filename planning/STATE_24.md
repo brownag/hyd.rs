@@ -37,9 +37,9 @@ Prior reference (from STATE_23 / ADR 0019, not re-run here): parity 44/44; M5-V 
 | 2 | 24.2.2 | SetUpHeat boundary kernel | done (9634b4e) |
 | 3 | 24.3.1 | Temper transport solve (heat-only) | done (9426aa7) |
 | 3 | 24.3.2 | Heat state and accepted-step snapshot | done (d5f8f11) |
-| 4 | 24.4.1 | Coupled water→heat step driver | pending |
-| 4 | 24.4.2 | Heat-energy balance accounting | pending |
-| 4 | 24.4.3 | Pinned-Fortran heat decks and fixture producer | pending |
+| 4 | 24.4.1 | Coupled water→heat step driver | done (757be7d → c4ccc8a) |
+| 4 | 24.4.2 | Heat-energy balance accounting | done (2224109 → 2d082a3) |
+| 4 | 24.4.3 | Pinned-Fortran heat decks and fixture producer | done (7bb479e, 7a3b662; SD-006 added; 4th deck refused) |
 | 5 | 24.5.1 | Analytical comparisons | pending |
 | 5 | 24.5.2 | Source-matched Fortran parity | pending |
 | 5 | 24.5.3 | Balance and invariant properties | pending |
@@ -49,6 +49,13 @@ Prior reference (from STATE_23 / ADR 0019, not re-run here): parity 44/44; M5-V 
 Wave-end gate after each wave: serial AGENTS.md Quick Start suite; counts recorded in the wave's section below.
 
 ## Wave gates
+
+### Wave 4 (2026-11-11, HEAD after `eda010b`)
+- Build, clippy `--workspace --all-targets -D warnings`, fmt: pass.
+- Workspace tests: 510 passed, 0 failed (Wave 3: 501; +5 `heat_driver_order`, +3 `heat::balance`, +1 SD-006 pin).
+- Python: 378 OK (includes `tools/test_run_heat_reference.py`).
+- Verdict: pass for the wave.
+- Open items carried forward: tolerances still unassigned (user review gate before 24.5.2). SD-006 (Campbell scale, reproduced as-is; fixed alternative later). The `kBotT==0` contract entry has no fixture: its only deck is refused (SD-006 evidence). The bottom-flux Campbell fixture is weakly sensitive (profile equilibrates by t=6 h).
 
 ### Wave 3 (2026-11-11, HEAD after `9426aa7`)
 - Build: pass. Clippy `--workspace --all-targets -D warnings`: pass. fmt check: pass.
@@ -80,8 +87,26 @@ Wave-end gate after each wave: serial AGENTS.md Quick Start suite; counts record
 - Gotchas: `temp_cap(input: TempCapInput, cap: &mut [f64], cond: &mut [f64]) -> Result<(), TempCapError>`. Material indices are zero-based. `TempMaterial::from_tpar([f64; 9])`. Rows 2, 3, 7, 8 of TPar are inferred from usage. Outputs are unspecified after an error.
 - `TempCapError` variants: LengthMismatch, MaterialIndexOutOfRange, NonFiniteInput, NonFiniteParameter, InvalidConversion, NegativeWaterContent, NonPositiveCapacity.
 
-## 24.3.1
-- Status: done. Commit `5cd9647`, cherry-picked to `feat/heat1` as `9426aa7`.
+## 24.4.1
+- Status: done. Commit `757be7d`, cherry-picked to `feat/heat1` as `c4ccc8a`.
+- Files: `heat/driver.rs`, `tests/heat_driver_order.rs` (5 tests).
+- Signature: `HeatWaterDriver::new(HeatConfigInput, x, material_indices, materials, initial_time, initial_temperatures, initial_velocity)`; `step(&mut self, water_state, water_workspace, WaterStepInput, WaterStepPolicy, CoupledHeatInput) -> Result<CoupledStepReport, HeatDriverError>`.
+- Failure behavior: preflight errors return before water runs. Water errors leave heat unchanged. Heat errors after water success return `HeatAfterWaterAccepted`, with water kept advanced (must not retry water alone).
+- Deviations accepted: `initial_time` in constructor; `x_conv`/`t_conv` in `CoupledHeatInput`.
+- Balance terms (boundary_out, sink) are not computed by the driver; 24.5.3 owns them.
+
+## 24.4.2
+- Status: done. Commit `2224109`, cherry-picked to `feat/heat1` as `2d082a3`. `heat/balance.rs`, 3 tests.
+- Caller supplies boundary_in, boundary_out, sink_heat; record_step derives none.
+
+## 24.4.3
+- Status: done with a scope amendment. Commits `7bb479e` (decks, fixtures, SD-006 pin in `heat/capacity.rs`, `docs/FORTRAN_SOURCE_DEFECTS.md`) and `7a3b662` (second Campbell fixture). Merged as `e513172`, `eda010b`.
+- Fixtures: `heat_dir_top_dir_bot_default` (iCampbell 0), `heat_dir_top_flux_bot_default` (0), `heat_flux_top_dir_bot_campbell` (1), `heat_dir_top_flux_bot_campbell` (1).
+- Refused (reproduction only, SD-006): `heat_flux_top_zero_bot_campbell` (non-finite output; `refusal.json`).
+- Executable sha256 `5a3734bee…`; build manifest `94bf5b96c…`.
+- Deviations accepted: `dtMin=0.01`; `run_fixture` not used because it fails under a symlinked `.development` (documented).
+
+## 24.3.1 Commit `5cd9647`, cherry-picked to `feat/heat1` as `9426aa7`.
 - Files: `heat/transport.rs` (+569). Tests: `heat::transport` 4/4. Clippy pass. fmt pass after one formatting fix.
 - Deviations: `HeatTransportInput` has an extra `temp_old` field (TempO), needed by SetUpHeat for the level-1 F row. Accepted. `HeatBoundaryError` has no Display, so transport formats it with Debug.
 - Gotchas for 24.4.1: `solve_heat_transport(config: HeatConfig, input: HeatTransportInput<'_>, temp_new: &mut [f64]) -> Result<HeatTransportReport, HeatTransportError>`. `HeatTransportReport { heat_flux, minimum_absolute_pivot }`. dtMaxT is not used in heat-only mode (one solve per call). The driver must check the mesh length against N. t_period is passed as 0.0, relying on HeatConfig rejecting tPeriod > 0. TempN is stored as f64 without sngl rounding (TEMPER.FOR:55).
