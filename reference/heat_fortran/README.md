@@ -96,6 +96,7 @@ The default and Campbell branches read the same TPar rows with different meaning
 | `heat_dir_top_dir_bot_default` | 1 | 25 | 1 | 5 | 0 | top>0, bottom>0, default | `fixtures/heat_dir_top_dir_bot_default.json` |
 | `heat_dir_top_flux_bot_default` | 1 | 25 | -1 | 5 | 0 | bottom<0 | `fixtures/heat_dir_top_flux_bot_default.json` |
 | `heat_flux_top_dir_bot_campbell` | -1 | 25 | 1 | 5 | 1 | top<0, bottom>0, Campbell | `fixtures/heat_flux_top_dir_bot_campbell.json` |
+| `heat_dir_top_flux_bot_campbell` | 1 | 25 | -1 | 5 | 1 | top>0, bottom<0, Campbell | `fixtures/heat_dir_top_flux_bot_campbell.json` |
 | `heat_flux_top_zero_bot_campbell` | -1 | 25 | 0 | 0 | 1 | top<0, bottom==0, Campbell | **no fixture** (refused; see below) |
 
 All decks: 41 nodes, depth 0 to -40 cm (dx = 1 cm), `LUnit=cm`, `TUnit=hours`,
@@ -104,7 +105,25 @@ All decks: 41 nodes, depth 0 to -40 cm (dx = 1 cm), `LUnit=cm`, `TUnit=hours`,
 Initial head is `-10` at every node, initial temperature `15.0`.
 
 Coverage: all five supported kinds (`kTopT>0`, `kTopT<0`, `kBotT>0`, `kBotT<0`,
-`kBotT==0`) and both conductivity modes appear in the fixtures above.
+`kBotT==0`) and both conductivity modes appear in the fixtures above. The
+`kBotT==0` kind has no fixture (its only deck is the refused SD-006 case).
+
+Boundary-code coverage by fixture:
+
+| Kind | Fixtures |
+|---|---|
+| `kTopT > 0` (Dirichlet top) | `heat_dir_top_dir_bot_default`, `heat_dir_top_flux_bot_default`, `heat_dir_top_flux_bot_campbell` |
+| `kTopT < 0` (flux top) | `heat_flux_top_dir_bot_campbell` |
+| `kBotT > 0` (Dirichlet bottom) | `heat_dir_top_dir_bot_default`, `heat_flux_top_dir_bot_campbell` |
+| `kBotT < 0` (flux bottom) | `heat_dir_top_flux_bot_default`, `heat_dir_top_flux_bot_campbell` |
+| `kBotT == 0` (zero gradient) | none (refused: `heat_flux_top_zero_bot_campbell`) |
+| `iCampbell = 0` | `heat_dir_top_dir_bot_default`, `heat_dir_top_flux_bot_default` |
+| `iCampbell = 1` | `heat_flux_top_dir_bot_campbell`, `heat_dir_top_flux_bot_campbell` |
+
+Caveat for `heat_dir_top_flux_bot_campbell`: at the Campbell scale (SD-006),
+the profile is uniform at 25.00 by the first print (t=6) and stays there. The fixture
+therefore has weak sensitivity to the bottom flux. It is kept as a source-matched target
+and is not evidence of a flux-bottom response.
 
 Each fixture JSON holds `source_matched: true`, `evidence_class: pinned-fortran`,
 `temperature_unit: C`, `time_points`, `node_numbers`, `node_depths`, `temperatures`
