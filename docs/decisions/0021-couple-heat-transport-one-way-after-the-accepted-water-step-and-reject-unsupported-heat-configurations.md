@@ -63,3 +63,12 @@ Chosen option: 2.
 - Coupling order and source map: [M6_HEAT_CONTRACT.md](../../planning/master/M6_HEAT_CONTRACT.md) sections `## Source map` and `## Coupling order`.
 - Fortran lines were checked by grep or read against `src_reference/` on 2026-11-11.
 - This ADR stays **Proposed** until the user accepts it. It is not accepted by the M6 acceptance gate.
+
+## Dated note (2026-11-12): scope and navigation
+
+This ADR describes heat-only behavior and is not generalized. The vapor-aware
+selection (`lVapor=true`) is governed by `planning/master/M6_VAPOR_CONTRACT.md`;
+its acceptance record is `planning/master/M6_VAPOR_ACCEPTANCE.md` and its coverage
+map is `planning/master/M6_VAPOR_COVERAGE.md`. The heat-only rejection of `lVapor`
+remains in force for heat-only entry points. This ADR stays **Proposed**; it is
+neither accepted nor superseded by the vapor acceptance.

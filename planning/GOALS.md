@@ -1,30 +1,30 @@
 # Project Goals (`planning/GOALS.md`)
 
-Last Updated: 2026-11-11
+Last Updated: 2026-11-12
 Source State: [STATE_24.md](STATE_24.md)
 
 ## Circled Goal (Active)
 
-- **[G19]** Vapor flow is added to the coupled heat capability: `lVapor` terms (`TempAdj`, `ConVapor`, `VaporContent`, `ConVh`, vapor output `NOD_INF_V.OUT`) are implemented with explicit coupling contracts, rejected combinations preserved until supported, provenance-backed fixtures, and capability-specific validation.
-  - Planning update (2026-11-11): [orchestration 25](EXECUTION_PLAN_25.md) is approved for the first increment: default thermal conductivity, enhancement on (`iEnhanc=1`, pinned executable default), fixed water heads and temperatures at both ends, two source-ordered coupling passes, atomic acceptance. Full vapor breadth is G22, not silently abandoned after this increment. Approved-scope [source contract](master/M6_VAPOR_CONTRACT.md) and [coverage matrix](master/M6_VAPOR_COVERAGE.md); numerical thresholds remain a separate approval gate; implementation not started.
-  - Why now: G12's M6 heat scope is delivered; vapor is the first deferred physics, and energy balance (G20) depends on the vapor path for evaporation terms.
-  - Boundary: vapor only. Energy balance (`lEnBal`, `UpdateEnergy`, `Evap`, `Rn`, `Rns`, `Rnl`) stays out. Heat-to-water feedback (`lWDep`) stays rejected unless separately approved. Hysteresis, dual porosity and root uptake with heat stay out.
-  - Exit criteria: a vapor source contract (`TEMPER.FOR:48` `TempAdj`, `TEMPER.FOR:180-268`, vapor output `HYDRUS.FOR:174`) is recorded; the heat-only config accepts `lVapor=true` only for the supported vapor selection; source-matched fixtures exist for each supported vapor case; analytical or balance checks pass at tolerances approved for vapor; the acceptance document states what is not claimed.
-  - First action: write the vapor source contract (`planning/master/M6_VAPOR_CONTRACT.md`) by reading `TEMPER.FOR:180-268` (`TempAdj`), `TEMPER.FOR:48`, the vapor conductivity and content code in `WATFLOW.FOR` (`:919-922`, `:995`), and the vapor output in `HYDRUS.FOR:174`; list the vapor variables and their precision. Hand the contract to plan-wave for the execution plan.
+- None. G19 is complete with exception; G22 (next dependency-ready coverage row, not yet selected) is the next candidate.
+
 
 ## Sequenced Goals (Dependency DAG)
 
 - **[G22]** All valid vapor capabilities and supported interactions are implemented and capability-specifically validated, rather than stopping at G19's restricted first increment.
   - Depends on: G19 initial acceptance; individual rows may also depend on G20, G23 or separately accepted optional physics.
   - Scope and exit: every active vapor branch and valid interaction has a contract, implementation, discriminating source evidence, independent/balance checks and acceptance status in [M6_VAPOR_COVERAGE.md](master/M6_VAPOR_COVERAGE.md). Invalid combinations are distinguished from deferred capabilities. Campbell, enhancement-off, remaining heat/water boundaries and related interactions remain explicit work, not claims inherited from G19.
-  - Trigger to plan the next increment: G19 accepted; select the next dependency-ready coverage row. No execution authorized by the current plan.
+  - Trigger to plan the next increment: G19 accepted with exception (2026-11-12); select the next dependency-ready coverage row, not yet selected. Remains open; no execution authorized by the current plan.
 
 - **[G20]** Energy balance (`lEnBal`, `UpdateEnergy`, surface energy terms `Evap`, `Rn`, `Rns`, `Rnl`) is added to the coupled capability with its own contract, fixtures and acceptance gate.
   - Depends on: G19 (evaporation uses the vapor path), and on the atmospheric boundary path with meteorological input (`lMeteo`, `MeteoIn`, `INPUT.FOR:966`, `HYDRUS.FOR:243-244`), which the Rust crate does not yet have.
-  - Trigger to start: G19 accepted.
+  - Trigger to start: G19 accepted with exception (2026-11-12), conditional on the vapor interactions G20 requires (atmospheric and flux boundaries are not accepted by G19; they are G22 rows to be resolved or scoped here).
 
 ## Completed
 
+- **[G19]** Vapor flow is added to the coupled heat capability: `lVapor` terms (`TempAdj`, `ConVapor`, `VaporContent`, `ConVh`, vapor output `NOD_INF_V.OUT`) are implemented with explicit coupling contracts, rejected combinations preserved until supported, provenance-backed fixtures, and capability-specific validation.
+  - Result (2026-11-12): **complete with exception** for the bounded first increment. Contract, configuration, kernels, water rows, heat transport, state, atomic driver, output, analytical, balance and Rust-vs-Fortran parity evidence are recorded in [M6_VAPOR_ACCEPTANCE.md](master/M6_VAPOR_ACCEPTANCE.md) (contract [M6_VAPOR_CONTRACT.md](master/M6_VAPOR_CONTRACT.md), [coverage](master/M6_VAPOR_COVERAGE.md)).
+  - Exception: 18 isothermal `v_vapor`/`v_vap_term` rows fail criteria v2 against the pinned fixture; explained by source single-precision `TempN` ([diagnosis](master/M6_VAPOR_PRECISION_DIAGNOSIS.md)) and not claimed as matched. Criteria v2 was a post-failure owner-approved revision of v1. Vapor content evidence is pinned-kernel only; wet fixtures do not discriminate head/moisture/temperature. Restricted to the first-increment selection.
+  - Original statement: Vapor flow is added to the coupled heat capability (`lVapor`, `TempAdj`, `ConVapor`, `VaporContent`, `ConVh`, `NOD_INF_V.OUT`).
 - **[G12]** Heat, temperature and related coupled capability is delivered for M6 (heat only; vapor and energy balance moved to G19 and G20).
   - Result: M6 heat capability with contract, configuration, boundary, transport, state, driver, balance, analytical, source-matched parity and balance property evidence is recorded in [M6_HEAT_ACCEPTANCE.md](master/M6_HEAT_ACCEPTANCE.md). Strict 2e-4 °C parity fails at 20–36 nodes (output rounding); rounded parity passes on the table water model. Campbell fixtures are flat at 25 °C (weak evidence). The zero-gradient bottom boundary is supported in code but not validated against the Fortran.
 - **[G13]** to **[G18]** are completed for the heat scope (contract, configuration, vertical slice, fixtures, comparisons, acceptance), recorded in [STATE_24.md](STATE_24.md) and the acceptance document.
@@ -48,7 +48,7 @@ Source State: [STATE_24.md](STATE_24.md)
 ## Independent Backlog
 
 - **[G23]** Temperature-dependent liquid-water coupling (`lWDep` / `lWTDep`, including `ConLT` in water flux and liquid material temperature adjustments) is separately contracted, implemented and validated when selected.
-  - Trigger: separate user scope approval after G19. Remains rejected in orchestration 25; not conflated with vapor's thermal-gradient terms or G20 energy balance.
+  - Trigger: separate user scope approval after G19 (complete with exception); remains deferred. Remains rejected in orchestration 25; not conflated with vapor's thermal-gradient terms or G20 energy balance.
 
 - **[G7]** The free-drainage end-row behavior is assessed against the source-defect register rules and recorded as a defect or modeling choice.
 - **[G10]** Investigate the Robin refinement anomaly only if a real supported-use case shows it could change a decision; the current finding is nonblocking.

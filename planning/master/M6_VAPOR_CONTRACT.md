@@ -1,11 +1,21 @@
 # M6 vapor source contract — first increment
 
-Status: **Scope/source contract approved with orchestration 25, 2026-11-11.**
-Numerical criteria unassigned; implementation and acceptance pending.
+Status: **Scope/source contract approved with orchestration 25, 2026-11-11.
+Numerical criteria approved 2026-11-12 (v1, then post-failure v2). First
+increment accepted with exception 2026-11-12:** see
+[M6_VAPOR_ACCEPTANCE.md](M6_VAPOR_ACCEPTANCE.md). The approved sections below
+are unchanged; this header and the evidence list are status annotations only.
 Source audit: 2026-11-11.
 Governing plan: [EXECUTION_PLAN_25.md](../EXECUTION_PLAN_25.md). This is a
 capability-specific extension, not a rewrite of the historical heat-only contract.
-Implementation and numerical acceptance have not occurred.
+
+Evidence status (2026-11-12): contract revisions `8e561a5` (v1) and `a4545e4`
+(v2); criteria `reference/vapor_fortran/criteria.json` v1 `bde9c7f`, v2 `21101ca`;
+parity harness `95ee096`; precision diagnosis `b4913c3`
+([M6_VAPOR_PRECISION_DIAGNOSIS.md](M6_VAPOR_PRECISION_DIAGNOSIS.md)). The 18
+isothermal `v_vapor`/`v_vap_term` rows that fail v2 are explained by source
+single-precision `TempN` and are not claimed as matched. Vapor content evidence
+is pinned-kernel only.
 
 ## Source map
 
