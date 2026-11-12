@@ -1,0 +1,157 @@
+{
+  "claim_limit": "direct VaporContent kernel observations; not a full-program trajectory or numerical acceptance",
+  "evidence_class": "pinned-fortran-kernel",
+  "observations": [
+    {
+      "adjusted_hydraulic_capacity": 0.019999882206320763,
+      "input_capacity": 0.02,
+      "node": 1,
+      "request_id": "dry-cold",
+      "vapor_content": 2.3748998501105234e-06
+    },
+    {
+      "adjusted_hydraulic_capacity": 0.029999809339642525,
+      "input_capacity": 0.03,
+      "node": 2,
+      "request_id": "dry-cold",
+      "vapor_content": 1.696421691121941e-06
+    },
+    {
+      "adjusted_hydraulic_capacity": 0.03999932110309601,
+      "input_capacity": 0.04,
+      "node": 1,
+      "request_id": "moist-warm",
+      "vapor_content": 2.0779473288712325e-06
+    },
+    {
+      "adjusted_hydraulic_capacity": 0.04999803379178047,
+      "input_capacity": 0.05,
+      "node": 2,
+      "request_id": "moist-warm",
+      "vapor_content": 3.987996024079621e-06
+    },
+    {
+      "adjusted_hydraulic_capacity": 0.010000173933804035,
+      "input_capacity": 0.01,
+      "node": 1,
+      "request_id": "length-conversion",
+      "vapor_content": 3.567463636500179e-06
+    },
+    {
+      "adjusted_hydraulic_capacity": 0.059998828917741776,
+      "input_capacity": 0.06,
+      "node": 2,
+      "request_id": "length-conversion",
+      "vapor_content": 3.0046367101022042e-06
+    }
+  ],
+  "provenance": {
+    "compiler": "gfortran",
+    "driver_sha256": "2825c164bed409cca829aa63dc84b4448b40b251de5534b2a9ca41f90cb32d13",
+    "executable_sha256": "2a053a47025ce14aba5151c74ec61fe186e1eefc239a579dc017f134f9701e68",
+    "flags": [
+      "-std=legacy",
+      "-ffixed-line-length-none",
+      "-O0"
+    ],
+    "raw_output_sha256": "dbab225e1395604537e9aa36788c7e94157c8ac0f87b587d3e3d57df80252388",
+    "request_sha256": "8404c1d4a73bd7ec2b5259b98d131446a4a963c881a8db2b2aba9b4921bf5d9d",
+    "routine_sha256": "99ae3d35a4425e7d7ca740856ba80f8bf4bb4dfe741ae18c685f07bcf05c59ee",
+    "source_sha256": "e5591cebae4cbb44e8fe07520e08fc98c1522531c67753c0cc03fe2e164b5ef9",
+    "staged_input_sha256": "e94372ad5d2469a64ede98d5ab88f985a0afb3b04a815298e5d05b7a9ea7e6c9",
+    "tool_sha256": "e2c6e4eec64f27c2cde048e4d02d6034974c958a1474ae666bfe6a0ba3952c10"
+  },
+  "requests": [
+    {
+      "id": "dry-cold",
+      "materials": [
+        {
+          "index": 1,
+          "porosity": 0.45
+        }
+      ],
+      "nodes": [
+        {
+          "capacity": 0.02,
+          "head": -100.0,
+          "material": 1,
+          "temperature": 5.0,
+          "theta": 0.1
+        },
+        {
+          "capacity": 0.03,
+          "head": -50.0,
+          "material": 1,
+          "temperature": 5.0,
+          "theta": 0.2
+        }
+      ],
+      "x_conv": 100.0
+    },
+    {
+      "id": "moist-warm",
+      "materials": [
+        {
+          "index": 1,
+          "porosity": 0.42
+        },
+        {
+          "index": 2,
+          "porosity": 0.5
+        }
+      ],
+      "nodes": [
+        {
+          "capacity": 0.04,
+          "head": -20.0,
+          "material": 1,
+          "temperature": 20.0,
+          "theta": 0.3
+        },
+        {
+          "capacity": 0.05,
+          "head": -5.0,
+          "material": 2,
+          "temperature": 35.0,
+          "theta": 0.4
+        }
+      ],
+      "x_conv": 100.0
+    },
+    {
+      "id": "length-conversion",
+      "materials": [
+        {
+          "index": 1,
+          "porosity": 0.38
+        }
+      ],
+      "nodes": [
+        {
+          "capacity": 0.01,
+          "head": -1000.0,
+          "material": 1,
+          "temperature": 10.0,
+          "theta": 0.0
+        },
+        {
+          "capacity": 0.06,
+          "head": -10.0,
+          "material": 1,
+          "temperature": 25.0,
+          "theta": 0.25
+        }
+      ],
+      "x_conv": 1000.0
+    }
+  ],
+  "schema_version": "vapor-content-kernel-fixture-v1",
+  "units": {
+    "capacity": "1/cm",
+    "head": "cm",
+    "porosity": "cm3/cm3",
+    "temperature": "degC",
+    "theta": "cm3/cm3",
+    "x_conv": "cm/m"
+  }
+}

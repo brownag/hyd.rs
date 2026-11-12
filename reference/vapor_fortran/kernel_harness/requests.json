@@ -1,0 +1,43 @@
+{
+  "schema_version": "vapor-content-request-v1",
+  "units": {
+    "temperature": "degC",
+    "head": "cm",
+    "theta": "cm3/cm3",
+    "porosity": "cm3/cm3",
+    "capacity": "1/cm",
+    "x_conv": "cm/m"
+  },
+  "requests": [
+    {
+      "id": "dry-cold",
+      "x_conv": 100.0,
+      "materials": [{"index": 1, "porosity": 0.45}],
+      "nodes": [
+        {"theta": 0.1, "temperature": 5.0, "head": -100.0, "material": 1, "capacity": 0.02},
+        {"theta": 0.2, "temperature": 5.0, "head": -50.0, "material": 1, "capacity": 0.03}
+      ]
+    },
+    {
+      "id": "moist-warm",
+      "x_conv": 100.0,
+      "materials": [
+        {"index": 1, "porosity": 0.42},
+        {"index": 2, "porosity": 0.5}
+      ],
+      "nodes": [
+        {"theta": 0.3, "temperature": 20.0, "head": -20.0, "material": 1, "capacity": 0.04},
+        {"theta": 0.4, "temperature": 35.0, "head": -5.0, "material": 2, "capacity": 0.05}
+      ]
+    },
+    {
+      "id": "length-conversion",
+      "x_conv": 1000.0,
+      "materials": [{"index": 1, "porosity": 0.38}],
+      "nodes": [
+        {"theta": 0.0, "temperature": 10.0, "head": -1000.0, "material": 1, "capacity": 0.01},
+        {"theta": 0.25, "temperature": 25.0, "head": -10.0, "material": 1, "capacity": 0.06}
+      ]
+    }
+  ]
+}
