@@ -1,6 +1,6 @@
 # Orchestration 25 state — G19 first vapor increment
 
-Created: 2026-11-11. Status: **PLAN APPROVED 2026-11-11; Waves 1–7 complete.**
+Created: 2026-11-11. Status: **PLAN APPROVED 2026-11-11; **All waves complete; G19 complete with exception.****
 Plan: [EXECUTION_PLAN_25.md](EXECUTION_PLAN_25.md).
 Worker: [PROMPT_TEMPLATE_25.md](PROMPT_TEMPLATE_25.md).
 Contract: [M6_VAPOR_CONTRACT.md](master/M6_VAPOR_CONTRACT.md).
@@ -95,7 +95,7 @@ criteria. Plan approval does not open this numeric gate.
 | 7 | 25.7.1 | Rust candidate runs and parity test | done |
 | 7 | 25.7.2 | Standalone Python comparator | done |
 | 7 | 25.7.3 | Isothermal discrepancy diagnosis | done |
-| 8 | 25.8.1 | Acceptance and coverage handoff | pending |
+| 8 | 25.8.1 | Acceptance and coverage handoff | done |
 
 Max two workers; separate worktrees and absolute target/run roots. Orchestrator
 owns shared state and serial full-suite gates, one task commit at a time.
@@ -321,12 +321,26 @@ unphysical heat and were rejected by staging — tests use cm/day conversions.
 - User decision: record as explained. 25.7.1 integrated as `95ee096`: 10 tests;
   the isothermal test passes only if the failing set equals the 18 pinned
   `KNOWN_SOURCE_PRECISION_FAILURES` rows (not claimed as matched); all other
-  fields/cases/kernel pass (worst err/bound <= 0.10). Dry discrimination
+  fields/cases/kernel pass (worst err/bound 0.199 kernel capacity
+  correction, 0.183 dry v_liquid; corrected 2026-11-12 from an earlier <=0.10). Dry discrimination
   reference and candidate ratios to 2x tolerance: head 21.4, moisture 9.3,
   temperature 28.8. Second pass changes temperature by up to 6.3e-3 C (dry).
 - Wave 7 serial gates (after `95ee096`): build PASS; workspace tests PASS (51
   suites, 584 passed, 0 failed, 2 ignored); fmt PASS; Clippy PASS;
   `hydraulic_curves` 9 passed; Python PASS (447 tests).
+
+- 2026-11-12 user decision for 25.8.1: mark G19 complete with exception (18
+  isothermal rows explained, not claimed; criteria v2 post-failure revision).
+
+### Wave 8 — complete
+
+- 25.8.1: `planning/master/M6_VAPOR_ACCEPTANCE.md` created (complete with
+  exception, evidence, disclosures, not claimed); coverage matrix Status column
+  with all 20 rows assigned; contract status/evidence header; ADR 0021 dated
+  heat-only note (still Proposed); GOALS: G19 completed with exception, G22
+  open, G20 conditional, G23 deferred. `git diff --check` clean; read-only path
+  check passes except four pre-existing bare filenames not introduced here.
+  Docs only, no solver launches; final code gates are the Wave 7 gates.
 
 ## Planning review
 
