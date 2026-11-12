@@ -46,7 +46,7 @@ fn config() -> VaporConfig {
         top_temperature: 30.0,
         bottom_temperature: 10.0,
         x_conv: 100.0,
-        t_conv: 86400.0,
+        t_conv: 1.0 / 86400.0,
     })
     .unwrap()
 }
@@ -61,7 +61,23 @@ fn row(value: f64) -> BoundaryRow {
 }
 
 fn material() -> TempMaterial {
-    TempMaterial::from_tpar([0.5, 0.0, 0.0, 0.5, 0.1, 0.2, 2.0, 0.0, 4.0])
+    {
+        // SI values in cm/day model units: capacity / (xConv*tConv^2),
+        // conductivity * xConv / tConv^3 (precedent: tests/vapor_balance.rs).
+        let (xc, tc) = (100.0_f64, 1.0_f64 / 86400.0);
+        let (kc, kl) = (1.0 / (xc * tc * tc), xc / (tc * tc * tc));
+        TempMaterial::from_tpar([
+            0.5,
+            0.0,
+            0.0,
+            0.25 * kl,
+            0.5 * kl,
+            1.0 * kl,
+            1.92e6 * kc,
+            0.0,
+            4.18e6 * kc,
+        ])
+    }
 }
 
 fn heat() -> CoupledHeatInput {
@@ -69,7 +85,7 @@ fn heat() -> CoupledHeatInput {
         top_temperature: 30.0,
         bottom_temperature: 10.0,
         x_conv: 100.0,
-        t_conv: 86400.0,
+        t_conv: 1.0 / 86400.0,
         minimum_pivot: 1.0e-14,
     }
 }
@@ -103,7 +119,7 @@ fn run(
                 material_indices: &[0; 3],
                 saturated_water_contents: &[0.45],
                 x_conv: 100.0,
-                t_conv: 86400.0,
+                t_conv: 1.0 / 86400.0,
             },
             coordinates: &X,
             gravity: 1.0,
@@ -189,7 +205,7 @@ fn second_pass_uses_first_heat_result_and_commits_once() {
             vapor_content_new: &report.vapor_contents_new,
             timestep: report.timestep,
             x_conv: 100.0,
-            t_conv: 86400.0,
+            t_conv: 1.0 / 86400.0,
         };
         solve_vapor_heat_transport(
             config(),
@@ -207,7 +223,7 @@ fn second_pass_uses_first_heat_result_and_commits_once() {
                 top_temperature: 30.0,
                 bottom_temperature: 10.0,
                 x_conv: 100.0,
-                t_conv: 86400.0,
+                t_conv: 1.0 / 86400.0,
                 minimum_pivot: 1.0e-14,
             },
             &adjust,
