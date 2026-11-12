@@ -132,6 +132,7 @@ pub enum WaterStepError {
     },
     Hydraulic(HydraulicError),
     Linear(TridiagonalError),
+    Vapor(crate::heat::vapor::VaporError),
 }
 
 /// Errors raised while validating the public single-domain solute contract.
@@ -203,6 +204,7 @@ impl fmt::Display for WaterStepError {
             Self::NonConverged { timestep, minimum_timestep, retries } => write!(formatter, "water step did not converge at dt={timestep} with dt_min={minimum_timestep} after {retries} retries"),
             Self::Hydraulic(error) => error.fmt(formatter),
             Self::Linear(error) => error.fmt(formatter),
+            Self::Vapor(error) => error.fmt(formatter),
         }
     }
 }
@@ -218,5 +220,11 @@ impl From<HydraulicError> for WaterStepError {
 impl From<TridiagonalError> for WaterStepError {
     fn from(error: TridiagonalError) -> Self {
         Self::Linear(error)
+    }
+}
+
+impl From<crate::heat::vapor::VaporError> for WaterStepError {
+    fn from(error: crate::heat::vapor::VaporError) -> Self {
+        Self::Vapor(error)
     }
 }

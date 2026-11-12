@@ -2,6 +2,11 @@ use crate::atmospheric::{
     decide_transition, AtmosphericAssembly, AtmosphericTransition, UpperBoundaryMode,
 };
 use crate::forcing::AtmosphericRates;
+use crate::heat::vapor::kernels;
+use crate::heat::vapor::water::{
+    assemble_water_rows, phase_velocities, PhaseVelocityInput, VaporWaterRowsInput,
+};
+use crate::heat::vapor::{VaporError, VaporPrimitiveInput, VaporWaterContext, VaporWaterTrial};
 use crate::hydraulics::{
     arithmetic_face_conductivity, geometric_face_conductivity, nodal_control_volume_width,
     solve_tridiagonal_in_place, transform_boundary_row, BoundaryCondition, BoundaryRow,
@@ -187,6 +192,323 @@ pub fn advance_water_step<'a>(
     policy: WaterStepPolicy,
 ) -> Result<WaterStepReport<'a>, WaterStepError> {
     advance_water_step_impl(state, workspace, input, policy, None)
+}
+
+/// Solves one uncommitted vapor-aware nonlinear water trial.
+///
+/// This crate-private seam deliberately returns owned candidate state and
+/// diagnostics. The coupled driver owns acceptance/rollback; ordinary public
+/// water entry points continue to use the unchanged liquid-only path.
+#[allow(dead_code)] // consumed by the vapor coupled driver in task 25.5.1
+pub(crate) fn solve_vapor_water_trial(
+    state: &WaterState,
+    workspace: &WaterWorkspace,
+    input: WaterStepInput<'_>,
+    policy: WaterStepPolicy,
+    context: VaporWaterContext<'_>,
+) -> Result<VaporWaterTrial, WaterStepError> {
+    context.old.validate()?;
+    context
+        .config
+        .validate_water_input(&input, state.time, policy)?;
+    let n = input.mesh.coordinates().len();
+    for (name, values) in [
+        ("temperature_estimate", context.temperature_estimate),
+        ("initial_heads", context.initial_heads),
+        ("initial_material_heads", context.initial_material_heads),
+    ] {
+        if values.len() != n {
+            return Err(VaporError::LengthMismatch {
+                name,
+                expected: n,
+                actual: values.len(),
+            }
+            .into());
+        }
+        for (index, &value) in values.iter().enumerate() {
+            if !value.is_finite() {
+                return Err(VaporError::NonFinite {
+                    name,
+                    index: Some(index),
+                    value,
+                }
+                .into());
+            }
+        }
+    }
+    if context.source_materials.len() != input.materials.len() {
+        return Err(VaporError::LengthMismatch {
+            name: "source_materials",
+            expected: input.materials.len(),
+            actual: context.source_materials.len(),
+        }
+        .into());
+    }
+    if context.old.heads.len() != n || context.old.temperatures.len() != n {
+        return Err(VaporError::LengthMismatch {
+            name: "accepted vapor history",
+            expected: n,
+            actual: context.old.heads.len(),
+        }
+        .into());
+    }
+    if context.old.time != state.time
+        || context.old.heads != state.heads
+        || context.old.liquid_water_contents != state.water_contents
+    {
+        return Err(VaporError::InvalidValue {
+            name: "accepted water/vapor snapshot mismatch",
+            value: context.old.time - state.time,
+        }
+        .into());
+    }
+    let mut candidate_workspace = workspace.clone();
+    let mut candidate = state.clone();
+    let mut dt = input.timestep.min(input.target_time - state.time);
+    let mut retries = 0;
+    loop {
+        candidate_workspace.snapshot(&candidate);
+        candidate_workspace
+            .trial_heads
+            .copy_from_slice(context.initial_heads);
+        let mut converged = None;
+        let mut previous_vapor = context.old.vapor_contents.to_vec();
+        let mut material_heads = context.initial_material_heads.to_vec();
+        for iteration in 1..=policy.max_iterations {
+            let h_temp = material_heads.clone();
+            let iterate_heads = candidate_workspace.trial_heads.clone();
+            let previous_total: Vec<f64> = candidate_workspace
+                .trial_water
+                .iter()
+                .zip(&previous_vapor)
+                .map(|(theta, theta_v)| theta + theta_v)
+                .collect();
+            let mut liquid = Vec::with_capacity(n);
+            let mut capacities = Vec::with_capacity(n);
+            let mut liquid_theta = Vec::with_capacity(n);
+            let saturated: Vec<f64> = context
+                .source_materials
+                .iter()
+                .map(|material| material.model.parameters().saturated_water_content())
+                .collect();
+            for (node, &head_temp) in h_temp.iter().enumerate() {
+                let material = input.mesh.material_indices()[node];
+                let mixed_head = 0.1 * head_temp + 0.9 * candidate_workspace.trial_heads[node];
+                let evaluation =
+                    evaluate_vapor_liquid(context.source_materials[material], mixed_head)?;
+                liquid.push(evaluation.conductivity);
+                capacities.push(evaluation.capacity);
+                liquid_theta.push(evaluation.theta);
+            }
+            let primitive = VaporPrimitiveInput {
+                heads: &candidate_workspace.trial_heads,
+                temperatures: context.temperature_estimate,
+                liquid_water_contents: &liquid_theta,
+                liquid_conductivities: &liquid,
+                liquid_capacities: &capacities,
+                material_indices: input.mesh.material_indices(),
+                saturated_water_contents: &saturated,
+                x_conv: context.config.x_conv(),
+                t_conv: context.config.t_conv(),
+            };
+            // Keep the per-iteration properties owned before row construction.
+            let properties = kernels::evaluate(&primitive)?;
+            let rows = assemble_water_rows(&VaporWaterRowsInput {
+                coordinates: input.mesh.coordinates(),
+                gravity: input.mesh.inclination_cosine(),
+                liquid_conductivities: &liquid,
+                effective_capacities: &properties.effective_hydraulic_capacities,
+                heads_new: &candidate_workspace.trial_heads,
+                liquid_water_old: &state.water_contents,
+                liquid_water_new: &liquid_theta,
+                vapor_water_old: context.old.vapor_contents,
+                vapor_water_new: &properties.vapor_contents,
+                temperatures: context.temperature_estimate,
+                sink: input.sink,
+                timestep: dt,
+                vapor: &properties,
+            })?;
+            let (upper_mode, lower_flux) = assemble(
+                &mut candidate_workspace,
+                state,
+                input,
+                policy.minimum_pivot,
+                dt,
+                None,
+            )?;
+            for (node, vapor_row) in (1..n - 1).zip(rows) {
+                // Replace the liquid-only row, not add it a second time.
+                candidate_workspace.lower[node] = vapor_row.lower;
+                candidate_workspace.diagonal[node] = vapor_row.diagonal;
+                candidate_workspace.upper[node] = vapor_row.upper;
+                candidate_workspace.rhs[node] = vapor_row.rhs;
+            }
+            let pivots = solve_tridiagonal_in_place(
+                &candidate_workspace.lower,
+                &mut candidate_workspace.diagonal,
+                &candidate_workspace.upper,
+                &mut candidate_workspace.rhs,
+                policy.minimum_pivot,
+            )?;
+            let solved_heads = candidate_workspace.rhs.clone();
+            let mut head_residual: f64 = 0.0;
+            let mut total_residual: f64 = 0.0;
+            for node in 0..n {
+                head_residual = head_residual.max((solved_heads[node] - h_temp[node]).abs());
+                let total = liquid_theta[node] + properties.vapor_contents[node];
+                total_residual = total_residual.max((total - previous_total[node]).abs());
+            }
+            if head_residual <= policy.head_tolerance && total_residual <= policy.water_tolerance {
+                let corrected_theta: Vec<f64> = (0..n)
+                    .map(|node| {
+                        liquid_theta[node]
+                            + properties.effective_hydraulic_capacities[node]
+                                * (solved_heads[node] - h_temp[node])
+                    })
+                    .collect();
+                if corrected_theta.iter().any(|theta| !theta.is_finite()) {
+                    return Err(WaterStepError::NonFiniteDiagnostic);
+                }
+                converged = Some((
+                    iteration,
+                    pivots,
+                    lower_flux,
+                    upper_mode,
+                    corrected_theta,
+                    liquid_theta,
+                    properties,
+                    iterate_heads,
+                    solved_heads,
+                    capacities,
+                    h_temp,
+                ));
+                break;
+            }
+            candidate_workspace
+                .trial_heads
+                .copy_from_slice(&solved_heads);
+            candidate_workspace
+                .trial_water
+                .copy_from_slice(&liquid_theta);
+            previous_vapor = properties.vapor_contents.clone();
+            material_heads = solved_heads;
+        }
+        if let Some((
+            iterations,
+            _pivots,
+            lower_flux,
+            _upper_mode,
+            corrected,
+            pre_solve_liquid_water,
+            properties,
+            pre_solve_heads,
+            solved_heads,
+            pre_solve_liquid_capacities,
+            _h_temp,
+        )) = converged
+        {
+            candidate.heads.copy_from_slice(&solved_heads);
+            candidate_workspace
+                .trial_heads
+                .copy_from_slice(&solved_heads);
+            candidate.water_contents.copy_from_slice(&corrected);
+            let phase = phase_velocities(&PhaseVelocityInput {
+                coordinates: input.mesh.coordinates(),
+                gravity: input.mesh.inclination_cosine(),
+                heads: &candidate.heads,
+                liquid_conductivities: &properties.liquid_conductivities,
+                liquid_water_old: context.old.liquid_water_contents,
+                liquid_water_new: &corrected,
+                sink: input.sink,
+                temperatures: context.temperature_estimate,
+                vapor_water_old: context.old.vapor_contents,
+                vapor_water_new: &properties.vapor_contents,
+                timestep: dt,
+                vapor: &properties,
+            })?;
+            let accepted_time = (state.time + dt).min(input.target_time);
+            candidate.time = accepted_time;
+            let mut liquid_face_fluxes = vec![0.0; n + 1];
+            let mut vapor_face_fluxes = vec![0.0; n + 1];
+            let mut total_face_fluxes = vec![0.0; n + 1];
+            liquid_face_fluxes[0] = lower_flux;
+            let upper_flux = input.upper.measured_flux().unwrap_or(0.0);
+            liquid_face_fluxes[n] = -upper_flux;
+            vapor_face_fluxes[0] = phase.vapor[0];
+            vapor_face_fluxes[n] = phase.vapor[n - 1];
+            for face in 1..n {
+                let left = face - 1;
+                let right = face;
+                let dx = input.mesh.coordinates()[right] - input.mesh.coordinates()[left];
+                liquid_face_fluxes[face] = -arithmetic_face_conductivity(
+                    properties.liquid_conductivities[left],
+                    properties.liquid_conductivities[right],
+                )? * ((candidate.heads[right] - candidate.heads[left])
+                    / dx
+                    + input.mesh.inclination_cosine());
+                vapor_face_fluxes[face] = -arithmetic_face_conductivity(
+                    properties.vapor_head_conductivities[left],
+                    properties.vapor_head_conductivities[right],
+                )? * (candidate.heads[right] - candidate.heads[left])
+                    / dx
+                    - arithmetic_face_conductivity(
+                        properties.vapor_thermal_conductivities[left],
+                        properties.vapor_thermal_conductivities[right],
+                    )? * (context.temperature_estimate[right]
+                        - context.temperature_estimate[left])
+                        / dx;
+            }
+            for face in 0..=n {
+                total_face_fluxes[face] = liquid_face_fluxes[face] + vapor_face_fluxes[face];
+            }
+            candidate_workspace
+                .face_fluxes
+                .copy_from_slice(&liquid_face_fluxes);
+            let liquid_velocities = phase.liquid.clone();
+            let vapor_velocities = phase.vapor.clone();
+            return Ok(VaporWaterTrial {
+                candidate,
+                workspace: candidate_workspace,
+                accepted_time,
+                timestep: dt,
+                iterations,
+                retries,
+                pre_solve_heads,
+                pre_solve_liquid_water_contents: pre_solve_liquid_water,
+                pre_solve_liquid_capacities,
+                liquid_velocities,
+                vapor_velocities,
+                properties,
+                liquid_face_fluxes,
+                vapor_face_fluxes,
+                total_face_fluxes,
+            });
+        }
+        let next = dt / policy.retry_factor;
+        if next < policy.minimum_timestep {
+            return Err(WaterStepError::NonConverged {
+                timestep: dt,
+                minimum_timestep: policy.minimum_timestep,
+                retries,
+            });
+        }
+        dt = next;
+        retries += 1;
+    }
+}
+
+fn evaluate_vapor_liquid(
+    source: crate::heat::vapor::VaporSourceMaterial<'_>,
+    head: f64,
+) -> Result<crate::hydraulics::Evaluation, WaterStepError> {
+    let evaluation = match source.table {
+        Some(table) if head >= table.heads()[0] && head <= *table.heads().last().unwrap() => {
+            table.evaluate(head)
+        }
+        // SetMat falls back to analytic `FK`/`FC`/`FQ` outside the table span.
+        Some(_) | None => source.model.evaluate(head),
+    }?;
+    Ok(evaluation)
 }
 
 pub(crate) fn advance_atmospheric_inner<'a>(
@@ -690,4 +1012,251 @@ fn validate(
         )?;
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod vapor_trial_tests {
+    use super::*;
+    use crate::heat::config::HeatConfigInput;
+    use crate::heat::vapor::{
+        VaporConfig, VaporConfigInput, VaporHistoryView, VaporSourceMaterial,
+    };
+    use crate::hydraulics::{VanGenuchtenModel, VanGenuchtenParameters};
+
+    fn config() -> VaporConfig {
+        VaporConfig::new(VaporConfigInput {
+            heat: HeatConfigInput {
+                l_vapor: true,
+                l_en_bal: false,
+                i_dual_por: 0,
+                l_w_dep: false,
+                i_model: 0,
+                domain_count: 1,
+                k_top_t: 1,
+                t_period: 0.0,
+                k_bot_t: 1,
+                campbell: false,
+            },
+            water_enabled: true,
+            heat_enabled: true,
+            i_enhanc: 1,
+            hysteresis: 0,
+            chemistry: false,
+            density_coupling: false,
+            centrifugal: false,
+            top_temperature: 20.0,
+            bottom_temperature: 20.0,
+            x_conv: 1.0,
+            t_conv: 1.0,
+        })
+        .unwrap()
+    }
+
+    #[test]
+    fn vapor_trial_returns_owned_candidate_without_mutating_accepted_inputs() {
+        let model = VanGenuchtenModel::new(
+            VanGenuchtenParameters::new(0.05, 0.45, 0.04, 1.6, 1.0e-5).unwrap(),
+        )
+        .unwrap();
+        let mesh = Mesh1D::new(vec![0.0, 0.5, 1.0], vec![0; 3], None, 1, 1, 1.0).unwrap();
+        let old_heads = vec![-100.0; 3];
+        let old_theta: Vec<f64> = old_heads
+            .iter()
+            .map(|h| model.evaluate(*h).unwrap().theta)
+            .collect();
+        let state = WaterState::new(0.0, old_heads.clone(), old_theta.clone()).unwrap();
+        let workspace = WaterWorkspace::new(3).unwrap();
+        let temperature = [20.0; 3];
+        let zero = [0.0; 3];
+        let vapor = kernels::evaluate(&VaporPrimitiveInput {
+            heads: &old_heads,
+            temperatures: &temperature,
+            liquid_water_contents: &old_theta,
+            liquid_conductivities: &[model.evaluate(-100.0).unwrap().conductivity; 3],
+            liquid_capacities: &[model.evaluate(-100.0).unwrap().capacity; 3],
+            material_indices: &[0; 3],
+            saturated_water_contents: &[0.45],
+            x_conv: 1.0,
+            t_conv: 1.0,
+        })
+        .unwrap();
+        let old_view = VaporHistoryView {
+            time: 0.0,
+            previous_timestep: None,
+            heads: &old_heads,
+            liquid_water_contents: &old_theta,
+            temperatures: &temperature,
+            vapor_contents: &vapor.vapor_contents,
+            liquid_velocities: &zero,
+            vapor_velocities: &zero,
+            head_predictor: &old_heads,
+        };
+        let source = [VaporSourceMaterial {
+            model: &model,
+            table: None,
+        }];
+        let materials: [&dyn HydraulicModel; 1] = [&model];
+        let sink = [0.0; 3];
+        let input = WaterStepInput {
+            mesh: &mesh,
+            materials: &materials,
+            sink: &sink,
+            root_uptake: None,
+            timestep: 0.1,
+            target_time: 0.1,
+            face_averaging: FaceAveraging::Arithmetic,
+            lower: LowerBoundaryMode::FixedHead {
+                head: -90.0,
+                row: BoundaryRow {
+                    lower: 0.0,
+                    diagonal: 1.0,
+                    upper: 0.0,
+                    rhs: -90.0,
+                },
+                flux: 0.0,
+            },
+            upper: UpperBoundary::Head {
+                head: -110.0,
+                row: BoundaryRow {
+                    lower: 0.0,
+                    diagonal: 1.0,
+                    upper: 0.0,
+                    rhs: -110.0,
+                },
+                flux: 0.0,
+            },
+        };
+        let policy = WaterStepPolicy {
+            max_iterations: 20,
+            head_tolerance: 1.0e-8,
+            water_tolerance: 1.0e-8,
+            minimum_timestep: 1.0e-6,
+            retry_factor: 3.0,
+            minimum_pivot: 1.0e-14,
+        };
+        let temp_estimate = [20.0; 3];
+        // The Newton/Picard guess is deliberately distinct from the accepted
+        // head and material-history head; old storage must remain the snapshot.
+        let initial_heads = [-105.0, -105.0, -105.0];
+        let material_heads = [-100.0, -100.0, -100.0];
+        let config = config();
+        let context = VaporWaterContext {
+            config: &config,
+            old: old_view,
+            temperature_estimate: &temp_estimate,
+            initial_heads: &initial_heads,
+            initial_material_heads: &material_heads,
+            source_materials: &source,
+        };
+        let trial = solve_vapor_water_trial(&state, &workspace, input, policy, context).unwrap();
+        let mut liquid_only_state = state.clone();
+        let mut liquid_only_workspace = workspace.clone();
+        advance_water_step(
+            &mut liquid_only_state,
+            &mut liquid_only_workspace,
+            input,
+            policy,
+        )
+        .unwrap();
+        assert_eq!(trial.accepted_time, 0.1);
+        assert_eq!(trial.timestep, 0.1);
+        assert!(
+            trial.iterations > 1,
+            "properties/rows must be rebuilt per iteration"
+        );
+        assert!((trial.pre_solve_heads[1] - material_heads[1]).abs() < 1.0e-3);
+        assert!(trial
+            .properties
+            .vapor_contents
+            .iter()
+            .any(|value| *value > 0.0));
+        assert_ne!(trial.candidate.heads(), liquid_only_state.heads());
+        let correction_trial = solve_vapor_water_trial(
+            &state,
+            &workspace,
+            input,
+            WaterStepPolicy {
+                max_iterations: 1,
+                head_tolerance: 100.0,
+                water_tolerance: 100.0,
+                ..policy
+            },
+            context,
+        )
+        .unwrap();
+        let mixed_evaluations: Vec<_> = material_heads
+            .iter()
+            .zip(initial_heads)
+            .map(|(h_temp, h_new)| model.evaluate(0.1 * h_temp + 0.9 * h_new).unwrap())
+            .collect();
+        let expected_mixed = kernels::evaluate(&VaporPrimitiveInput {
+            heads: &initial_heads,
+            temperatures: &temp_estimate,
+            liquid_water_contents: &mixed_evaluations
+                .iter()
+                .map(|v| v.theta)
+                .collect::<Vec<_>>(),
+            liquid_conductivities: &mixed_evaluations
+                .iter()
+                .map(|v| v.conductivity)
+                .collect::<Vec<_>>(),
+            liquid_capacities: &mixed_evaluations
+                .iter()
+                .map(|v| v.capacity)
+                .collect::<Vec<_>>(),
+            material_indices: &[0; 3],
+            saturated_water_contents: &[0.45],
+            x_conv: 1.0,
+            t_conv: 1.0,
+        })
+        .unwrap();
+        for (actual, expected) in correction_trial
+            .properties
+            .vapor_contents
+            .iter()
+            .zip(expected_mixed.vapor_contents)
+        {
+            assert!((actual - expected).abs() < 1.0e-15);
+        }
+        let retry_initial_heads = [-90.0, -105.0, -110.0];
+        let retry_material_heads = [-90.0, -100.0, -110.0];
+        let retry_context = VaporWaterContext {
+            initial_heads: &retry_initial_heads,
+            initial_material_heads: &retry_material_heads,
+            ..context
+        };
+        let retry_result = solve_vapor_water_trial(
+            &state,
+            &workspace,
+            input,
+            WaterStepPolicy {
+                max_iterations: 1,
+                head_tolerance: 0.01,
+                water_tolerance: 0.01,
+                minimum_timestep: 1.0e-14,
+                ..policy
+            },
+            retry_context,
+        );
+        assert!(matches!(
+            retry_result,
+            Err(WaterStepError::NonConverged {
+                timestep,
+                retries,
+                ..
+            }) if timestep < input.timestep && retries > 0
+        ));
+        assert_ne!(
+            correction_trial.candidate.water_contents(),
+            correction_trial.pre_solve_liquid_water_contents,
+            "candidate storage includes the final source head correction"
+        );
+        assert_eq!(state.heads(), &old_heads);
+        assert_eq!(state.water_contents(), &old_theta);
+        assert_ne!(trial.candidate.heads(), state.heads());
+        assert_eq!(trial.properties.vapor_contents.len(), 3);
+        assert_eq!(trial.total_face_fluxes.len(), 4);
+        assert_eq!(trial.liquid_velocities.len(), 3);
+        assert_eq!(trial.vapor_velocities.len(), 3);
+    }
 }
