@@ -61,6 +61,16 @@ This baseline is not vapor numerical acceptance.
   NOD_INF_V vapor fields discriminate). User chose to add dry-soil fixtures
   (plan amendment task 25.6.3) before proposing per-field trajectory criteria.
 
+- [x] 2026-11-12 POST-FAILURE criteria revision v2 (explicit user override of
+  the no-widening rule after Wave 7 v1 failures in isothermal v_vapor/v_vap_term,
+  29-31/164 points, errors within float32 TempN one-ulp noise). Only v_vapor,
+  v_vap_term, v_total gain a source-precision floor
+  `2*ulp32(|T|)*ConVT_max/dx_min`. Contract revision `a4545e4`, SHA-256
+  `1dd169b5879642ddc4aca100369d3dd4d7db37650e97eb15bf11b0fdc2e1cfce`;
+  `criteria.json` v2 SHA-256
+  `1d8dc73eac5fe66c1f8bbfd8c5108781c5efe92509c9689467c3dbf19cc4a7c0`. v1 verdicts
+  retained in `.development/25.7.1/attempt-20261112T162852Z/`.
+
 Target point: after Wave 2, before Wave 3. Wave 7 remains blocked without the
 gate; earlier independent acceptance checks likewise require their approved
 criteria. Plan approval does not open this numeric gate.
@@ -82,7 +92,8 @@ criteria. Plan approval does not open this numeric gate.
 | 6 | 25.6.2 | Independent mathematics/balances | done |
 | 6 | 25.6.3 | Dry-soil discriminating fixtures | done |
 | 6 | 25.6.4 | Water-trial iteration semantics | done |
-| 7 | 25.7.1 | Coupled and kernel parity | pending |
+| 7 | 25.7.1 | Rust candidate runs and parity test | in progress |
+| 7 | 25.7.2 | Standalone Python comparator | in progress |
 | 8 | 25.8.1 | Acceptance and coverage handoff | pending |
 
 Max two workers; separate worktrees and absolute target/run roots. Orchestrator

@@ -25,8 +25,8 @@
       "unit": "model"
     }
   },
-  "contract_revision": "8e561a570b9873695330fa7448fe8d16368609d5",
-  "contract_sha256": "2cd1f8b9d952fb15edddd23942dd32d10dbe1ca415e223a7e5ae81aea38cf79f",
+  "contract_revision": "a4545e41ffe0e0131b7c2b65762100072d82906e",
+  "contract_sha256": "1dd169b5879642ddc4aca100369d3dd4d7db37650e97eb15bf11b0fdc2e1cfce",
   "discrimination": {
     "dry_on_off_head": {
       "case": "vapor_dry_thermal_gradient",
@@ -205,8 +205,13 @@
       "scale": "abs_reference",
       "unit": "cm/h",
       "zero_rule": {
+        "conductivity_field": "con_vt",
+        "conductivity_neighbourhood": "node_and_mesh_neighbours_same_time",
         "fraction": 0.001,
-        "name": "case_time_field_max_fraction"
+        "name": "case_time_field_max_fraction_with_temperature_precision",
+        "spacing": "min_adjacent_dx",
+        "temperature_precision": "float32",
+        "ulp_multiple": 2.0
       }
     },
     "v_vap_iso": {
@@ -229,8 +234,13 @@
       "scale": "abs_reference",
       "unit": "cm/h",
       "zero_rule": {
+        "conductivity_field": "con_vt",
+        "conductivity_neighbourhood": "node_and_mesh_neighbours_same_time",
         "fraction": 0.001,
-        "name": "case_time_field_max_fraction"
+        "name": "case_time_field_max_fraction_with_temperature_precision",
+        "spacing": "min_adjacent_dx",
+        "temperature_precision": "float32",
+        "ulp_multiple": 2.0
       }
     },
     "v_vapor": {
@@ -241,10 +251,16 @@
       "scale": "abs_reference",
       "unit": "cm/h",
       "zero_rule": {
+        "conductivity_field": "con_vt",
+        "conductivity_neighbourhood": "node_and_mesh_neighbours_same_time",
         "fraction": 0.001,
-        "name": "case_time_field_max_fraction"
+        "name": "case_time_field_max_fraction_with_temperature_precision",
+        "spacing": "min_adjacent_dx",
+        "temperature_precision": "float32",
+        "ulp_multiple": 2.0
       }
     }
   },
-  "schema_version": "vapor-criteria-v1"
+  "revision_note": "post-failure owner override of v1 (sha256 d645cae2a0ba44219eed7b53185abb09a1815ee481041f4e7a3b9fbc0cbbf008); only v_vapor, v_vap_term, v_total zero_rule changed",
+  "schema_version": "vapor-criteria-v2"
 }

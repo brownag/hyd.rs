@@ -38,7 +38,7 @@ fn load_bounds() -> (Bound, Bound) {
     let bytes = std::fs::read(path).expect("criteria.json readable");
     println!("criteria.json sha256 {:x}", sha2::Sha256::digest(&bytes));
     let doc: serde_json::Value = serde_json::from_slice(&bytes).expect("criteria.json parses");
-    assert_eq!(doc["schema_version"], "vapor-criteria-v1", "schema_version");
+    assert_eq!(doc["schema_version"], "vapor-criteria-v2", "schema_version");
     let checks = doc["checks"].as_object().expect("checks object");
     let get = |name: &str| {
         let c = checks
