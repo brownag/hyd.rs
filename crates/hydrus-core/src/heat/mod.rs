@@ -7,3 +7,4 @@ pub mod config;
 pub mod driver;
 pub mod state;
 pub mod transport;
+pub mod vapor;

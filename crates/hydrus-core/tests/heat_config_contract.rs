@@ -68,16 +68,16 @@ fn accepts_campbell_conductivity_both_ways() {
 }
 
 #[test]
-fn rejects_vapor() {
-    let err = HeatConfig::new(HeatConfigInput {
+fn accepts_bounded_vapor_selection() {
+    let config = HeatConfig::new(HeatConfigInput {
         l_vapor: true,
         ..heat_only()
     })
-    .unwrap_err();
-    assert!(matches!(
-        err,
-        HeatConfigError::VaporNotSupported { value: true }
-    ));
+    .expect("bounded vapor heat selection");
+    assert!(config.vapor_enabled());
+    assert!(!config.campbell());
+    assert_eq!(config.top_boundary(), TopBoundaryKind::Dirichlet);
+    assert_eq!(config.bottom_boundary(), BottomBoundaryKind::Dirichlet);
 }
 
 #[test]

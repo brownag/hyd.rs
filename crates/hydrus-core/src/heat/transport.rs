@@ -58,6 +58,8 @@ pub struct HeatTransportReport {
 /// Typed rejections for [`solve_heat_transport`].
 #[derive(Clone, Debug, PartialEq)]
 pub enum HeatTransportError {
+    /// The heat-only entry cannot silently omit selected vapor terms.
+    VaporNotSupported,
     TooFewNodes {
         count: usize,
     },
@@ -78,6 +80,7 @@ pub enum HeatTransportError {
 impl fmt::Display for HeatTransportError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Self::VaporNotSupported => write!(formatter, "heat-only transport rejects vapor selection"),
             Self::TooFewNodes { count } => {
                 write!(
                     formatter,
@@ -127,6 +130,9 @@ pub fn solve_heat_transport(
     input: HeatTransportInput<'_>,
     temp_new: &mut [f64],
 ) -> Result<HeatTransportReport, HeatTransportError> {
+    if config.vapor_enabled() {
+        return Err(HeatTransportError::VaporNotSupported);
+    }
     let n = input.x.len();
     if n < 3 {
         return Err(HeatTransportError::TooFewNodes { count: n });

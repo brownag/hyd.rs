@@ -9,8 +9,10 @@ use std::fmt;
 /// Typed rejection for configurations outside the M6 heat-only selection.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum HeatConfigError {
-    /// `lVapor = true`: vapor terms are out of scope (`## Rejected`).
+    /// `lVapor = true` at a legacy heat-only entry that cannot apply vapor terms.
     VaporNotSupported { value: bool },
+    /// The vapor heat-selection subset requires default conductivity and fixed temperatures.
+    VaporSelectionNotSupported { name: &'static str },
     /// `lEnBal = true` after `MeteoIn`: energy balance is out of scope.
     EnergyBalanceNotSupported { value: bool },
     /// `iDualPor != 0`: dual porosity is out of scope.
@@ -35,6 +37,9 @@ impl fmt::Display for HeatConfigError {
         match self {
             Self::VaporNotSupported { value } => {
                 write!(formatter, "heat configuration rejects lVapor={value}")
+            }
+            Self::VaporSelectionNotSupported { name } => {
+                write!(formatter, "vapor heat configuration rejects {name}")
             }
             Self::EnergyBalanceNotSupported { value } => {
                 write!(formatter, "heat configuration rejects lEnBal={value}")
@@ -113,6 +118,7 @@ pub struct HeatConfigInput {
 /// Validated heat-only configuration.
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct HeatConfig {
+    vapor: bool,
     top: TopBoundaryKind,
     bottom: BottomBoundaryKind,
     campbell: bool,
@@ -121,11 +127,6 @@ pub struct HeatConfig {
 impl HeatConfig {
     /// Accepts only the M6 heat-only selection in `## Supported`.
     pub fn new(input: HeatConfigInput) -> Result<Self, HeatConfigError> {
-        if input.l_vapor {
-            return Err(HeatConfigError::VaporNotSupported {
-                value: input.l_vapor,
-            });
-        }
         if input.l_en_bal {
             return Err(HeatConfigError::EnergyBalanceNotSupported {
                 value: input.l_en_bal,
@@ -170,11 +171,31 @@ impl HeatConfig {
             code if code > 0 => BottomBoundaryKind::Dirichlet,
             _ => BottomBoundaryKind::Flux,
         };
+        if input.l_vapor {
+            if input.campbell {
+                return Err(HeatConfigError::VaporSelectionNotSupported { name: "iCampbell" });
+            }
+            if input.k_top_t <= 0 {
+                return Err(HeatConfigError::VaporSelectionNotSupported { name: "kTopT" });
+            }
+            if input.k_bot_t <= 0 {
+                return Err(HeatConfigError::VaporSelectionNotSupported { name: "kBotT" });
+            }
+            if !input.t_period.is_finite() || input.t_period != 0.0 {
+                return Err(HeatConfigError::VaporSelectionNotSupported { name: "tPeriod" });
+            }
+        }
         Ok(Self {
+            vapor: input.l_vapor,
             top,
             bottom,
             campbell: input.campbell,
         })
+    }
+
+    /// Whether this configuration retains the validated vapor selection.
+    pub fn vapor_enabled(self) -> bool {
+        self.vapor
     }
 
     pub fn top_boundary(self) -> TopBoundaryKind {
