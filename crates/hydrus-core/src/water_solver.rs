@@ -194,7 +194,32 @@ pub fn advance_water_step<'a>(
     advance_water_step_impl(state, workspace, input, policy, None)
 }
 
+/// Source `rMax` (`WATFLOW.FOR:35`).
+const SOURCE_R_MAX: f64 = 1.0e10;
+
+/// Source `hSat(M)=FH(iModel,1.0,Par)` (`INPUT.FOR:792`, `MATERIAL.FOR:350-374`,
+/// iModel 0). The source's final `sngl()` rounding is not reproduced.
+fn source_h_sat(parameters: &crate::hydraulics::VanGenuchtenParameters) -> f64 {
+    let alpha = parameters.alpha();
+    let n = parameters.n();
+    let m = 1.0 - 1.0 / n;
+    let h_min = -(1.0e300_f64.powf(1.0 / n)) / alpha.max(1.0);
+    let qee_m = (1.0 + (-alpha * h_min).powf(n)).powf(-m);
+    let qs = parameters.saturated_water_content();
+    let qr = parameters.residual_water_content();
+    let qee = (1.0 * (qs - qr) / (qs - qr))
+        .max(qee_m)
+        .min(0.999999999999999);
+    (-1.0 / alpha * (qee.powf(-1.0 / m) - 1.0).powf(1.0 / n)).max(-1.0e37)
+}
+
 /// Solves one uncommitted vapor-aware nonlinear water trial.
+///
+/// Iteration semantics follow `WatFlow` (`WATFLOW.FOR:60-160`): `SetMat` mixes
+/// the previous pre-solve iterate with the current iterate; convergence is the
+/// per-node `EpsTh`/`TolH` rule; a converged solve is accepted only from the
+/// second solve onward, so `max_iterations < 2` can never converge and returns
+/// `NonConverged`; the theta correction uses the pre-solve iterate.
 ///
 /// This crate-private seam deliberately returns owned candidate state and
 /// diagnostics. The coupled driver owns acceptance/rollback; ordinary public
@@ -272,17 +297,12 @@ pub(crate) fn solve_vapor_water_trial(
             .trial_heads
             .copy_from_slice(context.initial_heads);
         let mut converged = None;
-        let mut previous_vapor = context.old.vapor_contents.to_vec();
+        // SetMat `hTemp`: the pre-solve iterate of the previous pass.
         let mut material_heads = context.initial_material_heads.to_vec();
         for iteration in 1..=policy.max_iterations {
             let h_temp = material_heads.clone();
+            // WatFlow `hTemp=hNew` before Gauss (`WATFLOW.FOR:94-96`).
             let iterate_heads = candidate_workspace.trial_heads.clone();
-            let previous_total: Vec<f64> = candidate_workspace
-                .trial_water
-                .iter()
-                .zip(&previous_vapor)
-                .map(|(theta, theta_v)| theta + theta_v)
-                .collect();
             let mut liquid = Vec::with_capacity(n);
             let mut capacities = Vec::with_capacity(n);
             let mut liquid_theta = Vec::with_capacity(n);
@@ -350,20 +370,53 @@ pub(crate) fn solve_vapor_water_trial(
                 &mut candidate_workspace.rhs,
                 policy.minimum_pivot,
             )?;
-            let solved_heads = candidate_workspace.rhs.clone();
-            let mut head_residual: f64 = 0.0;
-            let mut total_residual: f64 = 0.0;
-            for node in 0..n {
-                head_residual = head_residual.max((solved_heads[node] - h_temp[node]).abs());
-                let total = liquid_theta[node] + properties.vapor_contents[node];
-                total_residual = total_residual.max((total - previous_total[node]).abs());
+            let mut solved_heads = candidate_workspace.rhs.clone();
+            for head in solved_heads.iter_mut() {
+                if head.abs() > SOURCE_R_MAX {
+                    *head = SOURCE_R_MAX.copysign(*head); // WATFLOW.FOR:96-97
+                }
             }
-            if head_residual <= policy.head_tolerance && total_residual <= policy.water_tolerance {
+            // Source convergence test (`WATFLOW.FOR:105-127`), ATh=1, Rate=1.
+            let mut r_max_failure = false;
+            let mut node_converged = true;
+            for node in 0..n {
+                let material = input.mesh.material_indices()[node];
+                let parameters = context.source_materials[material].model.parameters();
+                let h_sat = source_h_sat(parameters);
+                let (eps_th, eps_h) = if iterate_heads[node] < h_sat && solved_heads[node] < h_sat {
+                    let span =
+                        parameters.saturated_water_content() - parameters.residual_water_content();
+                    (
+                        (properties.effective_hydraulic_capacities[node]
+                            * (solved_heads[node] - iterate_heads[node])
+                            / span)
+                            .abs(),
+                        0.0,
+                    )
+                } else {
+                    (0.0, (solved_heads[node] - iterate_heads[node]).abs())
+                };
+                if solved_heads[node].abs() > SOURCE_R_MAX * 0.999 {
+                    r_max_failure = true;
+                }
+                if eps_th > policy.water_tolerance
+                    || eps_h > policy.head_tolerance
+                    || solved_heads[node].abs() > SOURCE_R_MAX * 0.999
+                {
+                    node_converged = false;
+                    break;
+                }
+            }
+            if r_max_failure {
+                break; // source sets Iter=MaxIt: this attempt fails
+            }
+            // `Iter.le.1` forces a second solve (`WATFLOW.FOR:128`).
+            if node_converged && iteration >= 2 {
                 let corrected_theta: Vec<f64> = (0..n)
                     .map(|node| {
                         liquid_theta[node]
                             + properties.effective_hydraulic_capacities[node]
-                                * (solved_heads[node] - h_temp[node])
+                                * (solved_heads[node] - iterate_heads[node])
                     })
                     .collect();
                 if corrected_theta.iter().any(|theta| !theta.is_finite()) {
@@ -390,8 +443,7 @@ pub(crate) fn solve_vapor_water_trial(
             candidate_workspace
                 .trial_water
                 .copy_from_slice(&liquid_theta);
-            previous_vapor = properties.vapor_contents.clone();
-            material_heads = solved_heads;
+            material_heads = iterate_heads;
         }
         if let Some((
             iterations,
@@ -1176,7 +1228,7 @@ mod vapor_trial_tests {
             &workspace,
             input,
             WaterStepPolicy {
-                max_iterations: 1,
+                max_iterations: 2,
                 head_tolerance: 100.0,
                 water_tolerance: 100.0,
                 ..policy
@@ -1184,13 +1236,36 @@ mod vapor_trial_tests {
             context,
         )
         .unwrap();
-        let mixed_evaluations: Vec<_> = material_heads
+        // Source minimum of two solves: one allowed solve can never converge.
+        let one_pass = solve_vapor_water_trial(
+            &state,
+            &workspace,
+            input,
+            WaterStepPolicy {
+                max_iterations: 1,
+                head_tolerance: 100.0,
+                water_tolerance: 100.0,
+                ..policy
+            },
+            context,
+        );
+        assert!(matches!(one_pass, Err(WaterStepError::NonConverged { .. })));
+        assert_eq!(correction_trial.iterations, 2);
+        // D1: pass 2 evaluates liquid at 0.1*hTemp + 0.9*hNew, where hTemp is the
+        // pass-1 pre-solve iterate (`initial_heads`) and hNew is the pass-1 solve
+        // output, which is the pass-2 pre-solve iterate.
+        let iterate2 = correction_trial.pre_solve_heads.clone();
+        let mixed2: Vec<f64> = initial_heads
             .iter()
-            .zip(initial_heads)
-            .map(|(h_temp, h_new)| model.evaluate(0.1 * h_temp + 0.9 * h_new).unwrap())
+            .zip(&iterate2)
+            .map(|(h_temp, h_new)| 0.1 * h_temp + 0.9 * h_new)
+            .collect();
+        let mixed_evaluations: Vec<_> = mixed2
+            .iter()
+            .map(|head| model.evaluate(*head).unwrap())
             .collect();
         let expected_mixed = kernels::evaluate(&VaporPrimitiveInput {
-            heads: &initial_heads,
+            heads: &iterate2,
             temperatures: &temp_estimate,
             liquid_water_contents: &mixed_evaluations
                 .iter()
@@ -1217,6 +1292,22 @@ mod vapor_trial_tests {
             .zip(expected_mixed.vapor_contents)
         {
             assert!((actual - expected).abs() < 1.0e-15);
+        }
+        // D4: ThNew = Th(mixed) + Cap*(hNew - pre-solve iterate), not material head.
+        for node in 0..3 {
+            let expected_theta = mixed_evaluations[node].theta
+                + expected_mixed.effective_hydraulic_capacities[node]
+                    * (correction_trial.candidate.heads()[node] - iterate2[node]);
+            assert!(
+                (correction_trial.candidate.water_contents()[node] - expected_theta).abs()
+                    < 1.0e-15
+            );
+            assert!(
+                (correction_trial.pre_solve_liquid_water_contents[node]
+                    - mixed_evaluations[node].theta)
+                    .abs()
+                    < 1.0e-15
+            );
         }
         let retry_initial_heads = [-90.0, -105.0, -110.0];
         let retry_material_heads = [-90.0, -100.0, -110.0];
@@ -1258,5 +1349,157 @@ mod vapor_trial_tests {
         assert_eq!(trial.total_face_fluxes.len(), 4);
         assert_eq!(trial.liquid_velocities.len(), 3);
         assert_eq!(trial.vapor_velocities.len(), 3);
+    }
+
+    /// 3-node fixed-head column at uniform 20 C, run with caller heads/tolerances.
+    fn run_fixture(
+        policy: WaterStepPolicy,
+        initial: [f64; 3],
+        material: [f64; 3],
+        old_head: f64,
+        bc: (f64, f64),
+    ) -> Result<VaporWaterTrial, WaterStepError> {
+        let model = VanGenuchtenModel::new(
+            VanGenuchtenParameters::new(0.05, 0.45, 0.04, 1.6, 1.0e-5).unwrap(),
+        )
+        .unwrap();
+        let mesh = Mesh1D::new(vec![0.0, 0.5, 1.0], vec![0; 3], None, 1, 1, 1.0).unwrap();
+        let old_heads = vec![old_head; 3];
+        let old_theta: Vec<f64> = old_heads
+            .iter()
+            .map(|h| model.evaluate(*h).unwrap().theta)
+            .collect();
+        let state = WaterState::new(0.0, old_heads.clone(), old_theta.clone()).unwrap();
+        let workspace = WaterWorkspace::new(3).unwrap();
+        let temperature = [20.0; 3];
+        let zero = [0.0; 3];
+        let e = model.evaluate(old_head).unwrap();
+        let vapor = kernels::evaluate(&VaporPrimitiveInput {
+            heads: &old_heads,
+            temperatures: &temperature,
+            liquid_water_contents: &old_theta,
+            liquid_conductivities: &[e.conductivity; 3],
+            liquid_capacities: &[e.capacity; 3],
+            material_indices: &[0; 3],
+            saturated_water_contents: &[0.45],
+            x_conv: 1.0,
+            t_conv: 1.0,
+        })
+        .unwrap();
+        let old_view = VaporHistoryView {
+            time: 0.0,
+            previous_timestep: None,
+            heads: &old_heads,
+            liquid_water_contents: &old_theta,
+            temperatures: &temperature,
+            vapor_contents: &vapor.vapor_contents,
+            liquid_velocities: &zero,
+            vapor_velocities: &zero,
+            head_predictor: &old_heads,
+        };
+        let source = [VaporSourceMaterial {
+            model: &model,
+            table: None,
+        }];
+        let materials: [&dyn HydraulicModel; 1] = [&model];
+        let row = |h: f64| BoundaryRow {
+            lower: 0.0,
+            diagonal: 1.0,
+            upper: 0.0,
+            rhs: h,
+        };
+        let input = WaterStepInput {
+            mesh: &mesh,
+            materials: &materials,
+            sink: &zero,
+            root_uptake: None,
+            timestep: 0.1,
+            target_time: 0.1,
+            face_averaging: FaceAveraging::Arithmetic,
+            lower: LowerBoundaryMode::FixedHead {
+                head: bc.0,
+                row: row(bc.0),
+                flux: 0.0,
+            },
+            upper: UpperBoundary::Head {
+                head: bc.1,
+                row: row(bc.1),
+                flux: 0.0,
+            },
+        };
+        let config = config();
+        let context = VaporWaterContext {
+            config: &config,
+            old: old_view,
+            temperature_estimate: &temperature,
+            initial_heads: &initial,
+            initial_material_heads: &material,
+            source_materials: &source,
+        };
+        solve_vapor_water_trial(&state, &workspace, input, policy, context)
+    }
+
+    fn fixture_policy(max_iterations: usize, head_tol: f64, water_tol: f64) -> WaterStepPolicy {
+        WaterStepPolicy {
+            max_iterations,
+            head_tolerance: head_tol,
+            water_tolerance: water_tol,
+            minimum_timestep: 1.0e-6,
+            retry_factor: 3.0,
+            minimum_pivot: 1.0e-14,
+        }
+    }
+
+    #[test]
+    fn d3_converged_first_solve_is_never_accepted() {
+        // Tolerances of 100 are met by the first solve; source still iterates.
+        let trial = run_fixture(
+            fixture_policy(20, 100.0, 100.0),
+            [-105.0; 3],
+            [-100.0; 3],
+            -100.0,
+            (-90.0, -110.0),
+        )
+        .unwrap();
+        assert_eq!(trial.iterations, 2);
+    }
+
+    #[test]
+    fn d2_dry_unsaturated_node_converges_on_eps_th_not_head_change() {
+        // Head change between passes is far above TolH=1e-12, but EpsTh
+        // = |Cap*dh/(ths-thr)| (Cap ~ 1e-5 scale, span 0.4) stays below TolTh=1e-3.
+        let trial = run_fixture(
+            fixture_policy(20, 1.0e-12, 1.0e-3),
+            [-105.0; 3],
+            [-100.0; 3],
+            -100.0,
+            (-90.0, -110.0),
+        )
+        .unwrap();
+        // A head-only rule at TolH=1e-12 could not accept within 20 passes.
+        assert!(trial.iterations >= 2);
+        let dh = (trial.candidate.heads()[1] - trial.pre_solve_heads[1]).abs();
+        assert!(dh > 1.0e-12, "dh = {dh}");
+        // Hand rule check for the accepted pass, independent of the solver.
+        let cap = trial.properties.effective_hydraulic_capacities[1];
+        assert!((cap * dh / 0.4).abs() <= 1.0e-3);
+    }
+
+    #[test]
+    fn d2_saturated_node_uses_head_tolerance() {
+        // All heads above hSat (~ -1e-8): TolH applies even with TolTh = 100.
+        // Pass 1 moves the middle node by ~10 cm (> TolH=1e-3) so it cannot
+        // be accepted there; a tight TolH must still bound the final change.
+        let trial = run_fixture(
+            fixture_policy(20, 1.0e-3, 100.0),
+            [10.0, 0.0, 10.0],
+            [10.0, 0.0, 10.0],
+            10.0,
+            (10.0, 10.0),
+        )
+        .unwrap();
+        assert!(trial.iterations >= 2);
+        let dh = (trial.candidate.heads()[1] - trial.pre_solve_heads[1]).abs();
+        assert!(dh <= 1.0e-3, "dh = {dh}");
     }
 }
