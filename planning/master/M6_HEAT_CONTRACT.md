@@ -135,20 +135,21 @@ Not a rejection: `lTemp = false` means heat is off, so no heat code runs.
 
 ## Tolerances
 
-Method: ADR 0006 (per-field tolerances from source precision). The fields and their basis are listed here. Numeric values are NOT assigned.
+Method: ADR 0006 (per-field tolerances from source precision). Values approved by the user on 2026-11-11 (option: "Derived from REAL precision"). Each value is derived from the single-precision source basis, not chosen from observed errors.
 
-**GATE: numeric tolerances need user review before 24.5.2 can run.** Until the user reviews each field's criteria, no comparison may run and no tolerance value may be written into code, fixtures or the state board. Raised by the orchestrator; visible here by design.
-
-| Field | Units (source) | Precision basis | Tolerance (numeric) |
+| Field | Units (source) | Precision basis | Tolerance |
 |---|---|---|---|
-| `TempN` (nodal temperature, accepted step) | Celsius-based temperature (`OUTPUT.FOR:449`) | REAL store (`TEMPER.FOR:55`); solution computed in double | UNASSIGNED (needs user review) |
-| `HeatFl` (top flux) | energy per area per time, scaled by `xConv`, `tConv` | REAL (`TEMPER.FOR:26-27`) | UNASSIGNED (needs user review) |
-| `Cap`, `Cond` (material capacity and conductivity) | volumetric heat capacity; conductivity scaled by `xConv/tConv^3` (`:300`) | REAL (`:279`, `:286`, `:300`) | UNASSIGNED (needs user review) |
-| Matrix coefficients `B,D,E,F` before solve | units follow `Cap`, `Cond`, `dt` | Coefficients computed in REAL inside `SetUpHeat`, stored double | UNASSIGNED (needs user review) |
+| `TempN` (nodal temperature, accepted step) | degC (`OUTPUT.FOR:449`) | REAL store (`TEMPER.FOR:55`); about 2.4e-6 degC ulp at 25 degC | Absolute 2e-4 degC (about 100 x the ulp) |
+| `HeatFl` (top flux) | energy per area per time, scaled by `xConv`, `tConv` | REAL (`TEMPER.FOR:26-27`) | Relative 1e-5, absolute floor 1e-12 |
+| `Cap`, `Cond` (material capacity and conductivity) | volumetric heat capacity; conductivity scaled by `xConv/tConv^3` (`:300`) | REAL (`:279`, `:286`, `:300`) | Relative 1e-5, absolute floor 1e-12 |
+| Matrix coefficients `B,D,E,F` before solve | units follow `Cap`, `Cond`, `dt` | Computed in REAL inside `SetUpHeat`, stored double | Relative 1e-5, absolute floor 1e-12 |
+| Balance residual per step | energy per area | Derived from the storage integral and boundary terms | Absolute, at most 1e-6 of the total storage scale of the step |
 | Accepted-step snapshot (`TempO`, `vOld`) | copies (`WATFLOW.FOR:1109`, `:1115`) | Exact copy, no arithmetic | Exact equality (not a tolerance) |
 | Boundary kind and flags | integers and logicals | Not floating point | Exact equality (ADR 0006: discrete states exact) |
 
-Zero handling and absolute/relative split: to be defined in the reviewed criteria, not here.
+Zero handling: where a reference value is zero, the absolute floor applies (1e-12). Tolerance values are for comparison only; no code or fixture may tune them to pass.
+
+**Gate closed 2026-11-11:** user approved the values above. Wave 5 may use them.
 
 ## Not claimed
 
