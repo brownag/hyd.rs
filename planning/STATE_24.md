@@ -40,15 +40,40 @@ Prior reference (from STATE_23 / ADR 0019, not re-run here): parity 44/44; M5-V 
 | 4 | 24.4.1 | Coupled water→heat step driver | done (757be7d → c4ccc8a) |
 | 4 | 24.4.2 | Heat-energy balance accounting | done (2224109 → 2d082a3) |
 | 4 | 24.4.3 | Pinned-Fortran heat decks and fixture producer | done (7bb479e, 7a3b662; SD-006 added; 4th deck refused) |
-| 5 | 24.5.1 | Analytical comparisons | pending |
-| 5 | 24.5.2 | Source-matched Fortran parity | pending |
-| 5 | 24.5.3 | Balance and invariant properties | pending |
+| 5 | 24.5.1 | Analytical comparisons | done (fd2bdb0 → 5770a7e) |
+| 5 | 24.5.2 | Source-matched Fortran parity | done (6a18626 → 31b9ad0; rounded verdict pass, strict 2e-4 fails at 20–36 nodes; table water model) |
+| 5 | 24.5.3 | Balance and invariant properties | done (5dfdf20 → c94c808; reservoir convention) |
 | 6 | 24.6.1 | Capability acceptance document | pending |
 | 6 | 24.6.2 | Draft ADR for heat coupling and rejection | pending |
 
 Wave-end gate after each wave: serial AGENTS.md Quick Start suite; counts recorded in the wave's section below.
 
 ## Wave gates
+
+### Wave 5 (2026-11-11, HEAD after `31b9ad0`)
+- Build, clippy `--workspace --all-targets -D warnings`, fmt: pass.
+- Workspace tests: 529 passed, 0 failed (+5 analytical, +4 parity, +6 balance, +4 VG correction tests).
+- Python: 389 OK (includes compare_heat_reference tests).
+- Verdict: pass for the wave's commits. Parity criterion is the approved rounded rule. Strict 2e-4 verdict fails at 20–36 nodes per default-conductivity time point (output rounding), reported in full.
+
+### Dated correction: van Genuchten conductivity exponent (`1d4131a`, 2026-11-11)
+- Finding: `hydraulics/van_genuchten.rs` computed `Se^1.5` hardcoded. The Fortran (`MATERIAL.FOR:29`, `:76`, iModel 0) computes `Se^l * [1-(1-Se^(1/m))^m]^2`, with `l` = `Par(6)` = 0.5 in the heat decks.
+- Fix: `l` added as `VanGenuchtenParameters::pore_connectivity` (default 0.5; `with_pore_connectivity` validated in [0, 10]); derivative updated; zero-derivative guard at Se <= 0.
+- Effect: no existing test expectation changed (521 → 525 workspace tests, all pass). Water results for unsaturated cases change. This correction is to the accepted M4 water product and is recorded here.
+- Why it was not caught: the Fortran-compatible solute parity path uses prescribed water and does not use this hydraulics module.
+
+### Heat parity water model (decision 2026-11-11, user)
+- Heat parity uses the table water model, which reproduces the Fortran GenMat table (100 log-spaced knots, `INPUT.FOR:1590`, `:777`). Known differences from SetMat, documented in the test: mixed head `hiM` and the analytic fallback outside the table range. These do not affect the fixtures (heads fixed at -10).
+- The accepted water product keeps the analytic default.
+- With the analytic model, `heat_dir_top_flux_bot_default` misses the rounded rule by 0.02 degC at 24 h. With the table model, all four pass.
+
+### Open items for Wave 6 and the close
+- Strict 2e-4 TempN verdict fails at many nodes in the default cases (output rounding). Documented; not a pass.
+- Campbell fixtures are flat at 25 degC: weak evidence for conduction.
+- Campbell scaling SD-006 is reproduced as-is; fixed alternative later.
+- `kBotT==0` has no fixture (refused case is SD-006 evidence only), but the contract still lists it as Supported. Decide whether to keep it Supported in the acceptance document.
+- Balance full residual holds by construction at Dirichlet ends (reservoir convention); interior closure is the real test.
+- Analytical nonzero-gradient conduction case is not available through the driver (top flux advective only); zero-flux case used.
 
 ### Wave 4 (2026-11-11, HEAD after `eda010b`)
 - Build, clippy `--workspace --all-targets -D warnings`, fmt: pass.
