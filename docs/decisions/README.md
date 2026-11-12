@@ -22,6 +22,7 @@
 | [0018](0018-default-to-the-fortran-compatible-solute-backend.md) | Default to the Fortran-compatible solute backend | Accepted | 2026-10-22 | 0013 (default clause) | - | Orch 22 (22.1.3) |
 | [0019](0019-validate-scientific-accuracy-on-the-default-backend.md) | Validate scientific accuracy on the default backend | Accepted; M5-V accepted with limitations | 2026-10-24 | - | - | Orch 22; 2026-11-11 handoff decision |
 | [0020](0020-keep-architecture-decisions-distinct-from-project-policy.md) | Keep architecture decisions distinct from project policy | Accepted | 2026-11-11 | - | - | 2026-11-11 policy review |
+| [0021](0021-couple-heat-transport-one-way-after-the-accepted-water-step-and-reject-unsupported-heat-configurations.md) | Couple heat transport one-way after the accepted water step and reject unsupported heat configurations | Proposed | 2026-11-11 | - | - | 24.6.2; D7, D9, D13 |
 
 ## Scope and Status Notes
 
