@@ -12,6 +12,8 @@ use super::boundary::{
 };
 use super::capacity::{temp_cap, TempCapError, TempCapInput, TempMaterial};
 use super::config::{BottomBoundaryKind, HeatConfig, TopBoundaryKind};
+use super::vapor::adjust::{adjust_heat_rows, VaporHeatAdjustmentInput};
+use super::vapor::{VaporConfig, VaporError};
 use crate::hydraulics::{solve_tridiagonal_in_place, TridiagonalError};
 
 /// Inputs to [`solve_heat_transport`]. Slices hold one entry per node, `N >= 3`.
@@ -69,10 +71,12 @@ pub enum HeatTransportError {
         actual: usize,
     },
     MissingMaterial,
+    VaporInputMismatch,
     NonFiniteOutput {
         index: usize,
     },
     TempCap(TempCapError),
+    Vapor(VaporError),
     Boundary(HeatBoundaryError),
     Tridiagonal(TridiagonalError),
 }
@@ -100,6 +104,9 @@ impl fmt::Display for HeatTransportError {
             Self::MissingMaterial => {
                 write!(formatter, "heat transport needs at least one material")
             }
+            Self::VaporInputMismatch => {
+                write!(formatter, "vapor heat inputs must match the base heat step")
+            }
             Self::NonFiniteOutput { index } => {
                 write!(
                     formatter,
@@ -107,6 +114,7 @@ impl fmt::Display for HeatTransportError {
                 )
             }
             Self::TempCap(error) => write!(formatter, "heat capacity: {error:?}"),
+            Self::Vapor(error) => write!(formatter, "vapor heat adjustment: {error}"),
             Self::Boundary(error) => write!(formatter, "heat boundary: {error:?}"),
             Self::Tridiagonal(error) => write!(formatter, "heat transport solve: {error}"),
         }
@@ -135,6 +143,42 @@ pub fn solve_heat_transport(
     if config.vapor_enabled() {
         return Err(HeatTransportError::VaporNotSupported);
     }
+    solve_heat_transport_inner(config, input, None, temp_new)
+}
+
+/// Runs a vapor-enabled heat step using the selected fixed-temperature boundaries.
+///
+/// The ordinary heat-only entry remains unchanged and continues to reject vapor
+/// selections. Vapor additions are calculated into owned arrays and applied only
+/// to interior rows after both base levels have been assembled.
+pub fn solve_vapor_heat_transport(
+    config: VaporConfig,
+    input: HeatTransportInput<'_>,
+    vapor: &VaporHeatAdjustmentInput<'_>,
+    temp_new: &mut [f64],
+) -> Result<HeatTransportReport, HeatTransportError> {
+    if !config.heat().vapor_enabled()
+        || config.top_temperature() != input.top_temperature
+        || config.bottom_temperature() != input.bottom_temperature
+        || config.x_conv() != input.x_conv
+        || config.t_conv() != input.t_conv
+        || vapor.coordinates != input.x
+        || vapor.temperature_old != input.temp_old
+        || vapor.timestep != input.dt
+        || vapor.x_conv != input.x_conv
+        || vapor.t_conv != input.t_conv
+    {
+        return Err(HeatTransportError::VaporInputMismatch);
+    }
+    solve_heat_transport_inner(config.heat(), input, Some(vapor), temp_new)
+}
+
+fn solve_heat_transport_inner(
+    config: HeatConfig,
+    input: HeatTransportInput<'_>,
+    vapor: Option<&VaporHeatAdjustmentInput<'_>>,
+    temp_new: &mut [f64],
+) -> Result<HeatTransportReport, HeatTransportError> {
     let n = input.x.len();
     if n < 3 {
         return Err(HeatTransportError::TooFewNodes { count: n });
@@ -226,6 +270,17 @@ pub fn solve_heat_transport(
         &mut diagonal,
         &mut upper,
     )?;
+
+    if let Some(vapor_input) = vapor {
+        let adjustment = adjust_heat_rows(vapor_input).map_err(HeatTransportError::Vapor)?;
+        for i in 0..n {
+            rhs[i] += adjustment.rhs_level_one[i];
+            lower[i] += adjustment.lower_level_two[i];
+            diagonal[i] += adjustment.diagonal_level_two[i];
+            upper[i] += adjustment.upper_level_two[i];
+            rhs[i] += adjustment.rhs_level_two[i];
+        }
+    }
 
     // Source sets B(1) and E(N) only through the boundary rows; neither is assigned for Temper.
     lower[0] = 0.0;
