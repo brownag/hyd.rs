@@ -624,6 +624,175 @@ fn next_predictor(heads: &[f64], stored: &[f64], dt: f64, previous: f64) -> Vec<
         .collect()
 }
 
+/// Opt-in port of the Fortran next-step controller `TmCont` (`src_reference/TIME.FOR:3-30`)
+/// together with the retry memory of `WatFlow` (`src_reference/WATFLOW.FOR:144-145`).
+///
+/// Nothing in [`VaporWaterHeatDriver::step`] uses it; the caller supplies every `dt`, as before.
+/// A caller that wants the Fortran schedule calls [`Self::next_timestep`] after each accepted step
+/// and passes the result as the next `WaterStepInput::timestep`.
+///
+/// Rule (`dtOpt` is the persistent optimal step, `Iter` the iteration count of the step):
+/// - after a retry the accepted (reduced) step becomes `dtOpt`, floored at `dtMin`
+///   (`WATFLOW.FOR:144-145`);
+/// - grow `dtOpt = min(dtMax, DMul*dtOpt)` only if `Iter <= ItMin` and `tFix - t >= DMul*dtOpt`
+///   (`TIME.FOR:16`);
+/// - shrink `dtOpt = max(dtMin, DMul2*dtOpt)` if `Iter >= ItMax` (`TIME.FOR:18`);
+/// - `dt = min(dtOpt, tFix - t)`, then split `tFix - t` evenly when it fits in 1..=10 steps
+///   (`TIME.FOR:19-27`), halving a lone step that exceeds `dtMax` by more than `dtMin`;
+///   a non-positive `dt` becomes `dtMin/3` (`TIME.FOR:28`).
+///
+/// `tFix` is the next print/boundary time, `min(tPrint, tAtm, tMax)` (`TIME.FOR:15`).
+/// Fortran calls `TmCont` with `Iter = max(IterW, IterC)` (`HYDRUS.FOR:655-659`); with solute off
+/// this is the water iteration count, and for the vapor loop the final (pass-two) count of
+/// [`VaporStepReport::passes`], which is what the source prints as `Iter`.
+///
+/// Differences from the source, all deliberate: `lMinStep`, `dtInit`, `dtMaxW` and `dtMaxC` are
+/// not ported (a single `dtMax`); arithmetic is `f64`, the source `dt` is single precision;
+/// and the retry granularity is the driver's (both passes restart, `dt / retry_factor`),
+/// whereas the source retries inside each `WatFlow` call. The driver still errors when
+/// `dt / retry_factor < minimum_timestep` instead of clamping to `dtMin`; the controller floors
+/// only its own `dtOpt`.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct VaporTimestepController {
+    pub dt_min: f64,
+    pub dt_max: f64,
+    pub d_mul: f64,
+    pub d_mul2: f64,
+    pub it_min: usize,
+    pub it_max: usize,
+    dt_opt: f64,
+}
+
+impl VaporTimestepController {
+    /// `dtOpt` starts at the initial step (`INPUT.FOR:893`, `dtOpt = dt`).
+    pub fn new(
+        dt: f64,
+        dt_min: f64,
+        dt_max: f64,
+        d_mul: f64,
+        d_mul2: f64,
+        it_min: usize,
+        it_max: usize,
+    ) -> Self {
+        Self {
+            dt_min,
+            dt_max,
+            d_mul,
+            d_mul2,
+            it_min,
+            it_max,
+            dt_opt: dt,
+        }
+    }
+
+    /// Current `dtOpt`; the caller's first step uses it.
+    pub fn dt_opt(&self) -> f64 {
+        self.dt_opt
+    }
+
+    /// Step to attempt next, after a step accepted at `accepted_dt` with `restarts` retries
+    /// ([`VaporStepReport::restarts`]) and `iterations` iterations, ending at `time` with the
+    /// next fixed time `t_fix`.
+    pub fn next_timestep(
+        &mut self,
+        accepted_dt: f64,
+        restarts: usize,
+        iterations: usize,
+        time: f64,
+        t_fix: f64,
+    ) -> f64 {
+        if restarts > 0 {
+            self.dt_opt = accepted_dt.max(self.dt_min);
+        }
+        let remaining = t_fix - time;
+        if iterations <= self.it_min && remaining >= self.d_mul * self.dt_opt {
+            self.dt_opt = self.dt_max.min(self.d_mul * self.dt_opt);
+        }
+        if iterations >= self.it_max {
+            self.dt_opt = self.dt_min.max(self.d_mul2 * self.dt_opt);
+        }
+        let mut dt = self.dt_opt.min(remaining);
+        let steps = if dt > 0.0 {
+            (remaining / dt).round()
+        } else {
+            1.0
+        };
+        if (1.0..=10.0).contains(&steps) {
+            dt = (remaining / steps).min(self.dt_max);
+        }
+        if steps == 1.0 {
+            dt = remaining;
+            if dt - self.dt_max > self.dt_min {
+                dt /= 2.0;
+            }
+        }
+        if dt <= 0.0 {
+            dt = self.dt_min / 3.0;
+        }
+        dt
+    }
+}
+
+#[cfg(test)]
+mod timestep_controller_tests {
+    use super::VaporTimestepController;
+
+    // Source inputs, `INPUT.FOR:880,893`: dt dtMin dtMax DMul DMul2 ItMin ItMax.
+    fn source() -> VaporTimestepController {
+        VaporTimestepController::new(0.1, 0.01, 0.5, 1.2, 0.5, 1, 20)
+    }
+
+    #[test]
+    fn retry_sets_dt_opt_and_two_iterations_never_grow_it() {
+        let mut c = source();
+        // First step: attempt 0.1, accepted at 0.1/3 after one restart, Iter 7 (> ItMin).
+        let dt = c.next_timestep(0.1 / 3.0, 1, 7, 0.1 / 3.0, 6.0);
+        assert_eq!(c.dt_opt(), 0.1 / 3.0);
+        assert!((dt - 0.1 / 3.0).abs() < 1e-12);
+        for i in 2..50 {
+            let t = i as f64 * 0.1 / 3.0;
+            let dt = c.next_timestep(0.1 / 3.0, 0, 2, t, 6.0);
+            assert_eq!(c.dt_opt(), 0.1 / 3.0);
+            assert!((dt - 0.1 / 3.0).abs() < 1e-9);
+        }
+    }
+
+    #[test]
+    fn grows_when_iterations_at_most_it_min_and_room_remains() {
+        let mut c = source();
+        assert!((c.next_timestep(0.1, 0, 1, 0.1, 6.0) - 0.12).abs() < 1e-12);
+        // Not enough room before tFix: no growth, dt from the even split.
+        let mut c = source();
+        let dt = c.next_timestep(0.1, 0, 1, 5.95, 6.0);
+        assert_eq!(c.dt_opt(), 0.1);
+        assert!((dt - 0.05).abs() < 1e-12);
+    }
+
+    #[test]
+    fn shrinks_at_it_max_and_floors_at_dt_min() {
+        let mut c = source();
+        c.next_timestep(0.1, 0, 20, 0.1, 6.0);
+        assert!((c.dt_opt() - 0.05).abs() < 1e-15);
+        for _ in 0..10 {
+            c.next_timestep(0.1, 0, 20, 0.1, 6.0);
+        }
+        assert_eq!(c.dt_opt(), 0.01);
+        // A retry below dtMin is floored too.
+        c.next_timestep(0.001, 1, 2, 0.1, 6.0);
+        assert_eq!(c.dt_opt(), 0.01);
+    }
+
+    #[test]
+    fn lone_step_is_halved_and_zero_remaining_uses_third_of_dt_min() {
+        let mut c = VaporTimestepController::new(0.1, 0.01, 0.5, 1.2, 0.5, 1, 20);
+        assert!((c.next_timestep(0.1, 0, 2, 0.0, 0.7) - 0.1).abs() < 1e-12);
+        let mut c = VaporTimestepController::new(2.0, 0.01, 0.5, 1.2, 0.5, 1, 20);
+        // dtOpt 2.0, remaining 1.0: one step, 1.0 - 0.5 > 0.01, so halved.
+        assert!((c.next_timestep(2.0, 0, 2, 0.0, 1.0) - 0.5).abs() < 1e-12);
+        assert!((c.next_timestep(0.5, 0, 2, 1.0, 1.0) - 0.01 / 3.0).abs() < 1e-15);
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
