@@ -236,3 +236,13 @@ _Empty at planning. Any unlisted work goes here and waits for approval._
 - Result: 2401 accepted steps (2400 at dt 0.1 plus one landing remainder dt 9.5e-12 at t=240, same loop as parity); worst ratio 4.036e-7 (<= 1.0 everywhere, 0 violations); all finite; max |dT| 20.8; max row scale 9.3e23 (TPar in J/cm/h).
 - Water: diagnostic only, finiteness asserted. Max |R| 1.4e-16, max |R|/scale 1.004 (roundoff-level; static water). Not a bound.
 - Checks: test passes, `cargo fmt -p hydrus-core -- --check` and targeted clippy `-D warnings` clean. Log `.development/28.2/test.log`.
+
+## 28.1
+
+- Added opt-in `VaporTimestepController` (TmCont + WatFlow retry memory port) at the end of `crates/hydrus-core/src/heat/vapor/driver.rs`, plus `mod timestep_controller_tests` (4 tests, pass). `step`/`run_passes` untouched; default path unchanged. Cited `TIME.FOR:3-30`, `WATFLOW.FOR:144-145`, `HYDRUS.FOR:655-659`.
+- New reference `reference/vapor_fortran/timestep/vapor_nonuniform_step_on_dt_sequence.json` (7200 steps RLE, landings 180/720/2160/7200, RUN_INF.OUT sha256 and exe e6d69dd3...). Test reads only it and fails if missing.
+- New test `crates/hydrus-core/tests/vapor_nonuniform_timestep_controller.rs` (copied harness; controller input Iter = pass-two iterations, dt_opt set from the accepted dt after a restart).
+- Result: step count 7200 matches; first step attempts 0.1, retries, accepted dt/3; dtOpt stays dt/3 (never grows); landings at print times match; steps 1-7190 match printed `0.33333E-01`.
+- First mismatch (ignored test `step_on_controller_single_precision_landing_rows_match_fortran`, tolerance 1 unit of the printed last digit): `first mismatch at step 7191: rust dt 3.3333333334e-2 vs fortran dt 0.33332E-01`. Last 10 rows are the Fortran f32 landing on t=240; Rust f64 keeps 1/30 (~1.3 units, ~4e-5 relative, larger than f32 eps because Fortran accumulates single-precision dt). Not widened.
+- Retry granularity unchanged (both passes restart); dtMin: controller floors dtOpt, driver error at dt/3 < dtMin untouched; lMinStep/dtInit/dtMaxW/dtMaxC not ported.
+- Ran: vapor_heat_boundary_parity 9 ok/1 ignored, vapor_fortran_parity 10 ok, vapor_nonuniform_parity 5 ok, new test 1 ok + 1 ignored (fails as above), fmt ok. Clippy and full suites not run. Not committed.
