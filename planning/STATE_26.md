@@ -1,6 +1,6 @@
 # Orchestration 26 state — G22.1 heat top/bottom boundary rows with vapor
 
-Created: 2026-11-12. Status: **Waves 1–6 executed (final gate 94967be). D-26.1 diagnosis and audit done; FD held; M3 scratch checks refuted (2026-11-13).** Header updated 2026-11-13.
+Created: 2026-11-12. Status: **Waves 1–6 executed (final gate 94967be). D-26.1 diagnosis and audit done; FD held; M3 scratch checks refuted (2026-11-13).** Header updated 2026-11-13. Plan files tracked 2026-11-13.
 Plan: [EXECUTION_PLAN_26.md](EXECUTION_PLAN_26.md).
 Worker: [PROMPT_TEMPLATE_26.md](PROMPT_TEMPLATE_26.md).
 Goal: [GOALS.md](GOALS.md) circled goal G22.1. Coverage: [M6_VAPOR_COVERAGE.md](master/M6_VAPOR_COVERAGE.md).
@@ -138,14 +138,15 @@ _Filled in as each wave completes (commits, serial gate results, deviations)._
   - Other ranked items: M3b (REAL temperatures, ~1e-3 cm est.), M3c (REAL vapor arrays), M5 (REAL latent/Cv, ~6e-8), M2 (boundary rows; low for head, Dirichlet ends).
   - Refuted or consistent: M1 (interior velocity storage matches), M4 (initial state matches), kernel constants, iEnhanc, convergence settings, kernel timing, time level.
 
-- **M3 scratch checks (2026-11-13, no src change, scratch worktree at `16b879e`, removed after run).** Each probe rounds one quantity to f32 in the scratch copy only and reruns `vapor_heat_boundary_parity` (fd_on). Baseline FD worst head error 4.341896 cm at (t=240, node 38); v_liquid ratio 1.5018.
-  - M3a (committed heads to f32, staged copy kept consistent): 4.341965 cm (+7e-5). Refuted.
-  - M3b (heat1 and heat2 to f32 at heat_pass output): 4.342971 cm (+1.1e-3). Refuted at the 1e-3 threshold; 0.02% of the drift.
-  - M3c (staged vapor velocities to f32): 4.341894 cm (-2e-6). Refuted.
-  - M3a+M3b: 4.342941 cm (+1.0e-3). Refuted.
-  - M5 and M2 not run; each is expected to be far below the drift. Not run.
-  - Result: single-precision storage of head, temperature or vapor velocity does not explain the FD drift. Ranking M3 is closed. Remaining candidates: M1 (refuted in audit), spatially patterned temperature error, and the boundary rows (M2, not run).
-  - **Discrepancy, unreconciled:** the audit lists FD head drift at t=240 as 5.7035 cm. This run gives 4.34 cm as the worst head error over all times and nodes, and FF gives 4.41 cm. The 5.70 figure may come from the scratch diagnosis copy, not the committed test. Not resolved here.
+- **M3 scratch checks (2026-11-13, no src change, scratch worktree at `16b879e`, removed after run).** Each probe rounds one quantity to f32 in the scratch copy only, reruns `vapor_heat_boundary_parity` (fd_on), and reads max absolute head error per time from the candidate JSON. Baseline (absolute): t=6 0.11959, t=24 0.53960, t=72 0.73300, t=240 5.70353 cm (node 4).
+  - Note: the test's "worst" line ranks rows by error/bound and reports node 38 (4.34 cm). That is a different metric, not a different run. The absolute maximum is 5.70 cm at node 4. An earlier version of this note measured node 38 only; the conclusions below use absolute error.
+  - M3a (committed heads to f32): t=240 5.70277 (-0.0008); others within 0.001. Refuted.
+  - M3b (heat1 and heat2 to f32): t=240 5.71342 (+0.0099); t=6 -0.007; t=72 -0.011. Refuted: 0.2% of the drift.
+  - M3c (staged vapor velocities to f32): t=240 5.70349 (-0.00004). Refuted.
+  - Result: single-precision storage of head, temperature or vapor velocity does not explain the FD drift.
+- **M2 boundary rows (2026-11-13, read-only on the committed candidate JSON `attempt-20261113T054631Z`).** End-node head error is 0 at every time. End-node `v_liquid` error is at most 7.7e-11 at t=240 (bound 3.5e-10). Vapor fields at the ends agree to 1e-9 or better. Refuted: the boundary rows do not carry the drift. The drift is interior (nodes 2-5 at the largest).
+- **Discrepancy resolved:** the 5.70 cm (audit) and 4.34 cm (test line) figures come from the same run and differ only in the metric (see note above).
+- **Still open:** the cause of the FD interior head drift. M1, M2, M3a, M3b, M3c and M5 (not run) are ruled out or negligible. The ranked hypotheses in the audit's "spatially patterned temperature error" class remain untested. FD stays held. FF's acceptance stays conditional on the same disclosure.
 
 ## Open execution blockers / discoveries
 
