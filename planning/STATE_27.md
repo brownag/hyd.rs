@@ -177,3 +177,10 @@ _Empty at planning. Any unlisted work goes here and waits for approval._
 - User chose: diagnose and fix the Rust NaN in the vapor step. Production change only after a diagnosis is approved.
 - Diagnosis task (read-only first, Sonnet): writes `planning/master/M6_VAPOR_NONUNIFORM_NAN_DIAGNOSIS.md`. Scratch at `.development/27.3.3-diag/`. Fix to be approved before any code change.
 - 27.3.2 test file stays uncommitted until the fix is in.
+
+## NaN diagnosis result (2026-11-13)
+
+- Doc: `planning/master/M6_VAPOR_NONUNIFORM_NAN_DIAGNOSIS.md`.
+- Cause (verified against source): the Rust vapor water step mixes head iterates at `crates/hydrus-core/src/water_solver.rs:316` (`0.1*h_temp + 0.9*trial`) without clamping to `hSat`. Fortran clamps first (`WATFLOW.FOR:455-462`), and the compat path does too (`water_compat.rs:538-549`).
+- Proposed fix: clamp both heads with `min(h_sat)` before the mix, at `water_solver.rs:314-322`. Scratch check: NaN gone, dt/3 retry matches Fortran, 4 of 5 nonuniform parity tests pass.
+- After fix, `nonuniform_step_on_matches_fixture` still fails: 147 of 2460 rows exceed criteria v3 bounds (first: head t=6, node 17, err 682 vs bound 246). Not investigated; to be reported, not tuned.
