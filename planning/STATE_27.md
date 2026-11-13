@@ -24,17 +24,17 @@ Goal: [GOALS.md](GOALS.md) sequenced goal G22.4. Coverage: [M6_VAPOR_COVERAGE.md
 
 ## Gates
 
-- [ ] GATE S (user): disposition of sink and root uptake after 27.1.1. Decision: pending.
+- [x] GATE S (user): decided 2026-11-13: reject all rows (a)–(d) with triggers.
 - [ ] GATE N2 (user, conditional): bounds for any new case not covered by criteria v3. Needed: pending (decided at 27.2.2).
 
 ## Wave board
 
 | Wave | Task | Title | Status |
 |---|---|---|---|
-| 1 | 27.1.1 | Sink and root-uptake source/coupling audit | pending |
-| 1 | 27.1.2 | ConVh scalar helper location and reachability audit | pending |
-| 1 | 27.1.3 | Nonuniform-temperature coverage audit | pending |
-| — | GATE S | Sink and root disposition | pending |
+| 1 | 27.1.1 | Sink and root-uptake source/coupling audit | done |
+| 1 | 27.1.2 | ConVh scalar helper location and reachability audit | done |
+| 1 | 27.1.3 | Nonuniform-temperature coverage audit | done |
+| — | GATE S | Sink and root disposition | done: reject all with triggers |
 | 2 | 27.2.1 | Nonuniform case specs and producer | pending |
 | 2 | 27.2.2 | Reference-only fixture run | pending |
 | — | GATE N2 | Conditional bounds | pending |
@@ -48,7 +48,7 @@ Max two workers. Separate worktrees with absolute target and run roots. The orch
 
 ## Wave gates
 
-_Filled in as each wave completes (commits, serial gate results, deviations)._
+- Wave 1 (2026-11-13), serial gate after 27.1.3: Rust 607 passed, 0 failed, 3 ignored; fmt OK; clippy OK; Python 459 OK. Commits: a850e69 (baseline), ddc8ef6 (27.1.1, 27.1.2 audits), 33c786d (27.1.3 audit).
 
 ## Task reports
 
