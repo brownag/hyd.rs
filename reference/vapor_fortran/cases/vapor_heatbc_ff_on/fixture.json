@@ -1,0 +1,25 @@
+{
+  "case_id": "vapor_heatbc_ff_on",
+  "runner": {
+    "inputs": [
+      "LEVEL_01.DIR",
+      "SELECTOR.IN",
+      "PROFILE.DAT"
+    ],
+    "outputs": [
+      {
+        "name": "NOD_INF.OUT",
+        "marker": "end"
+      },
+      {
+        "name": "NOD_INF_V.OUT",
+        "marker": "end"
+      }
+    ],
+    "aliases": {
+      "SELECTOR.IN": "Selector.in",
+      "PROFILE.DAT": "Profile.dat"
+    },
+    "data_prefix": "vapor_heatbc_ff_on"
+  }
+}

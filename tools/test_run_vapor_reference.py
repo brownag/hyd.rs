@@ -90,6 +90,41 @@ class CaseSelectionTests(unittest.TestCase):
         with redirect_stderr(io.StringIO()), mock.patch("builtins.print"):
             self.assertEqual(self.run_main("vapor_dry_thermal_gradient", "vapor_dry_off_control"), 0)
 
+    HEATBC = {
+        "df": ("f f f t f f", "1 45 -1 0.0"),
+        "dz": ("f f f t f f", "1 45 0 5"),
+        "fd": ("f f f t f f", "-1 0.0 1 5"),
+        "ff": ("f f f t f f", "-1 0.0 -1 0.0"),
+        "fz": ("f f f t f f", "-1 0.0 0 5"),
+    }
+
+    def test_heatbc_decks_differ_only_in_lvapor_and_boundary_rows(self):
+        base = (vapor.CASES / "vapor_dry_off_control/SELECTOR.IN").read_text().splitlines()
+        for pair, (_, boundary) in self.HEATBC.items():
+            for state, row in (("on", "f f f t f f"), ("off", "f f f f f f")):
+                lines = (vapor.CASES / f"vapor_heatbc_{pair}_{state}/SELECTOR.IN").read_text().splitlines()
+                self.assertEqual(lines[11], row, f"{pair}_{state} lVapor row")
+                self.assertEqual(lines[42], boundary, f"{pair}_{state} boundary row")
+                self.assertEqual(len(lines), len(base))
+                self.assertEqual([i for i, (a, b) in enumerate(zip(lines, base)) if a != b and i not in (11, 42)], [])
+
+    def test_accepts_new_heatbc_cases_and_existing_ids(self):
+        ids = [f"vapor_heatbc_{p}_{s}" for p in self.HEATBC for s in ("on", "off")]
+        existing = ["vapor_isothermal_head_gradient", "vapor_thermal_gradient", "vapor_off_control", "vapor_dry_thermal_gradient", "vapor_dry_off_control"]
+        with redirect_stderr(io.StringIO()), mock.patch("builtins.print"):
+            self.assertEqual(self.run_main(*ids, *existing), 0)
+
+    def test_all_lists_new_heatbc_ids(self):
+        called = []
+        argv = ["--all", "--build-dir", "unused", "--task-base", self.BASE]
+        with mock.patch.object(vapor, "run_case", side_effect=lambda c, *a: called.append(c) or Path(c)), \
+             mock.patch.object(Path, "mkdir"), mock.patch("builtins.print"):
+            self.assertEqual(vapor.main(argv), 0)
+        for pair in self.HEATBC:
+            for state in ("on", "off"):
+                self.assertIn(f"vapor_heatbc_{pair}_{state}", called)
+        self.assertIn("vapor_dry_off_control", called)
+
 
 if __name__ == "__main__":
     unittest.main()
