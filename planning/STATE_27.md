@@ -118,3 +118,18 @@ _Empty at planning. Any unlisted work goes here and waits for approval._
 - `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest tools.test_run_vapor_reference`: 20 tests OK.
 - Existing fixtures, existing case dirs, and `criteria.json`: `git diff --stat` empty.
 - Reference executable not run (27.2.2). No commit.
+
+## 27.2.2 -- Reference-only fixture run (done, reference-only, not committed)
+
+- Plan: `planning/tasks/27.2.2.todo.md` (approved; orchestrator answers 1-3 applied). Executable SHA-256 `e6d69dd3...` verified; `criteria.json` SHA-256 `f198d0c1...` verified.
+- Producer run: `--case vapor_nonuniform_step_on --case vapor_nonuniform_step_off --build-dir .development/26.2.2/build --task-base .development/27.2.2/runs`. Exit 0, no Error.msg.
+- New fixtures (untracked additions; `git diff --stat -- reference/vapor_fortran/fixtures` empty):
+  - `vapor_nonuniform_step_on.json` SHA-256 `787889b69d09fcb13dd831b71b487c2fd48853f19b74af08ad11647396559074` (vapor available; 5 times x 41 nodes)
+  - `vapor_nonuniform_step_off.json` SHA-256 `af3c155e94f67e6ac638b652c1f86c69b332cb44f004b3e4f1595a222245a257` (vapor unavailable)
+- All head, liquid_moisture, temperature_c and vapor_fields values finite; shapes match time_points and node_numbers. Vapor reachability matches the case (selector flag on, off).
+- Max |on-off| per field (same node and time): head 8677.23; liquid_moisture 0.0212; temperature_c 2.91. Vapor fields have no off counterpart (n/a); on-case max |v|: con 3.43e-07, con_lt 6.96e-06, con_vh 7.12e-09, con_vt 5.31e-03, v_liquid 3.01e-04, v_total 5.88e-02, v_vap_iso 5.31e-05, v_vap_term 5.88e-02, v_vapor 5.88e-02.
+- Time points `[0, 6, 24, 72, 240]` equal `vapor_dry_thermal_gradient`; they differ from `vapor_thermal_gradient` (`[0, 6, 12, 24]`). No designated baseline; recorded only.
+- Criteria coverage (step 9): all 12 vapor/moisture/head/temperature fields present in `criteria.json` `fields`. Time rules are generic (any print time). No GATE N2 stop. Note: no nonuniform-specific `discrimination` entries exist.
+- Rerun (step 10): `vapor_nonuniform_step_on` run directly with the pinned executable into `.development/27.2.2/rerun/`, parsed with `parse_blocks`. Exact match to fixture arrays (0 mismatches).
+- `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest tools.test_run_vapor_reference`: 20 tests OK.
+- Scratch: `.development/27.2.2/` (`verify.py`, `rerun.py`, `runs/`, `rerun/`). No commit.
