@@ -3,7 +3,10 @@ use hydrus_core::heat::config::{HeatConfig, HeatConfigInput};
 use hydrus_core::heat::transport::{
     solve_heat_transport, solve_vapor_heat_transport, HeatTransportError, HeatTransportInput,
 };
-use hydrus_core::heat::vapor::adjust::{adjust_heat_rows, VaporHeatAdjustmentInput};
+use hydrus_core::heat::vapor::adjust::{
+    adjust_boundary_rows, adjust_heat_rows, top_heat_flux_vapor_terms, VaporHeatAdjustmentInput,
+};
+use hydrus_core::heat::vapor::kernels::x_latent;
 use hydrus_core::heat::vapor::{VaporConfig, VaporConfigInput, VaporError};
 
 fn heat_input(vapor: bool) -> HeatConfigInput {
@@ -190,4 +193,181 @@ fn invalid_adjustment_and_pivot_failure_leave_destination_unchanged() {
         Err(HeatTransportError::Tridiagonal(_))
     ));
     assert_eq!(destination, [77.0; 3]);
+}
+
+// Hand-derived endpoint terms. Nodes x = [0, 1, 2] (dx = 1), uniform vapor
+// velocity 1 (so every vapor gradient is zero and g0 vanishes), no vapor
+// content change, Cv = 1.8e6 so Cv/12 = 1.5e5 and Cv/4 = 4.5e5.
+// Old temperatures [10, 20, 30]; top temperature 30; bottom temperature 10.
+/// Coordinates, old and new temperatures, old and new vapor velocity, and zero content.
+type Nodes3 = [f64; 3];
+type EndpointCase = (Nodes3, Nodes3, Nodes3, Nodes3, Nodes3, Nodes3);
+
+fn endpoint_case() -> EndpointCase {
+    let x = [0.0, 1.0, 2.0];
+    let temp = [10.0, 20.0, 30.0];
+    let velocity = [1.0; 3];
+    let zero = [0.0; 3];
+    (x, temp, temp, velocity, velocity, zero)
+}
+
+#[test]
+fn bottom_flux_term_matches_hand_value() {
+    // Bottom kBotT<0 (TEMPER.FOR:220-232), level 1 at node 0:
+    // rhs0 = T0*(-Cv/4) + T1*(-Cv/4) + tBot*Cv = 10*(-4.5e5) + 20*(-4.5e5) + 10*1.8e6 = 4.5e6.
+    let (x, temp, temp_new, v_old, v_new, zero) = endpoint_case();
+    let out = adjust_boundary_rows(
+        &adjustment(&x, &temp, &temp_new, &v_old, &v_new, &zero, &zero),
+        1,
+        -1,
+        30.0,
+        10.0,
+    )
+    .unwrap();
+    assert_eq!(out.rhs_level_one[0], 4.5e6);
+    assert_eq!(out.diagonal_level_two[0], 4.5e5);
+    assert_eq!(out.upper_level_two[0], 4.5e5);
+    assert_eq!(out.rhs_level_two[0], 0.0);
+    assert_eq!(out.lower_level_two[0], 0.0);
+    // Top is Dirichlet (kTopT>0): no top entries.
+    assert_eq!(out.rhs_level_one[2], 0.0);
+    assert_eq!(out.diagonal_level_two[2], 0.0);
+    assert_eq!(out.lower_level_two[2], 0.0);
+}
+
+#[test]
+fn top_flux_storage_term_matches_hand_value() {
+    // Top kTopT==-1: rhs2 = T1*Cv/4 + T2*Cv/4 - tTop*Cv = 9e6 + 1.35e7 - 5.4e7 = -3.15e7.
+    // Level 2: B(N) = D(N) = -Cv/4 = -4.5e5.
+    let (x, temp, temp_new, v_old, v_new, zero) = endpoint_case();
+    let out = adjust_boundary_rows(
+        &adjustment(&x, &temp, &temp_new, &v_old, &v_new, &zero, &zero),
+        -1,
+        1,
+        30.0,
+        10.0,
+    )
+    .unwrap();
+    assert_eq!(out.rhs_level_one[2], -3.15e7);
+    assert_eq!(out.lower_level_two[2], -4.5e5);
+    assert_eq!(out.diagonal_level_two[2], -4.5e5);
+    assert_eq!(out.rhs_level_two[2], 0.0);
+    assert_eq!(out.rhs_level_one[0], 0.0);
+}
+
+#[test]
+fn top_code_below_minus_one_keeps_matrix_terms_without_storage_term() {
+    // kTopT==-2: the explicit -tTop*Cv term is omitted (TEMPER.FOR:255), the rest stays.
+    let (x, temp, temp_new, v_old, v_new, zero) = endpoint_case();
+    let out = adjust_boundary_rows(
+        &adjustment(&x, &temp, &temp_new, &v_old, &v_new, &zero, &zero),
+        -2,
+        1,
+        30.0,
+        10.0,
+    )
+    .unwrap();
+    assert_eq!(out.rhs_level_one[2], 2.25e7);
+    assert_eq!(out.lower_level_two[2], -4.5e5);
+    assert_eq!(out.diagonal_level_two[2], -4.5e5);
+}
+
+#[test]
+fn zero_gradient_bottom_and_dirichlet_top_add_nothing() {
+    // DZ: kTopT>0, kBotT==0 (TEMPER.FOR:220 tests kBotT<0 only).
+    let (x, temp, temp_new, v_old, v_new, zero) = endpoint_case();
+    let out = adjust_boundary_rows(
+        &adjustment(&x, &temp, &temp_new, &v_old, &v_new, &zero, &zero),
+        1,
+        0,
+        30.0,
+        10.0,
+    )
+    .unwrap();
+    for values in [
+        &out.rhs_level_one,
+        &out.lower_level_two,
+        &out.diagonal_level_two,
+        &out.upper_level_two,
+        &out.rhs_level_two,
+    ] {
+        assert!(values.iter().all(|&value| value == 0.0));
+    }
+}
+
+#[test]
+fn both_flux_endpoints_are_independent_and_interior_is_untouched() {
+    // FF: bottom and top terms are each the single-sided values above, and the
+    // interior row stays zero because endpoint terms never touch node 1.
+    let (x, temp, temp_new, v_old, v_new, zero) = endpoint_case();
+    let out = adjust_boundary_rows(
+        &adjustment(&x, &temp, &temp_new, &v_old, &v_new, &zero, &zero),
+        -1,
+        -1,
+        30.0,
+        10.0,
+    )
+    .unwrap();
+    assert_eq!(out.rhs_level_one[0], 4.5e6);
+    assert_eq!(out.rhs_level_one[2], -3.15e7);
+    assert_eq!(out.upper_level_two[0], 4.5e5);
+    assert_eq!(out.lower_level_two[2], -4.5e5);
+    assert_eq!(out.rhs_level_one[1], 0.0);
+    assert_eq!(out.diagonal_level_two[1], 0.0);
+}
+
+#[test]
+fn top_flux_heat_term_uses_new_estimate_and_source_cv() {
+    // HeatFl vapor parts (TEMPER.FOR:25-32): a = Cv*tTop*(vVNew+vVOld)/2, b = xLat(TempN)*(vVNew+vVOld)/2.
+    // Here vVNew(N)+vVOld(N) = 4, so a = 1.8e6*30*4/2 = 1.08e8 exactly.
+    let x = [0.0, 1.0, 2.0];
+    let temp_old = [10.0, 20.0, 30.0];
+    let temp_new = [10.0, 20.0, 25.0];
+    let v_old = [1.0; 3];
+    let v_new = [3.0; 3];
+    let zero = [0.0; 3];
+    let input = adjustment(&x, &temp_old, &temp_new, &v_old, &v_new, &zero, &zero);
+    let (a, b) = top_heat_flux_vapor_terms(&input, 30.0).unwrap();
+    assert_eq!(a, 1.08e8);
+    // The latent term uses the new estimate at the top node (25), not temp_old (30).
+    let latent_new = x_latent(25.0).unwrap();
+    let latent_old = x_latent(30.0).unwrap();
+    assert_eq!(b, latent_new * 4.0 / 2.0);
+    assert_ne!(b, latent_old * 4.0 / 2.0);
+}
+
+#[test]
+fn heat_only_path_still_rejects_vapor_config() {
+    // The heat-only entry rejects any vapor-enabled HeatConfig before solving.
+    let heat_only_vapor = HeatConfig::new(heat_input(true)).unwrap();
+    let x = [0.0, 1.0, 2.0];
+    let indices = [0usize; 3];
+    let materials = [material()];
+    let temp = [20.0; 3];
+    let water = [0.2; 3];
+    let zero = [0.0; 3];
+    let sink = [0.0; 3];
+    let input = HeatTransportInput {
+        x: &x,
+        dt: 2.0,
+        material_indices: &indices,
+        materials: &materials,
+        temp_old: &temp,
+        water_old: &water,
+        water_new: &water,
+        velocity_old: &zero,
+        velocity_new: &zero,
+        sink: &sink,
+        top_temperature: 30.0,
+        bottom_temperature: 10.0,
+        x_conv: 1.0,
+        t_conv: 1.0,
+        minimum_pivot: 1.0e-12,
+    };
+    let mut out = [0.0; 3];
+    assert!(matches!(
+        solve_heat_transport(heat_only_vapor, input, &mut out),
+        Err(HeatTransportError::VaporNotSupported)
+    ));
+    assert_eq!(out, [0.0; 3]);
 }

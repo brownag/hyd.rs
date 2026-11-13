@@ -12,7 +12,9 @@ use super::boundary::{
 };
 use super::capacity::{temp_cap, TempCapError, TempCapInput, TempMaterial};
 use super::config::{BottomBoundaryKind, HeatConfig, TopBoundaryKind};
-use super::vapor::adjust::{adjust_heat_rows, VaporHeatAdjustmentInput};
+use super::vapor::adjust::{
+    adjust_boundary_rows, adjust_heat_rows, top_heat_flux_vapor_terms, VaporHeatAdjustmentInput,
+};
 use super::vapor::{VaporConfig, VaporError};
 use crate::hydraulics::{solve_tridiagonal_in_place, TridiagonalError};
 
@@ -216,12 +218,23 @@ fn solve_heat_transport_inner(
         BottomBoundaryKind::Flux => -1,
         BottomBoundaryKind::ZeroGradient => 0,
     };
-    // TEMPER.FOR:25-27, computed only for a flux top (lEnBal is false in M6).
+    // TEMPER.FOR:25-32, computed only for a flux top (lEnBal is false in M6).
+    // The vapor parts are added in source order, HeatFl + Cv-term + xLat-term,
+    // and only when the vapor path supplies the adjustment input.
     let heat_flux = match config.top_boundary() {
         TopBoundaryKind::Dirichlet => 0.0,
         TopBoundaryKind::Flux => {
-            cw * input.top_temperature * (input.velocity_new[n - 1] + input.velocity_old[n - 1])
-                / 2.0
+            let mut flux = cw
+                * input.top_temperature
+                * (input.velocity_new[n - 1] + input.velocity_old[n - 1])
+                / 2.0;
+            if let Some(vapor_input) = vapor {
+                let (cv_term, latent_term) =
+                    top_heat_flux_vapor_terms(vapor_input, input.top_temperature)
+                        .map_err(HeatTransportError::Vapor)?;
+                flux = flux + cv_term + latent_term;
+            }
+            flux
         }
     };
     let setup = Setup {
@@ -279,6 +292,23 @@ fn solve_heat_transport_inner(
             diagonal[i] += adjustment.diagonal_level_two[i];
             upper[i] += adjustment.upper_level_two[i];
             rhs[i] += adjustment.rhs_level_two[i];
+        }
+        // Endpoint TempAdj terms (TEMPER.FOR:220-260). Applied after the stored
+        // SetUpHeat rows, matching source order. Zero for Dirichlet/zero-gradient codes.
+        let boundary = adjust_boundary_rows(
+            vapor_input,
+            setup.top_code,
+            setup.bottom_code,
+            input.top_temperature,
+            input.bottom_temperature,
+        )
+        .map_err(HeatTransportError::Vapor)?;
+        for i in [0, n - 1] {
+            rhs[i] += boundary.rhs_level_one[i];
+            lower[i] += boundary.lower_level_two[i];
+            diagonal[i] += boundary.diagonal_level_two[i];
+            upper[i] += boundary.upper_level_two[i];
+            rhs[i] += boundary.rhs_level_two[i];
         }
     }
 
