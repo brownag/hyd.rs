@@ -65,6 +65,10 @@ CANDIDATE_KEYS = {"schema_version", "case_id", "evidence_class", "criteria_sha25
                   "fixture_sha256", "input_sha256", "schedule", "time_points", "node_numbers",
                   "node_depths", "head", "liquid_moisture", "temperature_c",
                   "vapor_output_available", "vapor_fields"}
+# Keys a trajectory candidate may carry in addition to CANDIDATE_KEYS (27.4.1).
+CANDIDATE_OPTIONAL_KEYS = {"requests_sha256"}
+SCHEDULE_KEYS = {"kind", "dt", "retry_factor", "note"}
+SCHEDULE_OPTIONAL_KEYS = {"step_on_dt"}
 OBS_KEYS = {"request_id", "node", "vapor_content", "adjusted_hydraulic_capacity",
             "input_capacity"}
 DECKS = ("SELECTOR.IN", "PROFILE.DAT")
@@ -104,6 +108,16 @@ def _keys(obj, expected, label):
         raise Reject(f"{label}: expected object")
     if set(obj) != set(expected):
         raise Reject(f"{label}: keys {sorted(obj)} != {sorted(expected)}")
+
+
+def _keys_optional(obj, expected, optional, label):
+    """Exact required set plus an allowed optional set; anything else is rejected."""
+    if not isinstance(obj, dict):
+        raise Reject(f"{label}: expected object")
+    missing = set(expected) - set(obj)
+    extra = set(obj) - set(expected) - set(optional)
+    if missing or extra:
+        raise Reject(f"{label}: keys {sorted(obj)} != {sorted(expected)} (+optional {sorted(optional)})")
 
 
 def validate_criteria(criteria):
@@ -255,7 +269,9 @@ def _is_hex(value):
 
 
 def validate_candidate(cand, fixture, crit_sha, fix_sha):
-    _keys(cand, CANDIDATE_KEYS, "candidate")
+    _keys_optional(cand, CANDIDATE_KEYS, CANDIDATE_OPTIONAL_KEYS, "candidate")
+    if "requests_sha256" in cand and not _is_hex(cand["requests_sha256"]):
+        raise Reject("candidate: requests_sha256 must be 64 lowercase hex characters")
     if cand["schema_version"] != CANDIDATE_SCHEMA:
         raise Reject("candidate: schema_version")
     if cand["evidence_class"] != "rust-candidate":
@@ -274,9 +290,11 @@ def validate_candidate(cand, fixture, crit_sha, fix_sha):
         if not _is_hex(inputs[deck]) or inputs[deck] != manifest.get(deck):
             raise Reject(f"candidate: input_sha256[{deck}] differs from fixture manifest")
     sched = cand["schedule"]
-    _keys(sched, {"kind", "dt", "retry_factor", "note"}, "candidate.schedule")
+    _keys_optional(sched, SCHEDULE_KEYS, SCHEDULE_OPTIONAL_KEYS, "candidate.schedule")
     if sched["kind"] != "constant_dt" or not isinstance(sched["note"], str):
         raise Reject("candidate.schedule: kind/note")
+    if "step_on_dt" in sched and not (isinstance(sched["step_on_dt"], str) and sched["step_on_dt"]):
+        raise Reject("candidate.schedule.step_on_dt: expected non-empty string")
     for key in ("dt", "retry_factor"):
         if not is_num(sched[key]) or sched[key] <= 0:
             raise Reject(f"candidate.schedule.{key}: expected finite positive")

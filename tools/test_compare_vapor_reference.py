@@ -479,5 +479,87 @@ class CliTests(Base):
         self.assertEqual(self.call(argv)[0], 2)
 
 
+DECKS = ("SELECTOR.IN", "PROFILE.DAT")
+
+
+def traj_candidate(fx, fsha, csha):
+    """Minimal valid trajectory candidate built from a fixture (27.4.1 optional-key tests)."""
+    return {
+        "schema_version": cmp.CANDIDATE_SCHEMA, "case_id": fx["case_id"],
+        "evidence_class": "rust-candidate", "criteria_sha256": csha, "fixture_sha256": fsha,
+        "input_sha256": {d: fx["manifest"]["input_sha256"][d] for d in DECKS},
+        "schedule": {"kind": "constant_dt", "dt": 0.1, "retry_factor": 3.0, "note": "n"},
+        "time_points": copy.deepcopy(fx["time_points"]),
+        "node_numbers": copy.deepcopy(fx["node_numbers"]),
+        "node_depths": copy.deepcopy(fx["node_depths"]),
+        "head": copy.deepcopy(fx["head"]), "liquid_moisture": copy.deepcopy(fx["liquid_moisture"]),
+        "temperature_c": copy.deepcopy(fx["temperature_c"]),
+        "vapor_output_available": fx["vapor_output_available"],
+        "vapor_fields": copy.deepcopy(fx["vapor_fields"]),
+    }
+
+
+class CandidateOptionalKeyTests(Base):
+    """27.4.1: requests_sha256 (top level) and schedule.step_on_dt are optional; others still rejected."""
+
+    def setUp(self):
+        super().setUp()
+        self.fx = fixture("vapor_nonuniform_step_on")
+        self.fsha = "9" * 64
+        self.cand = traj_candidate(self.fx, self.fsha, self.csha)
+
+    def run_cand(self, cand=None):
+        return cmp.compare_trajectory(self.criteria, self.csha, self.fx, self.fsha,
+                                      self.cand if cand is None else cand)
+
+    def test_without_optional_keys_accepted(self):
+        self.assertEqual(self.run_cand()["verdict"], "PASS")
+
+    def test_requests_sha256_accepted_when_hex(self):
+        self.cand["requests_sha256"] = "e" * 64
+        self.assertEqual(self.run_cand()["verdict"], "PASS")
+
+    def test_requests_sha256_must_be_hex(self):
+        for bad in ("E" * 64, "e" * 63, "zz" * 32, 7):
+            self.cand["requests_sha256"] = bad
+            with self.assertRaises(cmp.Reject):
+                self.run_cand()
+
+    def test_step_on_dt_accepted_when_nonempty_string(self):
+        self.cand["schedule"]["step_on_dt"] = "deck dt / retry_factor"
+        self.assertEqual(self.run_cand()["verdict"], "PASS")
+
+    def test_step_on_dt_must_be_nonempty_string(self):
+        for bad in ("", None, 0.0333):
+            self.cand["schedule"]["step_on_dt"] = bad
+            with self.assertRaises(cmp.Reject):
+                self.run_cand()
+
+    def test_unknown_top_level_and_schedule_keys_still_rejected(self):
+        self.cand["extra"] = 1
+        with self.assertRaises(cmp.Reject):
+            self.run_cand()
+        del self.cand["extra"]
+        self.cand["schedule"]["extra"] = "x"
+        with self.assertRaises(cmp.Reject):
+            self.run_cand()
+
+    def test_required_keys_still_required(self):
+        for key in ("criteria_sha256", "time_points"):
+            bad = copy.deepcopy(self.cand)
+            del bad[key]
+            with self.assertRaises(cmp.Reject):
+                self.run_cand(bad)
+        bad = copy.deepcopy(self.cand)
+        del bad["schedule"]["note"]
+        with self.assertRaises(cmp.Reject):
+            self.run_cand(bad)
+
+    def test_evidence_class_must_be_rust_candidate(self):
+        self.cand["evidence_class"] = "candidate-rust"
+        with self.assertRaises(cmp.Reject):
+            self.run_cand()
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -16,6 +16,9 @@ from pathlib import Path
 import tools.compare_vapor_reference as cmp
 
 HEATBC_PREFIX = "vapor_heatbc_"
+# Nonuniform-T trajectory cases (27.4.1). Trajectory mode only; criteria has no nonuniform
+# discrimination entries, so discrimination mode does not select them.
+NONUNIFORM_IDS = ("vapor_nonuniform_step_on", "vapor_nonuniform_step_off")
 RESULT_SCHEMA = "vapor-heat-boundary-result-v1"
 
 
@@ -32,12 +35,15 @@ def discrimination(criteria, crit_sha, fixtures):
 
 
 def trajectory(criteria, crit_sha, fixture, fix_sha, cand):
-    """Per-field, per-row verdicts (err/bound) for one heat-boundary trajectory fixture."""
-    if not fixture["case_id"].startswith(HEATBC_PREFIX):
-        raise cmp.Reject(f"trajectory: {fixture['case_id']} is not a heat-boundary case")
+    """Per-field, per-row verdicts (err/bound) for one heat-boundary or nonuniform trajectory fixture."""
+    case = fixture["case_id"]
+    if not (case.startswith(HEATBC_PREFIX) or case in NONUNIFORM_IDS):
+        raise cmp.Reject(f"trajectory: {case} is not a heat-boundary or nonuniform case")
     res = cmp.compare_trajectory(criteria, crit_sha, fixture, fix_sha, cand)
     res["schema_version"] = RESULT_SCHEMA
     res["mode"] = "trajectory"
+    # Echo only: Python does not time-step, so the schedule is reported, not checked against Fortran.
+    res["schedule"] = cand["schedule"]
     return res
 
 

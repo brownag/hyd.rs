@@ -10,7 +10,7 @@ from pathlib import Path
 
 import tools.compare_vapor_heat_boundary as hb
 import tools.compare_vapor_reference as cmp
-from tools.test_compare_vapor_reference import fixture
+from tools.test_compare_vapor_reference import fixture, traj_candidate
 
 STEMS = ("df", "dz", "fd", "ff", "fz")
 
@@ -100,6 +100,73 @@ class TrajectoryTests(Base):
         fx = fixture("vapor_dry_thermal_gradient")
         with self.assertRaises(cmp.Reject):
             hb.trajectory(self.criteria, self.csha, fx, "f" * 64, {})
+
+
+class NonuniformTests(Base):
+    """27.4.1: nonuniform trajectory IDs are accepted; per-row err/bound; criteria-driven limits."""
+
+    def real(self, case):
+        fx, fsha = cmp.load_fixture(cmp.DEFAULT_FIXTURE_DIR / f"{case}.json")
+        return fx, fsha, traj_candidate(fx, fsha, self.csha)
+
+    def test_self_compare_counts_and_schema(self):
+        fx, fsha, cand = self.real("vapor_nonuniform_step_on")
+        res = hb.trajectory(self.criteria, self.csha, fx, fsha, cand)
+        self.assertEqual(res["verdict"], "PASS")
+        self.assertEqual((res["mode"], res["schema_version"]), ("trajectory", hb.RESULT_SCHEMA))
+        self.assertEqual((res["points"], res["failures"]), (2460, 0))
+        self.assertEqual(res["summary"]["head"]["points"], 5 * 41)
+        self.assertEqual(set(res["summary"]), set(cmp.TRAJ_FIELDS))
+        row = res["rows"][0]
+        for key in ("case_id", "field", "time", "node", "candidate", "reference", "error", "bound", "verdict"):
+            self.assertIn(key, row)
+
+    def test_off_control_accepted_with_vapor_unavailable(self):
+        fx, fsha, cand = self.real("vapor_nonuniform_step_off")
+        res = hb.trajectory(self.criteria, self.csha, fx, fsha, cand)
+        self.assertEqual((res["verdict"], res["points"]), ("PASS", 3 * 5 * 41))
+        self.assertEqual(set(res["unavailable"]), set(cmp.VAPOR_FIELDS))
+
+    def test_schedule_echoed_not_checked(self):
+        fx, fsha, cand = self.real("vapor_nonuniform_step_on")
+        cand["schedule"]["dt"] = 0.5  # Python does not time-step; echo only, no Fortran check
+        res = hb.trajectory(self.criteria, self.csha, fx, fsha, cand)
+        self.assertEqual(res["schedule"], cand["schedule"])
+        self.assertEqual(res["verdict"], "PASS")
+
+    def test_one_row_out_of_bound_is_the_only_failure(self):
+        fx, fsha, cand = self.real("vapor_nonuniform_step_on")
+        cand["head"][1][0] += 1000.0
+        res = hb.trajectory(self.criteria, self.csha, fx, fsha, cand)
+        self.assertEqual(res["verdict"], "FAIL")
+        failed = [r for r in res["rows"] if r["verdict"] == "FAIL"]
+        self.assertEqual(len(failed), 1)
+        self.assertEqual((failed[0]["field"], failed[0]["time"], failed[0]["node"]),
+                         ("head", fx["time_points"][1], fx["node_numbers"][0]))
+        self.assertGreater(failed[0]["error"], failed[0]["bound"])
+
+    def test_limits_come_from_criteria(self):
+        fx, fsha, cand = self.real("vapor_nonuniform_step_on")
+        cand["head"][1][0] += 1000.0
+        self.assertEqual(hb.trajectory(self.criteria, self.csha, fx, fsha, cand)["verdict"], "FAIL")
+        crit = copy.deepcopy(self.criteria)
+        crit["fields"]["head"]["absolute"] = 1e9
+        self.assertEqual(hb.trajectory(crit, self.csha, fx, fsha, cand)["verdict"], "PASS")
+
+    def test_unlisted_nonuniform_id_rejected(self):
+        fx = fixture("vapor_nonuniform_step_other")
+        fsha = "f" * 64
+        with self.assertRaises(cmp.Reject):
+            hb.trajectory(self.criteria, self.csha, fx, fsha, traj_candidate(fx, fsha, self.csha))
+
+    def test_discrimination_does_not_select_nonuniform(self):
+        fixtures = heatbc_fixtures()
+        for case in hb.NONUNIFORM_IDS:
+            fixtures[case], _ = cmp.load_fixture(cmp.DEFAULT_FIXTURE_DIR / f"{case}.json")
+        res = hb.discrimination(self.criteria, self.csha, fixtures)
+        self.assertFalse(any(c.startswith("vapor_nonuniform_") for c in res["cases"]))
+        self.assertTrue(all(c["name"].startswith("heatbc_") for c in res["checks"]))
+        self.assertEqual(res["verdict"], "PASS")
 
 
 class CliTests(Base):
