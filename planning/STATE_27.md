@@ -171,3 +171,9 @@ _Empty at planning. Any unlisted work goes here and waits for approval._
 - Fortran reference runs the same case with finite output (27.2.2). So this is a Rust-side defect or an input the Rust path does not accept, not a fixture problem.
 - Constraint: 27.3.2 may not change production code. No criteria or tolerance change. No candidate JSON written.
 - Decision pending (user): diagnose and fix the Rust NaN (new task), or record as an explicit known failure, or stop.
+
+## Blocker decision (2026-11-13)
+
+- User chose: diagnose and fix the Rust NaN in the vapor step. Production change only after a diagnosis is approved.
+- Diagnosis task (read-only first, Sonnet): writes `planning/master/M6_VAPOR_NONUNIFORM_NAN_DIAGNOSIS.md`. Scratch at `.development/27.3.3-diag/`. Fix to be approved before any code change.
+- 27.3.2 test file stays uncommitted until the fix is in.
