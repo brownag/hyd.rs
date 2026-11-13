@@ -37,8 +37,8 @@ Goal: [GOALS.md](GOALS.md) circled goal G22.1. Coverage: [M6_VAPOR_COVERAGE.md](
 | 2 | 26.2.1 | Vapor heat-boundary case specs and producer | done (07cce6e) |
 | 2 | 26.2.2 | Reference-only fixture run | done (fixtures committed; reference-only) |
 | — | GATE N1 | User approves numeric criteria v3 | pending |
-| 3 | 26.3.1 | Vapor config accepts audited forms, rejects others | pending |
-| 3 | 26.3.2 | TempAdj and top/bottom vapor heat terms | pending |
+| 3 | 26.3.1 | Vapor config accepts audited forms, rejects others | done (a07cd92) |
+| 3 | 26.3.2 | TempAdj and top/bottom vapor heat terms | done (573f816) |
 | 4 | 26.4.1 | Rust candidate runs and parity test | pending |
 | 4 | 26.4.2 | Python comparator against criteria v3 | pending |
 | 5 | 26.5.1 | Independent balance checks for accepted forms | pending |
@@ -76,6 +76,27 @@ _Filled in as each wave completes (commits, serial gate results, deviations)._
 - Reproducibility: `NOD_INF.OUT` header contains a run-time stamp, so its file SHA is not reproducible. `NOD_INF_V.OUT` matched on rerun. Any reproducibility check must compare parsed values, not file hashes.
 - Discrimination (max |on−off|): head df 4959.4 / dz 4927.2 / fd 20254.3 / ff 8455.9 / fz 8306.5 cm; moisture ≈0.0018–0.0035; temperature 1.0–5.4 C. Records in `.development/26.2.2/record.json`.
 - **Open question for GATE N1:** the vapor-field maxima (`con_vh`, `con_vt`, `v_vapor`, `v_total`) are identical across all five pairs. Likely set at the initial time, so they do not discriminate boundary forms. Must check the time index of the maxima before proposing criteria v3.
+
+## 26.3.1
+- Status: done (a07cd92). Worker: Haiku, in worktree; base reset to cee7943 (approved).
+- Files: `heat/config.rs` (constant `VAPOR_ACCEPTED_NEGATIVE_TOP_CODES = [-1]`; accepts kTopT>0 or -1; accepts every nonzero/zero kBotT), `tests/vapor_config_contract.rs` (kTopT=-1 and kBotT=0 moved out of rejected list; kTopT=-2 added), new `tests/vapor_heat_boundary_config.rs`.
+- Reuses existing typed `VaporSelectionNotSupported{name:"kTopT"}` (approved; no public variant added).
+- Targeted: vapor_config_contract 6/6, vapor_heat_boundary_config 5/5, heat_config_contract 12/12 unchanged.
+
+## 26.3.2
+- Status: done (573f816). Worker: Haiku, in worktree; base reset to cee7943 (approved). One retry used for a clippy `type_complexity` in a test helper (fixed by type aliases, values unchanged).
+- Files: `heat/vapor/adjust.rs` (new `adjust_boundary_rows`, `top_heat_flux_vapor_terms`; `VaporHeatAdjustmentInput` unchanged), `heat/transport.rs` (vapor branch: flux-top heat_flux adds vapor parts; endpoint adjustments after SetUpHeat rows), `tests/vapor_heat_transport.rs` (+7 tests).
+- Targeted: vapor_heat_transport 11/11; heat::transport 4/4; heat_driver_order and vapor_driver_order pass.
+- **Deviation (recorded, not widened):** endpoint and interior sums are grouped before adding, not accumulated in source order. Expected ULP-level difference under H7; to be checked by the Wave 4 comparison, not by widening criteria.
+- Gotcha for 26.4: FD (flux top + vapor) is covered at adjust/helper level; the end-to-end FD path depends on 26.3.1 config, which is now merged.
+
+## Wave 3 serial gate (orchestrator, final: after clippy retry, HEAD 573f816)
+- `cargo build --workspace --locked`: exit 0.
+- `cargo test --workspace --no-fail-fast`: 596 passed, 0 failed, 2 ignored (baseline 584 + 12 new).
+- `cargo fmt --all -- --check`: exit 0.
+- `cargo clippy --workspace --all-targets -- -D warnings`: exit 0 (first attempt failed on test-helper type_complexity; fixed by worker retry).
+- `python3 -m unittest discover -s tools`: 450 tests OK (baseline 447 + 3 producer tests from 26.2.1).
+- Note: the first clippy attempt ran on commit 9e3fbbb (pre-fix), which was replaced by 573f816 (same tree plus the clippy fix); the re-run above is on 573f816.
 
 ## Open execution blockers / discoveries
 
