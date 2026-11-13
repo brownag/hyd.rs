@@ -313,7 +313,11 @@ pub(crate) fn solve_vapor_water_trial(
                 .collect();
             for (node, &head_temp) in h_temp.iter().enumerate() {
                 let material = input.mesh.material_indices()[node];
-                let mixed_head = 0.1 * head_temp + 0.9 * candidate_workspace.trial_heads[node];
+                // SetMat clamps both heads to `hSat` before mixing
+                // (`WATFLOW.FOR:455-462`); `Ah = AT = 1` here.
+                let h_sat = source_h_sat(context.source_materials[material].model.parameters());
+                let mixed_head =
+                    clamped_mixed_head(head_temp, candidate_workspace.trial_heads[node], h_sat);
                 let evaluation =
                     evaluate_vapor_liquid(context.source_materials[material], mixed_head)?;
                 liquid.push(evaluation.conductivity);
@@ -547,6 +551,11 @@ pub(crate) fn solve_vapor_water_trial(
         dt = next;
         retries += 1;
     }
+}
+
+/// `hi1=min(hSat,hTemp)`, `hi2=min(hSat,hNew)`, `0.1*hi1+0.9*hi2`.
+fn clamped_mixed_head(h_temp: f64, h_new: f64, h_sat: f64) -> f64 {
+    0.1 * h_temp.min(h_sat) + 0.9 * h_new.min(h_sat)
 }
 
 fn evaluate_vapor_liquid(
@@ -1501,5 +1510,18 @@ mod vapor_trial_tests {
         assert!(trial.iterations >= 2);
         let dh = (trial.candidate.heads()[1] - trial.pre_solve_heads[1]).abs();
         assert!(dh <= 1.0e-3, "dh = {dh}");
+    }
+
+    #[test]
+    fn clamped_mixed_head_clamps_before_mixing() {
+        let h_sat = -0.5;
+        let mixed = clamped_mixed_head(-1.0e4, 1.9388e4, h_sat);
+        assert_eq!(mixed, 0.1 * -1.0e4 + 0.9 * h_sat);
+        assert!(mixed < h_sat);
+        // Heads at or below hSat are unchanged.
+        assert_eq!(
+            clamped_mixed_head(-10.0, -20.0, h_sat),
+            0.1 * -10.0 + 0.9 * -20.0
+        );
     }
 }
