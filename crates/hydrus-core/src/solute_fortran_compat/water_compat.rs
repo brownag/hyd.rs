@@ -192,30 +192,6 @@ pub(crate) fn fs(model: i32, h: f32, par: &[f32]) -> f32 {
     }
 }
 
-/// Isothermal vapor hydraulic conductivity `ConVh(hNew, Theta, ths, xConv, tConv)` from `WATFLOW.FOR:968-997`.
-pub(crate) fn con_vh(h_new: f32, theta: f32, ths: f32, x_conv: f32, t_conv: f32) -> f32 {
-    let diff0 = 2.12e-5;
-    let g = 9.81;
-    let x_mol = 0.018015;
-    let r = 8.314;
-
-    let temp = 20.0f32;
-    let h = h_new / x_conv;
-    let t_kelv = temp + 273.15;
-    let diff_t = diff0 * (t_kelv / 273.15).powi(2);
-    let theta_a = ths - theta;
-    let mut tau = 0.0f32;
-    if theta_a > 0.0 {
-        tau = theta_a.powf(7.0 / 3.0) / ths.powi(2);
-    }
-    let diff = tau * theta_a * diff_t;
-    let row = (1.0 - 7.37e-6 * (temp - 4.0).powi(2) + 3.79e-8 * (temp - 4.0).powi(3)) * 1000.0;
-    let rovs = 0.001 * (31.3716 - 6014.79 / t_kelv - 0.00792495 * t_kelv).exp() / t_kelv;
-    let hr = (h * x_mol * g / r / t_kelv).exp();
-    let con_vh_val = diff / row * rovs * x_mol * g / r / t_kelv * hr;
-    con_vh_val * x_conv / t_conv
-}
-
 /// Precomputed material tables produced by `GenMat` (`INPUT.FOR:762-862`).
 #[derive(Clone, Debug)]
 pub(crate) struct MaterialTables {
@@ -242,8 +218,8 @@ pub(crate) fn gen_mat(
     h_tab_1: f32,
     h_tab_n: f32,
     model: i32,
-    x_conv: f32,
-    t_conv: f32,
+    _x_conv: f32,
+    _t_conv: f32,
 ) -> MaterialTables {
     let model = normalize_model(model);
     assert!(n_tab >= 2);
@@ -278,7 +254,6 @@ pub(crate) fn gen_mat(
             cap_tab[m][i] = fc(model, h_tab[i], &par[m]);
             the_tab[m][i] = fq(model, h_tab[i], &par[m]);
             let _qe = fs(model, h_tab[i], &par[m]);
-            let _conv = con_vh(h_tab[i], the_tab[m][i], ths[m], x_conv, t_conv);
         }
     }
 
