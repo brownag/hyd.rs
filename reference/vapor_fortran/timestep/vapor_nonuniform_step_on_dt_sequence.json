@@ -1,0 +1,45 @@
+{
+  "schema_version": "vapor-fortran-dt-sequence-v1",
+  "case_id": "vapor_nonuniform_step_on",
+  "derived_from": "RUN_INF.OUT of the pinned run (task 27.2.2), columns TLevel, Time, dt (printed, 5 significant digits, single precision)",
+  "source_run_inf_sha256": "ee258d7c3af22d332e1e08c7b502e095cb2281e2b9c3928958bb5a5922e5b413",
+  "source_executable_sha256": "e6d69dd352d7dc99eba98ca1c5a14391eee8dd20a98bee6e5736ed5035ada8fa",
+  "step_count": 7200,
+  "first_row": {
+    "step": 1,
+    "iter": 7,
+    "itcum": 41
+  },
+  "dt_runs": [
+    {
+      "dt_text": "0.33333E-01",
+      "count": 7190
+    },
+    {
+      "dt_text": "0.33332E-01",
+      "count": 10
+    }
+  ],
+  "print_time_landings": [
+    {
+      "print_time": 6,
+      "step": 180,
+      "time_text": "0.6000000E+01"
+    },
+    {
+      "print_time": 24,
+      "step": 720,
+      "time_text": "0.2400000E+02"
+    },
+    {
+      "print_time": 72,
+      "step": 2160,
+      "time_text": "0.7200000E+02"
+    },
+    {
+      "print_time": 240,
+      "step": 7200,
+      "time_text": "0.2400000E+03"
+    }
+  ]
+}
