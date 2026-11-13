@@ -61,6 +61,17 @@ fixtures `cee7943`; config `a07cd92`; transport/adjust `573f816`; comparator
      with the same quantities from the Rust driver at the same step. A match
      at the first step where the error appears would localise the cause. This
      is follow-up work, not a condition of this acceptance.
+   - **Result (2026-11-13, [D-26.2_DRIFT_MECHANISM.md](D-26.2_DRIFT_MECHANISM.md)):
+     mechanism identified as single-precision (REAL*4) arithmetic in the pinned
+     reference's vapor-coupled solve.** The same Fortran source built with
+     `real*8` defaults agrees with the Rust driver to 5e-9 cm (head) and 5e-10 °C
+     (temperature) at every step for FD. The FD `v_liquid` row at node 37 agrees
+     to 1e-14 with the double build; the single-precision fixture differs by
+     5.3e-10, which is the 1.50× failure. The drift is a reference-precision
+     effect (H7 class), not a Rust defect. Criteria v3 are unchanged. Not yet
+     isolated: which REAL declaration amplifies the error. The choice of how to
+     record this (keep single-precision fixtures with an H7 exception, or add a
+     double-precision evidence class) is open and needs a user decision.
 2. **FF carries the same head drift** (4.41 cm at t=240, absolute). Its
    `v_liquid` passes by margin. FF is accepted with the same disclosure. If the
    drift is found to be a real bug, FF and FD must be re-opened.
