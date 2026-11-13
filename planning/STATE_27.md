@@ -228,3 +228,11 @@ _Empty at planning. Any unlisted work goes here and waits for approval._
 - Decisions: nonuniform T accepted with exceptions; ConVh resolved by removal; sink/root rejected with triggers (audit labels (a)-(d)).
 - G22.4 stays Circled (closure is the user's). Open: (1) Rust time-step controller on step_on untested; (2) step_off has no balance check.
 - `git diff --check` clean; changed paths limited to the listed docs.
+
+## 28.2
+
+- New `crates/hydrus-core/tests/vapor_nonuniform_step_off_balance.rs` (uncommitted); todo `planning/tasks/28.2.todo.md`. No src, criteria, fixture or existing-test edits.
+- Heat-only TEMPER.FOR interior rows (vapor terms absent), `checks.heat_balance_interior` via `load_bound`; constant dt 0.1, replay-checked timestep bits.
+- Result: 2401 accepted steps (2400 at dt 0.1 plus one landing remainder dt 9.5e-12 at t=240, same loop as parity); worst ratio 4.036e-7 (<= 1.0 everywhere, 0 violations); all finite; max |dT| 20.8; max row scale 9.3e23 (TPar in J/cm/h).
+- Water: diagnostic only, finiteness asserted. Max |R| 1.4e-16, max |R|/scale 1.004 (roundoff-level; static water). Not a bound.
+- Checks: test passes, `cargo fmt -p hydrus-core -- --check` and targeted clippy `-D warnings` clean. Log `.development/28.2/test.log`.
