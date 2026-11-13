@@ -107,6 +107,16 @@ _Filled in as each wave completes (commits, serial gate results, deviations)._
 - Decision (user, 2026-11-13): **hold FD open; disclose the vapor-on head drift.** FD is not accepted and not rejected. Start a src-level investigation of the vapor-coupled water step (`heat/vapor/water.rs`, `heat/vapor/adjust.rs`) as a separate task. No tolerance widened. Criteria v3 unchanged.
 - Test file stays uncommitted: the default suite currently fails on `heatbc_fd_on` and must not be committed as a red gate.
 
+## Waves 4–6 and final gate (2026-11-13)
+- GATE N1: approved by user as proposed (2026-11-12). Criteria v3 frozen at `1f38cb1`; contract revision `0c4c743`; `contract_sha256` `33bdc31e…`; criteria file sha `f198d0c1…`.
+- 26.4.2 comparator: committed `c509fd4`. 38 heat-boundary discrimination checks PASS on real fixtures. Existing 25.7.2 tests pass after the helper fix.
+- 26.4.1 Rust parity: committed `072431e` for accepted forms only (DF, DZ, FF, FZ; on and off). 9 pass, 1 investigation test ignored. FD is held (not asserted), reported as a diagnostic.
+- 26.5.1 balance: committed `df57561`. DF, DZ, FF, FZ pass with worst ratios ~7e-7 water and ~3e-7 heat, against a bound of 1.0. Zero flux only (synthetic setup carries no flux value).
+- FD held open: vapor-on head drift (~5.7 cm at t=240; FF ~4.4 cm). Schedule ruled out. Src-level investigation is a separate task.
+- 26.6.1 acceptance: committed `e20fe6a`. `planning/master/M6_VAPOR_HEAT_BOUNDARY_ACCEPTANCE.md`; coverage rows updated; GOALS G22.1 stays Circled (partially complete).
+- Deviation: 25.7.1 test hardcoded criteria SHA of v2; bumped to v3 hash in `94967be` (values of existing fields unchanged; approved change). All 10 parity tests pass again.
+- **Final serial gate (HEAD `94967be`):** build exit 0; Rust 607 passed / 0 failed / 3 ignored; fmt exit 0; clippy exit 0; Python 459 OK. Baseline was 584 / 447.
+
 ## Open execution blockers / discoveries
 
 - **FD blocker (open):** vapor-on head drift up to 5.7 cm at t=240 (FD), 4.4 cm (FF). Causes v_liquid miss in FD. FD held open pending a src investigation of the vapor-coupled water step. FF also carries the drift; its v_liquid passes by margin, so FF's acceptance needs the same disclosure.
