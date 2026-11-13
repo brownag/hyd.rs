@@ -200,3 +200,24 @@ _Empty at planning. Any unlisted work goes here and waits for approval._
 - `cargo test -p hydrus-core --test vapor_nonuniform_parity`: 5 passed, 0 failed. step_on: 0 of 2460 comparisons exceed the criteria v3 bounds.
 - `cargo clippy -p hydrus-core --all-targets -- -D warnings` clean; `cargo fmt -p hydrus-core -- --check` clean.
 - No criteria, tolerance, fixture or production file touched. Not committed.
+
+## 27.4.2
+- New test `crates/hydrus-core/tests/vapor_nonuniform_balance.rs` (untracked, not committed). Copied parser and run setup from the parity test; bounds from `criteria.json` `checks` via `load_bound`; no hash check (per orchestrator). Step_on driven at dt/3 on all 7200 steps; interior rows only; every step asserted.
+- `cargo test -p hydrus-core --test vapor_nonuniform_balance`: 1 passed. step_on worst water ratio 9.310e-7, worst heat ratio 5.137e-7 (bounds rel 1e-9, abs 1e-15). 0 rows over bound.
+- `cargo test -p hydrus-core --test vapor_heat_boundary_balance`: 2 passed.
+- `cargo fmt -p hydrus-core -- --check`: clean (new file formatted with rustfmt).
+- Gap, not covered: `vapor_nonuniform_step_off` has lVapor=f. The vapor driver rejects `l_vapor = false` (`heat/vapor/mod.rs`, UnsupportedBoolean), and the legacy heat driver has no balance helper. No existing balance helper applies, so step_off has no balance check. Needs an approved decision (new helper or accept the gap).
+- No src/ or balance.rs edits. No commit.
+
+## 27.4.1
+
+- Plan: `planning/tasks/27.4.1.todo.md` (approved; Q1 decision: widen shared comparator keys; Q2-Q5 as proposed). No commit.
+- Rust test (`vapor_nonuniform_parity.rs:1053`): candidate `evidence_class` `candidate-rust` -> `rust-candidate`. `requests_sha256` and `schedule` block kept.
+- `tools/compare_vapor_reference.py`: `CANDIDATE_OPTIONAL_KEYS={requests_sha256}`, `SCHEDULE_OPTIONAL_KEYS={step_on_dt}` via new `_keys_optional` (required keys still exact). Hex check on `requests_sha256`; non-empty string check on `step_on_dt`.
+- `tools/compare_vapor_heat_boundary.py`: trajectory accepts `NONUNIFORM_IDS` (step_on, step_off); echoes `schedule` (no Fortran check). Discrimination unchanged (no nonuniform entries).
+- Tests: `NonuniformTests` (heat-boundary, 7 tests, real fixtures); `CandidateOptionalKeyTests` (reference, 8 tests). Existing 25.7.x/26.4.x test methods unedited.
+- Unit: `tools.test_compare_vapor_heat_boundary` + `tools.test_compare_vapor_reference` OK (59 incl. new); `tools.test_run_vapor_reference` OK (20).
+- `cargo test -p hydrus-core --test vapor_nonuniform_parity`: 5 passed, 0 failed.
+- Cross-check, attempt `.development/27.3.2/attempt-20261113T142943Z` (`evidence_class` rust-candidate, requests_sha256 and step_on_dt present): step_on 2460 points, 0 fails (py) / 0 non-pass (rust), 0 verdict mismatches; step_off 615 points, 0 / 0, 0 mismatches. Max |err| diff py vs rust 5.0e-8 (print precision).
+- Per-field summary (max err/bound): step_on temperature_c 0.100, liquid_moisture 0.047, v_liquid 0.075; step_off temperature_c 0.096.
+- Scratch: `.development/27.4.1/` (py_step_on.json, py_step_off.json, crosscheck.py). No criteria or fixture edits.
