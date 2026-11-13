@@ -133,3 +133,9 @@ _Empty at planning. Any unlisted work goes here and waits for approval._
 - Rerun (step 10): `vapor_nonuniform_step_on` run directly with the pinned executable into `.development/27.2.2/rerun/`, parsed with `parse_blocks`. Exact match to fixture arrays (0 mismatches).
 - `PYTHONDONTWRITEBYTECODE=1 python3 -m unittest tools.test_run_vapor_reference`: 20 tests OK.
 - Scratch: `.development/27.2.2/` (`verify.py`, `rerun.py`, `runs/`, `rerun/`). No commit.
+
+## Wave 2 gate and ConVh decision (2026-11-13)
+
+- Wave 2 serial gate after 27.2.2: Rust 607 passed, 0 failed, 3 ignored; fmt OK; clippy OK; Python 464 OK (459 + 5 producer tests from 27.2.1).
+- Commits: 3196777 (producer, tests, case specs), 316643e (planning 27.2.1), ecf401d (fixtures), dbd8502 (planning 27.2.2).
+- User decision on ConVh (2026-11-13): **remove the scalar helper `con_vh` and its discarded call at `water_compat.rs:281`** (27.3.1). Guard option rejected: gen_mat calls it on every compat deck, so a guard would fire on every run.
