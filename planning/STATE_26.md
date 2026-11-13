@@ -132,6 +132,11 @@ _Filled in as each wave completes (commits, serial gate results, deviations)._
   - Open: spatially patterned temperature error; commit-time vapor content; boundary-row vapor terms; predictor swap.
   - Note: the vapor-off control uses the legacy driver, so it does not test the vapor driver. The driver-machinery check above is what covers that.
   - Diagnosis note: `planning/tasks/D-26.1.diagnosis.md`.
+- **Temperature-coupling source audit (2026-11-13, read-only):** `planning/master/D-26.1_TEMPERATURE_COUPLING_AUDIT.md`.
+  - Leading candidate M3a: Fortran head and temperature arrays are default single-precision REAL (`WATFLOW.FOR:21` declares only P,R,S,PB,...,t,tOld as double; `hNew`, `hTemp`, `TempN`, `ConVT`, `ConVh`, `vVNew`, `ThVNew` are not). Rust stores f64. Verified by orchestrator. Not yet quantified.
+  - Caveat: the vapor-off control cannot exclude M3a, because its head barely moves, so rounding would not show there.
+  - Other ranked items: M3b (REAL temperatures, ~1e-3 cm est.), M3c (REAL vapor arrays), M5 (REAL latent/Cv, ~6e-8), M2 (boundary rows; low for head, Dirichlet ends).
+  - Refuted or consistent: M1 (interior velocity storage matches), M4 (initial state matches), kernel constants, iEnhanc, convergence settings, kernel timing, time level.
 
 ## Open execution blockers / discoveries
 
