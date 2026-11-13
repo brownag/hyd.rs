@@ -184,3 +184,10 @@ _Empty at planning. Any unlisted work goes here and waits for approval._
 - Cause (verified against source): the Rust vapor water step mixes head iterates at `crates/hydrus-core/src/water_solver.rs:316` (`0.1*h_temp + 0.9*trial`) without clamping to `hSat`. Fortran clamps first (`WATFLOW.FOR:455-462`), and the compat path does too (`water_compat.rs:538-549`).
 - Proposed fix: clamp both heads with `min(h_sat)` before the mix, at `water_solver.rs:314-322`. Scratch check: NaN gone, dt/3 retry matches Fortran, 4 of 5 nonuniform parity tests pass.
 - After fix, `nonuniform_step_on_matches_fixture` still fails: 147 of 2460 rows exceed criteria v3 bounds (first: head t=6, node 17, err 682 vs bound 246). Not investigated; to be reported, not tuned.
+
+## 27.3.3
+- Done (uncommitted): `water_solver.rs` vapor liquid block now mixes via new private `clamped_mixed_head(h_temp, h_new, h_sat)` = `0.1*min(hSat,hTemp)+0.9*min(hSat,hNew)`, with `h_sat = source_h_sat(...)` per node material. Unit test `clamped_mixed_head_clamps_before_mixing` added. Diff: 23 insertions, 1 deletion, one file.
+- No ConSat branch added (per orchestrator). The `evaluate(h_sat)` vs ConSat difference was not measured.
+- Before -> after: `vapor_nonuniform_parity` 2 pass/3 fail (NaN) -> 4 pass/1 fail; `vapor_heat_boundary_parity` 9 pass/1 ignored -> same; `vapor_fortran_parity` 10 -> 10; `--lib water_solver` 4 -> 5 (new test).
+- Also pass after: `vapor_water_rows` 4, `vapor_driver_order` 3, `vapor_balance` 3. fmt applied to the crate; only `water_solver.rs` changed.
+- Remaining failure (not tuned), verbatim: `vapor_nonuniform_step_on: 147 of 2460 comparisons exceed the criteria v3 bounds; first: Some(Row { case: "vapor_nonuniform_step_on", field: "head", time: 6.0, node: 17, candidate: -11592.948732449926, reference: -12275.127, error: 682.1782675500745, bound: 246.00254, pass: false })`
