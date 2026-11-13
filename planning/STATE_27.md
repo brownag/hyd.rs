@@ -25,7 +25,7 @@ Goal: [GOALS.md](GOALS.md) sequenced goal G22.4. Coverage: [M6_VAPOR_COVERAGE.md
 ## Gates
 
 - [x] GATE S (user): decided 2026-11-13: reject all rows (a)–(d) with triggers.
-- [ ] GATE N2 (user, conditional): bounds for any new case not covered by criteria v3. Needed: pending (decided at 27.2.2).
+- [x] GATE N2 (user, conditional): not needed; criteria v3 cover all new fields and times.
 
 ## Wave board
 
@@ -35,14 +35,14 @@ Goal: [GOALS.md](GOALS.md) sequenced goal G22.4. Coverage: [M6_VAPOR_COVERAGE.md
 | 1 | 27.1.2 | ConVh scalar helper location and reachability audit | done |
 | 1 | 27.1.3 | Nonuniform-temperature coverage audit | done |
 | — | GATE S | Sink and root disposition | done: reject all with triggers |
-| 2 | 27.2.1 | Nonuniform case specs and producer | pending |
-| 2 | 27.2.2 | Reference-only fixture run | pending |
-| — | GATE N2 | Conditional bounds | pending |
-| 3 | 27.3.1 | ConVh helper removed or guarded | pending |
-| 3 | 27.3.2 | Nonuniform-T Rust parity test | pending |
-| 4 | 27.4.1 | Python comparator for nonuniform cases | pending |
-| 4 | 27.4.2 | Independent balance checks for nonuniform cases | pending |
-| 5 | 27.5.1 | Acceptance, coverage and goal handoff | pending |
+| 2 | 27.2.1 | Nonuniform case specs and producer | done |
+| 2 | 27.2.2 | Reference-only fixture run | done |
+| — | GATE N2 | Conditional bounds | not needed (27.2.2: criteria cover all new fields and times) |
+| 3 | 27.3.1 | ConVh helper removed or guarded | done (cbc52c0) |
+| 3 | 27.3.2 | Nonuniform-T Rust parity test | done (47b36a1; schedule-driven, see Discovered) |
+| 4 | 27.4.1 | Python comparator for nonuniform cases | done (a0ab6c1) |
+| 4 | 27.4.2 | Independent balance checks for nonuniform cases | done for step_on; step_off gap (5a41592) |
+| 5 | 27.5.1 | Acceptance, coverage and goal handoff | done (22275d9); goal stays Circled |
 
 Max two workers. Separate worktrees with absolute target and run roots. The orchestrator owns shared state and serial full-suite gates, one task commit at a time.
 
