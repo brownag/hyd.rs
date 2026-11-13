@@ -152,3 +152,22 @@ _Empty at planning. Any unlisted work goes here and waits for approval._
 - `cargo clippy -p hydrus-core --all-targets -- -D warnings`: OK.
 - `cargo fmt --all -- --check`: OK.
 - Plan: `planning/tasks/27.3.1.todo.md`. Not touched: `vapor_nonuniform_parity.rs`, `kernels.rs`, `tools/`, fixtures. No commit.
+
+## 27.3.2
+
+- New standalone test `crates/hydrus-core/tests/vapor_nonuniform_parity.rs` (copied helpers; `vapor_heat_boundary_parity.rs` not edited or imported). Evidence class `candidate-rust`; output root `.development/27.3.2/attempt-<UTC>/`; local `(1, 1)` code mapping for step IDs.
+- Input contract tests PASS: PROFILE.DAT parses to 20 nodes at 45 C and 21 at 5 C; both decks give lVapor on/off, print times `[0, 6, 24, 72, 240]`.
+- Parity tests FAIL (not widened, no candidate JSON written): `vapor_nonuniform_step_on` candidate run aborts with `Water(Vapor(NonFinite { name: "ConVh", index: Some(20), value: NaN }))` (Rust index 20 = node 21, the 5 C side of the step). Because all cases share one OnceLock outcome, the off-case tests fail with the same message.
+- Empty attempt roots left by the failing runs: `.development/27.3.2/attempt-20261113T074707Z` and `attempt-20261113T074714Z`.
+- Not run: `cargo clippy`, full suites. `rustfmt --check` on the new file passes. Not committed. `water_compat.rs` untouched.
+- Next: orchestrator decision on the NaN in ConVh at the step interface (27.3.1 scope or a separate investigation). No rows were evaluated against criteria v3.
+
+## Blocker — 27.3.2 (2026-11-13): Rust vapor step NaN on nonuniform step case
+
+- Test file `crates/hydrus-core/tests/vapor_nonuniform_parity.rs` created, **uncommitted** (red; would break the workspace gate).
+- `cargo test -p hydrus-core --test vapor_nonuniform_parity`: 2 passed, 3 failed. Reproduced twice.
+- Failure, verbatim: `vapor step failed: Water(Vapor(NonFinite { name: "ConVh", index: Some(20), value: NaN }))` for `vapor_nonuniform_step_on`. Index 20 is node 21, the 5 °C side of the step.
+- The off-case tests fail only because they share the on-case run. Off case not measured on its own.
+- Fortran reference runs the same case with finite output (27.2.2). So this is a Rust-side defect or an input the Rust path does not accept, not a fixture problem.
+- Constraint: 27.3.2 may not change production code. No criteria or tolerance change. No candidate JSON written.
+- Decision pending (user): diagnose and fix the Rust NaN (new task), or record as an explicit known failure, or stop.
