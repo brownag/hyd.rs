@@ -343,12 +343,22 @@ class KernelTests(Base):
 
 class DiscriminationTests(Base):
     def fixtures(self, off_head=-10.0, vapor=1.0):
-        return {
+        out = {
             "vapor_dry_thermal_gradient": fixture("vapor_dry_thermal_gradient", vapor=vapor),
             "vapor_dry_off_control": fixture("vapor_dry_off_control", available=False, head=off_head),
             "vapor_isothermal_head_gradient": fixture("vapor_isothermal_head_gradient", vapor=vapor),
             "vapor_thermal_gradient": fixture("vapor_thermal_gradient", vapor=vapor),
         }
+        # heat-boundary (criteria v3) on/off pairs; on-case differs from off beyond
+        # 2x tolerance at a print time after t=0 for every dry-checked field
+        for stem in ("df", "dz", "fd", "ff", "fz"):
+            on = fixture(f"vapor_heatbc_{stem}_on", vapor=vapor)
+            on["head"][1][0] += 5.0
+            on["liquid_moisture"][1][0] += 0.05
+            on["temperature_c"][1][0] += 1.0
+            out[f"vapor_heatbc_{stem}_on"] = on
+            out[f"vapor_heatbc_{stem}_off"] = fixture(f"vapor_heatbc_{stem}_off", available=False)
+        return out
 
     def disc(self, fixtures):
         return cmp.discrimination(self.criteria, self.csha, fixtures)
@@ -384,11 +394,13 @@ class DiscriminationTests(Base):
 
     def test_nonzero_rule(self):
         res = self.disc(self.fixtures(vapor=1.0))
-        nz = [c for c in res["checks"] if c["rule"] == "max_abs_exceeds_zero_floor_each_case"]
+        nz = [c for c in res["checks"] if c["rule"] == "max_abs_exceeds_zero_floor_each_case"
+              and c["name"] == "vapor_fields_nonzero"]
         self.assertEqual(len(nz), 15)
         self.assertTrue(all(c["verdict"] == "PASS" for c in nz))
         res = self.disc(self.fixtures(vapor=0.0))
-        nz = [c for c in res["checks"] if c["rule"] == "max_abs_exceeds_zero_floor_each_case"]
+        nz = [c for c in res["checks"] if c["rule"] == "max_abs_exceeds_zero_floor_each_case"
+              and c["name"] == "vapor_fields_nonzero"]
         self.assertTrue(all(c["verdict"] == "FAIL" for c in nz))
 
     def test_nonzero_floor_is_per_time(self):
