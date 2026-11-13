@@ -1,6 +1,6 @@
 # Orchestration 26 state — G22.1 heat top/bottom boundary rows with vapor
 
-Created: 2026-11-12. Status: **PLAN DRAFT — awaiting user approval. Nothing executed.**
+Created: 2026-11-12. Status: **Waves 1–6 executed (final gate 94967be). D-26.1 diagnosis and audit done; FD held; M3 scratch checks refuted (2026-11-13).** Header updated 2026-11-13.
 Plan: [EXECUTION_PLAN_26.md](EXECUTION_PLAN_26.md).
 Worker: [PROMPT_TEMPLATE_26.md](PROMPT_TEMPLATE_26.md).
 Goal: [GOALS.md](GOALS.md) circled goal G22.1. Coverage: [M6_VAPOR_COVERAGE.md](master/M6_VAPOR_COVERAGE.md).
@@ -137,6 +137,15 @@ _Filled in as each wave completes (commits, serial gate results, deviations)._
   - Caveat: the vapor-off control cannot exclude M3a, because its head barely moves, so rounding would not show there.
   - Other ranked items: M3b (REAL temperatures, ~1e-3 cm est.), M3c (REAL vapor arrays), M5 (REAL latent/Cv, ~6e-8), M2 (boundary rows; low for head, Dirichlet ends).
   - Refuted or consistent: M1 (interior velocity storage matches), M4 (initial state matches), kernel constants, iEnhanc, convergence settings, kernel timing, time level.
+
+- **M3 scratch checks (2026-11-13, no src change, scratch worktree at `16b879e`, removed after run).** Each probe rounds one quantity to f32 in the scratch copy only and reruns `vapor_heat_boundary_parity` (fd_on). Baseline FD worst head error 4.341896 cm at (t=240, node 38); v_liquid ratio 1.5018.
+  - M3a (committed heads to f32, staged copy kept consistent): 4.341965 cm (+7e-5). Refuted.
+  - M3b (heat1 and heat2 to f32 at heat_pass output): 4.342971 cm (+1.1e-3). Refuted at the 1e-3 threshold; 0.02% of the drift.
+  - M3c (staged vapor velocities to f32): 4.341894 cm (-2e-6). Refuted.
+  - M3a+M3b: 4.342941 cm (+1.0e-3). Refuted.
+  - M5 and M2 not run; each is expected to be far below the drift. Not run.
+  - Result: single-precision storage of head, temperature or vapor velocity does not explain the FD drift. Ranking M3 is closed. Remaining candidates: M1 (refuted in audit), spatially patterned temperature error, and the boundary rows (M2, not run).
+  - **Discrepancy, unreconciled:** the audit lists FD head drift at t=240 as 5.7035 cm. This run gives 4.34 cm as the worst head error over all times and nodes, and FF gives 4.41 cm. The 5.70 figure may come from the scratch diagnosis copy, not the committed test. Not resolved here.
 
 ## Open execution blockers / discoveries
 
