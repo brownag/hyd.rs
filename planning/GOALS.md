@@ -1,11 +1,16 @@
 # Project Goals (`planning/GOALS.md`)
 
 Last Updated: 2026-11-13
-Source State: [STATE_25.md](STATE_25.md)
+Source State: [STATE_27.md](STATE_27.md)
 
 ## Circled Goal (Active)
 
-_No active circled goal. G22.1 completed 2026-11-13 with exceptions._
+- **[G22.4]** Remaining G22 rows: nonuniform-temperature coverage for default thermal conductivity, scalar `ConVh` reachability audit, and nonzero prescribed sink or root uptake with heat/vapor.
+  - Status (2026-11-13, orchestration 27): all three rows decided; goal **kept Circled** because two items are open. Closure decision is the user's. Record: [M6_VAPOR_G22_4_ACCEPTANCE.md](master/M6_VAPOR_G22_4_ACCEPTANCE.md).
+  - Decided: nonuniform T accepted with exceptions (`vapor_nonuniform_step_on`/`_off`); scalar `ConVh` helper removed (`cbc52c0`); sink and root rejected with triggers at Gate S (no implementation).
+  - Open 1: Rust time-step controller on step_on is untested (parity holds only at the Fortran dt/3 schedule; constant 0.1 misses 147 of 2460 rows). Closes on a user-approved controller test or an explicit acceptance of the schedule-driven parity.
+  - Open 2: step_on is balance-checked on all 7200 steps; step_off has no balance check (no heat-only helper). Closes on a user-approved helper or an explicit acceptance of the gap.
+  - Depends on: G22.1 (done).
 
 ## Sequenced Goals (Dependency DAG)
 
@@ -17,9 +22,6 @@ _No active circled goal. G22.1 completed 2026-11-13 with exceptions._
 
 - **[G20]** Energy balance (`lEnBal`, `UpdateEnergy`, surface energy terms `Evap`, `Rn`, `Rns`, `Rnl`) is added to the coupled capability with its own contract, fixtures and acceptance gate.
   - Depends on: G19 (done with exception), G22.1 (top energy boundary), and the atmospheric boundary path with meteorological input (`lMeteo`, `MeteoIn`, `INPUT.FOR:966`, `HYDRUS.FOR:243-244`), which the Rust crate does not yet have. G22.3 is the atmospheric prerequisite.
-
-- **[G22.4]** Remaining G22 rows: nonuniform-temperature coverage for default thermal conductivity, scalar `ConVh` reachability audit, and nonzero prescribed sink or root uptake with heat/vapor (separate source/coupling audit).
-  - Depends on: G22.1 for the heat rows; the sink audit is independent.
 
 ## Independent Backlog
 

@@ -221,3 +221,10 @@ _Empty at planning. Any unlisted work goes here and waits for approval._
 - Cross-check, attempt `.development/27.3.2/attempt-20261113T142943Z` (`evidence_class` rust-candidate, requests_sha256 and step_on_dt present): step_on 2460 points, 0 fails (py) / 0 non-pass (rust), 0 verdict mismatches; step_off 615 points, 0 / 0, 0 mismatches. Max |err| diff py vs rust 5.0e-8 (print precision).
 - Per-field summary (max err/bound): step_on temperature_c 0.100, liquid_moisture 0.047, v_liquid 0.075; step_off temperature_c 0.096.
 - Scratch: `.development/27.4.1/` (py_step_on.json, py_step_off.json, crosscheck.py). No criteria or fixture edits.
+
+## 27.5.1
+
+- Docs only, uncommitted. Edited `planning/master/M6_VAPOR_COVERAGE.md` (3 rows plus header), `planning/GOALS.md` (G22.4 moved to Circled with open items; Source State line), created `planning/master/M6_VAPOR_G22_4_ACCEPTANCE.md`. Micro-TODO: `planning/tasks/27.5.1.todo.md`.
+- Decisions: nonuniform T accepted with exceptions; ConVh resolved by removal; sink/root rejected with triggers (audit labels (a)-(d)).
+- G22.4 stays Circled (closure is the user's). Open: (1) Rust time-step controller on step_on untested; (2) step_off has no balance check.
+- `git diff --check` clean; changed paths limited to the listed docs.
