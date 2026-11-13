@@ -1,5 +1,6 @@
 """Focused parser and format tests for the full vapor reference producer."""
 import io
+import json
 import unittest
 from contextlib import redirect_stderr
 from pathlib import Path
@@ -124,6 +125,49 @@ class CaseSelectionTests(unittest.TestCase):
             for state in ("on", "off"):
                 self.assertIn(f"vapor_heatbc_{pair}_{state}", called)
         self.assertIn("vapor_dry_off_control", called)
+
+
+class NonuniformStepTests(unittest.TestCase):
+    STEP = ("vapor_nonuniform_step_on", "vapor_nonuniform_step_off")
+    TEMPLATE = {"vapor_nonuniform_step_on": "vapor_dry_thermal_gradient", "vapor_nonuniform_step_off": "vapor_dry_off_control"}
+
+    def test_step_profile_is_45_then_5_at_node_20(self):
+        rows = [f for f in (line.split() for line in (vapor.CASES / "vapor_nonuniform_step_on/PROFILE.DAT").read_text().splitlines()[4:]) if len(f) == 10]
+        self.assertEqual(len(rows), 41)
+        temps = {int(r[0]): float(r[-1]) for r in rows}
+        self.assertTrue(all(temps[n] == 45.0 for n in range(1, 21)))
+        self.assertTrue(all(temps[n] == 5.0 for n in range(21, 42)))
+
+    def test_step_decks_match_dry_templates(self):
+        for case in self.STEP:
+            template = self.TEMPLATE[case]
+            self.assertEqual((vapor.CASES / case / "SELECTOR.IN").read_bytes(), (vapor.CASES / template / "SELECTOR.IN").read_bytes(), case)
+            self.assertEqual((vapor.CASES / case / "LEVEL_01.DIR").read_bytes(), (vapor.CASES / template / "LEVEL_01.DIR").read_bytes(), case)
+            self.assertEqual((vapor.CASES / case / "PROFILE.DAT").read_text().splitlines()[:5], (vapor.CASES / template / "PROFILE.DAT").read_text().splitlines()[:5], case)
+
+    def test_step_fixture_ids_match_directories(self):
+        for case in self.STEP:
+            spec = json.loads((vapor.CASES / case / "fixture.json").read_text())
+            self.assertEqual(spec["case_id"], case)
+            self.assertEqual(spec["runner"]["data_prefix"], case)
+
+    def test_accepts_step_cases_and_existing_ids(self):
+        base = str(vapor.ROOT / ".development/27.2.1/unit-test-never-created")
+        for cases in (self.STEP, (*self.STEP, "vapor_thermal_gradient", "vapor_dry_off_control")):
+            argv = [a for c in cases for a in ("--case", c)] + ["--build-dir", "unused", "--task-base", base]
+            with redirect_stderr(io.StringIO()), mock.patch.object(vapor, "run_case", side_effect=lambda c, *a: Path(c)), \
+                 mock.patch.object(Path, "mkdir"), mock.patch("builtins.print"):
+                self.assertEqual(vapor.main(argv), 0)
+
+    def test_all_lists_step_ids(self):
+        called = []
+        argv = ["--all", "--build-dir", "unused", "--task-base", CaseSelectionTests.BASE]
+        with mock.patch.object(vapor, "run_case", side_effect=lambda c, *a: called.append(c) or Path(c)), \
+             mock.patch.object(Path, "mkdir"), mock.patch("builtins.print"):
+            self.assertEqual(vapor.main(argv), 0)
+        for case in self.STEP:
+            self.assertIn(case, called)
+        self.assertIn("vapor_thermal_gradient", called)
 
 
 if __name__ == "__main__":

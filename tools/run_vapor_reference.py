@@ -183,6 +183,7 @@ def main(argv=None) -> int:
     cases = sorted(p.name for p in CASES.iterdir() if p.is_dir()) if args.all else args.case
     expected = {"vapor_isothermal_head_gradient", "vapor_thermal_gradient", "vapor_off_control", "vapor_dry_thermal_gradient", "vapor_dry_off_control"}
     expected |= {f"vapor_heatbc_{pair}_{state}" for pair in ("df", "dz", "fd", "ff", "fz") for state in ("on", "off")}
+    expected |= {f"vapor_nonuniform_step_{state}" for state in ("on", "off")}
     if not set(cases) <= expected:
         parser.error(f"cases must be a subset of: {', '.join(sorted(expected))}")
     args.task_base.mkdir(parents=True, exist_ok=False)
