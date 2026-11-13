@@ -98,7 +98,17 @@ _Filled in as each wave completes (commits, serial gate results, deviations)._
 - `python3 -m unittest discover -s tools`: 450 tests OK (baseline 447 + 3 producer tests from 26.2.1).
 - Note: the first clippy attempt ran on commit 9e3fbbb (pre-fix), which was replaced by 573f816 (same tree plus the clippy fix); the re-run above is on 573f816.
 
+## 26.4.1 (Rust candidate parity, in progress)
+- Worker: Haiku, worktree `agent-a4b02a8af1f3f57a6`, base `1f38cb1`. **Not committed.** Test file `crates/hydrus-core/tests/vapor_heat_boundary_parity.rs`.
+- Result: 10 of 11 pass. Failing row: `vapor_heatbc_fd_on`, `v_liquid`, t=240, node 37 (cand 4.156e-9, ref 3.630e-9, bound 3.50e-10, ratio 1.50). Other 204 rows of that field and all other fields/cases pass.
+- Ruled out: constant-dt schedule. Source runs constant 0.1 h (RUN_INF.OUT, 2400 steps, all Iter=2); schedule-matched run fails the same row (ratio 1.5018).
+- Ruled out: output formula. `observe_vapor` (Rust, output.rs:111-155) matches `NodOut` (OUTPUT.FOR:776-816) term by term; Fortran formula applied to Rust inputs reproduces the Rust value.
+- **Found: vapor-on head drift.** Rust head minus reference head: fd_on up to 5.70 cm at t=240; ff_on up to 4.41 cm. Vapor-off controls match to ~4e-9 cm. Temperature drift ~0.005 C. Head criterion (2% relative) still passes, so v_liquid is the field that exposes it. The drift is not in criteria v2/v3 and is not recorded in the G19 record.
+- Decision (user, 2026-11-13): **hold FD open; disclose the vapor-on head drift.** FD is not accepted and not rejected. Start a src-level investigation of the vapor-coupled water step (`heat/vapor/water.rs`, `heat/vapor/adjust.rs`) as a separate task. No tolerance widened. Criteria v3 unchanged.
+- Test file stays uncommitted: the default suite currently fails on `heatbc_fd_on` and must not be committed as a red gate.
+
 ## Open execution blockers / discoveries
 
+- **FD blocker (open):** vapor-on head drift up to 5.7 cm at t=240 (FD), 4.4 cm (FF). Causes v_liquid miss in FD. FD held open pending a src investigation of the vapor-coupled water step. FF also carries the drift; its v_liquid passes by margin, so FF's acceptance needs the same disclosure.
 - Provisional accepted-form set in 26.3.1 depends on the Wave 1 audit and the Wave 2 evidence; confirm at Phase 6.
 - Hazard H1: if a negative `kTopT` code other than `-1` is reachable, Rust's all-negative-is-flux mapping is unfaithful for vapor. Must be settled in 26.1.1.
