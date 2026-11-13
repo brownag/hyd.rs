@@ -6,6 +6,10 @@
 
 use std::fmt;
 
+/// Negative `kTopT` codes accepted with vapor. Only -1 has the TEMPER.FOR:255
+/// vapor storage term. Change this (and only this) in 26.6.1.
+pub(crate) const VAPOR_ACCEPTED_NEGATIVE_TOP_CODES: &[i32] = &[-1];
+
 /// Typed rejection for configurations outside the M6 heat-only selection.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum HeatConfigError {
@@ -175,11 +179,13 @@ impl HeatConfig {
             if input.campbell {
                 return Err(HeatConfigError::VaporSelectionNotSupported { name: "iCampbell" });
             }
-            if input.k_top_t <= 0 {
+            // kTopT == 0 is unassigned in source (H3); other negative top codes
+            // lack the TEMPER.FOR:255 storage term. kBotT: the source tests only
+            // the sign (TEMPER.FOR:220), so every nonzero bottom code is accepted.
+            let top_accepted =
+                input.k_top_t > 0 || VAPOR_ACCEPTED_NEGATIVE_TOP_CODES.contains(&input.k_top_t);
+            if !top_accepted {
                 return Err(HeatConfigError::VaporSelectionNotSupported { name: "kTopT" });
-            }
-            if input.k_bot_t <= 0 {
-                return Err(HeatConfigError::VaporSelectionNotSupported { name: "kBotT" });
             }
             if !input.t_period.is_finite() || input.t_period != 0.0 {
                 return Err(HeatConfigError::VaporSelectionNotSupported { name: "tPeriod" });

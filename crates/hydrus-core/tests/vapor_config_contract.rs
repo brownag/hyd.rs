@@ -60,10 +60,7 @@ fn rejects_each_excluded_heat_and_vapor_selector() {
     h.campbell = true;
     cases.push(VaporConfigInput { heat: h, ..input() });
     let mut h = heat();
-    h.k_top_t = -1;
-    cases.push(VaporConfigInput { heat: h, ..input() });
-    let mut h = heat();
-    h.k_bot_t = 0;
+    h.k_top_t = -2;
     cases.push(VaporConfigInput { heat: h, ..input() });
     let mut h = heat();
     h.l_en_bal = true;
