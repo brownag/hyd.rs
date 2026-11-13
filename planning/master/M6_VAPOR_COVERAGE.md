@@ -14,7 +14,7 @@ Accepting G19 does not complete G22.
 | Enhancement on (`iEnhanc=1`) | Planned | Unchanged full-executable default | Accepted (first increment) |
 | Enhancement off (`iEnhanc=0`) | Rejected | Kernel harness can select it; full executable cannot via input. Decide evidence strategy before implementation | Rejected; deferred to G22 |
 | Constant Dirichlet heat at both ends | Planned | Initial supported boundary pair | Accepted (first increment) |
-| Heat flux top / bottom and supported pairs | Accepted (DF, DZ, FF, FZ) with exceptions; FD held | Audit `TempAdj:255` integer-code distinction; fixtures; parity; balance (zero flux only) | See [M6_VAPOR_HEAT_BOUNDARY_ACCEPTANCE.md](M6_VAPOR_HEAT_BOUNDARY_ACCEPTANCE.md). FD held open: vapor-on head drift. `kTopT<-1` rejected with trigger |
+| Heat flux top / bottom and supported pairs | Accepted (DF, DZ, FF, FZ, FD) with exceptions | Audit `TempAdj:255` integer-code distinction; fixtures; parity; balance (zero flux only) | See [M6_VAPOR_HEAT_BOUNDARY_ACCEPTANCE.md](M6_VAPOR_HEAT_BOUNDARY_ACCEPTANCE.md). FD accepted with a failing v_liquid row and a disclosed vapor-on head drift (user decision 2026-11-13). `kTopT<-1` rejected with trigger |
 | Zero-gradient heat bottom | Accepted (DZ, FZ) | Source has no vapor term at `kBotT==0` (H2); fixtures, parity, balance | Accepted; see acceptance doc |
 | Sinusoidal top temperature | Rejected | Contract periodic forcing, source precision and fixtures | Rejected; deferred to G22 |
 | `kTopT=0` | Invalid/unsupported (kept rejected, H3) | Source has no assigned heat row; not a promised valid capability | Invalid/unsupported; not a deferred capability |

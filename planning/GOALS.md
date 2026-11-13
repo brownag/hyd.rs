@@ -1,15 +1,11 @@
 # Project Goals (`planning/GOALS.md`)
 
-Last Updated: 2026-11-12
+Last Updated: 2026-11-13
 Source State: [STATE_25.md](STATE_25.md)
 
 ## Circled Goal (Active)
 
-- **[G22.1]** The heat top-boundary forms that G20 and atmospheric switching both need are audited, contracted and accepted or rejected for the vapor path: `TempAdj:255` integer-code distinction, heat flux top/bottom and supported heat-boundary pairs with vapor, and the zero-gradient bottom gap.
-  - Why now: G20 (surface energy) and atmospheric switching both require a top energy/flux boundary; every such row is currently rejected. This audit is the first bounded step that unblocks them, and it can finish without the meteorological input path.
-  - Exit criteria: for each heat boundary form (top flux, bottom flux, supported pairs, zero-gradient bottom) a contract entry in [M6_VAPOR_CONTRACT.md](master/M6_VAPOR_CONTRACT.md); a source audit note citing `TempAdj` lines; either a discriminating fixture plus Rust-vs-Fortran comparison and an independent balance check, or an explicit rejection with a named trigger. Coverage rows in [M6_VAPOR_COVERAGE.md](master/M6_VAPOR_COVERAGE.md) updated. No rejected row silently flipped to accepted.
-  - First action: read `TempAdj` in `src_reference/` around the integer-code selector (`TempAdj:255` per the coverage matrix) and record which codes map to which heat row, with line citations, in a new section of the vapor contract.
-  - Status (2026-11-13): **Circled, partially complete.** DF, DZ, FF, FZ accepted with exceptions; FD held open (vapor-on head drift, not yet explained); `kTopT<-1` rejected with trigger; `kTopT=0` invalid; sinusoidal rejected. Remaining: FD and the FF conditional acceptance, both blocked on the vapor-coupled water step investigation. See [M6_VAPOR_HEAT_BOUNDARY_ACCEPTANCE.md](master/M6_VAPOR_HEAT_BOUNDARY_ACCEPTANCE.md).
+_No active circled goal. G22.1 completed 2026-11-13 with exceptions._
 
 ## Sequenced Goals (Dependency DAG)
 
@@ -47,6 +43,9 @@ Source State: [STATE_25.md](STATE_25.md)
 
 ## Completed
 
+- **[G22.1]** Heat top/bottom boundary forms with vapor audited, contracted and accepted or rejected with triggers, recorded in [M6_VAPOR_HEAT_BOUNDARY_ACCEPTANCE.md](master/M6_VAPOR_HEAT_BOUNDARY_ACCEPTANCE.md).
+  - Result (2026-11-13): **complete with exceptions** (user decision). DD (existing), DF, DZ, FF, FZ and FD accepted; `kTopT<-1` rejected with trigger; `kTopT=0` invalid; sinusoidal top rejected.
+  - Exceptions: FD has one `v_liquid` row failing its frozen bound (1.50x at t=240, node 37). FD and FF both carry an unexplained vapor-on head drift (5.70 and 4.41 cm absolute at t=240). The mechanism is not identified; see the acceptance doc for ruled-out causes and the proof plan. Criteria v3 are unchanged.
 - **[G19]** Vapor flow is added to the coupled heat capability: `lVapor` terms (`TempAdj`, `ConVapor`, `VaporContent`, `ConVh`, vapor output `NOD_INF_V.OUT`) are implemented with explicit coupling contracts, rejected combinations preserved until supported, provenance-backed fixtures, and capability-specific validation.
   - Result (2026-11-12): **complete with exception** for the bounded first increment. Recorded in [M6_VAPOR_ACCEPTANCE.md](master/M6_VAPOR_ACCEPTANCE.md) (contract [M6_VAPOR_CONTRACT.md](master/M6_VAPOR_CONTRACT.md), [coverage](master/M6_VAPOR_COVERAGE.md)).
   - Exception: 18 isothermal `v_vapor`/`v_vap_term` rows fail criteria v2 against the pinned fixture; explained by source single-precision `TempN` ([diagnosis](master/M6_VAPOR_PRECISION_DIAGNOSIS.md)) and not claimed as matched. Vapor content evidence is pinned-kernel only; wet fixtures do not discriminate head/moisture/temperature. Restricted to the first-increment selection.

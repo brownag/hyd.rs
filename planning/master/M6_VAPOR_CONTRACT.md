@@ -342,3 +342,11 @@ Changing any value above requires a new user approval.
 
 
 Acceptance status and per-form decisions: [M6_VAPOR_HEAT_BOUNDARY_ACCEPTANCE.md](M6_VAPOR_HEAT_BOUNDARY_ACCEPTANCE.md). FD is held open; accepted forms are DF, DZ, FF and FZ, with exceptions recorded there.
+
+
+## Heat-boundary forms with vapor (orchestration 26)
+
+- `kTopT == -1` (top flux) and `kBotT == -1` (bottom flux) are accepted with vapor. `kBotT == 0` (zero-gradient) is accepted and adds no vapor term (`TEMPER.FOR:220-232`). Pairs DF, DZ, FF, FZ and FD are accepted; FD and FF carry a disclosed vapor-on head drift.
+- `kTopT < -1` is rejected: the storage term at `TEMPER.FOR:255` is omitted for these codes. Trigger: a reference case plus a source decision.
+- `kTopT == 0` is invalid. Sinusoidal top is rejected.
+- Decisions and exceptions: [M6_VAPOR_HEAT_BOUNDARY_ACCEPTANCE.md](M6_VAPOR_HEAT_BOUNDARY_ACCEPTANCE.md).

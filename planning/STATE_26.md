@@ -146,6 +146,7 @@ _Filled in as each wave completes (commits, serial gate results, deviations)._
   - Result: single-precision storage of head, temperature or vapor velocity does not explain the FD drift.
 - **M2 boundary rows (2026-11-13, read-only on the committed candidate JSON `attempt-20261113T054631Z`).** End-node head error is 0 at every time. End-node `v_liquid` error is at most 7.7e-11 at t=240 (bound 3.5e-10). Vapor fields at the ends agree to 1e-9 or better. Refuted: the boundary rows do not carry the drift. The drift is interior (nodes 2-5 at the largest).
 - **Discrepancy resolved:** the 5.70 cm (audit) and 4.34 cm (test line) figures come from the same run and differ only in the metric (see note above).
+- **Decision (user, 2026-11-13):** accept FD and FF with the drift disclosed, since no mechanism is identified. Acceptance doc and GOALS updated; G22.1 completed with exceptions. Criteria v3 unchanged.
 - **Still open:** the cause of the FD interior head drift. M1, M2, M3a, M3b, M3c and M5 (not run) are ruled out or negligible. The ranked hypotheses in the audit's "spatially patterned temperature error" class remain untested. FD stays held. FF's acceptance stays conditional on the same disclosure.
 
 ## Open execution blockers / discoveries
