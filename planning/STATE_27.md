@@ -93,3 +93,15 @@ _Empty at planning. Any unlisted work goes here and waits for approval._
 - Row (a) keeps its trigger text (a sink-only, vapor-on case with `SinkF=1, lRoot=0`, after the `Beta` source is confirmed and an explicit balance criterion is approved).
 - Rows (b)–(d) keep their triggers as written in the sink/root audit.
 - 27.5.1 handoff: record these as rejected-with-trigger in `M6_VAPOR_COVERAGE.md`.
+
+## 27.1.3 -- Nonuniform-temperature coverage audit (done, read-only)
+
+- Audit: `planning/master/M6_VAPOR_NONUNIFORM_T_AUDIT.md` (untracked). Micro-TODO: `planning/tasks/27.1.3.todo.md`. No fixture, producer edit, executable run, or commit.
+- Existing thermal cases: all iCampbell=0 and fixed-head both ends. Wet cases are uniform initial T (15 C or 25 C). Dry cases (`vapor_dry_thermal_gradient`, 10 `vapor_heatbc_*`) use a linear 45 to 5 C ramp.
+- Gap (M6 row 12): no non-linear initial T profile in any case, and no wet case with a nonuniform initial profile.
+- Proposed pair (orchestrator answers applied): `vapor_nonuniform_step_on` / `vapor_nonuniform_step_off`, dry h=-1e4 cm, step initial profile (nodes 1-20 at 45 C, 21-41 at 5 C), boundary 45/5 Dirichlet, fixed head, iCampbell=0.
+- Producer schema: expressible with no new field. Needs the `expected` set at `tools/run_vapor_reference.py:20-21` extended in 27.2.1, and the same LEVEL_01.DIR content as the dry case.
+- Fortran: `TempIn` at `INPUT.FOR:1205-1245`; `iCampbell` read at `:1223`; boundary record at `:1236`.
+- Resolved: kBotT=0 is the zero-gradient branch (`TEMPER.FOR:109-111`), so the "z" heatbc codes mean zero flux and tB is unused.
+- Risk: `vapor_thermal_gradient`, `vapor_off_control`, `vapor_isothermal_head_gradient` list LEVEL_01.DIR in fixture inputs but have no such file on disk or in git history; `run_case` copies it unconditionally (`:123`). Do not reuse those directories as templates.
+- Git: planning/STATE_27.md was already staged by another task; this append is unstaged and not committed.
