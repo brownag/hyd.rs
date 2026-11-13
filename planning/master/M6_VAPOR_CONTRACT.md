@@ -318,3 +318,24 @@ fixtures' documented omissions cannot simply carry over to this new evidence.
   dual porosity or boundary modes outside this increment.
 - Acceptance of proposed ADR 0021. It describes heat-only behavior; this contract
   adds a distinct vapor-aware selection without changing that historical scope.
+
+## Heat-boundary criteria v3 (approved 2026-11-12, GATE N1)
+
+Scope: the vapor heat-boundary pairs DF, DZ, FD, FF and FZ (orchestration 26).
+Approved by the user as proposed. Per-field tolerances in `fields` and `checks`
+are unchanged from v2. Only `discrimination` gains entries:
+
+- For each pair: head and temperature must differ between the vapor-on and
+  vapor-off fixtures at some print time after the initial time, at 2x the v2
+  tolerance (`any_print_time_after_initial`).
+- Liquid moisture discriminates at 2x for DF, DZ and FD. **FF and FZ moisture
+  do not reach 2x** (observed 0.0018 against a threshold of 0.0021). This is a
+  recorded exception, not a widened tolerance. Head and temperature carry
+  discrimination for FF and FZ.
+- Vapor fields (`con_vh`, `con_vt`, `v_vapor`, `v_vap_iso`, `v_vap_term`) must be
+  nonzero above the case zero floor for each on case. Their global maxima sit at
+  the initial-state node and are equal across pairs, so they do not discriminate
+  pairs. Pair-level differences are judged on full fields in the 26.4 evidence,
+  not on maxima.
+
+Changing any value above requires a new user approval.
