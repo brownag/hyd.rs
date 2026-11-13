@@ -124,6 +124,14 @@ _Filled in as each wave completes (commits, serial gate results, deviations)._
 - Scope: diagnosis first. Read `crates/hydrus-core/src/heat/vapor/water.rs`, `heat/vapor/adjust.rs`, `heat/vapor/driver.rs`, and the Fortran water/vapor coupling (`src_reference/` routines that update head with vapor).
 - Output: a diagnosis with a verified cause and evidence. Any src fix is a separate, later decision by the user.
 - Gate: FD stays held and FF's acceptance stays conditional until this is recorded.
+- **Result (2026-11-13, diagnosis only, no src change):**
+  - Driver machinery ruled out: with vapor terms zeroed, head matches the vapor-off fixture to 9e-12 cm.
+  - Single precision ruled out (f32 kernel changes t=240 error by ~0.02 cm).
+  - Pass-two time level: old-temperature swap is much worse (789 cm); uniform ±0.001/±0.005 C shifts do not reproduce the curve.
+  - Perturbation (±1e-4 per term): no single term reproduces the drift shape and magnitude. ConVh, ConVT and the water-row thermal term are very sensitive and non-monotone. Storage matches shape only at a magnitude too small. The drift needs a combined or spatially patterned error, most likely in the temperature field feeding the thermal terms.
+  - Open: spatially patterned temperature error; commit-time vapor content; boundary-row vapor terms; predictor swap.
+  - Note: the vapor-off control uses the legacy driver, so it does not test the vapor driver. The driver-machinery check above is what covers that.
+  - Diagnosis note: `planning/tasks/D-26.1.diagnosis.md`.
 
 ## Open execution blockers / discoveries
 
