@@ -339,3 +339,6 @@ are unchanged from v2. Only `discrimination` gains entries:
   not on maxima.
 
 Changing any value above requires a new user approval.
+
+
+Acceptance status and per-form decisions: [M6_VAPOR_HEAT_BOUNDARY_ACCEPTANCE.md](M6_VAPOR_HEAT_BOUNDARY_ACCEPTANCE.md). FD is held open; accepted forms are DF, DZ, FF and FZ, with exceptions recorded there.
