@@ -1050,7 +1050,7 @@ fn candidate_json(case: &str, c: &Candidate, criteria_sha: &str) -> Value {
     json!({
         "schema_version": "vapor-candidate-v1",
         "case_id": case,
-        "evidence_class": "candidate-rust",
+        "evidence_class": "rust-candidate",
         "criteria_sha256": criteria_sha,
         "requests_sha256": requests_sha256(case),
         "fixture_sha256": sha256_hex(&fixture_path),
