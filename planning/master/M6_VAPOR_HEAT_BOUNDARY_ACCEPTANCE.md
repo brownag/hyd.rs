@@ -2,8 +2,10 @@
 
 Status: **accepted with exceptions (2026-11-13, user decision).** DF, DZ, FF,
 FZ and FD (and existing DD) accepted for the heat-boundary increment, with the
-exceptions below. FD and FF carry an unexplained vapor-on head drift, which is
-disclosed and not resolved. Criteria v3 are unchanged. `kTopT < -1` rejected
+exceptions below. FD and FF carry a vapor-on head drift whose cause is identified:
+single-precision (REAL*4) arithmetic in the pinned reference's vapor-coupled solve
+(H7 precision class, proven 2026-11-13). It is recorded as a precision exception,
+not a Rust defect. Criteria v3 are unchanged. `kTopT < -1` rejected
 with a trigger. `kTopT == 0` invalid. Sinusoidal top rejected. G22.1 is
 Completed with these exceptions.
 
@@ -49,29 +51,23 @@ fixtures `cee7943`; config `a07cd92`; transport/adjust `573f816`; comparator
    drift is exposed only by `v_liquid`. Criteria v3 are not widened. Accepting
    FD is a user decision, not a passing criterion. The `v_liquid` row is
    recorded as a known failure.
-   - **Mechanism: not identified.** Ruled out (with evidence in
-     [STATE_26.md](../STATE_26.md)): driver machinery (vapor terms zeroed gives
-     head within 9e-12 cm of legacy); constant-dt schedule; single-precision
-     storage of head, temperature or vapor velocity (M3a/b/c, each changes the
-     t=240 maximum by under 0.01 cm); boundary rows (M2, end-node head error
-     zero). Not ruled out: spatially patterned temperature error in the
-     vapor-coupled water step (`heat/vapor/water.rs`, `heat/vapor/adjust.rs`).
-   - **How it would be proven:** an instrumented reference run that dumps
-     per-iteration head and temperature at nodes 2–5 for t=24–240, compared
-     with the same quantities from the Rust driver at the same step. A match
-     at the first step where the error appears would localise the cause. This
-     is follow-up work, not a condition of this acceptance.
-   - **Result (2026-11-13, [D-26.2_DRIFT_MECHANISM.md](D-26.2_DRIFT_MECHANISM.md)):
-     mechanism identified as single-precision (REAL*4) arithmetic in the pinned
-     reference's vapor-coupled solve.** The same Fortran source built with
-     `real*8` defaults agrees with the Rust driver to 5e-9 cm (head) and 5e-10 °C
-     (temperature) at every step for FD. The FD `v_liquid` row at node 37 agrees
-     to 1e-14 with the double build; the single-precision fixture differs by
-     5.3e-10, which is the 1.50× failure. The drift is a reference-precision
-     effect (H7 class), not a Rust defect. Criteria v3 are unchanged. Not yet
-     isolated: which REAL declaration amplifies the error. The choice of how to
-     record this (keep single-precision fixtures with an H7 exception, or add a
-     double-precision evidence class) is open and needs a user decision.
+   - **Mechanism: identified (2026-11-13,
+     [D-26.2_DRIFT_MECHANISM.md](D-26.2_DRIFT_MECHANISM.md)).** Single-precision
+     (REAL*4) arithmetic inside the pinned reference's vapor-coupled solve. The
+     same Fortran source built with `real*8` defaults agrees with the Rust driver
+     to 5e-9 cm (head) and 5e-10 °C (temperature) at every step for FD. The
+     single-precision fixture differs from that double build by the 5.70 cm drift.
+     The FD `v_liquid` row at node 37 agrees to 1e-14 with the double build; the
+     fixture differs by 5.3e-10, which is the 1.50× failure. Ruled out earlier
+     (with evidence in [STATE_26.md](../STATE_26.md)): driver machinery, constant-dt
+     schedule, boundary rows, and Rust-side storage rounding (M2, M3a–c). The
+     earlier D-26.1 claim that single precision was ruled out was wrong; that test
+     did not change the reference arithmetic.
+   - **Not isolated:** which REAL declaration amplifies the error. Not required
+     for this acceptance.
+   - **Evidence class:** the fixtures stay single-precision reference evidence.
+     The Rust candidate is compared against them with the unchanged v3 criteria.
+     The double-precision build is diagnostic only, not a new evidence class.
 2. **FF carries the same head drift** (4.41 cm at t=240, absolute). Its
    `v_liquid` passes by margin. FF is accepted with the same disclosure. If the
    drift is found to be a real bug, FF and FD must be re-opened.
@@ -104,8 +100,9 @@ fixtures `cee7943`; config `a07cd92`; transport/adjust `573f816`; comparator
 - Vapor-on head agreement with the reference beyond the head criterion.
 - Acceptance of proposed ADR 0021.
 
-## Follow-up (outside this acceptance)
+## Follow-up (optional, outside this acceptance)
 
-Instrumented per-iteration comparison of the vapor-on head drift described in
-exception 1. Its outcome may re-open FD and FF. It is not required to keep this
-acceptance in force.
+- Isolate the amplifying REAL declaration (mixed-precision build of the
+  vapor-coupled arrays). Diagnostic only.
+- Decide whether to add a double-precision reference evidence class with new
+  fixtures and a separate criteria decision. Not required for this acceptance.
