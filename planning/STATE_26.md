@@ -117,6 +117,14 @@ _Filled in as each wave completes (commits, serial gate results, deviations)._
 - Deviation: 25.7.1 test hardcoded criteria SHA of v2; bumped to v3 hash in `94967be` (values of existing fields unchanged; approved change). All 10 parity tests pass again.
 - **Final serial gate (HEAD `94967be`):** build exit 0; Rust 607 passed / 0 failed / 3 ignored; fmt exit 0; clippy exit 0; Python 459 OK. Baseline was 584 / 447.
 
+## Discovered
+
+### D-26.1 Vapor-coupled head drift (approved by user 2026-11-13)
+- Goal: find the cause of the vapor-on head drift against the Fortran reference (FD 5.7 cm, FF 4.4 cm at t=240; vapor-off controls match to ~4e-9 cm; temperature ~0.005 C).
+- Scope: diagnosis first. Read `crates/hydrus-core/src/heat/vapor/water.rs`, `heat/vapor/adjust.rs`, `heat/vapor/driver.rs`, and the Fortran water/vapor coupling (`src_reference/` routines that update head with vapor).
+- Output: a diagnosis with a verified cause and evidence. Any src fix is a separate, later decision by the user.
+- Gate: FD stays held and FF's acceptance stays conditional until this is recorded.
+
 ## Open execution blockers / discoveries
 
 - **FD blocker (open):** vapor-on head drift up to 5.7 cm at t=240 (FD), 4.4 cm (FF). Causes v_liquid miss in FD. FD held open pending a src investigation of the vapor-coupled water step. FF also carries the drift; its v_liquid passes by margin, so FF's acceptance needs the same disclosure.
