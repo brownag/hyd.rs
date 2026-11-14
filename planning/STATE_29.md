@@ -7,15 +7,15 @@ Plan: [EXECUTION_PLAN_29.md](EXECUTION_PLAN_29.md). Goal: [GOALS.md](GOALS.md) G
 
 | Suite | Command | Result |
 |---|---|---|
-| Build | `cargo build --workspace --locked` | pending |
-| Rust | `cargo test --workspace --no-fail-fast` | pending (expected 620 passed, 0 failed, 4 ignored) |
-| Format | `cargo fmt --all -- --check` | pending |
-| Clippy | `cargo clippy --workspace --all-targets -- -D warnings` | pending |
-| Python | `python3 -m unittest discover -s tools -p 'test_*.py'` | pending (expected 479 OK) |
+| Build | `cargo build --workspace --locked` | pass |
+| Rust | `cargo test --workspace --no-fail-fast` | pass: 620 passed, 0 failed, 4 ignored |
+| Format | `cargo fmt --all -- --check` | pass |
+| Clippy | `cargo clippy --workspace --all-targets -- -D warnings` | pass |
+| Python | `python3 -m unittest discover -s tools -p 'test_*.py'` | pass: 479 OK |
 
 ## Gates
 
-- [ ] Wave 0 baseline green.
+- [x] Wave 0 baseline green (2026-11-14, HEAD d4b44f4).
 - [ ] GATE 29.1 (user): fixture design, deck choice, guard shape. Decision: pending.
 - [ ] GATE 29.2 (user): fixture and balance evidence against the exit criterion. Decision: pending.
 
@@ -23,7 +23,7 @@ Plan: [EXECUTION_PLAN_29.md](EXECUTION_PLAN_29.md). Goal: [GOALS.md](GOALS.md) G
 
 | Wave | Task | Title | Status |
 |---|---|---|---|
-| 0 | — | Commit plan; baseline | pending |
+| 0 | — | Commit plan; baseline | done |
 | 1 | 29.1.1 | Fortran closed-pair deck and fixture design | pending |
 | 1 | 29.1.2 | Rust design for vapor-aware flux rows and typed guard | pending |
 | — | GATE 29.1 | Design approval | pending |
