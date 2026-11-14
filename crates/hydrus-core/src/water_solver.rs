@@ -7,7 +7,9 @@ use crate::heat::vapor::water::{
     assemble_water_rows, phase_velocities, vapor_lower_flux_row, vapor_upper_flux_row,
     PhaseVelocityInput, VaporWaterRowsInput,
 };
-use crate::heat::vapor::{VaporError, VaporPrimitiveInput, VaporWaterContext, VaporWaterTrial};
+use crate::heat::vapor::{
+    VaporBoundaryPair, VaporError, VaporPrimitiveInput, VaporWaterContext, VaporWaterTrial,
+};
 use crate::hydraulics::{
     arithmetic_face_conductivity, geometric_face_conductivity, nodal_control_volume_width,
     solve_tridiagonal_in_place, transform_boundary_row, BoundaryCondition, BoundaryRow,
@@ -214,13 +216,6 @@ fn source_h_sat(parameters: &crate::hydraulics::VanGenuchtenParameters) -> f64 {
     (-1.0 / alpha * (qee.powf(-1.0 / m) - 1.0).powf(1.0 / n)).max(-1.0e37)
 }
 
-/// Closed-pair fluxes `(lower, upper)` for the vapor trial; always `None` until
-/// the typed guard of task 29.2.2 classifies a closed flux/flux pair. A helper,
-/// not a literal, so the `Some` branch is not constant-folded away as dead code.
-fn closed_pair_fluxes() -> Option<(f64, f64)> {
-    None
-}
-
 /// Solves one uncommitted vapor-aware nonlinear water trial.
 ///
 /// Iteration semantics follow `WatFlow` (`WATFLOW.FOR:60-160`): `SetMat` mixes
@@ -244,6 +239,7 @@ pub(crate) fn solve_vapor_water_trial(
     context
         .config
         .validate_water_input(&input, state.time, policy)?;
+    let boundary_pair = VaporBoundaryPair::classify(input.lower, input.upper)?;
     let n = input.mesh.coordinates().len();
     for (name, values) in [
         ("temperature_estimate", context.temperature_estimate),
@@ -362,15 +358,18 @@ pub(crate) fn solve_vapor_water_trial(
             };
             let rows = assemble_water_rows(&rows_input)?;
             // Closed flux/flux pair (task 29.2.1): `(rBot, -rTop)`, both positive
-            // into the domain. No caller produces it until the typed guard in 29.2.2.
-            let closed_rows = match closed_pair_fluxes() {
-                Some((lower_flux_in, upper_flux_in)) => Some((
+            // Classified by `VaporBoundaryPair` (task 29.2.2).
+            let closed_rows = match boundary_pair {
+                VaporBoundaryPair::ClosedFlux {
+                    lower_flux: lower_flux_in,
+                    upper_flux: upper_flux_in,
+                } => Some((
                     lower_flux_in,
                     upper_flux_in,
                     vapor_lower_flux_row(&rows_input, input.face_averaging)?,
                     vapor_upper_flux_row(&rows_input, input.face_averaging)?,
                 )),
-                None => None,
+                VaporBoundaryPair::HeadHead => None,
             };
             let (upper_mode, lower_flux) = assemble(
                 &mut candidate_workspace,

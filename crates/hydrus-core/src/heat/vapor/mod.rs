@@ -208,23 +208,96 @@ impl VaporConfig {
                 });
             }
         }
-        match input.lower {
-            LowerBoundaryMode::FixedHead { head, row, flux } => {
-                validate_finite("lower head", head)?;
-                validate_finite("lower flux", flux)?;
-                validate_row("lower row", row.lower, row.diagonal, row.upper, row.rhs)?;
-            }
-            mode => return Err(VaporError::UnsupportedLowerBoundary(mode)),
-        }
-        match input.upper {
-            UpperBoundary::Head { head, row, flux } => {
-                validate_finite("upper head", head)?;
-                validate_finite("upper flux", flux)?;
-                validate_row("upper row", row.lower, row.diagonal, row.upper, row.rhs)?;
-            }
-            mode => return Err(VaporError::UnsupportedUpperBoundary(mode)),
-        }
+        VaporBoundaryPair::classify(input.lower, input.upper)?;
         Ok(())
+    }
+}
+
+/// Boundary pair accepted by the vapor water path.
+///
+/// lDensity is rejected in `VaporConfig::new` (`density_coupling`); iDualPor and
+/// lWTDep are rejected in `HeatConfig::new`. They are off by construction here.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) enum VaporBoundaryPair {
+    HeadHead,
+    /// Closed flux/flux pair; fluxes are positive into the domain, unchanged.
+    ClosedFlux {
+        lower_flux: f64,
+        upper_flux: f64,
+    },
+}
+
+impl VaporBoundaryPair {
+    /// Classifies the endpoint modes. The caller's `Flux.row` is ignored (the
+    /// vapor builders supply the rows). No wildcard arm: a new variant on either
+    /// enum is a compile error here.
+    pub(crate) fn classify(
+        lower: LowerBoundaryMode,
+        upper: UpperBoundary,
+    ) -> Result<Self, VaporError> {
+        match (lower, upper) {
+            (
+                LowerBoundaryMode::FixedHead {
+                    head: lower_head,
+                    row: lower_row,
+                    flux: lower_flux,
+                },
+                UpperBoundary::Head {
+                    head: upper_head,
+                    row: upper_row,
+                    flux: upper_flux,
+                },
+            ) => {
+                validate_finite("lower head", lower_head)?;
+                validate_finite("lower flux", lower_flux)?;
+                validate_row(
+                    "lower row",
+                    lower_row.lower,
+                    lower_row.diagonal,
+                    lower_row.upper,
+                    lower_row.rhs,
+                )?;
+                validate_finite("upper head", upper_head)?;
+                validate_finite("upper flux", upper_flux)?;
+                validate_row(
+                    "upper row",
+                    upper_row.lower,
+                    upper_row.diagonal,
+                    upper_row.upper,
+                    upper_row.rhs,
+                )?;
+                Ok(Self::HeadHead)
+            }
+            (
+                LowerBoundaryMode::PrescribedFlux { flux: lower_flux },
+                UpperBoundary::Flux {
+                    flux: upper_flux, ..
+                },
+            ) => {
+                validate_finite("lower flux", lower_flux)?;
+                validate_finite("upper flux", upper_flux)?;
+                Ok(Self::ClosedFlux {
+                    lower_flux,
+                    upper_flux,
+                })
+            }
+            // Fixed-head lower with a non-head upper: today's upper rejection.
+            (
+                LowerBoundaryMode::FixedHead { .. },
+                UpperBoundary::Flux { .. } | UpperBoundary::Atmospheric { .. },
+            ) => Err(VaporError::UnsupportedUpperBoundary(upper)),
+            // Every other lower mode is rejected first, as today.
+            (
+                LowerBoundaryMode::PrescribedFlux { .. },
+                UpperBoundary::Head { .. } | UpperBoundary::Atmospheric { .. },
+            )
+            | (
+                LowerBoundaryMode::FreeDrainage | LowerBoundaryMode::Unsupported(_),
+                UpperBoundary::Head { .. }
+                | UpperBoundary::Flux { .. }
+                | UpperBoundary::Atmospheric { .. },
+            ) => Err(VaporError::UnsupportedLowerBoundary(lower)),
+        }
     }
 }
 
@@ -533,4 +606,92 @@ fn validate_row(
         validate_finite(name, value)?;
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod boundary_pair_tests {
+    use super::*;
+    use crate::hydraulics::BoundaryRow;
+    use crate::lower_boundary::UnsupportedLowerBoundaryMode;
+
+    fn row(d: f64) -> BoundaryRow {
+        BoundaryRow {
+            lower: 0.0,
+            diagonal: d,
+            upper: 0.0,
+            rhs: 0.0,
+        }
+    }
+    fn lowers() -> [LowerBoundaryMode; 5] {
+        [
+            LowerBoundaryMode::FixedHead {
+                head: 0.0,
+                row: row(1.0),
+                flux: 0.0,
+            },
+            LowerBoundaryMode::PrescribedFlux { flux: 0.5 },
+            LowerBoundaryMode::FreeDrainage,
+            LowerBoundaryMode::Unsupported(UnsupportedLowerBoundaryMode::SeepageFace),
+            LowerBoundaryMode::Unsupported(UnsupportedLowerBoundaryMode::WaterTable),
+        ]
+    }
+    fn uppers() -> [UpperBoundary; 3] {
+        [
+            UpperBoundary::Head {
+                head: 0.0,
+                row: row(1.0),
+                flux: 0.0,
+            },
+            UpperBoundary::Flux {
+                flux: -0.25,
+                row: row(2.0),
+            },
+            UpperBoundary::Atmospheric {
+                critical_head: -1.0,
+            },
+        ]
+    }
+
+    #[test]
+    fn classifies_pairs_and_rejects_all_others() {
+        for (i, lower) in lowers().into_iter().enumerate() {
+            for (j, upper) in uppers().into_iter().enumerate() {
+                let got = VaporBoundaryPair::classify(lower, upper);
+                match (i, j) {
+                    (0, 0) => assert_eq!(got, Ok(VaporBoundaryPair::HeadHead)),
+                    (1, 1) => assert_eq!(
+                        got,
+                        Ok(VaporBoundaryPair::ClosedFlux {
+                            lower_flux: 0.5,
+                            upper_flux: -0.25
+                        })
+                    ),
+                    (0, _) => assert_eq!(got, Err(VaporError::UnsupportedUpperBoundary(upper))),
+                    _ => assert_eq!(got, Err(VaporError::UnsupportedLowerBoundary(lower))),
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn flux_row_is_ignored_and_nonfinite_rejected() {
+        let lower = LowerBoundaryMode::PrescribedFlux { flux: 1.0 };
+        let a = UpperBoundary::Flux {
+            flux: 2.0,
+            row: row(1.0),
+        };
+        let b = UpperBoundary::Flux {
+            flux: 2.0,
+            row: row(f64::NAN),
+        };
+        assert_eq!(
+            VaporBoundaryPair::classify(lower, a),
+            VaporBoundaryPair::classify(lower, b)
+        );
+        let bad = UpperBoundary::Flux {
+            flux: f64::NAN,
+            row: row(1.0),
+        };
+        assert!(VaporBoundaryPair::classify(lower, bad).is_err());
+    }
 }
