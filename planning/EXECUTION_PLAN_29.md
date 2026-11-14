@@ -100,8 +100,23 @@ Max two workers in parallel. Waves 2 and 3 touch disjoint files (see task specs)
 - **Spec.** Add `VaporBoundaryPair { HeadHead, ClosedFlux { lower_flux, upper_flux } }` and `classify` per design section 6. Rules: `(FixedHead, Head)` keeps today's checks; `(PrescribedFlux, Flux)` gives `ClosedFlux` after finite checks; every other combination returns the existing `Unsupported*` error. Use an exhaustive match with no wildcard. Assert lDensity, iDualPor and lWTDep off on the vapor path (GATE 29.1 item C). The caller's `Flux.row` is ignored on the vapor path, and a test proves it.
 - **Acceptance.** New guard tests: every non-pair combination still returns its `Unsupported*` error; head/head and closed-pair classify correctly; `Flux.row` ignored. `cargo test -p hydrus-core --test vapor_heat_transport`, `--test vapor_state` and `--test vapor_driver_order` pass unchanged. `git diff --name-only` lists only the must-edit files and planning paths.
 
-### 29.3.1, 29.3.2 — Balance check, and deck and fixture generation (wave 3)
-Specs are written after wave 2 closes. Wave 3 includes the runner and comparator whitelist amendment and the nonzero-flux deck (approved, GATE 29.1). Criteria entries are decided at GATE 29.2 (D5).
+### 29.3.1 — Closed-pair column balance check, vapor on (Rust)
+- **Files in scope.** *Can create only:* `crates/hydrus-core/tests/vapor_closed_pair_balance.rs`; `planning/tasks/29.3.1.*`. *Read only:* `crates/hydrus-core/tests/vapor_boundary_guard.rs` (to reuse setup), `crates/hydrus-core/src/heat/vapor/mod.rs` (public entrypoints), `water_solver.rs` (trial entrypoint only). *Not in scope:* any src edit, `criteria.json`, fixtures.
+- **Spec.** One integration test drives the closed flux/flux pair with vapor on through the public vapor path and checks column conservation: integrated (liquid + vapor) storage change over a step equals the imposed net flux `(rBot - rTop)·dt` (positive-in convention, design section 6), within a tolerance stated in the test. Add a control: the same run with `Flux`=0 at both ends conserves storage exactly (flux term vanishes). Use only public or `pub(crate)`-visible entrypoints already used by existing tests; if none exists, STOP and report.
+- **Acceptance.** `cargo test -p hydrus-core --test vapor_closed_pair_balance` passes; `git diff --name-only` empty; `git status --short` shows only the new test file and planning paths.
+
+### 29.3.2 — Closed-pair decks and runner whitelist (no run)
+- **Files in scope.** *Must edit:* `tools/run_vapor_reference.py` (case whitelist, `:184-186`), `tools/compare_vapor_reference.py` (case binding only, as needed for the new cases), the matching tests under `tools/` for the whitelist. *Can create:* four decks under `reference/vapor_fortran/cases/` named in GATE 29.1 (`vapor_closed_flux_on`, `vapor_closed_flux_off`, `vapor_flux_known_on`, `vapor_flux_known_off`), each with `SELECTOR.IN`, `PROFILE.DAT` and the design's `README` fragment; `planning/tasks/29.3.2.*`. *Not in scope:* `criteria.json`, existing fixtures, `src_reference/`, `reference/vapor_fortran/README.md` beyond a single pointer line.
+- **Spec.** Build the four decks from `vapor_dry_thermal_gradient` and `vapor_dry_off_control` as the design (`planning/master/M6_VAPOR_CLOSED_PAIR_FIXTURE_DESIGN.md`) specifies. Add them to the runner whitelist. The on/off pairs differ only in `lVapor`. Do not generate fixtures. Do not write criteria (D5).
+- **Acceptance.** Python tests for the runner whitelist pass: `python3 -m unittest tools.test_run_vapor_kernel_reference` (or the nearest existing runner test module; name it in the report). `python3 tools/run_vapor_reference.py --help` exits 0. `git diff --name-only` shows only the must-edit tools files and planning paths.
+
+### 29.3.3 — Reference run, fixtures and Rust comparison (no criteria change)
+- **Depends on:** 29.3.1 and 29.3.2 committed. Reference build staged and built under `.development/` per `reference/fortran_reference/README.md`.
+- **Spec.** Stage and build the reference (`tools/stage_fortran_reference.py`, `tools/build_fortran_reference.sh`). Run the four new cases with `tools/run_vapor_reference.py --case ...`. Write fixtures to `reference/vapor_fortran/fixtures/` (new files only; the runner refuses to overwrite). Run the Rust comparison with `tools/compare_vapor_reference.py` against the existing criteria only. Report each field's worst err/bound and each on/off discrimination result. No criteria or threshold edits: any new entry is a GATE 29.2 item (D5).
+- **Acceptance.** Four new fixture files exist with manifest hashes; comparison output recorded verbatim in the task report; `git diff --name-only` shows no tracked file outside the fixtures directory and planning paths.
+
+### GATE 29.2 (user) — decided when 29.3.3 reports
+Accept or reject the closed-pair fixture and balance evidence against the exit criterion, and approve or reject any proposed D5 criteria entries (discrimination and nonzero) with their evidence.
 
 ## Notes
 
