@@ -50,15 +50,26 @@ water-row, driver-order and balance tests were unchanged by it (STATE_27, 27.3.3
 
 ## Exceptions and disclosures
 
-1. **Rust time-step controller on step_on is untested (open).** Fortran fails its
-   first dt = 0.1 attempt, retries at dt/3 and keeps dt/3 for 7200 steps. Rust
-   converges at dt = 0.1 on later steps; at constant 0.1 it misses 147 of 2460
-   rows (up to about 87x bound in `v_liquid`, worst at 45/5 C step nodes 17-22).
-   The parity result holds only under the Fortran-chosen schedule; it does not
-   show that Rust's own controller reproduces the reference. Diagnosis:
-   `M6_VAPOR_NONUNIFORM_PARITY_MISS_DIAGNOSIS.md`. Not a criteria change.
-2. **step_off has no balance check (open).** The vapor balance helper refuses
-   `lVapor=f` (`UnsupportedBoolean`) and there is no heat-only balance helper.
+1. **Rust time-step controller (partly closed; decision open).** Fortran fails its
+   first dt = 0.1 attempt, retries at dt/3 and keeps dt/3 for 7200 steps. An
+   opt-in controller now ports the Fortran `TmCont` rule (`4804a0d`, in
+   `heat/vapor/driver.rs`). Driven through it, step_on reproduces the Fortran
+   step sequence on 7190 of 7200 steps, and all four print-time landings match
+   (`0fdc1f9`). The last 10 steps are the final landing on t = 240: Fortran
+   computes that split in single precision and prints `0.33332E-01`, while Rust
+   uses f64 (about 4e-5 relative). That check is `#[ignore]`d with the reason
+   recorded; the tolerance was not widened. The default loop is still
+   schedule-driven, so the parity result is unchanged by this work. Retries
+   restart both passes rather than retrying inside each WatFlow call (documented).
+   Diagnosis: `M6_VAPOR_TIMESTEP_CONTROLLER_DIAGNOSIS.md`. Not a criteria change.
+2. **step_off balance (heat side checked; water diagnostic only).** A test-local
+   heat-only interior row check (`34e987d`) passes on every accepted step of
+   `vapor_nonuniform_step_off` at dt 0.1, worst ratio 4.0e-7 against bound 1.0,
+   with bounds from `criteria.json` `heat_balance_interior`. The water balance
+   for this case is not asserted: the `water_balance_interior` criteria form does
+   not reproduce for it, so only the continuum residual is printed (finite).
+   Asserting it needs a user-approved bound. Assessment:
+   `M6_VAPOR_STEP_OFF_BALANCE_ASSESSMENT.md`.
 3. **Precision (H6).** No new precision-limited rows were observed; none are
    claimed. Criteria v3 were not widened.
 4. **Dead parameters.** `_x_conv` and `_t_conv` of `gen_mat` remain after the
@@ -103,21 +114,20 @@ relaxation must touch both; no balance-closure claim for sink.
 
 ## Goal status
 
-G22.4 stays **Circled**. All three rows are decided, but the nonuniform
-acceptance rests on parity at the Fortran dt/3 schedule and on a balance check
-that covers only step_on. Closing it on this evidence would overstate it. The
-closure decision is the user's.
+G22.4 stays **Circled**. All three rows are decided. Both open items now have
+partial closure, but each still needs your decision.
 
 Closure triggers:
-- Controller: a user-approved test that runs Rust's own controller on step_on and
-  compares to the fixture, or an explicit decision to accept the schedule-driven
-  parity as sufficient.
-- step_off balance: a user-approved heat-only balance helper, or an explicit
-  acceptance of the gap.
+- Controller: decide whether the opt-in controller (`4804a0d`) closes item 1, or
+  whether the default loop must use it before closure. Either way the final
+  landing precision difference stays disclosed.
+- step_off balance: decide whether the heat-side check closes the gap, and
+  whether the water side needs a user-approved bound or stays a diagnostic.
 
 ## Not claimed
 
-- Rust controller behaviour on step_on; step_off balance closure.
+- That the default vapor loop uses the opt-in controller; step_off water balance closure.
+- Bit-level agreement at the final landing on step_on (f32 versus f64).
 - Any nonzero-sink or root-uptake behaviour with vapor.
 - Other nonuniform profile shapes, nonzero-flux boundaries, Campbell,
   enhancement off, G22.2, G22.3, G20, G23.
