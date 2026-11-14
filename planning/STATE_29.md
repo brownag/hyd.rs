@@ -17,7 +17,7 @@ Plan: [EXECUTION_PLAN_29.md](EXECUTION_PLAN_29.md). Goal: [GOALS.md](GOALS.md) G
 
 - [x] Wave 0 baseline green (2026-11-14, HEAD d4b44f4).
 - [x] GATE 29.1 (user, 2026-11-14): design approved as written, with lGeom implemented in wave 2 (not rejected). Wave 3 whitelist amendment approved. Criteria (D5) deferred to GATE 29.2.
-- [ ] GATE 29.2 (user): fixture and balance evidence against the exit criterion. Decision: pending.
+- [x] GATE 29.2 (user, 2026-11-14): exit criterion accepted as met for the closed flux/flux pair, with caveats (Rust trajectory comparison and full-trajectory Fortran balance open; criteria D5 not written; start -100 cm, not dry). G22.2 stays Circled.
 
 ## Wave board
 
@@ -30,7 +30,7 @@ Plan: [EXECUTION_PLAN_29.md](EXECUTION_PLAN_29.md). Goal: [GOALS.md](GOALS.md) G
 | 2 | 29.2.1 | Vapor-aware flux row builders | done (5af819d, ce6dde6) |
 | 2 | 29.2.2 | Lift rejection for closed pair only | done (4194d27, 2c56c2e) |
 | 3 | 29.3.1 | Column balance check | pending |
-| 3 | 29.3.2 | Deck and fixture generation and comparison | pending |
+| 3 | 29.3.2 | Decks and runner whitelist | done (5de3b20, 70350a5) |
 | — | GATE 29.2 | Exit criterion decision | pending |
 
 ## Wave gates
