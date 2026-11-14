@@ -25,7 +25,7 @@ Goal: [GOALS.md](GOALS.md) Circled goal G22.2. Coverage: [M6_VAPOR_COVERAGE.md](
 
 ## Gates
 
-- [ ] GATE W1 (user): disposition per water form after wave 1. Decision: pending.
+- [x] GATE W1 (user): disposition per water form after wave 1. Decision recorded 2026-11-13 (see below).
 
 ## Wave board
 
@@ -70,7 +70,18 @@ Max two workers in parallel. The orchestrator owns shared state and the serial g
 
 **Decision requested at GATE W1 (user).** Per form and pair: (i) reject with trigger, (ii) accept for orchestration 29 (implementation, fixture and balance check), or (iii) other. Also decide G7: accept "not established" as recorded, or direct a defect investigation.
 
-_Wave 2 (28.2.1) does not start until GATE W1 is answered._
+### GATE W1 decision (user, 2026-11-13)
+
+- Free drainage, lower (`FreeD`): **accepted for orchestration 29** (implementation, fixture, balance check; bottom-row design must match `WATFLOW.FOR:211-229`).
+- Prescribed flux, upper (`KodTop=-1`) and lower (`KodBot=-1`): **both accepted for orchestration 29**; the closed flux-flux pair is the first candidate.
+- Seepage face (`SeepF`) and water table (`qDrain`): **rejected, triggers kept** as recorded above.
+- `qGWLF` (`KodBot=-7`), `TopInF`/`BotInF` (±3), atmospheric (G22.3): not in the answers. Recorded as the audit's disposition (`qGWLF` reject with trigger; ±3 reject with trigger; atmospheric G22.3, not decided here). Flag for the user to confirm at wave 2 close.
+- Pairs: follow the singles. Free-drainage pairs are accepted with free drainage; flux-with-`qGWLF` rejected.
+- G7: **recorded as not established.** No SD-007 entry now.
+
+G22.2 stays Circled: at least one form is accepted for orchestration 29.
+
+_Wave 2 (28.2.1) runs after this decision._
 
 ## Task reports
 
