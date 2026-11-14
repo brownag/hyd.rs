@@ -129,7 +129,7 @@ fn every_non_pair_combination_keeps_its_unsupported_error() {
             let got =
                 c.validate_water_input(&water_input(&mesh, &[0.0; 3], lower, upper), 0.0, policy());
             match (i, j) {
-                (0, 0) | (1, 1) => assert_eq!(got, Ok(()), "{lower:?} {upper:?}"),
+                (0, 0) | (1, 1) | (2, 1) => assert_eq!(got, Ok(()), "{lower:?} {upper:?}"),
                 (0, _) => assert_eq!(got, Err(VaporError::UnsupportedUpperBoundary(upper))),
                 _ => assert_eq!(got, Err(VaporError::UnsupportedLowerBoundary(lower))),
             }

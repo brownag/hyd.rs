@@ -281,6 +281,65 @@ pub fn vapor_lower_flux_row(
     finite_row(row, 0)
 }
 
+/// Bottom-node (index 0) free-drainage row and flux with vapor terms, `WATFLOW.FOR:202-228`.
+///
+/// Implements Option (a):
+/// - Liquid face conductivity `ConB` follows `averaging` (`WATFLOW.FOR:202-203`).
+/// - Gravity term `B = ConB * Grav` uses liquid conductivity only (`WATFLOW.FOR:205`).
+/// - Vapor head conductivity is added arithmetically to `ConB` (`WATFLOW.FOR:211`).
+/// - Free-drainage flux `rBot = -ConB * Grav` carries total conductivity (`WATFLOW.FOR:213`).
+/// - Nodal storage `F2 = Cap(1) * dx / dt` (`WATFLOW.FOR:214`).
+/// - Diagonal `RB = ConB / dxB + F2` and upper `SB = -ConB / dxB` (`WATFLOW.FOR:215-216`).
+/// - RHS includes liquid gravity term `B`, nodal storage, and liquid storage change (`WATFLOW.FOR:221`).
+/// - Thermal vapor conductivity adds `ConTB * (T[1] - T[0]) / dxB` (`WATFLOW.FOR:226,228`).
+/// - Vapor storage change subtracts `(ThVNew - ThVOld) * dx / dt` (`WATFLOW.FOR:228`).
+///
+/// Returns `(r_bot, row)`. `r_bot` is positive into the domain (negative for outward drainage).
+/// `r_bot` is not added to `row.rhs` here; pass `r_bot` as Neumann flux to `transform_boundary_row`,
+/// which adds it once to the RHS (`WATFLOW.FOR:221-222`).
+pub fn vapor_lower_free_drainage_row(
+    input: &VaporWaterRowsInput<'_>,
+    averaging: FaceAveraging,
+) -> Result<(f64, VaporWaterRow), VaporError> {
+    validate_boundary_input(input)?;
+    let dx_b = input.coordinates[1] - input.coordinates[0];
+    let half = dx_b / 2.0;
+    // WATFLOW.FOR:202-203: liquid face conductivity
+    let liquid = liquid_face(
+        input.liquid_conductivities[0],
+        input.liquid_conductivities[1],
+        averaging,
+    );
+    // WATFLOW.FOR:205: gravity term B evaluated with liquid conductivity before lVapor
+    let gravity_term = liquid * input.gravity;
+    // WATFLOW.FOR:211: ConB augmented with vapor head conductivity
+    let con_b = liquid
+        + face(
+            input.vapor.vapor_head_conductivities[0],
+            input.vapor.vapor_head_conductivities[1],
+        );
+    // WATFLOW.FOR:213: rBot evaluated with ConB containing vapor head conductivity (fRE=1.0)
+    let r_bot = -con_b * input.gravity;
+    // WATFLOW.FOR:214: storage term F2
+    let storage = input.effective_capacities[0] * half / input.timestep;
+    // WATFLOW.FOR:226: thermal vapor conductivity ConTB
+    let con_tb = face(
+        input.vapor.vapor_thermal_conductivities[0],
+        input.vapor.vapor_thermal_conductivities[1],
+    );
+    // WATFLOW.FOR:212, 215-216, 221, 228
+    let row = VaporWaterRow {
+        lower: 0.0,
+        diagonal: con_b / dx_b + storage,
+        upper: -con_b / dx_b,
+        rhs: gravity_term - input.sink[0] * half + storage * input.heads_new[0]
+            - (input.liquid_water_new[0] - input.liquid_water_old[0]) * half / input.timestep
+            + con_tb * (input.temperatures[1] - input.temperatures[0]) / dx_b
+            - (input.vapor_water_new[0] - input.vapor_water_old[0]) * half / input.timestep,
+    };
+    Ok((r_bot, finite_row(row, 0)?))
+}
+
 /// Top-node (index n-1) flux row with vapor terms, `WATFLOW.FOR:272-291`.
 ///
 /// `rTop` is positive out of the domain and enters as `PT=PT-rTop` (`:294`),
@@ -697,6 +756,66 @@ mod tests {
         assert_eq!(up.rhs, -2.0 - 12.0);
         let ar = vapor_lower_flux_row(&inp, FaceAveraging::Arithmetic).unwrap();
         assert_ne!(ar.upper, lo.upper);
+    }
+
+    #[test]
+    fn free_drainage_rbot_carries_convh_while_gravity_is_liquid_only() {
+        let f = fx([1.0, 3.0, 0.0], [0.0; 3]);
+        let (r_bot, r) =
+            vapor_lower_free_drainage_row(&input(&f, 1.0, &T0, &Z, &Z), FaceAveraging::Arithmetic)
+                .unwrap();
+        // liquid face 6.5, ConB = 6.5 + 2.0 = 8.5
+        // WATFLOW.FOR:205: B = ConB_liq * Grav = 6.5 * 1.0 = 6.5
+        // WATFLOW.FOR:213: rBot = -ConB * Grav = -8.5 * 1.0 = -8.5
+        assert_eq!(r_bot, -8.5);
+        assert_eq!(r.lower, 0.0);
+        assert_eq!(r.upper, -4.25);
+        assert_eq!(r.diagonal, 4.5);
+        // rhs has B (6.5) + storage (0.25 * -2.0 = -0.5) = 6.0
+        assert_eq!(r.rhs, 6.0);
+        // Neumann pairing: rBot is added to rhs, leaving net residual -ConVh * g = -2.0
+        let t = transform_boundary_row(
+            3,
+            BoundaryRowLocation::Lower,
+            conv(r),
+            BoundaryCondition::Neumann { flux: r_bot },
+            1e-30,
+        )
+        .unwrap();
+        assert_eq!(t.rhs, -2.5); // 6.0 + (-8.5) = -2.5 (storage -0.5 + net residual -2.0)
+    }
+
+    #[test]
+    fn free_drainage_thermal_and_vapor_storage_terms() {
+        let f = fx([0.0; 3], [2.0, 4.0, 0.0]);
+        let t = [10.0, 14.0, 0.0];
+        let v = [0.04, 0.0, 0.0];
+        let (r_bot, r) =
+            vapor_lower_free_drainage_row(&input(&f, 1.0, &T0, &v, &t), FaceAveraging::Arithmetic)
+                .unwrap();
+        // liquid = 6.5, con_b = 6.5, r_bot = -6.5
+        assert_eq!(r_bot, -6.5);
+        // rhs = liquid*g (6.5) + storage (-0.5) + thermal (3 * 4 / 2 = 6.0) - vapor storage (0.04 * 1 / 2 = 0.02)
+        // rhs = 6.5 - 0.5 + 6.0 - 0.02 = 11.98
+        assert!((r.rhs - 11.98).abs() < 1e-12);
+    }
+
+    #[test]
+    fn free_drainage_geometric_averaging() {
+        let f = fx([1.0, 3.0, 1.0], [0.0; 3]);
+        let inp = input(&f, 1.0, &T0, &Z, &Z);
+        let (r_bot_geom, lo_geom) =
+            vapor_lower_free_drainage_row(&inp, FaceAveraging::Geometric).unwrap();
+        // liquid sqrt(4*9) = 6, ConB = 6 + 2 = 8
+        // r_bot = -8 * 1.0 = -8.0
+        assert_eq!(r_bot_geom, -8.0);
+        assert_eq!(lo_geom.upper, -4.0);
+        assert_eq!(lo_geom.rhs, 6.0 - 0.5);
+
+        let (r_bot_arith, lo_arith) =
+            vapor_lower_free_drainage_row(&inp, FaceAveraging::Arithmetic).unwrap();
+        assert_ne!(lo_arith.upper, lo_geom.upper);
+        assert_ne!(r_bot_arith, r_bot_geom);
     }
 
     fn conv(r: VaporWaterRow) -> crate::hydraulics::BoundaryRow {

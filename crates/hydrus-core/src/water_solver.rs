@@ -4,8 +4,8 @@ use crate::atmospheric::{
 use crate::forcing::AtmosphericRates;
 use crate::heat::vapor::kernels;
 use crate::heat::vapor::water::{
-    assemble_water_rows, phase_velocities, vapor_lower_flux_row, vapor_upper_flux_row,
-    PhaseVelocityInput, VaporWaterRowsInput,
+    assemble_water_rows, phase_velocities, vapor_lower_flux_row, vapor_lower_free_drainage_row,
+    vapor_upper_flux_row, PhaseVelocityInput, VaporWaterRowsInput,
 };
 use crate::heat::vapor::{
     VaporBoundaryPair, VaporError, VaporPrimitiveInput, VaporWaterContext, VaporWaterTrial,
@@ -358,6 +358,7 @@ pub(crate) fn solve_vapor_water_trial(
             };
             let rows = assemble_water_rows(&rows_input)?;
             // Closed flux/flux pair (task 29.2.1): `(rBot, -rTop)`, both positive
+            // Free-drainage lower with flux upper (task 30.2.1): dynamic `rBot` carries ConVh
             // Classified by `VaporBoundaryPair` (task 29.2.2).
             let closed_rows = match boundary_pair {
                 VaporBoundaryPair::ClosedFlux {
@@ -369,9 +370,21 @@ pub(crate) fn solve_vapor_water_trial(
                     vapor_lower_flux_row(&rows_input, input.face_averaging)?,
                     vapor_upper_flux_row(&rows_input, input.face_averaging)?,
                 )),
+                VaporBoundaryPair::FreeDrainage {
+                    upper_flux: upper_flux_in,
+                } => {
+                    let (r_bot, lower_row) =
+                        vapor_lower_free_drainage_row(&rows_input, input.face_averaging)?;
+                    Some((
+                        r_bot,
+                        upper_flux_in,
+                        lower_row,
+                        vapor_upper_flux_row(&rows_input, input.face_averaging)?,
+                    ))
+                }
                 VaporBoundaryPair::HeadHead => None,
             };
-            let (upper_mode, lower_flux) = assemble(
+            let (upper_mode, mut lower_flux) = assemble(
                 &mut candidate_workspace,
                 state,
                 input,
@@ -380,6 +393,7 @@ pub(crate) fn solve_vapor_water_trial(
                 None,
             )?;
             if let Some((lower_flux_in, upper_flux_in, closed_lower, closed_upper)) = closed_rows {
+                lower_flux = lower_flux_in;
                 for (location, node, flux, row) in [
                     (BoundaryRowLocation::Lower, 0, lower_flux_in, closed_lower),
                     (

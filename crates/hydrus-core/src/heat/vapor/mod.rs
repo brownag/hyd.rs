@@ -225,6 +225,10 @@ pub(crate) enum VaporBoundaryPair {
         lower_flux: f64,
         upper_flux: f64,
     },
+    /// Free-drainage lower with prescribed upper flux; upper flux is positive into domain.
+    FreeDrainage {
+        upper_flux: f64,
+    },
 }
 
 impl VaporBoundaryPair {
@@ -281,6 +285,15 @@ impl VaporBoundaryPair {
                     upper_flux,
                 })
             }
+            (
+                LowerBoundaryMode::FreeDrainage,
+                UpperBoundary::Flux {
+                    flux: upper_flux, ..
+                },
+            ) => {
+                validate_finite("upper flux", upper_flux)?;
+                Ok(Self::FreeDrainage { upper_flux })
+            }
             // Fixed-head lower with a non-head upper: today's upper rejection.
             (
                 LowerBoundaryMode::FixedHead { .. },
@@ -292,7 +305,11 @@ impl VaporBoundaryPair {
                 UpperBoundary::Head { .. } | UpperBoundary::Atmospheric { .. },
             )
             | (
-                LowerBoundaryMode::FreeDrainage | LowerBoundaryMode::Unsupported(_),
+                LowerBoundaryMode::FreeDrainage,
+                UpperBoundary::Head { .. } | UpperBoundary::Atmospheric { .. },
+            )
+            | (
+                LowerBoundaryMode::Unsupported(_),
                 UpperBoundary::Head { .. }
                 | UpperBoundary::Flux { .. }
                 | UpperBoundary::Atmospheric { .. },
@@ -665,6 +682,10 @@ mod boundary_pair_tests {
                             lower_flux: 0.5,
                             upper_flux: -0.25
                         })
+                    ),
+                    (2, 1) => assert_eq!(
+                        got,
+                        Ok(VaporBoundaryPair::FreeDrainage { upper_flux: -0.25 })
                     ),
                     (0, _) => assert_eq!(got, Err(VaporError::UnsupportedUpperBoundary(upper))),
                     _ => assert_eq!(got, Err(VaporError::UnsupportedLowerBoundary(lower))),
