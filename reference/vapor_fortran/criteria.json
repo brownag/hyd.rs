@@ -23,10 +23,24 @@
    "relative": 1e-09,
    "scale": "max_abs_row_term",
    "unit": "model"
+  },
+  "water_balance_interior_step_off_reference": {
+   "absolute": 1e-15,
+   "assumptions": [
+    "case vapor_nonuniform_step_off only (lVapor off, constant dt 0.1, fixed heads, sink 0)",
+    "interior nodes only; Dirichlet end nodes not asserted",
+    "continuum residual dx*((th_new-th_old)/dt + s) + (q[i+1]-q[i]) from accepted theta and face fluxes",
+    "bound derived from pinned-Fortran NOD_INF/BALANCE/T_LEVEL output; Fortran residual is 0 at print resolution",
+    "reference is single precision; theta printed to 1e-4, so per-step storage is not resolved by print",
+    "claims static-water consistency only; not a general water balance and not the water_balance_interior iterate form"
+   ],
+   "relative": 1e-06,
+   "scale": "max_abs_row_term",
+   "unit": "model"
   }
  },
- "contract_revision": "0c4c7434089d870f854df50be75986e0c248c534",
- "contract_sha256": "33bdc31e8a04767cef1949b1964408af057666591e8e177f508e3cee9fa9a45e",
+ "contract_revision": "018c3c3824a082a2339eb63e9aa6e5ec470b80c5",
+ "contract_sha256": "5b6125154792e9674bb8c2576440e6b437edf468787d909a79175dc80cb0e110",
  "discrimination": {
   "dry_on_off_head": {
    "case": "vapor_dry_thermal_gradient",
@@ -384,6 +398,6 @@
    }
   }
  },
- "revision_note": "post-failure owner override of v1 (sha256 d645cae2a0ba44219eed7b53185abb09a1815ee481041f4e7a3b9fbc0cbbf008); only v_vapor, v_vap_term, v_total zero_rule changed",
+ "revision_note": "post-failure owner override of v1 (sha256 d645cae2a0ba44219eed7b53185abb09a1815ee481041f4e7a3b9fbc0cbbf008); only v_vapor, v_vap_term, v_total zero_rule changed; v4 (task 28.3, 2026-11-13) adds only checks.water_balance_interior_step_off_reference (static-water consistency, case vapor_nonuniform_step_off) and rebinds contract_revision/contract_sha256 to the v4 contract section",
  "schema_version": "vapor-criteria-v2"
 }

@@ -15,11 +15,11 @@
 //! - Closure proves the accepted `T` satisfies the rows built from the accepted water, not that the
 //!   rows are right (the parity test does that). `v_new` is rebuilt here (`Veloc`,
 //!   `WATFLOW.FOR:717-775`, copied from the private `heat/driver.rs:node_velocities`).
-//! - The water side is NOT asserted. The `water_balance_interior` form needs `h_it`, `thL_it`,
-//!   `C_eff` and iterate conductivities, none exposed by the legacy path, so it is not
-//!   reproducible. The available continuum residual closes only to TolTh/TolH, so a strict bound is
-//!   invalid; any asserted bound needs user-approved criteria. It is printed as a diagnostic only
-//!   (finiteness is the single assertion).
+//! - Water side: the continuum residual `dx*((th_new-th_old)/dt + s) + (q[i+1]-q[i])` at interior
+//!   nodes is asserted per step against `checks.water_balance_interior_step_off_reference`
+//!   (criteria v4, task 28.3), scale `max(|storage|, |q[i+1]|, |q[i]|)`. It claims static-water
+//!   consistency only, not the `water_balance_interior` iterate form (which needs `h_it`, `thL_it`,
+//!   `C_eff`, not exposed by the legacy path) and not any wetting or draining behavior.
 
 use std::fs;
 use std::path::PathBuf;
@@ -425,6 +425,7 @@ struct Outcome {
     max_abs_v: f64,
     water_max_abs: f64,
     water_max_ratio: f64,
+    water_worst: f64,
     initial_temps: Vec<f64>,
     final_temps: Vec<f64>,
     violations: Vec<String>,
@@ -432,7 +433,7 @@ struct Outcome {
     short_steps: Vec<String>,
 }
 
-fn run_step_off(bound: &Bound) -> Outcome {
+fn run_step_off(bound: &Bound, water_bound: &Bound) -> Outcome {
     let dir = repo_root().join("reference/vapor_fortran/cases").join(CASE);
     let deck = parse_deck(&fs::read_to_string(dir.join("SELECTOR.IN")).expect("SELECTOR.IN"));
     let profile = parse_profile(&fs::read_to_string(dir.join("PROFILE.DAT")).expect("PROFILE.DAT"));
@@ -598,12 +599,19 @@ fn run_step_off(bound: &Bound) -> Outcome {
                         "step {step} t={print_time} heat node {i} residual {r:e} scale {scale:e} ratio {q:e}"
                     ));
                 }
-                // Water continuum residual (diagnostic only, never asserted).
+                // Water continuum residual (asserted against the v4 step_off bound).
                 let dx = (x[i + 1] - x[i - 1]) / 2.0;
                 let storage = dx * ((theta_new[i] - theta_old[i]) / dt + sink[i]);
                 let flux = face[i + 1] - face[i];
                 let rw = storage + flux;
-                let sw = storage.abs().max(flux.abs());
+                let sw = storage.abs().max(face[i + 1].abs()).max(face[i].abs());
+                let qw = ratio(rw, sw, water_bound.relative, water_bound.absolute);
+                out.water_worst = out.water_worst.max(qw);
+                if qw > 1.0 || !qw.is_finite() {
+                    out.violations.push(format!(
+                        "step {step} t={print_time} water node {i} residual {rw:e} scale {sw:e} ratio {qw:e}"
+                    ));
+                }
                 out.water_finite &= rw.is_finite();
                 out.water_max_abs = out.water_max_abs.max(rw.abs());
                 if sw > 0.0 {
@@ -628,14 +636,15 @@ fn run_step_off(bound: &Bound) -> Outcome {
 #[test]
 fn step_off_interior_heat_balance_meets_approved_bounds_every_step() {
     let bound = load_bound("heat_balance_interior");
-    let out = run_step_off(&bound);
+    let water_bound = load_bound("water_balance_interior_step_off_reference");
+    let out = run_step_off(&bound, &water_bound);
     println!(
         "{CASE}: {} steps, worst heat ratio {:.3e} (bounds rel {:.1e}, abs {:.1e}), max row scale {:.3e}, max |dT| {:.3e}, max |v| {:.3e}",
         out.steps, out.worst_heat, bound.relative, bound.absolute, out.max_scale, out.max_abs_dt_temp, out.max_abs_v
     );
     println!(
-        "{CASE}: water continuum residual (DIAGNOSTIC, not asserted): max |R| {:.3e}, max |R|/scale {:.3e}",
-        out.water_max_abs, out.water_max_ratio
+        "{CASE}: water continuum residual: max |R| {:.3e}, max |R|/scale {:.3e} (diagnostic); worst bound ratio {:.3e} (rel {:.1e}, abs {:.1e}, asserted <= 1)",
+        out.water_max_abs, out.water_max_ratio, out.water_worst, water_bound.relative, water_bound.absolute
     );
     println!("{CASE}: steps off the declared dt: {:?}", out.short_steps);
     assert_eq!(
