@@ -1,6 +1,6 @@
 # Orchestration 29 state — G22.2 closed prescribed-flux pair with vapor on
 
-Created: 2026-11-14. Status: **Plan approved 2026-11-14. Wave 0 (baseline) in progress.**
+Created: 2026-11-14. Status: **Closed 2026-11-14.** Exit criterion accepted as met for the closed flux/flux pair with caveats (GATE 29.2). Open items are carried to orchestration 30 ([EXECUTION_PLAN_30.md](EXECUTION_PLAN_30.md), to be written). This closing update records the board; it changes no code, fixtures or criteria.
 Plan: [EXECUTION_PLAN_29.md](EXECUTION_PLAN_29.md). Goal: [GOALS.md](GOALS.md) G22.2 (Circled).
 
 ## Baseline (wave 0)
@@ -24,14 +24,19 @@ Plan: [EXECUTION_PLAN_29.md](EXECUTION_PLAN_29.md). Goal: [GOALS.md](GOALS.md) G
 | Wave | Task | Title | Status |
 |---|---|---|---|
 | 0 | — | Commit plan; baseline | done |
-| 1 | 29.1.1 | Fortran closed-pair deck and fixture design | pending |
-| 1 | 29.1.2 | Rust design for vapor-aware flux rows and typed guard | pending |
+| 1 | 29.1.1 | Fortran closed-pair deck and fixture design | done (designs approved at GATE 29.1; dry-start design amended 2026-11-14, see 29.4.2) |
+| 1 | 29.1.2 | Rust design for vapor-aware flux rows and typed guard | done (approved at GATE 29.1; implemented in 5af819d, 4194d27) |
 | — | GATE 29.1 | Design approval | done |
 | 2 | 29.2.1 | Vapor-aware flux row builders | done (5af819d, ce6dde6) |
 | 2 | 29.2.2 | Lift rejection for closed pair only | done (4194d27, 2c56c2e) |
-| 3 | 29.3.1 | Column balance check | pending |
+| 3 | 29.3.1 | Column balance check | done (b0a7f26, 04cc432; driven residual ~4e-14 relative) |
 | 3 | 29.3.2 | Decks and runner whitelist | done (5de3b20, 70350a5) |
-| — | GATE 29.2 | Exit criterion decision | pending |
+| 3 | 29.3.3 | Reference fixtures (vapor on and off) | superseded: vapor-on -1e4 decks diverge (29.4.1). Wet-start (-100 cm) fixtures committed in 839ce78 (29.4.2). Dry regime carried to orchestration 30 (G22.2-C3) |
+| 4 | 29.4.1 | Diagnose divergence; search for a milder vapor-on deck | done, no dry candidate converged (report: `planning/tasks/29.4.1.report.md`). Candidate D (-100 cm) passes |
+| 4 | 29.4.2 | Regenerate four fixtures on candidate D | done (839ce78; report: `planning/tasks/29.4.2.report.md`) |
+| — | GATE 29.2 | Exit criterion decision | done (2026-11-14, accepted with caveats) |
+
+**Not done, carried to orchestration 30:** Rust trajectory comparison against the four fixtures (G22.2-C1); criteria D5 entries (G22.2-C5, not written); full-trajectory Fortran balance (G22.2-C4); dry-regime closed pair (G22.2-C3); free-drainage assessment (G22.2-C6); `qGWLF`/±3 confirmation (G22.2-C2). Design docs still say -1e4 in places; amend at the orchestration 30 gate.
 
 ## Wave gates
 

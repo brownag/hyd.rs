@@ -1,6 +1,6 @@
 # Orchestration 29 — G22.2 implementation: closed prescribed-flux pair with vapor on
 
-Status: **Approved by user 2026-11-14.** Execution starts with wave 0.
+Status: **Closed 2026-11-14.** Approved by user 2026-11-14; exit criterion accepted as met with caveats at GATE 29.2. Open items carried to orchestration 30. Board and closing record: [STATE_29.md](STATE_29.md).
 Repo: `/home/andrew/AI/hyd.rs`, branch `main`. Baseline: orchestration 28 closing commit `8ff70e2` (Rust 620 passed / 0 failed / 4 ignored; Python 479 OK; fmt and clippy clean).
 Goal source: [GOALS.md](GOALS.md) G22.2 (Circled). Record: [M6_VAPOR_G22_2_ACCEPTANCE.md](master/M6_VAPOR_G22_2_ACCEPTANCE.md). Coverage: [M6_VAPOR_COVERAGE.md](master/M6_VAPOR_COVERAGE.md) row 22.
 Audits used: [M6_VAPOR_WATER_FLUX_AUDIT.md](master/M6_VAPOR_WATER_FLUX_AUDIT.md) (primary), [M6_VAPOR_FREE_DRAINAGE_AUDIT.md](master/M6_VAPOR_FREE_DRAINAGE_AUDIT.md) (`ConB` coupling only).
