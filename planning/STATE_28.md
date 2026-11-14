@@ -36,7 +36,7 @@ Goal: [GOALS.md](GOALS.md) Circled goal G22.2. Coverage: [M6_VAPOR_COVERAGE.md](
 | 1 | 28.1.3 | Seepage face and water table with vapor on: audit | done |
 | 1 | 28.1.4 | G7 free-drainage end-row assessment | done |
 | — | GATE W1 | Disposition per form | pending |
-| 2 | 28.2.1 | Coverage matrix, GOALS and G22.2 handoff | pending |
+| 2 | 28.2.1 | Coverage matrix, GOALS and G22.2 handoff | done |
 
 Max two workers in parallel. The orchestrator owns shared state and the serial gate at each wave end, one commit at a time.
 
@@ -81,7 +81,7 @@ Max two workers in parallel. The orchestrator owns shared state and the serial g
 
 G22.2 stays Circled: at least one form is accepted for orchestration 29.
 
-_Wave 2 (28.2.1) runs after this decision._
+
 
 ## Task reports
 
@@ -138,6 +138,24 @@ Gotchas: FqDrain body, zBotDr/BaseGW/rSpacing, KodBot consumption and Rust solve
 - Deviations: line refs in the todo/plan were re-checked and corrected in the assessment (bottom ConB :202-203, B :205, interior B :239, vapor :246-249, top B :276, vapor :277, lDensity :278-280). Todo notes still carry the earlier numbers.
 - Gotchas: Rust conductivity_a/b vapor content and heat/vapor/mod.rs:213-217 not read in scope. Vapor-off free drainage is unaffected. If a defect is later claimed: SD-007 plus pinning test source_defect_sd007_*.
 
+
+### Wave 2 serial gate (2026-11-13)
+
+- Build, Rust (620 passed, 0 failed, 4 ignored), fmt, clippy, Python (479 OK): all pass.
+- Changed paths: `planning/master/M6_VAPOR_COVERAGE.md`, `planning/GOALS.md`, new `planning/master/M6_VAPOR_G22_2_ACCEPTANCE.md`, and the 28.2.1 task files. `git diff --check` clean. No code, fixture, criteria, ADR or SD-register change.
+- G22.2 stays Circled, with a Result line in GOALS.
+- Open items for the user at wave 2 close: `qGWLF`, `TopInF`/`BotInF` (±3) rejections, and the flux/`qGWLF` pair were not explicitly answered at GATE W1. Atmospheric is G22.3.
+
+### 28.2.1
+
+# 28.2.1 report
+Status: DONE (docs only; no commit).
+Files: planning/master/M6_VAPOR_COVERAGE.md (line 3; row 22 replaced by lines 22-32, parent plus 10 sub-rows); planning/GOALS.md (new Result line after G22.2 Depends, line 13); created planning/master/M6_VAPOR_G22_2_ACCEPTANCE.md, planning/tasks/28.2.1.todo.md, this report.
+Acceptance: `git diff --check` clean; `git status --short` for the 3 paths shows two ` M` and one `??`; `git diff --name-only` lists only the two must-edit files; grep "Water flux" shows non-empty Status on every water-flux row.
+Row 22 final Status: FreeD lower, upper flux, lower flux = accepted for orchestration 29; seepage face, water table = rejected with trigger; qGWLF, TopInF/BotInF = rejected with trigger (flagged not explicitly answered); atmospheric = not decided (G22.3, row 23 unchanged).
+Pairs: flux/flux (closed first), flux/FixedHead, flux/FreeD, head/FreeD = accepted for orchestration 29; pairs with seepage or drain = rejected; flux/qGWLF = rejected (flagged).
+G22.2 stays Circled. G7 not established, no SD-007.
+Deviations: none. Trigger text for accepted forms copied from the audits' "trigger" cells verbatim.
 
 ## Discovered
 

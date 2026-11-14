@@ -10,6 +10,7 @@ Source State: [STATE_27.md](STATE_27.md)
   - Exit criteria: each water-flux and free-drainage form with vapor on is accepted or rejected with a named trigger; at least one accepted form has a provenance-backed fixture and a balance check; recorded in the coverage matrix. A full G22.2 will not finish in 24 hours; the first slice is the audit.
   - First action: a read-only source and coupling audit of the water boundary forms with vapor, in the style of `M6_VAPOR_SINK_ROOT_AUDIT.md`.
   - Depends on: G22.1 (done), G19 (done).
+  - Result (2026-11-13, GATE W1, user): stays Circled. Accepted for orchestration 29: free drainage (lower), prescribed flux upper and lower, and their pairs (closed flux-flux pair first). Rejected with triggers: seepage face, water table, and pairs with them. `qGWLF` and `TopInF`/`BotInF` (+-3) carry the audit's reject-with-trigger disposition but were not explicitly answered at GATE W1; atmospheric is G22.3. Record: [M6_VAPOR_G22_2_ACCEPTANCE.md](master/M6_VAPOR_G22_2_ACCEPTANCE.md).
 
 ## Sequenced Goals (Dependency DAG)
 
