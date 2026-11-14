@@ -89,8 +89,19 @@ Max two workers in parallel. Waves 2 and 3 touch disjoint files (see task specs)
 - Spec: design the vapor-aware flux row builders (lower: `ConVh` into the face conductance, `ConTB`, `ThV` storage; upper: `ConVh` into `ConA`, `ConTA`, `ThV` into `PT`). Design the typed guard that accepts exactly the closed pair. List every file and function to change.
 - Acceptance: design doc exists with each term cited to `WATFLOW.FOR`; `git diff --name-only` shows no changes outside the scope.
 
-### 29.2.1, 29.2.2, 29.3.1, 29.3.2
-Specs are written after GATE 29.1 approves the design.
+### 29.2.1 — Vapor-aware flux row builders, lower and upper, with geometric averaging (sequenced before 29.2.2)
+- **Files in scope.** *Must edit:* `crates/hydrus-core/src/heat/vapor/water.rs`, `crates/hydrus-core/src/water_solver.rs` (vapor trial only, near `:340-368`). *Can create:* `planning/tasks/29.2.1.*`. *Read only:* `planning/master/M6_VAPOR_CLOSED_PAIR_ROW_DESIGN.md`, `src_reference/WATFLOW.FOR:202-229, 272-294, 315-334` (read-only), `heat/vapor/water.rs`, `lower_boundary.rs:43-96, 219-235`. *Not in scope:* `vapor/mod.rs` (wave 2, 29.2.2), `criteria.json`, fixtures, `src_reference/` edits.
+- **Spec.** (a) Add `vapor_lower_flux_row` and `vapor_upper_flux_row` in `water.rs`, per the design section 4, with one unit test per vapor term (`ConVh` in the face, `ConTB`/`ConTA`, `ThV` storage, and the `rTop`/`rBot` sign). (b) Add geometric face averaging for the vapor builders (user decision, GATE 29.1, item A), matching `WATFLOW.FOR:203` and `:274`, with a test. (c) In the vapor trial, when the closed-pair classification is `ClosedFlux`, build both rows and write `workspace[0]` and `workspace[n-1]` through `transform_boundary_row` with Neumann flux. Head/head and all other paths are unchanged. Until 29.2.2 lands the guard, the call site must be gated behind a `ClosedFlux` input that no current caller produces, so behaviour is unchanged.
+- **Open items to settle in this task (GATE 29.1 items B and D).** B: confirm the sign of `rTop` against `WATFLOW.FOR:294`; the Rust upper flux is `-rTop`. D: confirm from `transform_boundary_row` that the flux is applied once (in the Neumann rhs), not also in the row.
+- **Acceptance.** `cargo test -p hydrus-core --lib heat::vapor::water` passes with the new unit tests; `cargo test -p hydrus-core --test vapor_water_rows` passes (existing 4 tests, unchanged). `git diff --name-only` lists only the two must-edit files and planning paths.
+
+### 29.2.2 — Typed guard and lift of the closed-pair rejection (after 29.2.1)
+- **Files in scope.** *Must edit:* `crates/hydrus-core/src/heat/vapor/mod.rs` (replace the two match blocks, `:211-226`), `crates/hydrus-core/src/water_solver.rs` (consume the classification; same file as 29.2.1, so run after it). *Can create:* new test file(s) under `crates/hydrus-core/tests/` named in the micro-plan; `planning/tasks/29.2.2.*`. *Not in scope:* `lower_boundary.rs`, `criteria.json`, fixtures.
+- **Spec.** Add `VaporBoundaryPair { HeadHead, ClosedFlux { lower_flux, upper_flux } }` and `classify` per design section 6. Rules: `(FixedHead, Head)` keeps today's checks; `(PrescribedFlux, Flux)` gives `ClosedFlux` after finite checks; every other combination returns the existing `Unsupported*` error. Use an exhaustive match with no wildcard. Assert lDensity, iDualPor and lWTDep off on the vapor path (GATE 29.1 item C). The caller's `Flux.row` is ignored on the vapor path, and a test proves it.
+- **Acceptance.** New guard tests: every non-pair combination still returns its `Unsupported*` error; head/head and closed-pair classify correctly; `Flux.row` ignored. `cargo test -p hydrus-core --test vapor_heat_transport`, `--test vapor_state` and `--test vapor_driver_order` pass unchanged. `git diff --name-only` lists only the must-edit files and planning paths.
+
+### 29.3.1, 29.3.2 — Balance check, and deck and fixture generation (wave 3)
+Specs are written after wave 2 closes. Wave 3 includes the runner and comparator whitelist amendment and the nonzero-flux deck (approved, GATE 29.1). Criteria entries are decided at GATE 29.2 (D5).
 
 ## Notes
 
