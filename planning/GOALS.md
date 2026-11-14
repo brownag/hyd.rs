@@ -5,20 +5,24 @@ Source State: [STATE_27.md](STATE_27.md)
 
 ## Circled Goal (Active)
 
-None.
+- **[G22.2]** Water-flux and free-drainage boundary pairs (and supported mixed pairs) are implemented with vapor, including vapor boundary/storage accounting and balance evidence.
+  - Why now: root of the remaining chain. G22.3 depends on it, and G20 depends on G22.3. Unblocks the atmospheric path.
+  - Exit criteria: each water-flux and free-drainage form with vapor on is accepted or rejected with a named trigger; at least one accepted form has a provenance-backed fixture and a balance check; recorded in the coverage matrix. A full G22.2 will not finish in 24 hours; the first slice is the audit.
+  - First action: a read-only source and coupling audit of the water boundary forms with vapor, in the style of `M6_VAPOR_SINK_ROOT_AUDIT.md`.
+  - Depends on: G22.1 (done), G19 (done).
 
 ## Sequenced Goals (Dependency DAG)
 
-- **[G22.2]** Water-flux and free-drainage boundary pairs (and supported mixed pairs) are implemented with vapor, including vapor boundary/storage accounting and balance evidence.
-  - Depends on: G22.1 (mixed heat/water pairs need the heat-boundary contract), G19.
-
 - **[G22.3]** Atmospheric water switching is implemented with vapor, with its meteorological and evaporation prerequisites contracted.
-  - Depends on: G22.1, G22.2. Coordinated with G20.
+  - Depends on: G22.2 (and G22.1). Coordinated with G20.
 
 - **[G20]** Energy balance (`lEnBal`, `UpdateEnergy`, surface energy terms `Evap`, `Rn`, `Rns`, `Rnl`) is added to the coupled capability with its own contract, fixtures and acceptance gate.
-  - Depends on: G19 (done with exception), G22.1 (top energy boundary), and the atmospheric boundary path with meteorological input (`lMeteo`, `MeteoIn`, `INPUT.FOR:966`, `HYDRUS.FOR:243-244`), which the Rust crate does not yet have. G22.3 is the atmospheric prerequisite.
+  - Depends on: G22.3 (atmospheric path with meteorological input, `lMeteo`, `MeteoIn`, `INPUT.FOR:966`, `HYDRUS.FOR:243-244`, which the Rust crate does not yet have), G19 (done with exception), G22.1 (top energy boundary).
 
 ## Independent Backlog
+
+- **[G7]** The free-drainage end-row behavior is assessed against the source-defect register rules and recorded as a defect or modeling choice.
+  - Why now: small and controllable; overlaps the G22.2 free-drainage question, so it can inform G22.2's scope.
 
 - **[G22.5]** Enhancement off (`iEnhanc=0`) evidence strategy decided and implemented. The kernel harness can select it; the full executable cannot via input.
   - Trigger to promote: a user decision on the evidence strategy.
@@ -26,14 +30,12 @@ None.
 - **[G22.6]** Campbell (`iCampbell=1`) vapor path: resolve SD-006 policy, add discriminating fixtures, no silent source correction.
   - Trigger to promote: SD-006 policy decision by the user.
 
-- **[G23]** Temperature-dependent liquid-water coupling (`lWDep` / `lWTDep`, including `ConLT` in water flux and liquid material temperature adjustments) is separately contracted, implemented and validated when selected.
-  - Trigger: separate user scope approval; remains deferred. Remains rejected in orchestration 25; not conflated with vapor's thermal-gradient terms or G20 energy balance.
-
-- **[G7]** The free-drainage end-row behavior is assessed against the source-defect register rules and recorded as a defect or modeling choice.
-
 - **[G10]** Investigate the Robin refinement anomaly only if a real supported-use case shows it could change a decision; the current finding is nonblocking.
 
 ## Deferred
+
+- **[G23]** Temperature-dependent liquid-water coupling (`lWDep` / `lWTDep`, including `ConLT` in water flux and liquid material temperature adjustments) is separately contracted, implemented and validated when selected.
+  - Trigger: separate user scope approval. Remains rejected in orchestration 25; not conflated with vapor's thermal-gradient terms or G20 energy balance.
 
 - **[G9]** Time-axis convergence is re-validated with three time-axis study levels or dual-axis centre reuse.
   - Trigger: only if a real supported-use case needs a stronger temporal claim or an observed timestep effect could change a decision.
