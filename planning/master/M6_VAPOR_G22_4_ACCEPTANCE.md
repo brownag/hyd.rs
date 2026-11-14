@@ -1,10 +1,9 @@
 # M6 vapor G22.4 acceptance (orchestration 27, task 27.5.1)
 
-Status: **rows decided 2026-11-13; goal G22.4 remains Circled.** The nonuniform
+Status: **complete with exceptions, 2026-11-13 (user decision). Goal G22.4 is Completed.** The nonuniform
 temperature row is accepted with exceptions. The scalar `ConVh` helper row is
 resolved by removal. The sink and root row is rejected with triggers (Gate S).
-Two items stay open (below), so this document does not close the goal. The
-closure decision is the user's.
+The exceptions are listed below. The user closed the goal on this evidence.
 
 Basis: [M6_VAPOR_NONUNIFORM_T_AUDIT.md](M6_VAPOR_NONUNIFORM_T_AUDIT.md),
 [M6_VAPOR_CONVH_AUDIT.md](M6_VAPOR_CONVH_AUDIT.md),
@@ -124,8 +123,7 @@ relaxation must touch both; no balance-closure claim for sink.
 
 ## Goal status
 
-G22.4 stays **Circled**. All three rows are decided. The step_off balance item is closed; the
-controller item was closed by user decision.
+G22.4 is **Completed** by user decision (complete with exceptions). All three rows are decided. The controller and step-off water items are closed as described in exceptions 1 and 2.
 
 Closure triggers:
 - step_off balance: closed by the v4 water bound (exception 2).

@@ -5,12 +5,7 @@ Source State: [STATE_27.md](STATE_27.md)
 
 ## Circled Goal (Active)
 
-- **[G22.4]** Remaining G22 rows: nonuniform-temperature coverage for default thermal conductivity, scalar `ConVh` reachability audit, and nonzero prescribed sink or root uptake with heat/vapor.
-  - Status (2026-11-13, orchestration 27; updated after 28.1/28.2): all three rows decided; goal **kept Circled**. Closure decision is the user's. Record: [M6_VAPOR_G22_4_ACCEPTANCE.md](master/M6_VAPOR_G22_4_ACCEPTANCE.md).
-  - Decided: nonuniform T accepted with exceptions (`vapor_nonuniform_step_on`/`_off`); scalar `ConVh` helper removed (`cbc52c0`); sink and root rejected with triggers at Gate S (no implementation).
-  - Closed 1 (2026-11-13, user decision): Rust time-step controller accepted as an opt-in port (`4804a0d`); reproduces the Fortran step sequence on 7190 of 7200 steps, final-landing precision difference disclosed. Default loop stays schedule-driven.
-  - Open 2 (closed, 28.3): step_on is balance-checked on all 7200 steps. step_off heat balance is checked on every step (`34e987d`), and its water balance is asserted on every step against the approved `water_balance_interior_step_off_reference` (criteria v4; static-water consistency only).
-  - Depends on: G22.1 (done).
+None.
 
 ## Sequenced Goals (Dependency DAG)
 
@@ -45,6 +40,9 @@ Source State: [STATE_27.md](STATE_27.md)
 
 ## Completed
 
+- **[G22.4]** Remaining G22 rows: nonuniform-temperature coverage for default thermal conductivity, scalar `ConVh` reachability audit, and nonzero prescribed sink or root uptake with heat/vapor.
+  - Result (2026-11-13): **complete with exceptions** (user decision). Nonuniform T accepted with exceptions (`vapor_nonuniform_step_on`/`_off`); scalar `ConVh` helper removed (`cbc52c0`); sink and root rejected with triggers at Gate S (no implementation). Record: [M6_VAPOR_G22_4_ACCEPTANCE.md](master/M6_VAPOR_G22_4_ACCEPTANCE.md).
+  - Exceptions: (1) the Rust time-step controller is an opt-in port (`4804a0d`) that reproduces the Fortran step sequence on 7190 of 7200 steps; the final-landing single-precision difference is disclosed, and the default loop stays schedule-driven. (2) step_off water balance is checked against criteria v4 `water_balance_interior_step_off_reference` for static-water consistency only. (3) `_x_conv`/`_t_conv` dead parameters remain in `gen_mat`.
 - **[G22.1]** Heat top/bottom boundary forms with vapor audited, contracted and accepted or rejected with triggers, recorded in [M6_VAPOR_HEAT_BOUNDARY_ACCEPTANCE.md](master/M6_VAPOR_HEAT_BOUNDARY_ACCEPTANCE.md).
   - Result (2026-11-13): **complete with exceptions** (user decision). DD (existing), DF, DZ, FF, FZ and FD accepted; `kTopT<-1` rejected with trigger; `kTopT=0` invalid; sinusoidal top rejected.
   - Exceptions: FD has one `v_liquid` row failing its frozen bound (1.50x at t=240, node 37). FD and FF both carry a vapor-on head drift (5.70 and 4.41 cm absolute at t=240). Cause identified 2026-11-13: single-precision (REAL*4) arithmetic in the pinned reference's vapor-coupled solve, recorded as a precision exception (H7 class). Rust agrees with the same source built in double precision to 5e-9 cm. Criteria v3 are unchanged. See [D-26.2_DRIFT_MECHANISM.md](master/D-26.2_DRIFT_MECHANISM.md).
