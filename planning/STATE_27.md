@@ -246,3 +246,12 @@ _Empty at planning. Any unlisted work goes here and waits for approval._
 - First mismatch (ignored test `step_on_controller_single_precision_landing_rows_match_fortran`, tolerance 1 unit of the printed last digit): `first mismatch at step 7191: rust dt 3.3333333334e-2 vs fortran dt 0.33332E-01`. Last 10 rows are the Fortran f32 landing on t=240; Rust f64 keeps 1/30 (~1.3 units, ~4e-5 relative, larger than f32 eps because Fortran accumulates single-precision dt). Not widened.
 - Retry granularity unchanged (both passes restart); dtMin: controller floors dtOpt, driver error at dt/3 < dtMin untouched; lMinStep/dtInit/dtMaxW/dtMaxC not ported.
 - Ran: vapor_heat_boundary_parity 9 ok/1 ignored, vapor_fortran_parity 10 ok, vapor_nonuniform_parity 5 ok, new test 1 ok + 1 ignored (fails as above), fmt ok. Clippy and full suites not run. Not committed.
+
+## 28.3
+
+- Criteria v4: added `checks.water_balance_interior_step_off_reference` (rel 1e-6, abs 1e-15, `max_abs_row_term`) to `reference/vapor_fortran/criteria.json`; existing keys byte-identical (verified by JSON compare against the v3 copy), `schema_version` unchanged. Note states static-water consistency only.
+- Freeze record: contract section commit `018c3c3`; `contract_revision` `018c3c38...`, `contract_sha256` `5b612515...` (sha256 of `M6_VAPOR_CONTRACT.md` at that commit). `revision_note` extended. New file sha256 `1d0acf88bebd5f14d866171d3301f0715c0d2829944868649560dcea659dd17e` (was `f198d0c1...`).
+- `CRITERIA_SHA256` updated in `vapor_fortran_parity.rs`, `vapor_heat_boundary_parity.rs`, `vapor_nonuniform_parity.rs`, `vapor_nonuniform_timestep_controller.rs`; no check weakened.
+- `vapor_nonuniform_step_off_balance.rs` now asserts the water residual ratio <= 1.0 on all 2401 steps: worst 0.139, max |R| 1.4e-16 (diagnostic print kept).
+- Ran, all ok: step_off_balance, nonuniform_parity, heat_boundary_balance, fortran_parity, heat_boundary_parity, timestep_controller, vapor_balance, nonuniform_balance; 79 Python tests; `cargo fmt -p hydrus-core -- --check`. Log `.development/28.3/test.log`.
+- Docs: acceptance item 2 closed with caveat; GOALS Open 2 closed. G22.4 stays Circled (closure is the user's). Not committed.

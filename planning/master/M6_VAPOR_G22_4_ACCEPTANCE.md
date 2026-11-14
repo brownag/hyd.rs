@@ -11,9 +11,9 @@ Basis: [M6_VAPOR_NONUNIFORM_T_AUDIT.md](M6_VAPOR_NONUNIFORM_T_AUDIT.md),
 [M6_VAPOR_SINK_ROOT_AUDIT.md](M6_VAPOR_SINK_ROOT_AUDIT.md),
 [M6_VAPOR_NONUNIFORM_NAN_DIAGNOSIS.md](M6_VAPOR_NONUNIFORM_NAN_DIAGNOSIS.md),
 [M6_VAPOR_NONUNIFORM_PARITY_MISS_DIAGNOSIS.md](M6_VAPOR_NONUNIFORM_PARITY_MISS_DIAGNOSIS.md),
-[STATE_27.md](../STATE_27.md), [coverage](M6_VAPOR_COVERAGE.md), criteria v3
-([criteria.json](../../reference/vapor_fortran/criteria.json), unchanged; no
-GATE N2 was needed). Commits: audits `ddc8ef6`; fixtures `ecf401d`; parity
+[STATE_27.md](../STATE_27.md), [coverage](M6_VAPOR_COVERAGE.md), criteria v4
+([criteria.json](../../reference/vapor_fortran/criteria.json); v3 values unchanged, one
+step_off water key added in 28.3). Commits: audits `ddc8ef6`; fixtures `ecf401d`; parity
 `47b36a1`, `cc4fce4`; comparator `a0ab6c1`; balance `5a41592`; ConVh removal
 `cbc52c0`; vapor head-clamp fix `6830b16`.
 
@@ -34,7 +34,7 @@ conductivity. Times `[0, 6, 24, 72, 240]`.
 | Case | Fixture SHA-256 | Parity (Rust vs fixture) | Python comparator | Balance |
 |---|---|---|---|---|
 | `vapor_nonuniform_step_on` (lVapor on) | `787889b6...` (`ecf401d`) | 0 of 2460 rows over criteria v3 bounds, run at the Fortran dt/3 schedule on all 7200 steps (`47b36a1`, `cc4fce4`) | 0 failing rows (`a0ab6c1`); max err/bound: temperature_c 0.100, liquid_moisture 0.047, v_liquid 0.075 | All 7200 steps checked; worst water ratio 9.3e-7, heat 5.1e-7 (`5a41592`; bounds rel 1e-9 / abs 1e-15 from `criteria.json` `checks`) |
-| `vapor_nonuniform_step_off` (lVapor off) | `af3c155e...` (`ecf401d`) | Passes at constant dt 0.1 (615 points) | 0 failing rows | **Not covered** (see exceptions) |
+| `vapor_nonuniform_step_off` (lVapor off) | `af3c155e...` (`ecf401d`) | Passes at constant dt 0.1 (615 points) | 0 failing rows | Heat and static-water checks pass every step (exception 2) |
 
 The Python comparator and the Rust test agree: 0 verdict mismatches on either
 case; largest error difference 5.0e-8 (print precision). Reference outputs
@@ -63,13 +63,22 @@ water-row, driver-order and balance tests were unchanged by it (STATE_27, 27.3.3
    schedule-driven by user decision. Retries
    restart both passes rather than retrying inside each WatFlow call (documented).
    Diagnosis: `M6_VAPOR_TIMESTEP_CONTROLLER_DIAGNOSIS.md`. Not a criteria change.
-2. **step_off balance (heat side checked; water diagnostic only).** A test-local
+2. **step_off balance (closed, criteria v4, task 28.3).** A test-local
    heat-only interior row check (`34e987d`) passes on every accepted step of
    `vapor_nonuniform_step_off` at dt 0.1, worst ratio 4.0e-7 against bound 1.0,
-   with bounds from `criteria.json` `heat_balance_interior`. The water balance
-   for this case is not asserted: the `water_balance_interior` criteria form does
-   not reproduce for it, so only the continuum residual is printed (finite).
-   Asserting it needs a user-approved bound. Assessment:
+   with bounds from `criteria.json` `heat_balance_interior`. The water side is
+   now asserted on every accepted step against the user-approved
+   `checks.water_balance_interior_step_off_reference` (relative 1e-6, absolute
+   1e-15, scale `max_abs_row_term`; residual
+   `dx*((theta_new-theta_old)/dt + s) + (q[i+1]-q[i])` at interior nodes):
+   worst ratio 0.139 (max |R| 1.4e-16) against bound 1.0. **Caveat: the bound
+   claims static-water consistency only** (this case is static, h = -1e4 cm,
+   K = 7e-11 cm/h, zero sink). It is not a general water balance, not the
+   `water_balance_interior` iterate form, and says nothing about wetting or
+   draining, other cases, Dirichlet end-node flux, or per-step Fortran
+   agreement (the reference is five snapshots). Adding the key re-froze the
+   criteria as v4 (contract section `018c3c3`; schema label unchanged).
+   Proposal: `M6_VAPOR_STEP_OFF_WATER_BOUND_PROPOSAL.md`. Assessment:
    `M6_VAPOR_STEP_OFF_BALANCE_ASSESSMENT.md`.
 3. **Precision (H6).** No new precision-limited rows were observed; none are
    claimed. Criteria v3 were not widened.
@@ -115,16 +124,15 @@ relaxation must touch both; no balance-closure claim for sink.
 
 ## Goal status
 
-G22.4 stays **Circled**. All three rows are decided. Both open items now have
-partial closure, but each still needs your decision.
+G22.4 stays **Circled**. All three rows are decided. The step_off balance item is closed; the
+controller item was closed by user decision.
 
 Closure triggers:
-- step_off balance: decide whether the heat-side check closes the gap, and
-  whether the water side needs a user-approved bound or stays a diagnostic.
+- step_off balance: closed by the v4 water bound (exception 2).
 
 ## Not claimed
 
-- That the default vapor loop uses the opt-in controller; step_off water balance closure.
+- That the default vapor loop uses the opt-in controller; any non-static water balance for step_off.
 - Bit-level agreement at the final landing on step_on (f32 versus f64).
 - Any nonzero-sink or root-uptake behaviour with vapor.
 - Other nonuniform profile shapes, nonzero-flux boundaries, Campbell,

@@ -9,7 +9,7 @@ Source State: [STATE_27.md](STATE_27.md)
   - Status (2026-11-13, orchestration 27; updated after 28.1/28.2): all three rows decided; goal **kept Circled**. Closure decision is the user's. Record: [M6_VAPOR_G22_4_ACCEPTANCE.md](master/M6_VAPOR_G22_4_ACCEPTANCE.md).
   - Decided: nonuniform T accepted with exceptions (`vapor_nonuniform_step_on`/`_off`); scalar `ConVh` helper removed (`cbc52c0`); sink and root rejected with triggers at Gate S (no implementation).
   - Closed 1 (2026-11-13, user decision): Rust time-step controller accepted as an opt-in port (`4804a0d`); reproduces the Fortran step sequence on 7190 of 7200 steps, final-landing precision difference disclosed. Default loop stays schedule-driven.
-  - Open 2: step_on is balance-checked on all 7200 steps. step_off heat balance is checked on every step (`34e987d`); its water balance is a diagnostic only. Closes on your decision about the water side (a new bound, or accept the diagnostic).
+  - Open 2 (closed, 28.3): step_on is balance-checked on all 7200 steps. step_off heat balance is checked on every step (`34e987d`), and its water balance is asserted on every step against the approved `water_balance_interior_step_off_reference` (criteria v4; static-water consistency only).
   - Depends on: G22.1 (done).
 
 ## Sequenced Goals (Dependency DAG)
