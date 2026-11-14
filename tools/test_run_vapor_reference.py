@@ -181,8 +181,10 @@ class ClosedPairTests(unittest.TestCase):
             base[18], base[20] = "f f -1 f", "f f f f -1 f 0"
             base[21:21] = ["rTop rBot rRoot", flux]
             self.assertEqual(new, base, case)
-            for name in ("LEVEL_01.DIR", "PROFILE.DAT"):
-                self.assertEqual((vapor.CASES / case / name).read_bytes(), (vapor.CASES / template / name).read_bytes(), case)
+            self.assertEqual((vapor.CASES / case / "LEVEL_01.DIR").read_bytes(), (vapor.CASES / template / "LEVEL_01.DIR").read_bytes(), case)
+            # Initial head adopted from candidate D (2026-11-14): only the head column differs.
+            profile_template = (vapor.CASES / template / "PROFILE.DAT").read_bytes()
+            self.assertEqual((vapor.CASES / case / "PROFILE.DAT").read_bytes(), profile_template.replace(b"-10000.000", b"-100.000"), case)
 
     def test_pairs_differ_only_in_lvapor(self):
         for pair in ("closed_flux", "flux_known"):

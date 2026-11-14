@@ -4,7 +4,7 @@ Status: design only. No deck, fixture, criteria or runner change is made by this
 
 ## Decks (four, in two on/off pairs)
 
-All cloned from `reference/vapor_fortran/cases/vapor_dry_thermal_gradient` and `vapor_dry_off_control` (SELECTOR/PROFILE/LEVEL_01.DIR; they differ from each other only in `lVapor`, `SELECTOR.IN` line 12). Shared base: one loamy material, 41 nodes, uniform h=-1e4 cm, 45 C top to 5 C bottom Dirichlet heat (`1 45 1 5`), 240 h, prints 6/24/72/240 h, `lWDep=false`.
+All cloned from `reference/vapor_fortran/cases/vapor_dry_thermal_gradient` and `vapor_dry_off_control` (SELECTOR/PROFILE/LEVEL_01.DIR; they differ from each other only in `lVapor`, `SELECTOR.IN` line 12). Shared base: one loamy material, 41 nodes, uniform h=-100 cm, 45 C top to 5 C bottom Dirichlet heat (`1 45 1 5`), 240 h, prints 6/24/72/240 h, `lWDep=false`.
 
 | Case id | lVapor | rTop | rBot | Purpose |
 |---|---|---|---|---|
@@ -52,3 +52,5 @@ For a closed column, integrated liquid plus vapor content should be conserved (z
 - `tools/compare_vapor_reference.py` and `tools/test_*` for the runner/comparator: validation and discrimination bind to case names (`_dry_check`, `_nonzero_checks`); scope amendment needed if new entries are approved. Not read in scope.
 - Four new case directories under `reference/vapor_fortran/cases/` and four fixtures under `reference/vapor_fortran/fixtures/` (29.3.2).
 - `reference/vapor_fortran/README.md` (describes the decks) may need an update.
+
+2026-11-14 amendment: the initial head is -100 cm, not -1e4 cm. The -1e4 cm start diverged with vapor on; the -100 cm start (candidate D) converged on both closed-pair decks (`planning/tasks/29.4.1.report.md`). The start is no longer dry, so the fixture does not cover dry-regime vapor behaviour.
