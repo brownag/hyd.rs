@@ -50,7 +50,7 @@ water-row, driver-order and balance tests were unchanged by it (STATE_27, 27.3.3
 
 ## Exceptions and disclosures
 
-1. **Rust time-step controller (partly closed; decision open).** Fortran fails its
+1. **Rust time-step controller (closed by user decision, 2026-11-13).** Fortran fails its
    first dt = 0.1 attempt, retries at dt/3 and keeps dt/3 for 7200 steps. An
    opt-in controller now ports the Fortran `TmCont` rule (`4804a0d`, in
    `heat/vapor/driver.rs`). Driven through it, step_on reproduces the Fortran
@@ -58,8 +58,9 @@ water-row, driver-order and balance tests were unchanged by it (STATE_27, 27.3.3
    (`0fdc1f9`). The last 10 steps are the final landing on t = 240: Fortran
    computes that split in single precision and prints `0.33332E-01`, while Rust
    uses f64 (about 4e-5 relative). That check is `#[ignore]`d with the reason
-   recorded; the tolerance was not widened. The default loop is still
-   schedule-driven, so the parity result is unchanged by this work. Retries
+   recorded; the tolerance was not widened. Closed as it stands: the opt-in
+   controller is the accepted Rust time-step handling; the default loop stays
+   schedule-driven by user decision. Retries
    restart both passes rather than retrying inside each WatFlow call (documented).
    Diagnosis: `M6_VAPOR_TIMESTEP_CONTROLLER_DIAGNOSIS.md`. Not a criteria change.
 2. **step_off balance (heat side checked; water diagnostic only).** A test-local
@@ -118,9 +119,6 @@ G22.4 stays **Circled**. All three rows are decided. Both open items now have
 partial closure, but each still needs your decision.
 
 Closure triggers:
-- Controller: decide whether the opt-in controller (`4804a0d`) closes item 1, or
-  whether the default loop must use it before closure. Either way the final
-  landing precision difference stays disclosed.
 - step_off balance: decide whether the heat-side check closes the gap, and
   whether the water side needs a user-approved bound or stays a diagnostic.
 
