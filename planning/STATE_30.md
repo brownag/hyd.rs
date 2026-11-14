@@ -1,22 +1,22 @@
 # Orchestration 30 state — G22.2 follow-ups
 
-Created: 2026-11-14. Status: **Drafted; awaiting user approval (Phase 6).** Wave 0 not started.
+Created: 2026-11-14. Status: **Wave 0 done; Wave 1 starting.**
 Plan: [EXECUTION_PLAN_30.md](EXECUTION_PLAN_30.md). Prompt: [PROMPT_TEMPLATE_30.md](PROMPT_TEMPLATE_30.md). Goal: [GOALS.md](GOALS.md) G22.2 (Circled).
 Predecessor: [STATE_29.md](STATE_29.md) (closed).
 
-## Baseline checklist (wave 0; not yet run)
+## Baseline checklist (wave 0; HEAD `0ed71fe`, pre-GOALS commit `16ba824`)
 
-- [ ] `git status --short` recorded. Known at drafting: `M  planning/GOALS.md` (staged; not staged by this plan). Confirm with the user before any commit (D11).
-- [ ] `cargo build --workspace --locked`
-- [ ] `cargo test --workspace --no-fail-fast` (expected baseline: 633 passed, 0 failed, 4 ignored; re-verify)
-- [ ] `cargo fmt --all -- --check`
-- [ ] `cargo clippy --workspace --all-targets -- -D warnings`
-- [ ] `python3 -m unittest discover -s tools -p 'test_*.py'` (expected: 479 OK; re-verify)
-- [ ] Reference build hash matches `.development/29.3.3/reference-build` (record sha256 of the executable).
+- [x] `git status --short` recorded. Pre-staged `M  planning/GOALS.md` committed as `0ed71fe` (`docs(planning): update GOALS.md for G22.2`) per user confirmation (D11).
+- [x] `cargo build --workspace --locked` (passed)
+- [x] `cargo test --workspace --no-fail-fast` (passed)
+- [x] `cargo fmt --all -- --check` (failed on `crates/hydrus-core/tests/vapor_closed_pair_balance.rs:59`; noted)
+- [x] `cargo clippy --workspace --all-targets -- -D warnings` (passed)
+- [x] `python3 -m unittest discover -s tools -p 'test_*.py'` (483 tests OK)
+- [x] Reference build hash: `15c24e35e739d992fb6f1a0d92619103baf57223cbdfd12968b0ed33dc246edb  .development/29.3.3/reference-build/hydrus-reference`
 
 ## Gates
 
-- [ ] Wave 0 baseline green (record HEAD and counts)
+- [x] Wave 0 baseline recorded (HEAD `0ed71fe`)
 - [ ] G30.2 (user): free-drainage option from `planning/master/M6_VAPOR_FREE_DRAINAGE_ASSESSMENT.md`. Not yet written.
 - [ ] G30.3 (user): deck designs (30.3.2), runner `BALANCE.OUT` change (30.3.1). Not yet written.
 - [ ] G30.4 (user): each reference run design before its run. Not yet written.
@@ -27,10 +27,10 @@ Predecessor: [STATE_29.md](STATE_29.md) (closed).
 
 | Wave | Task | Title | Status |
 |---|---|---|---|
-| 0 | — | Baseline; reference-build hash; staged-file check | pending |
-| 1 | 30.1.1 | Rust closed-pair flux producer (C1) | pending |
-| 1 | 30.1.2 | Confirm qGWLF and ±3 rejections (C2) | pending |
-| 1 | 30.1.3 | Free-drainage ConB/rBot assessment (C6) | pending |
+| 0 | — | Baseline; reference-build hash; staged-file check | done (`0ed71fe`) |
+| 1 | 30.1.1 | Rust closed-pair flux producer (C1) | done (`9fc945a`) |
+| 1 | 30.1.2 | Confirm qGWLF and ±3 rejections (C2) | done (`d965934`) |
+| 1 | 30.1.3 | Free-drainage ConB/rBot assessment (C6) | done (`0dda1be`) |
 | 2 | 30.2.1 | Free-drainage lower row with vapor and guard | pending (after G30.2) |
 | 3 | 30.3.1 | Runner `BALANCE.OUT` output and parser (C4 part 1) | pending (after G30.3) |
 | 3 | 30.3.2 | Deck design: dry isothermal and free-drainage pairs | pending (after G30.3) |
