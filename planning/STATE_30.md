@@ -17,7 +17,7 @@ Predecessor: [STATE_29.md](STATE_29.md) (closed).
 ## Gates
 
 - [x] Wave 0 baseline recorded (HEAD `0ed71fe`)
-- [ ] G30.2 (user): free-drainage option from `planning/master/M6_VAPOR_FREE_DRAINAGE_ASSESSMENT.md`. Not yet written.
+- [x] G30.2 (user, 2026-11-14): Option (a) — match `WATFLOW.FOR` as written (`rBot = -(K_L + K_vh) * Grav`); log proposed SD-008 in a subsequent docs task; accept `FreeDrainage` exclusively with `UpperBoundary::Flux`.
 - [ ] G30.3 (user): deck designs (30.3.2), runner `BALANCE.OUT` change (30.3.1). Not yet written.
 - [ ] G30.4 (user): each reference run design before its run. Not yet written.
 - [ ] G30.5 (user): fixture staging and new trajectory comparisons. Not yet written.
@@ -31,9 +31,9 @@ Predecessor: [STATE_29.md](STATE_29.md) (closed).
 | 1 | 30.1.1 | Rust closed-pair flux producer (C1) | done (`9fc945a`) |
 | 1 | 30.1.2 | Confirm qGWLF and ±3 rejections (C2) | done (`d965934`) |
 | 1 | 30.1.3 | Free-drainage ConB/rBot assessment (C6) | done (`0dda1be`) |
-| 2 | 30.2.1 | Free-drainage lower row with vapor and guard | pending (after G30.2) |
-| 3 | 30.3.1 | Runner `BALANCE.OUT` output and parser (C4 part 1) | pending (after G30.3) |
-| 3 | 30.3.2 | Deck design: dry isothermal and free-drainage pairs | pending (after G30.3) |
+| 2 | 30.2.1 | Free-drainage lower row with vapor and guard | done (`a0a24b2`, `4e1ebd3`) |
+| 3 | 30.3.1 | Runner `BALANCE.OUT` output and parser (C4 part 1) | done (`d645e42`) |
+| 3 | 30.3.2 | Deck design: dry isothermal and free-drainage pairs | done (`868e2bc`) |
 | 4 | 30.4.1 | Dry isothermal closed-pair run (C3) | pending (after G30.4) |
 | 4 | 30.4.2 | Free-drainage vapor-on and vapor-off runs (C6 evidence) | pending (after G30.4) |
 | 4 | 30.4.3 | Full-trajectory balance of the closed pair (C4 part 2) | pending (after G30.4) |
