@@ -350,3 +350,20 @@ Acceptance status and per-form decisions: [M6_VAPOR_HEAT_BOUNDARY_ACCEPTANCE.md]
 - `kTopT < -1` is rejected: the storage term at `TEMPER.FOR:255` is omitted for these codes. Trigger: a reference case plus a source decision.
 - `kTopT == 0` is invalid. Sinusoidal top is rejected.
 - Decisions and exceptions: [M6_VAPOR_HEAT_BOUNDARY_ACCEPTANCE.md](M6_VAPOR_HEAT_BOUNDARY_ACCEPTANCE.md).
+
+## Criteria v4: step_off water-balance bound (approved 2026-11-13, task 28.3)
+
+Scope: case `vapor_nonuniform_step_off` only. Approved by the user as proposed in
+`M6_VAPOR_STEP_OFF_WATER_BOUND_PROPOSAL.md`. All v3 keys and values are unchanged.
+`checks` gains one key, `water_balance_interior_step_off_reference`:
+
+- Residual at interior nodes, per accepted step:
+  `dx*((theta_new-theta_old)/dt + s) + (q[i+1]-q[i])`.
+- Bound: relative 1e-6, absolute 1e-15 (L/T per node row), scale `max_abs_row_term`.
+- Claim: static-water consistency only. It does not claim closure of the
+  `water_balance_interior` iterate form, wetting or draining behavior, other
+  cases, Dirichlet end-node flux, or per-step Fortran agreement.
+
+The file hash changes with the new key, so this is a re-freeze, not an in-place
+v3 edit. `schema_version` stays `vapor-criteria-v2`. Changing any value above
+requires a new user approval.
