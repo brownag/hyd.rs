@@ -18,16 +18,16 @@ Basis: [M6_VAPOR_FREE_DRAINAGE_AUDIT.md](M6_VAPOR_FREE_DRAINAGE_AUDIT.md),
 | Prescribed flux, lower (`KodBot=-1`) | accepted for orchestration 29 | yes |
 | Seepage face (`SeepF`) | rejected with trigger | yes |
 | Water table (`qDrain`) | rejected with trigger | yes |
-| Lower `qGWLF` (`KodBot=-7`) | rejected with trigger | **not explicitly answered; audit disposition recorded** |
-| `TopInF` / `BotInF` (+-3) | rejected with trigger | **not explicitly answered; audit disposition recorded** |
+| Lower `qGWLF` (`KodBot=-7`) | confirmed rejected with trigger | confirmed by user 2026-11-14 (C2; was audit disposition) |
+| `TopInF` / `BotInF` (+-3) | confirmed rejected with trigger | confirmed by user 2026-11-14 (C2; was audit disposition) |
 | Atmospheric (`KodTop=-4`) | not decided here (G22.3) | **not explicitly answered** |
 | Pairs flux/flux (closed pair first), flux/FixedHead | accepted for orchestration 29 | yes (follow the singles) |
 | Pairs flux/FreeD, head/FreeD | accepted for orchestration 29 | yes (follow free drainage) |
 | Pairs with seepage face or water table | rejected with trigger | yes (follow the singles) |
-| Pair flux/`qGWLF` | rejected with trigger | follows `qGWLF`, which was not explicitly answered |
+| Pair flux/`qGWLF` | confirmed rejected with trigger | confirmed by user 2026-11-14 (C2; follows `qGWLF`) |
 
-The user should confirm the three flagged items at wave 2 close. Trigger text is in the coverage
-matrix rows, copied from the audits.
+The user confirmed `qGWLF`, `TopInF`/`BotInF` and the flux/`qGWLF` pair on 2026-11-14 (see C2 decision below).
+Atmospheric remains G22.3 (not decided here). Trigger text is in the coverage matrix rows, copied from the audits.
 
 ## Evidence per form (audit level only)
 
@@ -54,7 +54,7 @@ made. Vapor-off free drainage is unaffected.
 
 - Any implemented, run or balance-checked water-flux or free-drainage vapor case.
 - That Fortran `WATFLOW.FOR:211` is a defect, or that the Rust liquid-only free drainage is wrong.
-- A decision on `qGWLF`, +-3 forms or atmospheric switching beyond the audit dispositions (G22.3).
+- Atmospheric switching beyond the audit dispositions (G22.3; decisions on `qGWLF` and ±3 forms are resolved below).
 - Anything about G22.3, G20, G23.
 
 ## ADR 0021 compliance
@@ -62,3 +62,36 @@ made. Vapor-off free drainage is unaffected.
 All decisions comply with ADR 0021 (heat-only, one-way water then heat; vapor deferred to
 `M6_VAPOR_CONTRACT.md`). Its status (Proposed) is unchanged. G22.1 and G22.4 decisions and the
 criteria are unchanged.
+
+## C2 decision (user, 2026-11-14)
+
+The user explicitly confirmed the rejection of `qGWLF`, `TopInF`/`BotInF` (±3), and the flux/`qGWLF` pair on 2026-11-14 as part of orchestration 30 planning (decision D2).
+
+### User decision (verbatim)
+
+> "Confirm rejection (Recommended)" for qGWLF and TopInF/BotInF (±3): keep rejected with their triggers.
+
+### Confirmation, audit triggers, and code reject sites
+
+1. **Lower `qGWLF` (`KodBot=-7`, head-dependent flux)**
+   - **Status:** Confirmed rejected.
+   - **Audit trigger quote (`M6_VAPOR_WATER_FLUX_AUDIT.md:48`):**
+     > "Trigger: no Rust mode for `qGWLF`; needs a new mode and per-iteration `Fqh` update before any vapor work. Check if later accepted: exchange equals `Fqh(h-GWL0L)` at the accepted head, in the column balance. ADR 0021 compliant."
+   - **Code reject site:**
+     - `crates/hydrus-core/src/lower_boundary.rs:11-26`: `LowerBoundaryMode` defines only `FixedHead`, `PrescribedFlux`, `FreeDrainage`, and `Unsupported(SeepageFace | WaterTable)`. There is no enum variant for `qGWLF`.
+     - `crates/hydrus-core/src/heat/vapor/mod.rs:210, 235-300`: `validate_water_input` validates boundary pairs via `VaporBoundaryPair::classify(input.lower, input.upper)`. Any unsupported lower boundary mode fails validation with `VaporError::UnsupportedLowerBoundary(lower)`.
+     - Grep `qGWLF` across `crates/hydrus-core/src`: only matches a comment header in `crates/hydrus-core/src/solute_fortran_compat/deck_reader.rs:391`.
+
+2. **Time-variable inputs: Upper `TopInF` / Lower `BotInF` (`KodTop=±3`, `KodBot=±3`)**
+   - **Status:** Confirmed rejected.
+   - **Audit trigger quote (`M6_VAPOR_WATER_FLUX_AUDIT.md:49`):**
+     > "Trigger: time-variable input path not audited here; no Rust mode in the in-scope files."
+   - **Code reject site:**
+     - `crates/hydrus-core/src/water_solver.rs:83-97`: `UpperBoundary` defines only `Head`, `Flux`, and `Atmospheric`. There is no variant for `TopInF` (`±3`).
+     - `crates/hydrus-core/src/lower_boundary.rs:11-26`: `LowerBoundaryMode` has no variant for `BotInF` (`±3`).
+     - `crates/hydrus-core/src/heat/vapor/mod.rs:210, 235-300`: `validate_water_input` dispatches to `VaporBoundaryPair::classify(input.lower, input.upper)`. Any non-whitelisted upper or lower boundary fails with `VaporError::UnsupportedUpperBoundary` or `VaporError::UnsupportedLowerBoundary`.
+     - Grep `TopInF` / `BotInF` across `crates/hydrus-core/src`: only matches the comment header in `crates/hydrus-core/src/solute_fortran_compat/deck_reader.rs:391`.
+
+3. **Pair flux/`qGWLF`**
+   - **Status:** Confirmed rejected (follows the confirmed rejection of `qGWLF`).
+
