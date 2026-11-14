@@ -4,7 +4,8 @@ use crate::atmospheric::{
 use crate::forcing::AtmosphericRates;
 use crate::heat::vapor::kernels;
 use crate::heat::vapor::water::{
-    assemble_water_rows, phase_velocities, PhaseVelocityInput, VaporWaterRowsInput,
+    assemble_water_rows, phase_velocities, vapor_lower_flux_row, vapor_upper_flux_row,
+    PhaseVelocityInput, VaporWaterRowsInput,
 };
 use crate::heat::vapor::{VaporError, VaporPrimitiveInput, VaporWaterContext, VaporWaterTrial};
 use crate::hydraulics::{
@@ -213,6 +214,13 @@ fn source_h_sat(parameters: &crate::hydraulics::VanGenuchtenParameters) -> f64 {
     (-1.0 / alpha * (qee.powf(-1.0 / m) - 1.0).powf(1.0 / n)).max(-1.0e37)
 }
 
+/// Closed-pair fluxes `(lower, upper)` for the vapor trial; always `None` until
+/// the typed guard of task 29.2.2 classifies a closed flux/flux pair. A helper,
+/// not a literal, so the `Some` branch is not constant-folded away as dead code.
+fn closed_pair_fluxes() -> Option<(f64, f64)> {
+    None
+}
+
 /// Solves one uncommitted vapor-aware nonlinear water trial.
 ///
 /// Iteration semantics follow `WatFlow` (`WATFLOW.FOR:60-160`): `SetMat` mixes
@@ -337,7 +345,7 @@ pub(crate) fn solve_vapor_water_trial(
             };
             // Keep the per-iteration properties owned before row construction.
             let properties = kernels::evaluate(&primitive)?;
-            let rows = assemble_water_rows(&VaporWaterRowsInput {
+            let rows_input = VaporWaterRowsInput {
                 coordinates: input.mesh.coordinates(),
                 gravity: input.mesh.inclination_cosine(),
                 liquid_conductivities: &liquid,
@@ -351,7 +359,19 @@ pub(crate) fn solve_vapor_water_trial(
                 sink: input.sink,
                 timestep: dt,
                 vapor: &properties,
-            })?;
+            };
+            let rows = assemble_water_rows(&rows_input)?;
+            // Closed flux/flux pair (task 29.2.1): `(rBot, -rTop)`, both positive
+            // into the domain. No caller produces it until the typed guard in 29.2.2.
+            let closed_rows = match closed_pair_fluxes() {
+                Some((lower_flux_in, upper_flux_in)) => Some((
+                    lower_flux_in,
+                    upper_flux_in,
+                    vapor_lower_flux_row(&rows_input, input.face_averaging)?,
+                    vapor_upper_flux_row(&rows_input, input.face_averaging)?,
+                )),
+                None => None,
+            };
             let (upper_mode, lower_flux) = assemble(
                 &mut candidate_workspace,
                 state,
@@ -360,6 +380,34 @@ pub(crate) fn solve_vapor_water_trial(
                 dt,
                 None,
             )?;
+            if let Some((lower_flux_in, upper_flux_in, closed_lower, closed_upper)) = closed_rows {
+                for (location, node, flux, row) in [
+                    (BoundaryRowLocation::Lower, 0, lower_flux_in, closed_lower),
+                    (
+                        BoundaryRowLocation::Upper,
+                        n - 1,
+                        upper_flux_in,
+                        closed_upper,
+                    ),
+                ] {
+                    let row = transform_boundary_row(
+                        n,
+                        location,
+                        BoundaryRow {
+                            lower: row.lower,
+                            diagonal: row.diagonal,
+                            upper: row.upper,
+                            rhs: row.rhs,
+                        },
+                        BoundaryCondition::Neumann { flux },
+                        policy.minimum_pivot,
+                    )?;
+                    candidate_workspace.lower[node] = row.lower;
+                    candidate_workspace.diagonal[node] = row.diagonal;
+                    candidate_workspace.upper[node] = row.upper;
+                    candidate_workspace.rhs[node] = row.rhs;
+                }
+            }
             for (node, vapor_row) in (1..n - 1).zip(rows) {
                 // Replace the liquid-only row, not add it a second time.
                 candidate_workspace.lower[node] = vapor_row.lower;
