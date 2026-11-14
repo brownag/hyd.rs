@@ -1,6 +1,6 @@
 # Project Goals (`planning/GOALS.md`)
 
-Last Updated: 2026-11-13
+Last Updated: 2026-11-14
 Source State: [STATE_27.md](STATE_27.md)
 
 ## Circled Goal (Active)
@@ -8,12 +8,49 @@ Source State: [STATE_27.md](STATE_27.md)
 - **[G22.2]** Water-flux and free-drainage boundary pairs (and supported mixed pairs) are implemented with vapor, including vapor boundary/storage accounting and balance evidence.
   - Why now: root of the remaining chain. G22.3 depends on it, and G20 depends on G22.3. Unblocks the atmospheric path.
   - Exit criteria: each water-flux and free-drainage form with vapor on is accepted or rejected with a named trigger; at least one accepted form has a provenance-backed fixture and a balance check; recorded in the coverage matrix. A full G22.2 will not finish in 24 hours; the first slice is the audit.
-  - First action: a read-only source and coupling audit of the water boundary forms with vapor, in the style of `M6_VAPOR_SINK_ROOT_AUDIT.md`.
+  - Active slice (2026-11-14): the closed flux/flux pair follow-ups, C1 first (see Sequenced Goals). The remaining G22.2 forms (free drainage, single flux, flux/FixedHead) stay out of this slice.
+  - First action: [G22.2-C1] read `outcome()` and `ALL_CASES` in `crates/hydrus-core/tests/vapor_fortran_parity.rs`, and the fixture keys in `reference/vapor_fortran/fixtures/vapor_closed_flux_on.json`. No reference runs and no edits to `criteria.json`.
   - Depends on: G22.1 (done), G19 (done).
   - Result (2026-11-14, GATE 29.2, user): closed flux/flux pair accepted and implemented with vapor on (fixtures, balance test, typed guard); exit criterion met with caveats. G22.2 stays Circled: free drainage, single flux forms and flux/FixedHead remain accepted for orchestration 29 but not implemented.
   - Result (2026-11-13, GATE W1, user): stays Circled. Accepted for orchestration 29: free drainage (lower), prescribed flux upper and lower, and their pairs (closed flux-flux pair first). Rejected with triggers: seepage face, water table, and pairs with them. `qGWLF` and `TopInF`/`BotInF` (+-3) carry the audit's reject-with-trigger disposition but were not explicitly answered at GATE W1; atmospheric is G22.3. Record: [M6_VAPOR_G22_2_ACCEPTANCE.md](master/M6_VAPOR_G22_2_ACCEPTANCE.md).
 
 ## Sequenced Goals (Dependency DAG)
+
+Order: C1, C2, C6, C3, C4, C5. C1, C2 and C6 need no reference run. C3 and C4 each need a gate before any deck or runner change. C5 needs C1 and C3.
+
+- **[G22.2-C1]** Rust trajectory producer for the closed flux/flux pair (vapor on, and off where fields allow) matches the four committed Fortran fixtures (`vapor_closed_flux_{on,off}`, `vapor_flux_known_{on,off}`) within stated tolerances. The comparison runs through `tools/compare_vapor_reference.py` without editing `criteria.json`.
+  - Why now: no gate, no reference run. Closes the gap that the closed pair has balance evidence but no trajectory evidence.
+  - Exit criteria: `outcome()` produces closed-pair trajectories; the comparison reports tolerance and max differences per field (head, liquid_moisture, temperature_c, and vapor fields where the Fortran output has them); results recorded in `M6_VAPOR_COVERAGE.md`.
+  - Files: `crates/hydrus-core/tests/vapor_fortran_parity.rs`, `tools/compare_vapor_reference.py`, `reference/vapor_fortran/`, `planning/master/M6_VAPOR_COVERAGE.md`.
+  - Depends on: none (wet-start fixtures already committed in `839ce78`).
+
+- **[G22.2-C2]** The `qGWLF` and time-variable ±3 input rejections (`TopInF`/`BotInF`) are explicitly confirmed or changed.
+  - Why now: decision only; closes the accounting gap left at GATE W1.
+  - Exit criteria: a dated user decision recorded in `planning/master/M6_VAPOR_G22_2_ACCEPTANCE.md`, with triggers for any rejection kept.
+  - Depends on: none.
+
+- **[G22.2-C6]** The free-drainage lower end-row behavior (formerly G7) is assessed against the source-defect register rules, recorded as a defect or modeling choice, and used to set the free-drainage scope for G22.2.
+  - Why now: small and controllable; the Fortran `ConB` vapor-conductance question (`WATFLOW.FOR:202-213`) decides whether free drainage with vapor can be accepted.
+  - Exit criteria: a source-defect entry (SD-NNN) or a recorded modeling choice; the free-drainage form is marked accepted with its pinning test, or rejected with a trigger.
+  - Depends on: none.
+
+- **[G22.2-C3]** Dry-regime closed flux/flux pair with vapor on is either converged in the pinned Fortran reference, or recorded as impossible with a reason. Chosen strategy: isothermal dry closed deck (tests whether the thermal vapor term drives the divergence seen at h = -10000 cm).
+  - Why now: the committed fixtures start at -100 cm, so they do not test dry-regime vapor behaviour. Working hypothesis (unproven): a free top head with a dry node stores little water, so the thermal vapor flux moves hTop by thousands of cm in one step.
+  - Exit criteria: either a converged dry reference run with provenance, or a documented divergence record (non-convergence counts, hTop trajectory) in `M6_VAPOR_COVERAGE.md`.
+  - Gate: required before any deck or input change and before any reference run. Prior failed attempts (for the record): initial head -1000 cm (died 19.5 h); smaller time steps (1350 non-convergence messages); gradient 25→15 C (NaN by 72 h).
+  - Depends on: none for the gate request; the design is written before the gate.
+
+- **[G22.2-C4]** Fortran `BALANCE.OUT` is added to the runner's output list, and a full-trajectory balance check is run on the closed pair. Today's balance check is one uniform-temperature, no-sink step only.
+  - Why now: needed for the balance claim to cover the whole trajectory.
+  - Exit criteria: full-trajectory balance residual reported for both closed-pair decks, with the runner change in `reference/vapor_fortran/` and `tools/test_run_vapor_reference.py` tests.
+  - Gate: required before the runner change and the rerun.
+  - Depends on: none.
+
+- **[G22.2-C5]** Criteria entries (D5) for the closed pair are approved and written: discrimination entries for head, liquid_moisture and temperature_c per closed pair, and nonzero entries for the `_on` ids. Ad hoc on/off differences (`.development/29.4.2/onoff.txt`): closed pair head 0.897 cm, moisture 9.0e-4, temperature 0.27 C; flux-known pair head 0.877 cm, moisture 8.0e-4, temperature 0.27 C.
+  - Why now: entries must bind to the C1 producer output and cover the dry regime from C3 if that succeeds.
+  - Exit criteria: tolerances proposed with evidence, approved by the user, then written. No edit to `criteria.json` without explicit approval (D5).
+  - Gate: required before any edit to `criteria.json`.
+  - Depends on: G22.2-C1, G22.2-C3.
 
 - **[G22.3]** Atmospheric water switching is implemented with vapor, with its meteorological and evaporation prerequisites contracted.
   - Depends on: G22.2 (and G22.1). Coordinated with G20.
@@ -23,8 +60,13 @@ Source State: [STATE_27.md](STATE_27.md)
 
 ## Independent Backlog
 
-- **[G7]** The free-drainage end-row behavior is assessed against the source-defect register rules and recorded as a defect or modeling choice.
-  - Why now: small and controllable; overlaps the G22.2 free-drainage question, so it can inform G22.2's scope.
+- **[G7]** Superseded by [G22.2-C6], which carries the same free-drainage end-row assessment inside G22.2.
+  - Status: merged into G22.2-C6. Kept for history.
+
+- **[G22.2-C7]** Cleanup: the `planning/STATE_29.md` wave-board rows for 29.3.3 and 29.4.x are updated from pending; the untracked failed-trial output in `.development/29.4.1/runs/B` (about 1.5 GB) and the quarantined partial fixture at `.development/29.3.3/quarantine/` are removed with user approval.
+  - Why now: hygiene only; low leverage.
+  - Gate: deletion needs explicit user approval before any `rm`.
+  - Depends on: none.
 
 - **[G22.5]** Enhancement off (`iEnhanc=0`) evidence strategy decided and implemented. The kernel harness can select it; the full executable cannot via input.
   - Trigger to promote: a user decision on the evidence strategy.
