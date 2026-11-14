@@ -170,5 +170,46 @@ class NonuniformStepTests(unittest.TestCase):
         self.assertIn("vapor_thermal_gradient", called)
 
 
+class ClosedPairTests(unittest.TestCase):
+    CASES = {"vapor_closed_flux_on": ("vapor_dry_thermal_gradient", "0.0 0.0 0.0"), "vapor_closed_flux_off": ("vapor_dry_off_control", "0.0 0.0 0.0"),
+             "vapor_flux_known_on": ("vapor_dry_thermal_gradient", "-1.0e-4 -5.0e-5 0.0"), "vapor_flux_known_off": ("vapor_dry_off_control", "-1.0e-4 -5.0e-5 0.0")}
+
+    def test_decks_match_templates_except_flux_edits(self):
+        for case, (template, flux) in self.CASES.items():
+            new = (vapor.CASES / case / "SELECTOR.IN").read_text().splitlines()
+            base = (vapor.CASES / template / "SELECTOR.IN").read_text().splitlines()
+            base[18], base[20] = "f f -1 f", "f f f f -1 f 0"
+            base[21:21] = ["rTop rBot rRoot", flux]
+            self.assertEqual(new, base, case)
+            for name in ("LEVEL_01.DIR", "PROFILE.DAT"):
+                self.assertEqual((vapor.CASES / case / name).read_bytes(), (vapor.CASES / template / name).read_bytes(), case)
+
+    def test_pairs_differ_only_in_lvapor(self):
+        for pair in ("closed_flux", "flux_known"):
+            on = (vapor.CASES / f"vapor_{pair}_on/SELECTOR.IN").read_text().splitlines()
+            off = (vapor.CASES / f"vapor_{pair}_off/SELECTOR.IN").read_text().splitlines()
+            self.assertEqual([i for i, (a, b) in enumerate(zip(on, off)) if a != b], [11])
+            self.assertEqual(len(on), len(off))
+
+    def test_fixture_specs_bind_ids_and_carry_no_outputs(self):
+        for case in self.CASES:
+            spec = json.loads((vapor.CASES / case / "fixture.json").read_text())
+            self.assertEqual(spec["case_id"], case)
+            self.assertEqual(spec["runner"]["data_prefix"], case)
+            self.assertNotIn("hashes", json.dumps(spec))
+
+    def test_accepts_closed_pair_ids_and_all_lists_them(self):
+        base = str(vapor.ROOT / ".development/29.3.2/unit-test-never-created")
+        argv = [a for c in self.CASES for a in ("--case", c)] + ["--build-dir", "unused", "--task-base", base]
+        called = []
+        with mock.patch.object(vapor, "run_case", side_effect=lambda c, *a: called.append(c) or Path(c)), \
+             mock.patch.object(Path, "mkdir"), mock.patch("builtins.print"):
+            self.assertEqual(vapor.main(argv), 0)
+            called.clear()
+            self.assertEqual(vapor.main(["--all", "--build-dir", "unused", "--task-base", base]), 0)
+        for case in self.CASES:
+            self.assertIn(case, called)
+
+
 if __name__ == "__main__":
     unittest.main()
