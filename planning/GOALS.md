@@ -1,15 +1,15 @@
 # Project Goals (`planning/GOALS.md`)
 
 Last Updated: 2026-11-14
-Source State: [STATE_27.md](STATE_27.md)
+Source State: [STATE_30.md](STATE_30.md)
 
 ## Circled Goal (Active)
 
 - **[G22.2]** Water-flux and free-drainage boundary pairs (and supported mixed pairs) are implemented with vapor, including vapor boundary/storage accounting and balance evidence.
   - Why now: root of the remaining chain. G22.3 depends on it, and G20 depends on G22.3. Unblocks the atmospheric path.
   - Exit criteria: each water-flux and free-drainage form with vapor on is accepted or rejected with a named trigger; at least one accepted form has a provenance-backed fixture and a balance check; recorded in the coverage matrix. A full G22.2 will not finish in 24 hours; the first slice is the audit.
-  - Active slice (2026-11-14): the closed flux/flux pair follow-ups, C1 first (see Sequenced Goals). The remaining G22.2 forms (free drainage, single flux, flux/FixedHead) stay out of this slice.
-  - First action: [G22.2-C1] read `outcome()` and `ALL_CASES` in `crates/hydrus-core/tests/vapor_fortran_parity.rs`, and the fixture keys in `reference/vapor_fortran/fixtures/vapor_closed_flux_on.json`. No reference runs and no edits to `criteria.json`.
+  - Active slice (2026-11-15): C5 done. Written as criteria v6: closed-pair temperature and moisture discrimination (moisture at factor 0.85, passes with about 1% margin), nonzero entries. Closed head dropped; no dry discrimination entries. Remaining for the G22.2 exit: C2 decision and the single-flux and flux/FixedHead forms. Earlier: C5, the closed-pair criteria, was unblocked. C1, C3, C4 and C6 are done (C3 record in `M6_VAPOR_COVERAGE.md`). C3 result: the thermal gradient diverges at -10000 cm (NaN by 72 h) and the isothermal control converges; hypothesis supported. Free drainage with vapor has fixture parity (30.5.1, `340fec7`). Pending user decisions: C2, and the closed-pair head and moisture criteria (dropped at G30.6). The single-flux and flux/FixedHead forms stay out of this slice.
+  - First action: [G22.2-C5] decide the closed-pair head and moisture criteria with the user, and the dry entries (now that C3 is recorded). No edit to `criteria.json` before approval.
   - Depends on: G22.1 (done), G19 (done).
   - Result (2026-11-14, GATE 29.2, user): closed flux/flux pair accepted and implemented with vapor on (fixtures, balance test, typed guard); exit criterion met with caveats. G22.2 stays Circled: free drainage, single flux forms and flux/FixedHead remain accepted for orchestration 29 but not implemented.
   - Result (2026-11-13, GATE W1, user): stays Circled. Accepted for orchestration 29: free drainage (lower), prescribed flux upper and lower, and their pairs (closed flux-flux pair first). Rejected with triggers: seepage face, water table, and pairs with them. `qGWLF` and `TopInF`/`BotInF` (+-3) carry the audit's reject-with-trigger disposition but were not explicitly answered at GATE W1; atmospheric is G22.3. Record: [M6_VAPOR_G22_2_ACCEPTANCE.md](master/M6_VAPOR_G22_2_ACCEPTANCE.md).
@@ -17,6 +17,8 @@ Source State: [STATE_27.md](STATE_27.md)
 ## Sequenced Goals (Dependency DAG)
 
 Order: C1, C2, C6, C3, C4, C5. C1, C2 and C6 need no reference run. C3 and C4 each need a gate before any deck or runner change. C5 needs C1 and C3.
+
+Status (2026-11-14): C1, C3, C4 and C6 are done (C4 pending confirmation). C2 is a pending user decision. C5 is the active slice and blocks the G22.2 exit.
 
 - **[G22.2-C1]** Rust trajectory producer for the closed flux/flux pair (vapor on, and off where fields allow) matches the four committed Fortran fixtures (`vapor_closed_flux_{on,off}`, `vapor_flux_known_{on,off}`) within stated tolerances. The comparison runs through `tools/compare_vapor_reference.py` without editing `criteria.json`.
   - Why now: no gate, no reference run. Closes the gap that the closed pair has balance evidence but no trajectory evidence.

@@ -53,3 +53,41 @@ Trigger: G19 first-increment acceptance (met 2026-11-12, with the recorded excep
 dependencies and user priority; completion is not authorized by orchestration 25.
 G20 need not wait for all of G22, but may not assume a vapor boundary interaction
 has been accepted merely because the initial fixed-head selection passed.
+
+
+## C3 dry-regime closed pair record (2026-11-14)
+
+Gate: G22.2-C3 approved as designed (`planning/master/M6_VAPOR_C3_DRY_DESIGN.md`). Runs under `.development/30.7.3/` (scratch, untracked). Executable: pinned reference build, sha256 `15c24e35e739d992fb6f1a0d92619103baf57223cbdfd12968b0ed33dc246edb`. Records: `.development/30.7.3/c3_record.json`.
+
+Both runs: closed flux/flux pair (`KodTop=-1`, `KodBot=-1`), vapor on, initial head -10000 cm, the same LEVEL_01.DIR. The only difference is the temperature profile and the bottom heat BC.
+
+### Thermal gradient (attempt C deck, 25 to 15 C)
+Exit code 0; 22153 steps; RUN_INF non-converged flags 0; final dt 0.10000E-01 h.
+
+| t (h) | top head (cm) | bottom head (cm) | NaN rows |
+|---|---|---|---|
+| 0.0000 | -10000.000 | -10000.000 | 0/41 |
+| 6.0000 | -239533.344 | -5302.966 | 0/41 |
+| 24.0000 | -614025.312 | -2300.055 | 0/41 |
+| 72.0000 | NaN | NaN | 41/41 |
+| 240.0000 | NaN | NaN | 41/41 |
+
+### Isothermal control (25 C, vapor on)
+Exit code 0; 2400 steps; non-converged flags 0; final dt 0.10000E+00 h.
+
+| t (h) | top head (cm) | bottom head (cm) | NaN rows |
+|---|---|---|---|
+| 0.0000 | -10000.000 | -10000.000 | 0/41 |
+| 6.0000 | -10000.005 | -10000.005 | 0/41 |
+| 24.0000 | -10000.002 | -10000.002 | 0/41 |
+| 72.0000 | -9999.998 | -9999.998 | 0/41 |
+| 240.0000 | -9999.994 | -9999.994 | 0/41 |
+
+### Finding
+Hypothesis supported. At the same head and flux settings, the thermal gradient diverges (head blow-up by 72 h, NaN) and the isothermal control converges to 240 h with head held near -10000 cm.
+
+Two points for the record:
+- The Fortran run exits with code 0 while its output is NaN. The divergence is silent to the exit code and to RUN_INF's convergence flags. Any runner must check NOD_INF for NaN, not only the exit code.
+- The thermal run takes 22153 steps and its dt shrinks to 0.01 h, against 2400 steps at dt 0.1 h for the control.
+
+Not tested here: whether the divergence goes away with the thermal vapor terms removed from the water equation. That counterfactual (scratch build `.development/30.7.1/cf2`) is outside the approved C3 design and is not run.
