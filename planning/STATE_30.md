@@ -1,6 +1,6 @@
 # Orchestration 30 state — G22.2 follow-ups
 
-Created: 2026-11-14. Status: **Waves 0-5 done; waiting on G30.6 before Wave 6.**
+Created: 2026-11-14. Status: **Waves 0-6 done.** Orchestration 30 is complete on the wave board; the head discrimination gap is open.
 Plan: [EXECUTION_PLAN_30.md](EXECUTION_PLAN_30.md). Prompt: [PROMPT_TEMPLATE_30.md](PROMPT_TEMPLATE_30.md). Goal: [GOALS.md](GOALS.md) G22.2 (Circled).
 Predecessor: [STATE_29.md](STATE_29.md) (closed).
 
@@ -21,7 +21,7 @@ Predecessor: [STATE_29.md](STATE_29.md) (closed).
 - [x] G30.3 (user, 2026-11-14): Deck A & B designs in `M6_VAPOR_ORCH30_DECK_DESIGN.md` and `BALANCE.OUT` runner change (`d645e42`) approved.
 - [x] G30.4 (user, 2026-11-14): Wave 4 reference runs (`30.4.1`, `30.4.2`, `30.4.3`) under `.development/` approved.
 - [x] G30.5 (user, 2026-11-14): approved as written: stage the four candidate fixtures (vapor_dry_isothermal_on/off, vapor_free_drainage_on/off) with cases and manifests into `reference/vapor_fortran/`; extend `vapor_fortran_parity.rs` with trajectory comparisons.
-- [ ] G30.6 (user): criteria D5 entries. Proposal in `planning/master/M6_VAPOR_ORCH30_CRITERIA_PROPOSAL.md` (`b8f070a`); 7 entries are below 2.0x tolerance and need a decision. Not yet written.
+- [x] G30.6 (user, 2026-11-14): drop the 7 flagged entries (below 2.0x tolerance). Written: 7 entries at factor 2.0 (`abe857a`). Dropped on a second decision: `free_drain_on_off_head` (r_max 0.9121 vs 2.0).
 
 ## Wave board
 
@@ -39,7 +39,7 @@ Predecessor: [STATE_29.md](STATE_29.md) (closed).
 | 4 | 30.4.3 | Full-trajectory balance of the closed pair (C4 part 2) | done (`WatBalR` max 0.156%) |
 | 5 | 30.5.1 | Stage approved fixtures; extend producer; trajectory tests | done (`340fec7`); 4 new parity tests pass |
 | 5 | 30.5.2 | Criteria proposal (D5, no write) | done (`b8f070a`); 7 entries flagged below 2.0x tolerance for G30.6 |
-| 6 | 30.6.1 | Write approved criteria entries (D5) | pending (after G30.6) |
+| 6 | 30.6.1 | Write approved criteria entries (D5) | done (`abe857a`); 7 entries written, head entry dropped |
 
 ## Wave gates
 
@@ -58,3 +58,6 @@ _Appended by the orchestrator from each worker's `planning/tasks/<id>.report.md`
 - Recon: `BALANCE.OUT` is not in the runner's output list (task 30.3.1).
 - Scope change (2026-11-14, user): free drainage implemented in this orchestration (D1). The orchestration input's out-of-scope line for free drainage is superseded.
 - Scope change (2026-11-14, user, task 30.5.1): `tools/run_vapor_reference.py` added to 30.5.1's must-edit list to add the four approved case names to the `--all`/`expected` whitelist (plan escalation rule 4: re-scoped, not ad hoc). Its test file `tools/test_run_vapor_reference.py` may be read but not changed.
+- Scope change (2026-11-14, user, task 30.6.1): the four `CRITERIA_SHA256` pins (vapor_fortran_parity.rs, vapor_heat_boundary_parity.rs, vapor_nonuniform_parity.rs, vapor_nonuniform_timestep_controller.rs) may change one line each to the new criteria.json hash. Contract fields stay at v4.
+- Wave 6 (30.6.1), 2026-11-14: build OK; clippy `-D warnings` OK; `cargo fmt --check` fails only on `vapor_closed_pair_balance.rs:59` (pre-existing); `cargo test --workspace` 648 passed / 0 failed; Python 499 OK; comparator discrimination PASS (7 entries, `.development/30.6.1/disc2.json`).
+- Open: head discrimination for free drainage (r_max 0.9121 at factor 2.0 tolerance). Investigation: the on/off head effect comes from the thermal vapor flux (`v_vap_term` with `con_vt` and the temperature gradient), not from the `ConVh` term in `rBot` (ratio about 1e-7 of K_L). Counterfactual run not yet done.
