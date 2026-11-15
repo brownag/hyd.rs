@@ -69,13 +69,14 @@ Source goal: [GOALS.md](GOALS.md) Circled G22.2, plus Sequenced G22.3 and the ra
 | GATE A | user | | 31.1.2, 31.1.3 | | Approve C5 tolerances and G22.3 contract |
 | 2 | 31.2.1 | hyd.rs | 31.1.3 | `tools/run_vapor_reference.py`, `reference/vapor_fortran/cases/vapor_met_*` (create) | Met deck generator and pinned Fortran `lMeteo=true` runs |
 | 2 | 31.2.2 | hyd.rs | 31.1.3 | `crates/hydrus-core/src/meteo/` (create), `crates/hydrus-core/src/lib.rs` | Port Rn, Rns, Rnl from `MeteoIn` (ADR 0010/0015) |
+| 2 | 31.2.3 | hyd.rs | GATE A | `reference/vapor_fortran/criteria.json` | Add `flux_known_on_off_liquid_moisture` (factor 0.75, C5 Option M1) |
 | 3 | 31.3.1 | hyd.rs | 31.2.2 | `crates/hydrus-core/src/meteo/evaporation.rs` (create), `crates/hydrus-core/src/meteo/mod.rs` | Port evaporation/ET from met input |
 | 3 | 31.3.2 | hyd.rs | 31.1.3, 31.2.2 | `crates/hydrus-core/src/atmospheric.rs`, `crates/hydrus-core/src/forcing.rs` | Atmospheric switching accepts vapor (water-only behavior unchanged) |
 | 4 | 31.4.1 | hyd.rs | 31.2.1, 31.3.1, 31.3.2 | `crates/hydrus-core/tests/vapor_met_parity.rs` (create), `reference/vapor_fortran/fixtures/` | Parity against pinned Fortran met trajectory |
 | 4 | 31.4.2 | hyd.rs | 31.3.2 | `crates/hydrus-core/tests/vapor_met_balance.rs` (create) | Water balance check with met switching |
-| 5 | 31.5.1 | hyd.rs | 31.4.1, 31.4.2, C5 approved | `planning/master/M6_VAPOR_COVERAGE.md`, `planning/master/M6_VAPOR_G22_3_ACCEPTANCE.md` (create), `GOALS.md` | Record G22.2 close and G22.3 acceptance |
+| 5 | 31.5.1 | hyd.rs | 31.4.1, 31.4.2, 31.2.3 | `planning/master/M6_VAPOR_COVERAGE.md`, `planning/master/M6_VAPOR_G22_3_ACCEPTANCE.md` (create), `GOALS.md` | Record G22.2 close and G22.3 acceptance |
 
-Wave disjointness: wave 1 touches docs only. Wave 2 `31.2.1` (tools/reference) and `31.2.2` (new meteo module) are disjoint. Wave 3 `31.3.1` (meteo/evaporation.rs) and `31.3.2` (atmospheric.rs, forcing.rs) are disjoint. Wave 4 `31.4.1` and `31.4.2` are disjoint test files. `water_solver.rs` is not edited by any task; if 31.3.2 needs it, it becomes a re-scope (escalation 4).
+Wave disjointness: wave 1 touches docs only. Wave 2 `31.2.1` (tools, cases), `31.2.2` (meteo module) and `31.2.3` (criteria.json) are disjoint. Wave 3 `31.3.1` (meteo/evaporation.rs) and `31.3.2` (atmospheric.rs, forcing.rs) are disjoint. Wave 4 `31.4.1` and `31.4.2` are disjoint test files. `water_solver.rs` is not edited by any task; if 31.3.2 needs it, it becomes a re-scope (escalation 4).
 
 ## Task specs
 
@@ -102,7 +103,7 @@ Wave disjointness: wave 1 touches docs only. Wave 2 `31.2.1` (tools/reference) a
 ### 31.2.1 Met reference harness
 - Depends on: 31.1.3. Repo: hyd.rs.
 - Spec: add a met case generator and `lMeteo=true` cases using the pinned Fortran reference, following the vapor harness (case dir layout, `SELECTOR.IN` with `lMeteo=t`, `LEVEL_01.DIR`). Extend the case allowlist in `run_vapor_reference.py` (~line 318) for the new cases only. Run through the existing producer. Do not edit `criteria.json`.
-- Must edit: `tools/run_vapor_reference.py`, `reference/vapor_fortran/cases/vapor_met_*` (create).
+- Must edit: `tools/run_vapor_reference.py`, `reference/vapor_fortran/cases/vapor_met_*` (create). Must not touch `criteria.json` (owned by 31.2.3).
 - Anchors: `tools/run_vapor_reference.py:318`, `reference/vapor_fortran/cases/vapor_flux_fixedhead_wet_on/SELECTOR.IN` (template).
 - Acceptance: `python3 -m unittest tools.test_run_vapor_reference` passes; a `vapor_met_*` fixture is produced under `reference/vapor_fortran/fixtures/`.
 
@@ -112,6 +113,13 @@ Wave disjointness: wave 1 touches docs only. Wave 2 `31.2.1` (tools/reference) a
 - Must edit: `crates/hydrus-core/src/meteo/mod.rs` (create), `crates/hydrus-core/src/meteo/radiation.rs` (create), `crates/hydrus-core/src/lib.rs`.
 - Anchors: `src_reference/INPUT.FOR:934` (`MeteoIn`), `ShortWaveRadA`/`ShortWaveRadB`.
 - Acceptance: `cargo test -p hydrus-core meteo::radiation` passes, with unit tests against the source formulas.
+
+### 31.2.3 C5 criteria entry (Option M1)
+- Depends on: GATE A (approved 2026-11-15: head Option A, moisture M1). Repo: hyd.rs.
+- Spec: add exactly one entry to `reference/vapor_fortran/criteria.json`: `flux_known_on_off_liquid_moisture` (case `vapor_flux_known_on`, control `vapor_flux_known_off`, `factor_of_tolerance` 0.75, field `liquid_moisture`, rule `any_print_time_after_initial`, unit `cm3/cm3`). Copy from `planning/master/M6_VAPOR_C5_PROPOSAL.md` section 5. No head entries (Option A). Bump the criteria version/changelog fields the way v6 did (see commit `231aa46`).
+- Must edit: `reference/vapor_fortran/criteria.json`. This is the only task allowed to edit it; 31.2.1 must not.
+- Anchors: `tools/compare_vapor_reference.py` (`validate_criteria`), commit `231aa46`.
+- Acceptance: `python3 -m unittest tools.test_compare_vapor_reference` passes; the comparator over existing fixtures passes the new entry (r_max 0.7619); `cargo test -p hydrus-core --test vapor_fortran_parity` still 19 pass.
 
 ### 31.3.1 Port evaporation from met input
 - Depends on: 31.2.2. Repo: hyd.rs.
@@ -140,7 +148,7 @@ Wave disjointness: wave 1 touches docs only. Wave 2 `31.2.1` (tools/reference) a
 - Acceptance: `cargo test -p hydrus-core --test vapor_met_balance` passes.
 
 ### 31.5.1 Record G22.2 close and G22.3 acceptance
-- Depends on: 31.4.1, 31.4.2, and GATE A (C5 approved). Repo: hyd.rs.
+- Depends on: 31.4.1, 31.4.2, 31.2.3 (criteria entry landed). Repo: hyd.rs.
 - Spec: record closure in the coverage matrix and GOALS. The acceptance doc is the record for G22.3. If C5 is not approved, do not claim G22.2 closed; record the open item.
 - Must edit: `planning/master/M6_VAPOR_COVERAGE.md`, `planning/master/M6_VAPOR_G22_3_ACCEPTANCE.md` (create), `planning/GOALS.md`.
 - Acceptance: files updated; `grep -n G22.3 planning/GOALS.md` shows the new result.

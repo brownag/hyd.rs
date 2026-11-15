@@ -26,7 +26,7 @@ that reviews your plan before you may write code.
 - After approval, a focused local commit is part of executing the approved task. This does not
   authorize pushes, pull requests, comments, or other outward-facing actions.
 - NEVER touch files outside "Files in scope". If required, STOP and report.
-- NEVER edit `reference/vapor_fortran/criteria.json` (GATE A owns it).
+- NEVER edit `reference/vapor_fortran/criteria.json`, except task 31.2.3 (one entry, Option M1).
 - NEVER edit `crates/hydrus-core/src/water_solver.rs` in this orchestration. Stop and report if needed.
 - NEVER go off-plan; discovered work goes in "## Discovered" and waits.
 - NEVER assume: resolve unknowns by reading code in Analysis. Anything still ambiguous becomes
