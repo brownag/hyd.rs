@@ -358,6 +358,14 @@ class DiscriminationTests(Base):
             on["temperature_c"][1][0] += 1.0
             out[f"vapor_heatbc_{stem}_on"] = on
             out[f"vapor_heatbc_{stem}_off"] = fixture(f"vapor_heatbc_{stem}_off", available=False)
+        # criteria v5 (30.6.1) pairs and nonzero cases, same on/off construction
+        for base in ("vapor_free_drainage", "vapor_closed_flux", "vapor_flux_known", "vapor_dry_isothermal"):
+            on = fixture(f"{base}_on", vapor=vapor)
+            on["head"][1][0] += 5.0
+            on["liquid_moisture"][1][0] += 0.05
+            on["temperature_c"][1][0] += 1.0
+            out[f"{base}_on"] = on
+            out[f"{base}_off"] = fixture(f"{base}_off", available=False)
         return out
 
     def disc(self, fixtures):

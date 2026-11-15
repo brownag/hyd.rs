@@ -1,5 +1,5 @@
 {
- "approved_at": "2026-11-12",
+ "approved_at": "2026-11-14",
  "approved_by": "user (repository owner)",
  "checks": {
   "heat_balance_interior": {
@@ -42,6 +42,45 @@
  "contract_revision": "018c3c3824a082a2339eb63e9aa6e5ec470b80c5",
  "contract_sha256": "5b6125154792e9674bb8c2576440e6b437edf468787d909a79175dc80cb0e110",
  "discrimination": {
+  "closed_flux_on_off_temperature_c": {
+   "case": "vapor_closed_flux_on",
+   "control": "vapor_closed_flux_off",
+   "factor_of_tolerance": 2.0,
+   "field": "temperature_c",
+   "rule": "any_print_time_after_initial",
+   "unit": "degC"
+  },
+  "closed_vapor_fields_nonzero": {
+   "cases": [
+    "vapor_closed_flux_on",
+    "vapor_flux_known_on"
+   ],
+   "factor_of_tolerance": 1.0,
+   "fields": [
+    "con_vh",
+    "con_vt",
+    "v_vapor",
+    "v_vap_iso",
+    "v_vap_term"
+   ],
+   "rule": "max_abs_exceeds_zero_floor_each_case",
+   "unit": "field"
+  },
+  "dry_iso_vapor_fields_nonzero": {
+   "cases": [
+    "vapor_dry_isothermal_on"
+   ],
+   "factor_of_tolerance": 1.0,
+   "fields": [
+    "con_vh",
+    "con_vt",
+    "v_vapor",
+    "v_vap_iso",
+    "v_vap_term"
+   ],
+   "rule": "max_abs_exceeds_zero_floor_each_case",
+   "unit": "field"
+  },
   "dry_on_off_head": {
    "case": "vapor_dry_thermal_gradient",
    "control": "vapor_dry_off_control",
@@ -65,6 +104,45 @@
    "field": "temperature_c",
    "rule": "any_print_time_after_initial",
    "unit": "degC"
+  },
+  "flux_known_on_off_temperature_c": {
+   "case": "vapor_flux_known_on",
+   "control": "vapor_flux_known_off",
+   "factor_of_tolerance": 2.0,
+   "field": "temperature_c",
+   "rule": "any_print_time_after_initial",
+   "unit": "degC"
+  },
+  "free_drain_on_off_liquid_moisture": {
+   "case": "vapor_free_drainage_on",
+   "control": "vapor_free_drainage_off",
+   "factor_of_tolerance": 2.0,
+   "field": "liquid_moisture",
+   "rule": "any_print_time_after_initial",
+   "unit": "cm3/cm3"
+  },
+  "free_drain_on_off_temperature_c": {
+   "case": "vapor_free_drainage_on",
+   "control": "vapor_free_drainage_off",
+   "factor_of_tolerance": 2.0,
+   "field": "temperature_c",
+   "rule": "any_print_time_after_initial",
+   "unit": "degC"
+  },
+  "free_drain_vapor_fields_nonzero": {
+   "cases": [
+    "vapor_free_drainage_on"
+   ],
+   "factor_of_tolerance": 1.0,
+   "fields": [
+    "con_vh",
+    "con_vt",
+    "v_vapor",
+    "v_vap_iso",
+    "v_vap_term"
+   ],
+   "rule": "max_abs_exceeds_zero_floor_each_case",
+   "unit": "field"
   },
   "heatbc_df_head": {
    "case": "vapor_heatbc_df_on",
@@ -398,6 +476,6 @@
    }
   }
  },
- "revision_note": "post-failure owner override of v1 (sha256 d645cae2a0ba44219eed7b53185abb09a1815ee481041f4e7a3b9fbc0cbbf008); only v_vapor, v_vap_term, v_total zero_rule changed; v4 (task 28.3, 2026-11-13) adds only checks.water_balance_interior_step_off_reference (static-water consistency, case vapor_nonuniform_step_off) and rebinds contract_revision/contract_sha256 to the v4 contract section",
+ "revision_note": "post-failure owner override of v1 (sha256 d645cae2a0ba44219eed7b53185abb09a1815ee481041f4e7a3b9fbc0cbbf008); only v_vapor, v_vap_term, v_total zero_rule changed; v4 (task 28.3, 2026-11-13) adds only checks.water_balance_interior_step_off_reference (static-water consistency, case vapor_nonuniform_step_off) and rebinds contract_revision/contract_sha256 to the v4 contract section; v5 (task 30.6.1, G30.6 approved 2026-11-14) adds only discrimination entries free_drain_on_off_{liquid_moisture,temperature_c}, closed_flux_on_off_temperature_c, flux_known_on_off_temperature_c and nonzero entries closed_vapor_fields_nonzero, dry_iso_vapor_fields_nonzero, free_drain_vapor_fields_nonzero; contract_revision/contract_sha256 unchanged",
  "schema_version": "vapor-criteria-v2"
 }
