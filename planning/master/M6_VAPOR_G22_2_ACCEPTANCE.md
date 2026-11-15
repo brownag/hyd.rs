@@ -21,7 +21,8 @@ Basis: [M6_VAPOR_FREE_DRAINAGE_AUDIT.md](M6_VAPOR_FREE_DRAINAGE_AUDIT.md),
 | Lower `qGWLF` (`KodBot=-7`) | confirmed rejected with trigger | confirmed by user 2026-11-14 (C2; was audit disposition) |
 | `TopInF` / `BotInF` (+-3) | confirmed rejected with trigger | confirmed by user 2026-11-14 (C2; was audit disposition) |
 | Atmospheric (`KodTop=-4`) | not decided here (G22.3) | **not explicitly answered** |
-| Pairs flux/flux (closed pair first), flux/FixedHead | accepted for orchestration 29 | yes (follow the singles) |
+| Pair flux/flux (closed pair) | accepted and implemented (orchestration 29, `ClosedFlux`) | yes (follow the singles) |
+| Pair flux/FixedHead (`FixedHeadLowerFluxUpper`) | accepted and implemented (`880c6c2`); wet parity passes; dry divergence recorded | yes (follow the singles) |
 | Pairs flux/FreeD, head/FreeD | accepted for orchestration 29 | yes (follow free drainage) |
 | Pairs with seepage face or water table | rejected with trigger | yes (follow the singles) |
 | Pair flux/`qGWLF` | confirmed rejected with trigger | confirmed by user 2026-11-14 (C2; follows `qGWLF`) |
@@ -97,4 +98,13 @@ The user explicitly confirmed the rejection of `qGWLF`, `TopInF`/`BotInF` (±3),
 
 ## C2 decision (2026-11-15, user)
 The user confirmed the rejections that GATE W1 left unanswered. Both stay rejected with their existing triggers: `qGWLF` (groundwater-level-dependent bottom flux) and time-variable +-3 `TopInF`/`BotInF` inflow with vapor. No code change. This closes G22.2-C2.
+
+## G22.2 flux/FixedHead acceptance and implementation (2026-11-15)
+
+The flux/FixedHead water boundary pair (`FixedHeadLowerFluxUpper`: lower fixed head with upper prescribed flux) was implemented in `880c6c2`:
+- **Kernel & solver acceptance:** `crates/hydrus-core/src/heat/vapor/mod.rs` accepts `(LowerBoundaryMode::FixedHead, UpperBoundary::Flux)` via `VaporBoundaryPair::FixedHeadLowerFluxUpper { upper_flux }`. The lower row retains the standard Dirichlet row from assembly, while the upper row receives the vapor flux row (`WATFLOW.FOR:288-291`) in `crates/hydrus-core/src/water_solver.rs`.
+- **Wet fixture & parity:** The wet fixture `reference/vapor_fortran/fixtures/vapor_flux_fixedhead_wet_on.json` (bottom head -100 cm, 0-240 h) passes exact parity in `crates/hydrus-core/tests/vapor_fortran_parity.rs` (`flux_fixedhead_wet_on_matches_fixture`).
+- **Dry divergence record:** The dry deck (-10000 cm) diverges with NaN by 72 h under graded temperature (exit code 0 in Fortran, head blow-up); recorded as a documented divergence per `M6_VAPOR_FLUX_FIXEDHEAD_DESIGN.md` and `M6_VAPOR_COVERAGE.md`.
+- **Reverse pair status:** Prescribed flux lower with fixed-head upper remains accepted, not implemented in code (`crates/hydrus-core/src/heat/vapor/mod.rs` returns `VaporError::UnsupportedLowerBoundary`).
+
 
