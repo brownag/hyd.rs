@@ -21,7 +21,7 @@ Branch: `feat/vapor-flux-fixedhead`. Tracked planning (D-5).
 | 1 | 31.1.3 G22.3 + met contract | done | `4a76818` |
 | GATE A | user approves C5 and G22.3 contract | approved 2026-11-15 | see Gate A decisions |
 | 2 | 31.2.1 met reference harness | pending | |
-| 2 | 31.2.2 radiation Rn/Rns/Rnl port | pending | |
+| 2 | 31.2.2 radiation Rn/Rns/Rnl port | done | `b7acedf` |
 | 2 | 31.2.3 C5 criteria entry (M1) | pending | |
 | 3 | 31.3.1 evaporation port | pending | |
 | 3 | 31.3.2 vapor-aware atmospheric switching | pending | |
@@ -58,3 +58,14 @@ Branch: `feat/vapor-flux-fixedhead`. Tracked planning (D-5).
 - Tests: cargo test -p hydrus-core --test vapor_fortran_parity (19 passed, 0 failed); python3 -m unittest tools.test_compare_vapor_reference (49 tests, OK)
 - Deviations: none
 - Gotchas for dependent tasks: criteria.json was NOT modified; GATE A requires explicit user decision on head (Options A/B/C) and moisture (Options M1/M2/M3) before any criteria.json update in subsequent waves.
+
+## 31.2.2 Port radiation Rn, Rns, Rnl
+- Status: done
+- Files changed:
+  - `crates/hydrus-core/src/meteo/mod.rs` (created, lines 1-270)
+  - `crates/hydrus-core/src/meteo/radiation.rs` (created, lines 1-755)
+  - `crates/hydrus-core/src/lib.rs` (lines 13, 28-35)
+- Code commit: `b7acedf`
+- Tests: `cargo test -p hydrus-core meteo::radiation` (9 passed, 0 failed); `cargo clippy -p hydrus-core --all-targets -- -D warnings` (clean); `cargo fmt --all -- --check` (clean)
+- Deviations from approved plan: none
+- Gotchas for dependent tasks: Latitude inputs use degrees-and-minutes decimal format (`50.30` = 50°30'); `meteo::radiation` computes strictly in `f32` per ADR 0010/0015; task 31.3.1 (evaporation) can consume `NetRadiation`, `ExtraterrestrialRadiation`, and `CloudinessResult` directly.
