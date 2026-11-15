@@ -16,7 +16,7 @@ Branch: `feat/vapor-flux-fixedhead`. Tracked planning (D-5).
 
 | Wave | Task | Status | Commit(s) |
 | --- | --- | --- | --- |
-| 1 | 31.1.1 coverage matrix fix | pending | |
+| 1 | 31.1.1 coverage matrix fix | complete | ffa1af1 |
 | 1 | 31.1.2 C5 criteria proposal | pending | |
 | 1 | 31.1.3 G22.3 + met contract | pending | |
 | GATE A | user approves C5 and G22.3 contract | pending | |
@@ -30,4 +30,15 @@ Branch: `feat/vapor-flux-fixedhead`. Tracked planning (D-5).
 
 ## Task reports
 
-(Workers append `## {{id}}` sections here, <=15 lines each.)
+## 31.1.1 Fix G22.2 coverage matrix
+- Status: complete
+- Files changed:
+  - `planning/master/M6_VAPOR_COVERAGE.md` (lines 24-25, 31)
+  - `planning/master/M6_VAPOR_G22_2_ACCEPTANCE.md` (lines 24-25, 102-110)
+  - `planning/tasks/31.1.1.todo.md` (lines 1-23)
+- Commit ID: `ffa1af1` (docs commit, no code modified)
+- Tests:
+  - `grep -n "still rejects" planning/master/M6_VAPOR_COVERAGE.md`: 0 matches
+  - `cargo test -p hydrus-core --test vapor_fortran_parity flux_fixedhead_wet_on_matches_fixture`: passed (1 passed, 0 failed)
+- Deviations from approved plan: none
+- Gotchas for dependent tasks: none; code support pre-landed in `880c6c2` (`FixedHeadLowerFluxUpper`).
