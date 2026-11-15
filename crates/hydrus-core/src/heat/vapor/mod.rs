@@ -229,6 +229,11 @@ pub(crate) enum VaporBoundaryPair {
     FreeDrainage {
         upper_flux: f64,
     },
+    /// Fixed-head lower (Dirichlet, `WATFLOW.FOR` `KodBot >= 0`) with prescribed upper flux.
+    /// Only the upper row carries vapor terms; the lower row is the standard Dirichlet row.
+    FixedHeadLowerFluxUpper {
+        upper_flux: f64,
+    },
 }
 
 impl VaporBoundaryPair {
@@ -294,11 +299,19 @@ impl VaporBoundaryPair {
                 validate_finite("upper flux", upper_flux)?;
                 Ok(Self::FreeDrainage { upper_flux })
             }
-            // Fixed-head lower with a non-head upper: today's upper rejection.
             (
                 LowerBoundaryMode::FixedHead { .. },
-                UpperBoundary::Flux { .. } | UpperBoundary::Atmospheric { .. },
-            ) => Err(VaporError::UnsupportedUpperBoundary(upper)),
+                UpperBoundary::Flux {
+                    flux: upper_flux, ..
+                },
+            ) => {
+                validate_finite("upper flux", upper_flux)?;
+                Ok(Self::FixedHeadLowerFluxUpper { upper_flux })
+            }
+            // Fixed-head lower with atmospheric upper stays rejected.
+            (LowerBoundaryMode::FixedHead { .. }, UpperBoundary::Atmospheric { .. }) => {
+                Err(VaporError::UnsupportedUpperBoundary(upper))
+            }
             // Every other lower mode is rejected first, as today.
             (
                 LowerBoundaryMode::PrescribedFlux { .. },
@@ -686,6 +699,10 @@ mod boundary_pair_tests {
                     (2, 1) => assert_eq!(
                         got,
                         Ok(VaporBoundaryPair::FreeDrainage { upper_flux: -0.25 })
+                    ),
+                    (0, 1) => assert_eq!(
+                        got,
+                        Ok(VaporBoundaryPair::FixedHeadLowerFluxUpper { upper_flux: -0.25 })
                     ),
                     (0, _) => assert_eq!(got, Err(VaporError::UnsupportedUpperBoundary(upper))),
                     _ => assert_eq!(got, Err(VaporError::UnsupportedLowerBoundary(lower))),

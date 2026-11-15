@@ -76,6 +76,7 @@ const FLUX_CASES: [&str; 8] = [
     "vapor_flux_known_on",
     "vapor_flux_known_off",
 ];
+const FIXEDHEAD_CASES: [&str; 1] = ["vapor_flux_fixedhead_wet_on"];
 const BASE_FIELDS: [&str; 3] = ["head", "liquid_moisture", "temperature_c"];
 const VAPOR_FIELDS: [&str; 9] = [
     "con",
@@ -763,6 +764,12 @@ fn run_case(case: &str, expect_vapor: bool) -> Result<Candidate, String> {
             "{case}: prescribed top flux with free drainage"
         );
         assert!(deck.r_top.is_finite(), "{case}: finite rTop");
+    } else if deck.k_top == -1 && deck.k_bot == 1 {
+        assert!(
+            !deck.top_inf && !deck.bot_inf,
+            "{case}: prescribed flux top with fixed-head bottom"
+        );
+        assert!(deck.r_top.is_finite(), "{case}: finite rTop");
     } else if deck.k_top == -1 && deck.k_bot == -1 {
         assert!(
             !deck.top_inf && !deck.bot_inf,
@@ -885,7 +892,7 @@ fn run_case(case: &str, expect_vapor: bool) -> Result<Candidate, String> {
     let is_flux_case = deck.k_top == -1;
     let lower = if deck.k_bot == -5 {
         LowerBoundaryMode::FreeDrainage
-    } else if is_flux_case {
+    } else if deck.k_bot == -1 {
         LowerBoundaryMode::PrescribedFlux { flux: deck.r_bot }
     } else {
         LowerBoundaryMode::FixedHead {
@@ -937,7 +944,7 @@ fn run_case(case: &str, expect_vapor: bool) -> Result<Candidate, String> {
         )
         .map_err(|e| format!("{e:?}"))?;
         for &print_time in &deck.print_times[1..] {
-            while water.time() < print_time - 1e-12 {
+            while water.time() < print_time - 1e-9 {
                 let upper_row = if is_flux_case {
                     let h_top = water.heads()[n - 1];
                     let h_prev = water.heads()[n - 2];
@@ -1061,7 +1068,7 @@ fn run_case(case: &str, expect_vapor: bool) -> Result<Candidate, String> {
 
     let mut last: Option<VaporStepReport> = None;
     for &print_time in &deck.print_times[1..] {
-        while water.time() < print_time - 1e-12 {
+        while water.time() < print_time - 1e-9 {
             let report = driver
                 .step(
                     &mut water,
@@ -1571,6 +1578,16 @@ fn outcome() -> &'static Result<Outcome, String> {
             rows.insert(case.to_owned(), compare_case(case, &c, &fixture, &crits)?);
             candidates.insert(case.to_owned(), c);
         }
+        for case in FIXEDHEAD_CASES {
+            let expect_vapor = case.ends_with("_on");
+            let c = run_case(case, expect_vapor)?;
+            let json = candidate_json(case, &c, CRITERIA_SHA256);
+            let path = root.join(format!("{case}.candidate.json"));
+            let _ = write_json(&path, &json);
+            let fixture = read_json(&ref_dir().join("fixtures").join(format!("{case}.json")));
+            rows.insert(case.to_owned(), compare_case(case, &c, &fixture, &crits)?);
+            candidates.insert(case.to_owned(), c);
+        }
         for case in FLUX_CASES {
             let expect_vapor = case.ends_with("_on");
             let c = run_case(case, expect_vapor)?;
@@ -1793,6 +1810,15 @@ fn dry_isothermal_off_matches_fixture() {
     assert_rows_pass(
         "vapor_dry_isothermal_off",
         &o.rows["vapor_dry_isothermal_off"],
+    );
+}
+
+#[test]
+fn flux_fixedhead_wet_on_matches_fixture() {
+    let o = out();
+    assert_rows_pass(
+        "vapor_flux_fixedhead_wet_on",
+        &o.rows["vapor_flux_fixedhead_wet_on"],
     );
 }
 

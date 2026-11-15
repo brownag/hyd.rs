@@ -382,7 +382,20 @@ pub(crate) fn solve_vapor_water_trial(
                         vapor_upper_flux_row(&rows_input, input.face_averaging)?,
                     ))
                 }
-                VaporBoundaryPair::HeadHead => None,
+                VaporBoundaryPair::HeadHead | VaporBoundaryPair::FixedHeadLowerFluxUpper { .. } => {
+                    None
+                }
+            };
+            // Fixed-head lower with flux upper: the lower Dirichlet row from `assemble` is kept;
+            // only the upper row takes the vapor flux row (`WATFLOW.FOR:288-291`).
+            let fixed_head_upper = match boundary_pair {
+                VaporBoundaryPair::FixedHeadLowerFluxUpper {
+                    upper_flux: upper_flux_in,
+                } => Some((
+                    upper_flux_in,
+                    vapor_upper_flux_row(&rows_input, input.face_averaging)?,
+                )),
+                _ => None,
             };
             let (upper_mode, mut lower_flux) = assemble(
                 &mut candidate_workspace,
@@ -420,6 +433,26 @@ pub(crate) fn solve_vapor_water_trial(
                     candidate_workspace.upper[node] = row.upper;
                     candidate_workspace.rhs[node] = row.rhs;
                 }
+            }
+            if let Some((upper_flux_in, fixed_upper)) = fixed_head_upper {
+                let row = transform_boundary_row(
+                    n,
+                    BoundaryRowLocation::Upper,
+                    BoundaryRow {
+                        lower: fixed_upper.lower,
+                        diagonal: fixed_upper.diagonal,
+                        upper: fixed_upper.upper,
+                        rhs: fixed_upper.rhs,
+                    },
+                    BoundaryCondition::Neumann {
+                        flux: upper_flux_in,
+                    },
+                    policy.minimum_pivot,
+                )?;
+                candidate_workspace.lower[n - 1] = row.lower;
+                candidate_workspace.diagonal[n - 1] = row.diagonal;
+                candidate_workspace.upper[n - 1] = row.upper;
+                candidate_workspace.rhs[n - 1] = row.rhs;
             }
             for (node, vapor_row) in (1..n - 1).zip(rows) {
                 // Replace the liquid-only row, not add it a second time.
