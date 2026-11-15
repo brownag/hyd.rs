@@ -316,6 +316,7 @@ def main(argv=None) -> int:
     expected |= {f"vapor_heatbc_{pair}_{state}" for pair in ("df", "dz", "fd", "ff", "fz") for state in ("on", "off")}
     expected |= {f"vapor_nonuniform_step_{state}" for state in ("on", "off")}
     expected |= {f"vapor_{pair}_{state}" for pair in ("closed_flux", "flux_known") for state in ("on", "off")}
+    expected |= {f"vapor_{pair}_{state}" for pair in ("dry_isothermal", "free_drainage") for state in ("on", "off")}
     if not set(cases) <= expected:
         parser.error(f"cases must be a subset of: {', '.join(sorted(expected))}")
     args.task_base.mkdir(parents=True, exist_ok=False)

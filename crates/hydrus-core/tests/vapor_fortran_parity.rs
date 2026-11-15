@@ -66,7 +66,11 @@ const ALL_CASES: [&str; 5] = [
     "vapor_dry_thermal_gradient",
     "vapor_dry_off_control",
 ];
-const FLUX_CASES: [&str; 4] = [
+const FLUX_CASES: [&str; 8] = [
+    "vapor_dry_isothermal_on",
+    "vapor_dry_isothermal_off",
+    "vapor_free_drainage_on",
+    "vapor_free_drainage_off",
     "vapor_closed_flux_on",
     "vapor_closed_flux_off",
     "vapor_flux_known_on",
@@ -455,6 +459,7 @@ struct Deck {
     top_inf: bool,
     k_top: i32,
     bot_inf: bool,
+    free_d: bool,
     k_bot: i32,
     r_top: f64,
     r_bot: f64,
@@ -533,6 +538,7 @@ fn parse_deck(text: &str) -> Deck {
         top_inf: flag(&top[0]),
         k_top: top[2].parse().expect("KodTop"),
         bot_inf: flag(&bot[0]),
+        free_d: flag(&bot[2]),
         k_bot: bot[4].parse().expect("KodBot"),
         r_top,
         r_bot,
@@ -751,7 +757,13 @@ fn run_case(case: &str, expect_vapor: bool) -> Result<Candidate, String> {
     );
     assert!(deck.l_wat && !deck.l_chem, "{case}: lWat on, lChem off");
     assert!(!deck.l_w_dep && !deck.l_meteo, "{case}: lWDep/lMeteo off");
-    if deck.k_top == -1 && deck.k_bot == -1 {
+    if deck.k_top == -1 && deck.k_bot == -5 {
+        assert!(
+            !deck.top_inf && !deck.bot_inf && deck.free_d,
+            "{case}: prescribed top flux with free drainage"
+        );
+        assert!(deck.r_top.is_finite(), "{case}: finite rTop");
+    } else if deck.k_top == -1 && deck.k_bot == -1 {
         assert!(
             !deck.top_inf && !deck.bot_inf,
             "{case}: prescribed flux both ends"
@@ -870,8 +882,10 @@ fn run_case(case: &str, expect_vapor: bool) -> Result<Candidate, String> {
         steps: 0,
         dt: deck.dt,
     };
-    let is_flux_case = deck.k_top == -1 && deck.k_bot == -1;
-    let lower = if is_flux_case {
+    let is_flux_case = deck.k_top == -1;
+    let lower = if deck.k_bot == -5 {
+        LowerBoundaryMode::FreeDrainage
+    } else if is_flux_case {
         LowerBoundaryMode::PrescribedFlux { flux: deck.r_bot }
     } else {
         LowerBoundaryMode::FixedHead {
@@ -1762,6 +1776,39 @@ fn closed_flux_known_on_matches_fixture() {
 fn closed_flux_known_off_matches_fixture() {
     let o = out();
     assert_rows_pass("vapor_flux_known_off", &o.rows["vapor_flux_known_off"]);
+}
+
+#[test]
+fn dry_isothermal_on_matches_fixture() {
+    let o = out();
+    assert_rows_pass(
+        "vapor_dry_isothermal_on",
+        &o.rows["vapor_dry_isothermal_on"],
+    );
+}
+
+#[test]
+fn dry_isothermal_off_matches_fixture() {
+    let o = out();
+    assert_rows_pass(
+        "vapor_dry_isothermal_off",
+        &o.rows["vapor_dry_isothermal_off"],
+    );
+}
+
+#[test]
+fn free_drainage_on_matches_fixture() {
+    let o = out();
+    assert_rows_pass("vapor_free_drainage_on", &o.rows["vapor_free_drainage_on"]);
+}
+
+#[test]
+fn free_drainage_off_matches_fixture() {
+    let o = out();
+    assert_rows_pass(
+        "vapor_free_drainage_off",
+        &o.rows["vapor_free_drainage_off"],
+    );
 }
 
 #[test]
