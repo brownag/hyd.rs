@@ -59,7 +59,14 @@ fn run(r_bot: f64, upper_flux: f64) -> (f64, f64) {
     let cap = vec![init.capacity; n];
     let mesh = Mesh1D::new(x.clone(), indices.clone(), None, 1, 0, 1.0).unwrap();
     let materials = vec![TempMaterial::from_tpar([
-        0.60, 0.02, 0.5, 1.1337408e12, 1.8335808e12, 7.1570304e12, 2.48832e11, 3.25296e11,
+        0.60,
+        0.02,
+        0.5,
+        1.1337408e12,
+        1.8335808e12,
+        7.1570304e12,
+        2.48832e11,
+        3.25296e11,
         5.41728e11,
     ])];
     let config = VaporConfig::new(VaporConfigInput {
