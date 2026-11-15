@@ -17,7 +17,7 @@ Branch: `feat/vapor-flux-fixedhead`. Tracked planning (D-5).
 | Wave | Task | Status | Commit(s) |
 | --- | --- | --- | --- |
 | 1 | 31.1.1 coverage matrix fix | pending | |
-| 1 | 31.1.2 C5 criteria proposal | pending | |
+| 1 | 31.1.2 C5 criteria proposal | done | `ac05c44` |
 | 1 | 31.1.3 G22.3 + met contract | pending | |
 | GATE A | user approves C5 and G22.3 contract | pending | |
 | 2 | 31.2.1 met reference harness | pending | |
@@ -30,4 +30,10 @@ Branch: `feat/vapor-flux-fixedhead`. Tracked planning (D-5).
 
 ## Task reports
 
-(Workers append `## {{id}}` sections here, <=15 lines each.)
+## 31.1.2
+- Status: done
+- Files changed: planning/master/M6_VAPOR_C5_PROPOSAL.md (lines 1-180, created), planning/tasks/31.1.2.todo.md, planning/tasks/31.1.2.report.md
+- Docs commit: `ac05c44`
+- Tests: cargo test -p hydrus-core --test vapor_fortran_parity (19 passed, 0 failed); python3 -m unittest tools.test_compare_vapor_reference (49 tests, OK)
+- Deviations: none
+- Gotchas for dependent tasks: criteria.json was NOT modified; GATE A requires explicit user decision on head (Options A/B/C) and moisture (Options M1/M2/M3) before any criteria.json update in subsequent waves.
