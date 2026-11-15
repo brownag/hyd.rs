@@ -18,7 +18,7 @@ Branch: `feat/vapor-flux-fixedhead`. Tracked planning (D-5).
 | --- | --- | --- | --- |
 | 1 | 31.1.1 coverage matrix fix | done | `ffa1af1` |
 | 1 | 31.1.2 C5 criteria proposal | done | `ac05c44` |
-| 1 | 31.1.3 G22.3 + met contract | pending | |
+| 1 | 31.1.3 G22.3 + met contract | done | `4a76818` |
 | GATE A | user approves C5 and G22.3 contract | pending | |
 | 2 | 31.2.1 met reference harness | pending | |
 | 2 | 31.2.2 radiation Rn/Rns/Rnl port | pending | |
