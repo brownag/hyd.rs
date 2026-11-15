@@ -10,6 +10,7 @@ pub mod forcing;
 pub mod heat;
 pub mod hydraulics;
 pub mod lower_boundary;
+pub mod meteo;
 pub mod root_uptake;
 pub mod solute;
 mod solute_fortran_compat;
@@ -24,6 +25,13 @@ pub use hydraulics::{
     Mesh1D, UnitSymbol, VanGenuchtenModel, VanGenuchtenParameters,
 };
 pub use lower_boundary::{LowerBoundaryMode, UnsupportedLowerBoundaryMode};
+pub use meteo::{
+    calculate_net_radiation, cloudiness_factor, dew_point_vapor_pressure,
+    extraterrestrial_radiation, net_longwave, net_radiation, net_shortwave, parse_latitude_deg_min,
+    saturation_vapor_pressure, CloudinessResult, ExtraterrestrialRadiation, MeteoError,
+    NetRadiation, RadiationDailyInput, RadiationMode, RadiationParams, RelativeHumidityMode,
+    SunshineMode,
+};
 pub use root_uptake::{feddes_reduction, RootUptakeInput, RootUptakeModel};
 pub use solute::{
     advance_solute_step, DeferredSoluteFeature, EquilibriumSorption, KineticSorption,
