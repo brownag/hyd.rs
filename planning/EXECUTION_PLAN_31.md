@@ -117,7 +117,7 @@ Wave disjointness: wave 1 touches docs only. Wave 2 `31.2.1` (tools, cases), `31
 ### 31.2.3 C5 criteria entry (Option M1)
 - Depends on: GATE A (approved 2026-11-15: head Option A, moisture M1). Repo: hyd.rs.
 - Spec: add exactly one entry to `reference/vapor_fortran/criteria.json`: `flux_known_on_off_liquid_moisture` (case `vapor_flux_known_on`, control `vapor_flux_known_off`, `factor_of_tolerance` 0.75, field `liquid_moisture`, rule `any_print_time_after_initial`, unit `cm3/cm3`). Copy from `planning/master/M6_VAPOR_C5_PROPOSAL.md` section 5. No head entries (Option A). Bump the criteria version/changelog fields the way v6 did (see commit `231aa46`).
-- Must edit: `reference/vapor_fortran/criteria.json`. This is the only task allowed to edit it; 31.2.1 must not.
+- Must edit: `reference/vapor_fortran/criteria.json`, plus the `CRITERIA_SHA256` constant in the four hash-pinning tests (`vapor_fortran_parity.rs`, `vapor_heat_boundary_parity.rs`, `vapor_nonuniform_parity.rs`, `vapor_nonuniform_timestep_controller.rs`), as in `231aa46`. Re-scoped 2026-11-15: the original spec missed the hash pins. This is the only task allowed to edit `criteria.json`; 31.2.1 must not.
 - Anchors: `tools/compare_vapor_reference.py` (`validate_criteria`), commit `231aa46`.
 - Acceptance: `python3 -m unittest tools.test_compare_vapor_reference` passes; the comparator over existing fixtures passes the new entry (r_max 0.7619); `cargo test -p hydrus-core --test vapor_fortran_parity` still 19 pass.
 
