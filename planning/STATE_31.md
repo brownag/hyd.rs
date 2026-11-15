@@ -19,7 +19,7 @@ Branch: `feat/vapor-flux-fixedhead`. Tracked planning (D-5).
 | 1 | 31.1.1 coverage matrix fix | done | `ffa1af1` |
 | 1 | 31.1.2 C5 criteria proposal | done | `ac05c44` |
 | 1 | 31.1.3 G22.3 + met contract | done | `4a76818` |
-| GATE A | user approves C5 and G22.3 contract | pending | |
+| GATE A | user approves C5 and G22.3 contract | approved 2026-11-15 | see Gate A decisions |
 | 2 | 31.2.1 met reference harness | pending | |
 | 2 | 31.2.2 radiation Rn/Rns/Rnl port | pending | |
 | 3 | 31.3.1 evaporation port | pending | |
@@ -27,6 +27,13 @@ Branch: `feat/vapor-flux-fixedhead`. Tracked planning (D-5).
 | 4 | 31.4.1 met parity | pending | |
 | 4 | 31.4.2 met water balance | pending | |
 | 5 | 31.5.1 record G22.2 close and G22.3 acceptance | pending | |
+
+## Gate A decisions (2026-11-15, user)
+
+- C5 head: Option A (no closed-pair head entries; rely on exact fixture parity).
+- C5 moisture: Option M1 (add `flux_known_on_off_liquid_moisture`, factor 0.75). `criteria.json` edit still pending; assign to a wave 2 task or 31.5.1 scope.
+- G22.3 Q1/Q2: bare soil (`iCrop=0`), daily records only for first met fixture.
+- G22.3 Q3/Q4: follow Fortran source for `hCritA` with vapor; atmospheric step decomposes into existing Flux/Head pairs (no new `VaporBoundaryPair` variant).
 
 ## Task reports
 
