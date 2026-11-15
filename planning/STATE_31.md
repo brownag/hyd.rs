@@ -33,7 +33,7 @@ Branch: `feat/vapor-flux-fixedhead`. Tracked planning (D-5).
 - C5 head: Option A (no closed-pair head entries; rely on exact fixture parity).
 - C5 moisture: Option M1 (add `flux_known_on_off_liquid_moisture`, factor 0.75). `criteria.json` edit still pending; assign to a wave 2 task or 31.5.1 scope.
 - G22.3 Q1/Q2: bare soil (`iCrop=0`), daily records only for first met fixture.
-- G22.3 Q3/Q4: follow Fortran source for `hCritA` with vapor; atmospheric step decomposes into existing Flux/Head pairs (no new `VaporBoundaryPair` variant).
+- G22.3 Q3/Q4: follow Fortran source for `hCritA` with vapor; atmospheric step decomposes into existing Flux/Head pairs (no new `VaporBoundaryPair` variant). Must retain Fortran parity (plan D-10); 31.4.1 is the gate, and a parity failure re-opens this decision.
 
 ## Task reports
 

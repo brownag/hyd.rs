@@ -231,3 +231,10 @@ The following open questions are explicitly submitted for orchestrator and user 
 2. **Sub-daily vs. daily meteorological stepping**: Fortran supports both daily aggregated stepping (`lMetDaily=false`) with sinusoidal diurnal variation, and sub-daily records (`lMetDaily=true`). Does wave 2 require both formats or should the initial fixture standardize on daily records?
 3. **Critical evaporative head ($h_{\text{critA}}$) in vapor regime**: In pure liquid water, $h_{\text{critA}}$ stops liquid evaporation at the surface when soil dries. With vapor active, does $h_{\text{critA}}$ truncate total surface flux or does vapor continue to desorb across the dry boundary layer per source code?
 4. **Boundary pair classification enum**: Should `VaporBoundaryPair` in `crates/hydrus-core/src/heat/vapor/mod.rs` be expanded to include explicit `Atmospheric` variants, or should `advance_atmospheric_step` dynamically decompose each step into existing `Flux` and `Head` variants before calling the vapor driver?
+
+
+## 9. GATE A resolutions (2026-11-15, user)
+
+- Q3/Q4: `hCritA` follows the Fortran source. The atmospheric step decomposes into existing `Flux`/`Head` pairs; no new `VaporBoundaryPair` variant.
+- **Fortran parity requirement:** the decomposition must preserve Fortran switching order, switch test and flux/head selection (ADR 0010). Acceptance is `vapor_met_parity` against the pinned trajectory. A parity failure re-opens this decision; bounds are not widened.
+- Q1/Q2: bare soil (`iCrop=0`), daily records only for the first fixture.

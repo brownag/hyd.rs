@@ -39,6 +39,7 @@ Source goal: [GOALS.md](GOALS.md) Circled G22.2, plus Sequenced G22.3 and the ra
 - **D-6 (2026-11-15, user):** Up to 3 workers per wave; worktrees for same-repo tasks; full suites serial at wave end.
 - **D-7 (default, AGENTS.md):** Full verification is serial at wave end: `cargo test --workspace`, clippy, fmt, Python tools.
 - **D-8 (ADR constraints):** ADR 0010 (preserve source operation order and precision) and ADR 0015 (precision-faithful ports in compat kernels) apply to all Rust ports of Fortran met/radiation code. ADR 0011 (no new dependencies without a plan amendment) applies. No ADR is superseded.
+- **D-10 (2026-11-15, user, Gate A Q3/Q4):** `hCritA` with vapor follows the Fortran source. The atmospheric step decomposes into the existing Flux/Head pairs; no new `VaporBoundaryPair` variant. **Fortran parity constraint:** the decomposition must reproduce the Fortran switching order, switch test, and flux/head selection per step (ADR 0010). It is accepted only if `vapor_met_parity` (31.4.1) matches the pinned Fortran trajectory. If parity cannot hold, stop and re-open this decision; do not adjust bounds. Tasks 31.3.2 and 31.4.1 must cite this.
 - **D-9 (gate):** C5 criteria tolerances require explicit user approval before any `criteria.json` edit (GOALS.md D5).
 
 ## Recon facts (anchors)
@@ -121,14 +122,14 @@ Wave disjointness: wave 1 touches docs only. Wave 2 `31.2.1` (tools/reference) a
 
 ### 31.3.2 Vapor-aware atmospheric switching
 - Depends on: 31.1.3, 31.2.2. Repo: hyd.rs.
-- Spec: let `advance_atmospheric_step` (`atmospheric.rs:55`) accept the vapor coupling per the contract. Water-only behavior must not change: the existing atmospheric tests stay green.
+- Spec (D-10: decompose into existing Flux/Head pairs, preserving Fortran switching order and parity): let `advance_atmospheric_step` (`atmospheric.rs:55`) accept the vapor coupling per the contract. Water-only behavior must not change: the existing atmospheric tests stay green.
 - Must edit: `crates/hydrus-core/src/atmospheric.rs`, `crates/hydrus-core/src/forcing.rs`.
 - Anchors: `atmospheric.rs:10` (`UpperBoundaryMode`), `:55` (`advance_atmospheric_step`), `forcing.rs:10` (`AtmosphericRates`).
 - Acceptance: `cargo test -p hydrus-core atmospheric` passes, including unchanged water-only tests.
 
 ### 31.4.1 Met parity
 - Depends on: 31.2.1, 31.3.1, 31.3.2. Repo: hyd.rs.
-- Spec: new parity test comparing the Rust met path with the pinned Fortran trajectory from 31.2.1, in the style of `vapor_fortran_parity.rs`. Source-precision rows are listed, not widened.
+- Spec (D-10: this test is the parity gate for the Flux/Head decomposition): new parity test comparing the Rust met path with the pinned Fortran trajectory from 31.2.1, in the style of `vapor_fortran_parity.rs`. Source-precision rows are listed, not widened.
 - Must edit: `crates/hydrus-core/tests/vapor_met_parity.rs` (create), fixtures under `reference/vapor_fortran/fixtures/`.
 - Acceptance: `cargo test -p hydrus-core --test vapor_met_parity` passes.
 
