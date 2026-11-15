@@ -42,6 +42,14 @@
  "contract_revision": "018c3c3824a082a2339eb63e9aa6e5ec470b80c5",
  "contract_sha256": "5b6125154792e9674bb8c2576440e6b437edf468787d909a79175dc80cb0e110",
  "discrimination": {
+  "closed_flux_on_off_liquid_moisture": {
+   "case": "vapor_closed_flux_on",
+   "control": "vapor_closed_flux_off",
+   "factor_of_tolerance": 0.85,
+   "field": "liquid_moisture",
+   "rule": "any_print_time_after_initial",
+   "unit": "cm3/cm3"
+  },
   "closed_flux_on_off_temperature_c": {
    "case": "vapor_closed_flux_on",
    "control": "vapor_closed_flux_off",
@@ -476,6 +484,6 @@
    }
   }
  },
- "revision_note": "post-failure owner override of v1 (sha256 d645cae2a0ba44219eed7b53185abb09a1815ee481041f4e7a3b9fbc0cbbf008); only v_vapor, v_vap_term, v_total zero_rule changed; v4 (task 28.3, 2026-11-13) adds only checks.water_balance_interior_step_off_reference (static-water consistency, case vapor_nonuniform_step_off) and rebinds contract_revision/contract_sha256 to the v4 contract section; v5 (task 30.6.1, G30.6 approved 2026-11-14) adds only discrimination entries free_drain_on_off_{liquid_moisture,temperature_c}, closed_flux_on_off_temperature_c, flux_known_on_off_temperature_c and nonzero entries closed_vapor_fields_nonzero, dry_iso_vapor_fields_nonzero, free_drain_vapor_fields_nonzero; contract_revision/contract_sha256 unchanged",
+ "revision_note": "post-failure owner override of v1 (sha256 d645cae2a0ba44219eed7b53185abb09a1815ee481041f4e7a3b9fbc0cbbf008); only v_vapor, v_vap_term, v_total zero_rule changed; v4 (task 28.3, 2026-11-13) adds only checks.water_balance_interior_step_off_reference (static-water consistency, case vapor_nonuniform_step_off) and rebinds contract_revision/contract_sha256 to the v4 contract section; v5 (task 30.6.1, G30.6 approved 2026-11-14) adds only discrimination entries free_drain_on_off_{liquid_moisture,temperature_c}, closed_flux_on_off_temperature_c, flux_known_on_off_temperature_c and nonzero entries closed_vapor_fields_nonzero, dry_iso_vapor_fields_nonzero, free_drain_vapor_fields_nonzero; contract_revision/contract_sha256 unchanged; v6 (C5, user decision 2026-11-15) adds only discrimination entry closed_flux_on_off_liquid_moisture at factor_of_tolerance 0.85 (largest passing factor 0.8571); contract_revision/contract_sha256 unchanged",
  "schema_version": "vapor-criteria-v2"
 }
