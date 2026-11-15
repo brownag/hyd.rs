@@ -95,3 +95,6 @@ The user explicitly confirmed the rejection of `qGWLF`, `TopInF`/`BotInF` (±3),
 3. **Pair flux/`qGWLF`**
    - **Status:** Confirmed rejected (follows the confirmed rejection of `qGWLF`).
 
+## C2 decision (2026-11-15, user)
+The user confirmed the rejections that GATE W1 left unanswered. Both stay rejected with their existing triggers: `qGWLF` (groundwater-level-dependent bottom flux) and time-variable +-3 `TopInF`/`BotInF` inflow with vapor. No code change. This closes G22.2-C2.
+
