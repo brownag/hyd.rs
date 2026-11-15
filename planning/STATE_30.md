@@ -1,6 +1,6 @@
 # Orchestration 30 state — G22.2 follow-ups
 
-Created: 2026-11-14. Status: **Wave 0 done; Wave 1 starting.**
+Created: 2026-11-14. Status: **Waves 0-4 done; Wave 5 starting (30.5.1 approved to run after G30.5).**
 Plan: [EXECUTION_PLAN_30.md](EXECUTION_PLAN_30.md). Prompt: [PROMPT_TEMPLATE_30.md](PROMPT_TEMPLATE_30.md). Goal: [GOALS.md](GOALS.md) G22.2 (Circled).
 Predecessor: [STATE_29.md](STATE_29.md) (closed).
 
@@ -20,7 +20,7 @@ Predecessor: [STATE_29.md](STATE_29.md) (closed).
 - [x] G30.2 (user, 2026-11-14): Option (a) — match `WATFLOW.FOR` as written (`rBot = -(K_L + K_vh) * Grav`); log proposed SD-008 in a subsequent docs task; accept `FreeDrainage` exclusively with `UpperBoundary::Flux`.
 - [x] G30.3 (user, 2026-11-14): Deck A & B designs in `M6_VAPOR_ORCH30_DECK_DESIGN.md` and `BALANCE.OUT` runner change (`d645e42`) approved.
 - [x] G30.4 (user, 2026-11-14): Wave 4 reference runs (`30.4.1`, `30.4.2`, `30.4.3`) under `.development/` approved.
-- [ ] G30.5 (user): fixture staging and new trajectory comparisons. Not yet written.
+- [x] G30.5 (user, 2026-11-14): approved as written: stage the four candidate fixtures (vapor_dry_isothermal_on/off, vapor_free_drainage_on/off) with cases and manifests into `reference/vapor_fortran/`; extend `vapor_fortran_parity.rs` with trajectory comparisons.
 - [ ] G30.6 (user): criteria D5 entries. Not yet written.
 
 ## Wave board
@@ -37,13 +37,15 @@ Predecessor: [STATE_29.md](STATE_29.md) (closed).
 | 4 | 30.4.1 | Dry isothermal closed-pair run (C3) | done (converged, 240 h) |
 | 4 | 30.4.2 | Free-drainage vapor-on and vapor-off runs (C6 evidence) | done (converged, 240 h) |
 | 4 | 30.4.3 | Full-trajectory balance of the closed pair (C4 part 2) | done (`WatBalR` max 0.156%) |
-| 5 | 30.5.1 | Stage approved fixtures; extend producer; trajectory tests | pending (after G30.5) |
+| 5 | 30.5.1 | Stage approved fixtures; extend producer; trajectory tests | done (`340fec7`); 4 new parity tests pass |
 | 5 | 30.5.2 | Criteria proposal (D5, no write) | pending |
 | 6 | 30.6.1 | Write approved criteria entries (D5) | pending (after G30.6) |
 
 ## Wave gates
 
 _Filled by the orchestrator at each wave end: five suites and the path check (plan D8)._
+
+- Wave 5 (30.5.1), 2026-11-14: build OK; clippy `-D warnings` OK; `cargo fmt --check` fails only on `vapor_closed_pair_balance.rs:59` (pre-existing, not touched); `cargo test --workspace` 648 passed / 0 failed; Python 499 OK. Path check: commit `340fec7` covers only the approved paths.
 
 ## Task reports
 
@@ -55,3 +57,4 @@ _Appended by the orchestrator from each worker's `planning/tasks/<id>.report.md`
 - Recon: the closed-pair `SELECTOR.IN` has `rTop=0 rBot=0`; the flux-known pair has nonzero rTop and rBot. Verify in each deck.
 - Recon: `BALANCE.OUT` is not in the runner's output list (task 30.3.1).
 - Scope change (2026-11-14, user): free drainage implemented in this orchestration (D1). The orchestration input's out-of-scope line for free drainage is superseded.
+- Scope change (2026-11-14, user, task 30.5.1): `tools/run_vapor_reference.py` added to 30.5.1's must-edit list to add the four approved case names to the `--all`/`expected` whitelist (plan escalation rule 4: re-scoped, not ad hoc). Its test file `tools/test_run_vapor_reference.py` may be read but not changed.
