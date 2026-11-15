@@ -18,7 +18,7 @@ Branch: `feat/vapor-flux-fixedhead`. Tracked planning (D-5).
 | --- | --- | --- | --- |
 | 1 | 31.1.1 coverage matrix fix | pending | |
 | 1 | 31.1.2 C5 criteria proposal | pending | |
-| 1 | 31.1.3 G22.3 + met contract | pending | |
+| 1 | 31.1.3 G22.3 + met contract | complete | 4a76818 |
 | GATE A | user approves C5 and G22.3 contract | pending | |
 | 2 | 31.2.1 met reference harness | pending | |
 | 2 | 31.2.2 radiation Rn/Rns/Rnl port | pending | |
@@ -30,4 +30,13 @@ Branch: `feat/vapor-flux-fixedhead`. Tracked planning (D-5).
 
 ## Task reports
 
-(Workers append `## {{id}}` sections here, <=15 lines each.)
+## 31.1.3
+- Status: complete.
+- Files changed: `planning/master/M6_VAPOR_G22_3_CONTRACT.md` (lines 1-233, created), `planning/tasks/31.1.3.todo.md` (created).
+- Commit ID: `4a76818` (docs commit, no code modified).
+- Tests: N/A (specification/contract task; verified mapping table and named rejections with triggers).
+- Deviations from approved plan: none.
+- Gotchas for dependent tasks:
+  - 31.2.1: Reference case runner must supply valid `Meteo.in` with $z_w, z_t > 0.667 \cdot h_{\text{crop}}$ to satisfy Error 33 guard.
+  - 31.2.2: Fortran `Latitude` uses degrees + minutes decimal encoding (`TIME.FOR:679`); port conversion formula faithfully.
+  - 31.3.2: `heat/vapor/mod.rs:312` rejects `Atmospheric` upper boundary; 31.3.2 must coordinate vapor flux/head active-set mapping.
