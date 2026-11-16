@@ -22,7 +22,7 @@ Branch: `feat/vapor-flux-fixedhead`. Tracked planning (D-5).
 | GATE A | user approves C5 and G22.3 contract | approved 2026-11-15 | see Gate A decisions |
 | 2 | 31.2.1 met reference harness | pending | |
 | 2 | 31.2.2 radiation Rn/Rns/Rnl port | pending | |
-| 2 | 31.2.3 C5 criteria entry (M1) | pending | |
+| 2 | 31.2.3 C5 criteria entry (M1) | done | `d2d1f32` |
 | 3 | 31.3.1 evaporation port | pending | |
 | 3 | 31.3.2 vapor-aware atmospheric switching | pending | |
 | 4 | 31.4.1 met parity | pending | |
@@ -58,3 +58,21 @@ Branch: `feat/vapor-flux-fixedhead`. Tracked planning (D-5).
 - Tests: cargo test -p hydrus-core --test vapor_fortran_parity (19 passed, 0 failed); python3 -m unittest tools.test_compare_vapor_reference (49 tests, OK)
 - Deviations: none
 - Gotchas for dependent tasks: criteria.json was NOT modified; GATE A requires explicit user decision on head (Options A/B/C) and moisture (Options M1/M2/M3) before any criteria.json update in subsequent waves.
+
+## 31.2.3 C5 criteria entry (Option M1)
+- Status: complete
+- Files changed:
+  - `reference/vapor_fortran/criteria.json` (lines 116-123, 492)
+  - `crates/hydrus-core/tests/vapor_fortran_parity.rs` (line 51)
+  - `crates/hydrus-core/tests/vapor_heat_boundary_parity.rs` (line 51)
+  - `crates/hydrus-core/tests/vapor_nonuniform_parity.rs` (line 56)
+  - `crates/hydrus-core/tests/vapor_nonuniform_timestep_controller.rs` (line 65)
+- Code commit ID: `d2d1f32`
+- Tests:
+  - `python3 -m unittest tools.test_compare_vapor_reference`: 43 passed, 0 failed
+  - `python3 tools/compare_vapor_reference.py discrimination --output <tmp>`: PASS (flux_known moisture r_max 0.7619, 4 points above tol)
+  - `cargo test -p hydrus-core --test vapor_fortran_parity`: 19 passed, 0 failed
+  - `cargo test -p hydrus-core --test vapor_heat_boundary_parity --test vapor_nonuniform_parity --test vapor_nonuniform_timestep_controller`: 15 passed, 0 failed (2 ignored)
+- Deviations from approved plan: none
+- Gotchas for dependent tasks: criteria.json SHA-256 updated to `b03047a6e0091b227d50da205de08c731e825ce192d88e8d4cadd9fc3b8a8541` across the four pinning test files.
+
