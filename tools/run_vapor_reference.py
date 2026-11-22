@@ -201,6 +201,53 @@ def load_build(directory: Path) -> dict:
     return {"build": build, "staged": staged, "exe": exe, "build_manifest_sha256": sha256(build_path), "staging_manifest_sha256": sha256(staged_path)}
 
 
+MET_CASE_ID = "vapor_met_bare_soil_on"
+# Daily records: tAtm [h], Rad [MJ/m2/d], TMax, TMin [C], RHMean [%], Wind [km/d], SunHours [h].
+MET_DAYS = [(24 * (i + 1), *row) for i, row in enumerate([
+    (24.0, 34.0, 20.0, 35.0, 250.0, 11.0), (25.0, 35.0, 21.0, 32.0, 250.0, 11.5),
+    (26.0, 36.0, 22.0, 30.0, 260.0, 12.0), (25.0, 35.0, 21.0, 32.0, 250.0, 11.5),
+    (24.0, 34.0, 20.0, 35.0, 240.0, 11.0), (10.0, 24.0, 18.0, 85.0, 150.0, 2.0),
+    (22.0, 30.0, 19.0, 50.0, 200.0, 9.0), (25.0, 34.0, 20.0, 35.0, 250.0, 11.5),
+    (26.0, 36.0, 22.0, 30.0, 260.0, 12.0), (25.0, 35.0, 21.0, 32.0, 250.0, 11.5)])]
+MET_PREC_CM_H = {144: 0.1}  # rain on day 6 only; all other records dry
+
+
+def generate_met_case(dest: Path) -> None:
+    """Write the bare-soil Penman-Monteith case deck (lMeteo=t, lVapor=t, atmospheric top BC)."""
+    wet = CASES / "vapor_flux_fixedhead_wet_on"
+    sel = (wet / "SELECTOR.IN").read_text()
+    for old, new in (("Heat-only derived deck for source-matched fixture production. Not a manual deck.", "Meteo bare-soil derived deck for source-matched fixture production. Not a manual deck."),
+                     ("t f t f f f f f f f", "t f t f f f f f t f"), ("f f f t f f", "f f t t f f"),
+                     ("TopInf WLayer KodTop InitCond\nf f -1 f", "TopInf WLayer KodTop InitCond\nt f -4 f"),
+                     ("rTop rBot rRoot\n-1.0e-4 0.0 0.0\n", ""), ("MPL\n0.1 0.01 0.5 1.2 0.5 1 20 4", "MPL\n0.1 0.01 0.5 1.2 0.5 1 20 10"),
+                     ("lEnter\nf 1 6 f", "lEnter\nf 1 24 f"), ("6 24 72 240", " ".join(str(24 * i) for i in range(1, 11)))):
+        if sel.count(old) != 1:
+            raise ValueError(f"template drift: {old!r}")
+        sel = sel.replace(old, new)
+    atm = ["Pcp_File_Version=4", "*** BLOCK I: ATMOSPHERIC INFORMATION ***********************************", "MaxAL", str(len(MET_DAYS)),
+           "DailyVar SinusVar lLAI lBCCycles lInterc", "f f f f f", "hCritS", "0",
+           "tAtm Prec rSoil rRoot hCritA rB hB ht tTop tBot Ampl"]
+    atm += [f"{d[0]} {MET_PREC_CM_H.get(d[0], 0.0)} 0 0 1000 0 0 0 25 15 0" for d in MET_DAYS] + ["end", "*** END OF INPUT FILE 'ATMOSPH.IN' **********************************"]
+    met = ["Pcp_File_Version=4", "*** BLOCK A: METEOROLOGICAL INFORMATION ****************************",
+           "MaxAL iRadiation lHargr", f"{len(MET_DAYS)} 1 f", "lEnBal lMetDaily", "f f", "Latitude Altitude", "-30.0 100.0",
+           "ShortWaveRadA ShortWaveRadB", "0.25 0.5", "LongWaveRadA LongWaveRadB", "0.9 0.1", "LongWaveRadA1 LongWaveRadB1", "0.34 -0.139",
+           "WindHeight TempHeight [cm]", "200. 190.", "iCrop iSunSh iRelHum", "0 0 0", "Albedo", "0.23",
+           "*** BLOCK B: DAILY METEOROLOGICAL RECORDS ****************************", "tAtm[h] Rad[MJ/m2/d] TMax[C] TMin[C] RHMean[%] Wind[km/d] SunHours[h]", "records follow"]
+    met += [" ".join(str(v) for v in d) for d in MET_DAYS] + ["end", "*** END OF INPUT FILE 'Meteo.in' **********************************"]
+    spec = {"case_id": MET_CASE_ID, "runner": {
+        "inputs": ["LEVEL_01.DIR", "SELECTOR.IN", "PROFILE.DAT", "ATMOSPH.IN", "Meteo.in"],
+        "outputs": [{"name": "NOD_INF.OUT", "marker": "end"}, {"name": "NOD_INF_V.OUT", "marker": "end"}],
+        "aliases": {"SELECTOR.IN": "Selector.in", "PROFILE.DAT": "Profile.dat", "ATMOSPH.IN": "ATMOSPH.IN", "Meteo.in": "Meteo.in"},
+        "data_prefix": MET_CASE_ID}}
+    dest.mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(wet / "LEVEL_01.DIR", dest / "LEVEL_01.DIR")
+    shutil.copyfile(wet / "PROFILE.DAT", dest / "PROFILE.DAT")
+    (dest / "SELECTOR.IN").write_text(sel)
+    (dest / "ATMOSPH.IN").write_text("\n".join(atm) + "\n")
+    (dest / "Meteo.in").write_text("\n".join(met) + "\n")
+    (dest / "fixture.json").write_text(json.dumps(spec, indent=1) + "\n")
+
+
 def run_case(case_id: str, task_base: Path, build_dir: Path, timeout: int | None, balance: bool = False) -> Path:
     case_dir = CASES / case_id
     spec = json.loads((case_dir / "fixture.json").read_text())
@@ -261,7 +308,7 @@ def run_case(case_id: str, task_base: Path, build_dir: Path, timeout: int | None
     if vapor_blocks and [b["time"] for b in vapor_blocks] != [b["time"] for b in main_blocks]:
         raise ValueError(f"{case_id}: vapor and nodal output times differ")
     selector = (case_dir / "SELECTOR.IN").read_text()
-    enabled = "f f f t f f" in selector
+    enabled = "f f f t f f" in selector or "f f t t f f" in selector
     if enabled != bool(vapor_blocks):
         raise ValueError(f"{case_id}: selector vapor reachability disagrees with output availability")
     staged, build = load_build(build_dir)["staged"], load_build(build_dir)["build"]
@@ -317,7 +364,7 @@ def main(argv=None) -> int:
     expected |= {f"vapor_nonuniform_step_{state}" for state in ("on", "off")}
     expected |= {f"vapor_{pair}_{state}" for pair in ("closed_flux", "flux_known") for state in ("on", "off")}
     expected |= {f"vapor_{pair}_{state}" for pair in ("dry_isothermal", "free_drainage") for state in ("on", "off")}
-    expected |= {"vapor_flux_fixedhead_wet_on"}
+    expected |= {"vapor_flux_fixedhead_wet_on", MET_CASE_ID}
     if not set(cases) <= expected:
         parser.error(f"cases must be a subset of: {', '.join(sorted(expected))}")
     args.task_base.mkdir(parents=True, exist_ok=False)

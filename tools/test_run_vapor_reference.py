@@ -422,5 +422,52 @@ class BalanceRunnerIntegrationTests(unittest.TestCase):
                 self.assertEqual(len(bal["balance_rows"]), 2)
 
 
+class MetCaseTests(unittest.TestCase):
+    CASE = "vapor_met_bare_soil_on"
+
+    def test_generator_reproduces_committed_deck(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as tmp:
+            vapor.generate_met_case(Path(tmp))
+            for name in ("LEVEL_01.DIR", "SELECTOR.IN", "PROFILE.DAT", "ATMOSPH.IN", "Meteo.in", "fixture.json"):
+                self.assertEqual((Path(tmp) / name).read_bytes(), (vapor.CASES / self.CASE / name).read_bytes(), name)
+
+    def test_selector_flags_and_no_unconsumed_flux_record(self):
+        sel = (vapor.CASES / self.CASE / "SELECTOR.IN").read_text().splitlines()
+        self.assertEqual(sel[9], "t f t f f f f f t f")  # AtmBC=t
+        self.assertEqual(sel[11], "f f t t f f")  # lMeteo=t lVapor=t
+        self.assertEqual(sel[18], "t f -4 f")
+        self.assertNotIn("rTop rBot rRoot", sel)
+
+    def test_meteo_deck_is_bare_soil_with_heights_in_cm(self):
+        met = (vapor.CASES / self.CASE / "Meteo.in").read_text().splitlines()
+        self.assertEqual(met[met.index("iCrop iSunSh iRelHum") + 1], "0 0 0")
+        self.assertEqual(met[met.index("lEnBal lMetDaily") + 1], "f f")
+        self.assertEqual(met[met.index("MaxAL iRadiation lHargr") + 1], "10 1 f")
+        self.assertEqual(met[met.index("WindHeight TempHeight [cm]") + 1], "200. 190.")
+        records = [l for l in met[met.index("records follow") + 1:] if l and l[0].isdigit()]
+        atm = [l for l in (vapor.CASES / self.CASE / "ATMOSPH.IN").read_text().splitlines() if l and l[0].isdigit() and len(l.split()) == 11]
+        self.assertEqual([r.split()[0] for r in records], [a.split()[0] for a in atm])
+        self.assertEqual([r.split()[0] for r in records], [str(24 * i) for i in range(1, 11)])
+        self.assertEqual(met[-1], "*** END OF INPUT FILE 'Meteo.in' **********************************")
+        self.assertEqual(met[-2], "end")
+
+    def test_fixture_spec_lists_all_met_inputs(self):
+        spec = json.loads((vapor.CASES / self.CASE / "fixture.json").read_text())
+        self.assertEqual(spec["case_id"], self.CASE)
+        self.assertEqual(spec["runner"]["data_prefix"], self.CASE)
+        self.assertEqual(set(spec["runner"]["aliases"]) | {"LEVEL_01.DIR"}, set(spec["runner"]["inputs"]))
+
+    def test_allowlist_accepts_met_case_and_all_lists_it(self):
+        with redirect_stderr(io.StringIO()), mock.patch("builtins.print"):
+            self.assertEqual(CaseSelectionTests.run_main(CaseSelectionTests(), self.CASE), 0)
+        called = []
+        argv = ["--all", "--build-dir", "unused", "--task-base", CaseSelectionTests.BASE]
+        with mock.patch.object(vapor, "run_case", side_effect=lambda c, *a: called.append(c) or Path(c)), \
+             mock.patch.object(Path, "mkdir"), mock.patch("builtins.print"):
+            self.assertEqual(vapor.main(argv), 0)
+        self.assertIn(self.CASE, called)
+
+
 if __name__ == "__main__":
     unittest.main()

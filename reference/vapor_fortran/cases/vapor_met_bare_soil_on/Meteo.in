@@ -1,0 +1,35 @@
+Pcp_File_Version=4
+*** BLOCK A: METEOROLOGICAL INFORMATION ****************************
+MaxAL iRadiation lHargr
+10 1 f
+lEnBal lMetDaily
+f f
+Latitude Altitude
+-30.0 100.0
+ShortWaveRadA ShortWaveRadB
+0.25 0.5
+LongWaveRadA LongWaveRadB
+0.9 0.1
+LongWaveRadA1 LongWaveRadB1
+0.34 -0.139
+WindHeight TempHeight [cm]
+200. 190.
+iCrop iSunSh iRelHum
+0 0 0
+Albedo
+0.23
+*** BLOCK B: DAILY METEOROLOGICAL RECORDS ****************************
+tAtm[h] Rad[MJ/m2/d] TMax[C] TMin[C] RHMean[%] Wind[km/d] SunHours[h]
+records follow
+24 24.0 34.0 20.0 35.0 250.0 11.0
+48 25.0 35.0 21.0 32.0 250.0 11.5
+72 26.0 36.0 22.0 30.0 260.0 12.0
+96 25.0 35.0 21.0 32.0 250.0 11.5
+120 24.0 34.0 20.0 35.0 240.0 11.0
+144 10.0 24.0 18.0 85.0 150.0 2.0
+168 22.0 30.0 19.0 50.0 200.0 9.0
+192 25.0 34.0 20.0 35.0 250.0 11.5
+216 26.0 36.0 22.0 30.0 260.0 12.0
+240 25.0 35.0 21.0 32.0 250.0 11.5
+end
+*** END OF INPUT FILE 'Meteo.in' **********************************

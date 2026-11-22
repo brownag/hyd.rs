@@ -1,0 +1,29 @@
+{
+ "case_id": "vapor_met_bare_soil_on",
+ "runner": {
+  "inputs": [
+   "LEVEL_01.DIR",
+   "SELECTOR.IN",
+   "PROFILE.DAT",
+   "ATMOSPH.IN",
+   "Meteo.in"
+  ],
+  "outputs": [
+   {
+    "name": "NOD_INF.OUT",
+    "marker": "end"
+   },
+   {
+    "name": "NOD_INF_V.OUT",
+    "marker": "end"
+   }
+  ],
+  "aliases": {
+   "SELECTOR.IN": "Selector.in",
+   "PROFILE.DAT": "Profile.dat",
+   "ATMOSPH.IN": "ATMOSPH.IN",
+   "Meteo.in": "Meteo.in"
+  },
+  "data_prefix": "vapor_met_bare_soil_on"
+ }
+}
