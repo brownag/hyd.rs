@@ -93,3 +93,13 @@ Branch: `feat/vapor-flux-fixedhead`. Tracked planning (D-5).
 - Tests: `cargo test -p hydrus-core meteo::radiation` (9 passed, 0 failed); `cargo clippy -p hydrus-core --all-targets -- -D warnings` (clean); `cargo fmt --all -- --check` (clean)
 - Deviations from approved plan: none
 - Gotchas for dependent tasks: Latitude inputs use degrees-and-minutes decimal format (`50.30` = 50°30'); `meteo::radiation` computes strictly in `f32` per ADR 0010/0015; task 31.3.1 (evaporation) can consume `NetRadiation`, `ExtraterrestrialRadiation`, and `CloudinessResult` directly.
+
+## 31.2.1 Met reference harness
+- Status: done; gate passed (Fortran reached 240 h, 0 non-convergence, 3 upper-BC switches).
+- Files: `tools/run_vapor_reference.py` (MET_* constants and `generate_met_case`, lines ~269-330; allowlist and `f f t t f f` check, ~1 line each); `tools/test_run_vapor_reference.py` (`MetCaseTests`, appended); new `reference/vapor_fortran/cases/vapor_met_bare_soil_on/` (6 files) and `fixtures/vapor_met_bare_soil_on.json`. `criteria.json` untouched.
+- Code commit: see `git log` subject "feat(vapor): add bare-soil Penman-Monteith met reference case and fixture".
+- Tests: `python3 -m unittest tools.test_run_vapor_reference` -> 45 run, 45 pass.
+- Run: `python3 tools/run_vapor_reference.py --case vapor_met_bare_soil_on --build-dir .development/31.2.1/reference-build --task-base .development/31.2.1/runs`.
+- Measured from RUN_INF.OUT (2400 steps, dt=0.1 h, max 2 iterations, Convergency column all T; no Error.msg) and KodT column: switches at 42.7 h (-4 to 4, hTop reaches hCritA=-1000), 120.1 h (4 to -4, rain), 200.3 h (-4 to 4). T_LEVEL.OUT hTop confirms (-912 at 42 h, -1000 from 42.7 h, -58 at 144 h).
+- Deviations: TopInf=t with KodTop=-4 (TopInf=f never applies hCritA in SetBC); MPL=10 daily print times 24..240 instead of the template's 6/24/72/240.
+- Gotchas for 31.3.3/31.4.1: Meteo.in record = `tAtm[h] Rad[MJ/m2/d] TMax TMin RHMean[%] Wind[km/d] SunHours`; tAtm must equal ATMOSPH.IN times (24..240). ATMOSPH.IN records have 11 columns (lTemp adds tTop tBot Ampl); with lMeteo only Prec (cm/h) and hCritA (positive, stored negative) are used, rSoil is overwritten by Meteo (EvapP). Records apply to the interval ending at tAtm. Heights are cm (200/190); bare soil CropHeight=0.1 cm. Latitude -30.0 deg.min format, altitude 100 m. Day 6 rain = 0.1 cm/h (24 mm/d); PET about 5.5 mm/d dry days.
