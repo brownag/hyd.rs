@@ -40,6 +40,7 @@ Source goal: [GOALS.md](GOALS.md) Circled G22.2, plus Sequenced G22.3 and the ra
 - **D-7 (default, AGENTS.md):** Full verification is serial at wave end: `cargo test --workspace`, clippy, fmt, Python tools.
 - **D-8 (ADR constraints):** ADR 0010 (preserve source operation order and precision) and ADR 0015 (precision-faithful ports in compat kernels) apply to all Rust ports of Fortran met/radiation code. ADR 0011 (no new dependencies without a plan amendment) applies. No ADR is superseded.
 - **D-10 (2026-11-15, user, Gate A Q3/Q4):** `hCritA` with vapor follows the Fortran source. The atmospheric step decomposes into the existing Flux/Head pairs; no new `VaporBoundaryPair` variant. **Fortran parity constraint:** the decomposition must reproduce the Fortran switching order, switch test, and flux/head selection per step (ADR 0010). It is accepted only if `vapor_met_parity` (31.4.1) matches the pinned Fortran trajectory. If parity cannot hold, stop and re-open this decision; do not adjust bounds. Tasks 31.3.2 and 31.4.1 must cite this.
+- **D-11 (2026-11-22, user, Magic Wand refresh):** (a) Add task 31.3.3, the `Meteo.in` reader (`meteo::config`, `meteo::series`). The contract names these modules, but no task owned them, and 31.4.1 needs them. (b) 31.2.1 case name is `vapor_met_bare_soil_on`, with 240 h and 10 daily records. (c) 31.2.1 is the critical-path task: it records the Fortran non-convergence count and the upper-boundary flux/head switch count. Fortran divergence, or zero switches, stops at a gate. Do not tune the deck without approval.
 - **D-9 (gate):** C5 criteria tolerances require explicit user approval before any `criteria.json` edit (GOALS.md D5).
 
 ## Recon facts (anchors)
@@ -72,11 +73,12 @@ Source goal: [GOALS.md](GOALS.md) Circled G22.2, plus Sequenced G22.3 and the ra
 | 2 | 31.2.3 | hyd.rs | GATE A | `reference/vapor_fortran/criteria.json` | Add `flux_known_on_off_liquid_moisture` (factor 0.75, C5 Option M1) |
 | 3 | 31.3.1 | hyd.rs | 31.2.2 | `crates/hydrus-core/src/meteo/evaporation.rs` (create), `crates/hydrus-core/src/meteo/mod.rs` | Port evaporation/ET from met input |
 | 3 | 31.3.2 | hyd.rs | 31.1.3, 31.2.2 | `crates/hydrus-core/src/atmospheric.rs`, `crates/hydrus-core/src/forcing.rs` | Atmospheric switching accepts vapor (water-only behavior unchanged) |
-| 4 | 31.4.1 | hyd.rs | 31.2.1, 31.3.1, 31.3.2 | `crates/hydrus-core/tests/vapor_met_parity.rs` (create), `reference/vapor_fortran/fixtures/` | Parity against pinned Fortran met trajectory |
+| 3 | 31.3.3 | hyd.rs | 31.1.3, 31.2.1 (deck) | `crates/hydrus-core/src/meteo/config.rs`, `crates/hydrus-core/src/meteo/series.rs` (create) | `Meteo.in` reader with contract section 7 typed rejections (D-11) |
+| 4 | 31.4.1 | hyd.rs | 31.2.1, 31.3.1, 31.3.2, 31.3.3 | `crates/hydrus-core/tests/vapor_met_parity.rs` (create), `reference/vapor_fortran/fixtures/` | Parity against pinned Fortran met trajectory |
 | 4 | 31.4.2 | hyd.rs | 31.3.2 | `crates/hydrus-core/tests/vapor_met_balance.rs` (create) | Water balance check with met switching |
 | 5 | 31.5.1 | hyd.rs | 31.4.1, 31.4.2, 31.2.3 | `planning/master/M6_VAPOR_COVERAGE.md`, `planning/master/M6_VAPOR_G22_3_ACCEPTANCE.md` (create), `GOALS.md` | Record G22.2 close and G22.3 acceptance |
 
-Wave disjointness: wave 1 touches docs only. Wave 2 `31.2.1` (tools, cases), `31.2.2` (meteo module) and `31.2.3` (criteria.json) are disjoint. Wave 3 `31.3.1` (meteo/evaporation.rs) and `31.3.2` (atmospheric.rs, forcing.rs) are disjoint. Wave 4 `31.4.1` and `31.4.2` are disjoint test files. `water_solver.rs` is not edited by any task; if 31.3.2 needs it, it becomes a re-scope (escalation 4).
+Wave disjointness: wave 1 touches docs only. Wave 2 `31.2.1` (tools, cases), `31.2.2` (meteo module) and `31.2.3` (criteria.json) are disjoint. Wave 3 `31.3.1` (meteo/evaporation.rs), `31.3.2` (atmospheric.rs, forcing.rs) and `31.3.3` (meteo/config.rs, meteo/series.rs) are disjoint, except that 31.3.1 and 31.3.3 each add one `mod` line to `meteo/mod.rs`. The orchestrator merges those lines at wave end. Wave 4 `31.4.1` and `31.4.2` are disjoint test files. `water_solver.rs` is not edited by any task; if 31.3.2 needs it, it becomes a re-scope (escalation 4).
 
 ## Task specs
 
@@ -102,6 +104,7 @@ Wave disjointness: wave 1 touches docs only. Wave 2 `31.2.1` (tools, cases), `31
 
 ### 31.2.1 Met reference harness
 - Depends on: 31.1.3. Repo: hyd.rs.
+- Case (D-11): `vapor_met_bare_soil_on`, 240 h, 10 daily records. Record the non-convergence count and the upper-boundary switch count. Fortran divergence, or zero switches, stops at a gate.
 - Spec: add a met case generator and `lMeteo=true` cases using the pinned Fortran reference, following the vapor harness (case dir layout, `SELECTOR.IN` with `lMeteo=t`, `LEVEL_01.DIR`). Extend the case allowlist in `run_vapor_reference.py` (~line 318) for the new cases only. Run through the existing producer. Do not edit `criteria.json`.
 - Must edit: `tools/run_vapor_reference.py`, `reference/vapor_fortran/cases/vapor_met_*` (create). Must not touch `criteria.json` (owned by 31.2.3).
 - Anchors: `tools/run_vapor_reference.py:318`, `reference/vapor_fortran/cases/vapor_flux_fixedhead_wet_on/SELECTOR.IN` (template).
@@ -135,8 +138,15 @@ Wave disjointness: wave 1 touches docs only. Wave 2 `31.2.1` (tools, cases), `31
 - Anchors: `atmospheric.rs:10` (`UpperBoundaryMode`), `:55` (`advance_atmospheric_step`), `forcing.rs:10` (`AtmosphericRates`).
 - Acceptance: `cargo test -p hydrus-core atmospheric` passes, including unchanged water-only tests.
 
+### 31.3.3 Meteo.in reader (added by D-11)
+- Depends on: 31.1.3; 31.2.1 for the committed deck used as test input. Repo: hyd.rs.
+- Spec: parse `Meteo.in` site and configuration data (`MeteoIn`, `INPUT.FOR:934-1066`) into `meteo::config::MeteoConfig`, and the met records (`SetMeteo`, `TIME.FOR:484-497`: `tAtm, Rad, TMax, TMin, RHMean, Wind_kmd, SunHours`) into `meteo::series::MeteoRecord`. Follow the contract's mapping table. Raise each section 7 rejection as a typed `MeteoError` before any state changes. Scope is the Gate A selection (bare soil, daily records). Other modes are rejected with a trigger, not implemented. No new dependencies (ADR 0011).
+- Must edit: `crates/hydrus-core/src/meteo/config.rs` (create), `crates/hydrus-core/src/meteo/series.rs` (create), and one-line `mod`/`pub use` additions in `meteo/mod.rs`.
+- Anchors: `planning/master/M6_VAPOR_G22_3_CONTRACT.md` sections 3 and 7, `reference/vapor_fortran/cases/vapor_met_bare_soil_on/Meteo.in`.
+- Acceptance: `cargo test -p hydrus-core meteo::config` and `meteo::series` pass. They parse the committed 31.2.1 deck and include one test per named rejection.
+
 ### 31.4.1 Met parity
-- Depends on: 31.2.1, 31.3.1, 31.3.2. Repo: hyd.rs.
+- Depends on: 31.2.1, 31.3.1, 31.3.2, 31.3.3. Repo: hyd.rs.
 - Spec (D-10: this test is the parity gate for the Flux/Head decomposition): new parity test comparing the Rust met path with the pinned Fortran trajectory from 31.2.1, in the style of `vapor_fortran_parity.rs`. Source-precision rows are listed, not widened.
 - Must edit: `crates/hydrus-core/tests/vapor_met_parity.rs` (create), fixtures under `reference/vapor_fortran/fixtures/`.
 - Acceptance: `cargo test -p hydrus-core --test vapor_met_parity` passes.

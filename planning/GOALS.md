@@ -1,74 +1,67 @@
 # Project Goals (`planning/GOALS.md`)
 
-Last Updated: 2026-11-15
-Source State: [STATE_30.md](STATE_30.md)
+Last Updated: 2026-11-22
+Source State: [STATE_31.md](STATE_31.md) (plan [EXECUTION_PLAN_31.md](EXECUTION_PLAN_31.md))
+
+Magic Wand refresh (2026-11-22, user-approved): extra ranking criteria are retire Fortran risk early, land on main soon, and minimize gate load. G22.3 is split into M1 to M7, which map to Plan 31 tasks. M2 (the `Meteo.in` reader) is new: the G22.3 contract names `meteo::config::MeteoConfig` and `meteo::series::MeteoRecord`, but no Plan 31 task owned them.
 
 ## Circled Goal (Active)
 
-- **[G22.2]** Water-flux and free-drainage boundary pairs (and supported mixed pairs) are implemented with vapor, including vapor boundary/storage accounting and balance evidence.
-  - Why now: root of the remaining chain. G22.3 depends on it, and G20 depends on G22.3. Unblocks the atmospheric path.
-  - Exit criteria: each water-flux and free-drainage form with vapor on is accepted or rejected with a named trigger; at least one accepted form has a provenance-backed fixture and a balance check; recorded in the coverage matrix. A full G22.2 will not finish in 24 hours; the first slice is the audit.
-  - Active slice (2026-11-15): C2 done (user confirmed the qGWLF and +-3 rejections, recorded in M6_VAPOR_G22_2_ACCEPTANCE.md). Remaining for the G22.2 exit: the single-flux and flux/FixedHead forms. C5 done. Written as criteria v6: closed-pair temperature and moisture discrimination (moisture at factor 0.85, passes with about 1% margin), nonzero entries. Closed head dropped; no dry discrimination entries. Remaining for the G22.2 exit: C2 decision and the single-flux and flux/FixedHead forms. Earlier: C5, the closed-pair criteria, was unblocked. C1, C3, C4 and C6 are done (C3 record in `M6_VAPOR_COVERAGE.md`). C3 result: the thermal gradient diverges at -10000 cm (NaN by 72 h) and the isothermal control converges; hypothesis supported. Free drainage with vapor has fixture parity (30.5.1, `340fec7`). Pending user decisions: C2, and the closed-pair head and moisture criteria (dropped at G30.6). The single-flux and flux/FixedHead forms stay out of this slice.
-  - Active slice (2026-11-15, uncommitted on `feat/vapor-flux-fixedhead`): the flux-upper with fixed-head-lower wet pair. The kernel accepts it and the solver applies the vapor upper row (`heat/vapor/mod.rs`, `water_solver.rs`). The vapor library tests pass (29/29). Parity is 18/19. The new wet fixed-head check fails on `v_liquid` at node 1, 240 h: candidate 2.0e-5, reference -3.6e-5, bound 7.3e-7. Open: whether the upper row or the fixed-head bottom handling causes it. The bound and fixture stay unchanged. Not yet committed.
-  - Result (2026-11-15, G22.2-F1, fixed): the `v_liquid` failure at node 1, 240 h was a harness timing artifact, not the flux-upper row. The last landing step was 9.5e-12 h (accumulated time sat 1e-11 h short of 240), and the top storage term `(theta_new - theta_old) / dt` divided round-off by that step. The landing loop now stops within 1e-9 h, matching the landing check. The candidate heads, conductivities and moisture already matched the reference at 240 h. Parity 19/19; workspace tests, clippy, fmt and the Python tools pass. Bounds and fixture unchanged.
-  - First action (superseded): [G22.2-F1] trace the `v_liquid` term at node 1, 240 h. Run the parity case with the fixed-head bottom handling bypassed, if the code allows it, to separate the upper row from the bottom handling. Then run the full workspace checks, the balance test, and commit.
-  - Pending (deferred behind F1): [G22.2-C5] decide the closed-pair head and moisture criteria with the user, and the dry entries. No edit to `criteria.json` before approval.
-  - Depends on: G22.1 (done), G19 (done).
-  - Result (2026-11-14, GATE 29.2, user): closed flux/flux pair accepted and implemented with vapor on (fixtures, balance test, typed guard); exit criterion met with caveats. G22.2 stays Circled: free drainage, single flux forms and flux/FixedHead remain accepted for orchestration 29 but not implemented.
-  - Result (2026-11-13, GATE W1, user): stays Circled. Accepted for orchestration 29: free drainage (lower), prescribed flux upper and lower, and their pairs (closed flux-flux pair first). Rejected with triggers: seepage face, water table, and pairs with them. `qGWLF` and `TopInF`/`BotInF` (+-3) carry the audit's reject-with-trigger disposition but were not explicitly answered at GATE W1; atmospheric is G22.3. Record: [M6_VAPOR_G22_2_ACCEPTANCE.md](master/M6_VAPOR_G22_2_ACCEPTANCE.md).
+- **[G22.3-M1]** A pinned-Fortran met fixture `reference/vapor_fortran/fixtures/vapor_met_bare_soil_on.json` exists. It is produced through `tools/run_vapor_reference.py` from the deck `reference/vapor_fortran/cases/vapor_met_bare_soil_on/`: `lMeteo=t`, `lVapor=t`, `AtmBC=t`, `KodTop=-4`, fixed-head lower at -100 cm, `iCrop=0`, 10 daily records over 240 h. (Plan 31 task 31.2.1.)
+  - Why now: the only unstarted input to the parity gate (M5), and the largest Fortran risk in Plan 31. The pinned reference has already diverged with vapor in the dry regime (G22.2-C3). Met evaporation can dry the surface node. Running it first tests the deck design and D-10 before M3 and M4 build on them. No user gate beyond the answers already given.
+  - Exit criteria: Fortran reaches 240 h without abort, and the non-convergence count is recorded. The fixture records the number of upper-boundary flux/head switches. Zero switches is a design finding, because M5 could not then test D-10. `python3 -m unittest tools.test_run_vapor_reference` passes. `git diff --quiet -- reference/vapor_fortran/criteria.json`. Provenance (source hash, deck hash) is in the fixture. On divergence: write a record in the G22.2-C3 style and stop at a gate. Do not tune the deck to force convergence without approval.
+  - Files: `tools/run_vapor_reference.py` (allowlist ~line 318; the vapor flag check ~line 264 must also accept `f f t t f f`), `tools/test_run_vapor_reference.py`, the case directory, `reference/vapor_fortran/fixtures/`, `planning/STATE_31.md`.
+  - Decisions (2026-11-22, user): case name `vapor_met_bare_soil_on`; 240 h with 10 daily records. These answer the open questions in the worker's `planning/tasks/31.2.1.todo.md`.
+  - First action: write those answers into the 31.2.1 worker todo and approve its plan. Rebase the worker worktree from `e4fd0ae` onto `49ebb43` and resume it.
+  - Depends on: G22.3 contract (31.1.3, done), Gate A (approved 2026-11-15).
 
 ## Sequenced Goals (Dependency DAG)
 
-Order: C1, C2, C6, C3, C4, C5. C1, C2 and C6 need no reference run. C3 and C4 each need a gate before any deck or runner change. C5 needs C1 and C3.
+```
+M1 fixture --+-------------> M5 parity --+
+             +-(deck)-> M2 reader -> M5   +-> M7 record G22.2 close + G22.3 -> G20 (deferred)
+M3 evaporation ---------> M5              |
+M4 vapor switching -+---> M5              |
+                    +---> M6 balance -----+
+```
 
-Status (2026-11-14): C1, C3, C4 and C6 are done (C4 pending confirmation). C2 is a pending user decision. C5 is the active slice and blocks the G22.2 exit.
+G22.3 (atmospheric water switching with vapor, meteorology contracted in [M6_VAPOR_G22_3_CONTRACT.md](master/M6_VAPOR_G22_3_CONTRACT.md)) is the parent of M1 to M7. It is accepted at M7.
 
-- **[G22.2-C1]** Rust trajectory producer for the closed flux/flux pair (vapor on, and off where fields allow) matches the four committed Fortran fixtures (`vapor_closed_flux_{on,off}`, `vapor_flux_known_{on,off}`) within stated tolerances. The comparison runs through `tools/compare_vapor_reference.py` without editing `criteria.json`.
-  - Why now: no gate, no reference run. Closes the gap that the closed pair has balance evidence but no trajectory evidence.
-  - Exit criteria: `outcome()` produces closed-pair trajectories; the comparison reports tolerance and max differences per field (head, liquid_moisture, temperature_c, and vapor fields where the Fortran output has them); results recorded in `M6_VAPOR_COVERAGE.md`.
-  - Files: `crates/hydrus-core/tests/vapor_fortran_parity.rs`, `tools/compare_vapor_reference.py`, `reference/vapor_fortran/`, `planning/master/M6_VAPOR_COVERAGE.md`.
-  - Depends on: none (wet-start fixtures already committed in `839ce78`).
+- **[G22.3-M2]** Rust reads `Meteo.in` and its met records into `meteo::config::MeteoConfig` and `meteo::series::MeteoRecord` (`INPUT.FOR:934-1066`, `TIME.FOR:484-497`). Every rejection in contract section 7 (`InvalidMeteoDeck`, temperature range, RH, wind, radiation, radiation mode, growth table) is a typed error raised before state mutation. (New Plan 31 task 31.3.3, wave 3.)
+  - Exit criteria: `cargo test -p hydrus-core meteo::config meteo::series` passes, parsing the M1 deck and one test per named rejection.
+  - Files: `crates/hydrus-core/src/meteo/config.rs`, `meteo/series.rs` (create), plus module declarations in `meteo/mod.rs`. `meteo/mod.rs` is shared with 31.3.1: one-line `mod` additions only, merged at wave end.
+  - Depends on: M1 (deck format; soft), contract (done).
 
-- **[G22.2-C2]** The `qGWLF` and time-variable ±3 input rejections (`TopInF`/`BotInF`) are explicitly confirmed or changed.
-  - Why now: decision only; closes the accounting gap left at GATE W1.
-  - Exit criteria: a dated user decision recorded in `planning/master/M6_VAPOR_G22_2_ACCEPTANCE.md`, with triggers for any rejection kept.
-  - Depends on: none.
+- **[G22.3-M3]** `meteo::evaporation` computes potential evaporation from the 31.2.2 radiation terms in `f32` with source operation order (ADR 0010/0015). (Task 31.3.1.)
+  - Exit criteria: `cargo test -p hydrus-core meteo::evaporation` passes against the source formulas.
+  - Depends on: 31.2.2 (done).
 
-- **[G22.2-C6]** The free-drainage lower end-row behavior (formerly G7) is assessed against the source-defect register rules, recorded as a defect or modeling choice, and used to set the free-drainage scope for G22.2.
-  - Why now: small and controllable; the Fortran `ConB` vapor-conductance question (`WATFLOW.FOR:202-213`) decides whether free drainage with vapor can be accepted.
-  - Exit criteria: a source-defect entry (SD-NNN) or a recorded modeling choice; the free-drainage form is marked accepted with its pinning test, or rejected with a trigger.
-  - Depends on: none.
+- **[G22.3-M4]** `advance_atmospheric_step` drives the vapor path by decomposing each step into existing Flux/Head pairs, in Fortran switching order (D-10). The water-only atmospheric tests stay unchanged and green. (Task 31.3.2.)
+  - Exit criteria: `cargo test -p hydrus-core atmospheric` passes. `water_solver.rs` is not edited; if it must be, re-scope (escalation 4).
+  - Depends on: contract (done), 31.2.2 (done).
 
-- **[G22.2-C3]** Dry-regime closed flux/flux pair with vapor on is either converged in the pinned Fortran reference, or recorded as impossible with a reason. Chosen strategy: isothermal dry closed deck (tests whether the thermal vapor term drives the divergence seen at h = -10000 cm).
-  - Why now: the committed fixtures start at -100 cm, so they do not test dry-regime vapor behaviour. Working hypothesis (unproven): a free top head with a dry node stores little water, so the thermal vapor flux moves hTop by thousands of cm in one step.
-  - Exit criteria: either a converged dry reference run with provenance, or a documented divergence record (non-convergence counts, hTop trajectory) in `M6_VAPOR_COVERAGE.md`.
-  - Gate: required before any deck or input change and before any reference run. Prior failed attempts (for the record): initial head -1000 cm (died 19.5 h); smaller time steps (1350 non-convergence messages); gradient 25→15 C (NaN by 72 h).
-  - Depends on: none for the gate request; the design is written before the gate.
+- **[G22.3-M5]** `vapor_met_parity` matches the pinned met trajectory from M1. Source-precision rows are listed, not widened. A failure re-opens D-10. (Task 31.4.1.)
+  - Depends on: M1, M2, M3, M4.
 
-- **[G22.2-C4]** Fortran `BALANCE.OUT` is added to the runner's output list, and a full-trajectory balance check is run on the closed pair. Today's balance check is one uniform-temperature, no-sink step only.
-  - Why now: needed for the balance claim to cover the whole trajectory.
-  - Exit criteria: full-trajectory balance residual reported for both closed-pair decks, with the runner change in `reference/vapor_fortran/` and `tools/test_run_vapor_reference.py` tests.
-  - Gate: required before the runner change and the rerun.
-  - Depends on: none.
+- **[G22.3-M6]** `vapor_met_balance` reports a water-balance residual within tolerance over the met-switched run. (Task 31.4.2.)
+  - Depends on: M4.
 
-- **[G22.2-C5]** Criteria entries (D5) for the closed pair are approved and written: discrimination entries for head, liquid_moisture and temperature_c per closed pair, and nonzero entries for the `_on` ids. Ad hoc on/off differences (`.development/29.4.2/onoff.txt`): closed pair head 0.897 cm, moisture 9.0e-4, temperature 0.27 C; flux-known pair head 0.877 cm, moisture 8.0e-4, temperature 0.27 C.
-  - Why now: entries must bind to the C1 producer output and cover the dry regime from C3 if that succeeds.
-  - Exit criteria: tolerances proposed with evidence, approved by the user, then written. No edit to `criteria.json` without explicit approval (D5).
-  - Gate: required before any edit to `criteria.json`.
-  - Depends on: G22.2-C1, G22.2-C3.
+- **[G22.3-M7]** G22.2 is recorded closed and G22.3 accepted in `M6_VAPOR_COVERAGE.md`, `M6_VAPOR_G22_3_ACCEPTANCE.md` (create) and this file. (Task 31.5.1.)
+  - Depends on: M5, M6, 31.2.3 (done).
 
-- **[G22.3]** Atmospheric water switching is implemented with vapor, with its meteorological and evaporation prerequisites contracted.
-  - Depends on: G22.2 (and G22.1). Coordinated with G20.
-
-- **[G20]** Energy balance (`lEnBal`, `UpdateEnergy`, surface energy terms `Evap`, `Rn`, `Rns`, `Rnl`) is added to the coupled capability with its own contract, fixtures and acceptance gate.
-  - Depends on: G22.3 (atmospheric path with meteorological input, `lMeteo`, `MeteoIn`, `INPUT.FOR:966`, `HYDRUS.FOR:243-244`, which the Rust crate does not yet have), G19 (done with exception), G22.1 (top energy boundary).
+- **[G22.2]** Water-flux and free-drainage boundary pairs (and supported mixed pairs) are implemented with vapor, including vapor boundary/storage accounting and balance evidence.
+  - Status (2026-11-22): all slices done; only the closure record remains, owned by G22.3-M7. C1, C3, C4 and C6 done (STATE_29/30). C2 confirmed by the user (`M6_VAPOR_G22_2_ACCEPTANCE.md`). C5 done: Gate A Option A (no closed-pair head entries) and M1 (`flux_known_on_off_liquid_moisture`, factor 0.75, `d2d1f32`). Flux upper with fixed-head lower: wet pair accepted (`880c6c2`), G22.2-F1 landing-step artifact fixed, parity 19/19; matrix corrected (`ffa1af1`). Dry (-10000 cm) divergence recorded, not converged. Full history: [STATE_30.md](STATE_30.md), [M6_VAPOR_G22_2_ACCEPTANCE.md](master/M6_VAPOR_G22_2_ACCEPTANCE.md), and git history of this file.
 
 ## Independent Backlog
+
+- **[G24]** `feat/vapor-flux-fixedhead` is merged into `main` with the full AGENTS.md suites green. At 2026-11-22 it is 21 commits ahead of `main` and 0 behind: G22.2 work, the C5 criteria entry, the radiation port.
+  - Why: scores on "land on main soon"; one approval, no dependency. Can run in parallel with M1.
+  - Gate: user approval before the merge.
 
 - **[G7]** Superseded by [G22.2-C6], which carries the same free-drainage end-row assessment inside G22.2.
   - Status: merged into G22.2-C6. Kept for history.
 
-- **[G22.2-C7]** Cleanup: the `planning/STATE_29.md` wave-board rows for 29.3.3 and 29.4.x are updated from pending; the untracked failed-trial output in `.development/29.4.1/runs/B` (about 1.5 GB) and the quarantined partial fixture at `.development/29.3.3/quarantine/` are removed with user approval.
+- **[G22.2-C7]** Cleanup: the `planning/STATE_29.md` wave-board rows for 29.3.3 and 29.4.x are updated from pending; the untracked failed-trial output in `.development/29.4.1/runs/B` (about 1.5 GB) and the quarantined partial fixture at `.development/29.3.3/quarantine/` are removed with user approval. Added 2026-11-22: about 100 stale worktrees from plans 1 to 31 (`git worktree list`), pruned after checking each for unmerged work.
   - Why now: hygiene only; low leverage.
   - Gate: deletion needs explicit user approval before any `rm`.
   - Depends on: none.
@@ -82,6 +75,10 @@ Status (2026-11-14): C1, C3, C4 and C6 are done (C4 pending confirmation). C2 is
 - **[G10]** Investigate the Robin refinement anomaly only if a real supported-use case shows it could change a decision; the current finding is nonblocking.
 
 ## Deferred
+
+- **[G20]** Energy balance (`lEnBal`, `UpdateEnergy`, surface energy terms `Evap`, `Rn`, `Rns`, `Rnl`) is added to the coupled capability with its own contract, fixtures and acceptance gate.
+  - Status: radiation (`Rn`, `Rns`, `Rnl`) ported in Plan 31 (31.2.2, `b7acedf`) per D-4. The energy update is split out.
+  - Trigger: G22.3-M7 records G22.3 accepted; then contract and reprioritize the remainder as its own orchestration.
 
 - **[G23]** Temperature-dependent liquid-water coupling (`lWDep` / `lWTDep`, including `ConLT` in water flux and liquid material temperature adjustments) is separately contracted, implemented and validated when selected.
   - Trigger: separate user scope approval. Remains rejected in orchestration 25; not conflated with vapor's thermal-gradient terms or G20 energy balance.

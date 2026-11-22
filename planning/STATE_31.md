@@ -25,6 +25,7 @@ Branch: `feat/vapor-flux-fixedhead`. Tracked planning (D-5).
 | 2 | 31.2.3 C5 criteria entry (M1) | done | `d2d1f32` |
 | 3 | 31.3.1 evaporation port | pending | |
 | 3 | 31.3.2 vapor-aware atmospheric switching | pending | |
+| 3 | 31.3.3 Meteo.in reader (D-11) | pending | |
 | 4 | 31.4.1 met parity | pending | |
 | 4 | 31.4.2 met water balance | pending | |
 | 5 | 31.5.1 record G22.2 close and G22.3 acceptance | pending | |
@@ -35,6 +36,11 @@ Branch: `feat/vapor-flux-fixedhead`. Tracked planning (D-5).
 - C5 moisture: Option M1 (add `flux_known_on_off_liquid_moisture`, factor 0.75). `criteria.json` edit is task 31.2.3 (wave 2, user decision).
 - G22.3 Q1/Q2: bare soil (`iCrop=0`), daily records only for first met fixture.
 - G22.3 Q3/Q4: follow Fortran source for `hCritA` with vapor; atmospheric step decomposes into existing Flux/Head pairs (no new `VaporBoundaryPair` variant). Must retain Fortran parity (plan D-10); 31.4.1 is the gate, and a parity failure re-opens this decision.
+
+## Magic Wand refresh (2026-11-22, user)
+
+- 31.2.1 is the Circled Goal (GOALS G22.3-M1). Its worker worktree (`subagent-Worker-31-2-1-met-harness-...`, base `e4fd0ae`) holds only an untracked `31.2.1.todo.md`. Answers to its questions: case name `vapor_met_bare_soil_on`; 240 h with 10 daily records. Rebase onto `49ebb43` before resuming.
+- Task 31.3.3 (`Meteo.in` reader) added per plan D-11; 31.4.1 now depends on it.
 
 ## Task reports
 
