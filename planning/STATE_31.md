@@ -109,3 +109,11 @@ Branch: `feat/vapor-flux-fixedhead`. Tracked planning (D-5).
 - Measured from RUN_INF.OUT (2400 steps, dt=0.1 h, max 2 iterations, Convergency column all T; no Error.msg) and KodT column: switches at 42.7 h (-4 to 4, hTop reaches hCritA=-1000), 120.1 h (4 to -4, rain), 200.3 h (-4 to 4). T_LEVEL.OUT hTop confirms (-912 at 42 h, -1000 from 42.7 h, -58 at 144 h).
 - Deviations: TopInf=t with KodTop=-4 (TopInf=f never applies hCritA in SetBC); MPL=10 daily print times 24..240 instead of the template's 6/24/72/240.
 - Gotchas for 31.3.3/31.4.1: Meteo.in record = `tAtm[h] Rad[MJ/m2/d] TMax TMin RHMean[%] Wind[km/d] SunHours`; tAtm must equal ATMOSPH.IN times (24..240). ATMOSPH.IN records have 11 columns (lTemp adds tTop tBot Ampl); with lMeteo only Prec (cm/h) and hCritA (positive, stored negative) are used, rSoil is overwritten by Meteo (EvapP). Records apply to the interval ending at tAtm. Heights are cm (200/190); bare soil CropHeight=0.1 cm. Latitude -30.0 deg.min format, altitude 100 m. Day 6 rain = 0.1 cm/h (24 mm/d); PET about 5.5 mm/d dry days.
+
+## 31.3.1 Port evaporation
+- Status: done.
+- Files: `crates/hydrus-core/src/meteo/evaporation.rs` (new, 1-337; tests from ~line 175), `crates/hydrus-core/src/meteo/mod.rs` (lines 3-8: `pub mod evaporation;` plus one `pub use`).
+- Code commit: `ea3c7a9`.
+- Tests: `cargo test -p hydrus-core --lib meteo::evaporation` -> 8 passed, 0 failed (includes all 10 records of pinned `Meteo.out`: ET, Rns, Rnl, RadTerm, AeroTerm within 5e-4); clippy `-D warnings` clean; fmt clean.
+- Deviations: none from approved plan. No `MeteoError` changes; out-of-scope modes are unrepresentable by signature (bare soil, daily only), so 31.3.3's reader must reject them. Only error raised by Aero is `CropHeightExceedsMeasurementHeight`; negative/non-finite wind uses existing variants.
+- Gotchas for 31.4.1: `calculate_bare_soil_et(&MeteoSite, &EvaporationInput, &RadiationParams)` returns mm/d only; the caller must convert to L/T (`rSoil = EvapP*rConv/TTConv`, `rConv=0.001*xConv`, `TTConv=86400*tConv`) and pass day_no = tAtm/TTConv (days). Precip conversion and interception are not ported. Record applies to the interval ending at tAtm. Test constants are hard-coded from the pinned run (executable_sha256 87969711...0519638).
