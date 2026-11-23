@@ -1,6 +1,8 @@
 //! Meteorological parameter and radiation modeling for HYDRUS (`INPUT.FOR:934-1066`, `TIME.FOR:443-800`).
 
+pub mod config;
 pub mod radiation;
+pub mod series;
 
 pub use radiation::{
     calculate_net_radiation, cloudiness_factor, dew_point_vapor_pressure,
@@ -8,6 +10,9 @@ pub use radiation::{
     saturation_vapor_pressure, CloudinessResult, ExtraterrestrialRadiation, NetRadiation,
     RadiationDailyInput,
 };
+
+pub use config::MeteoConfig;
+pub use series::{parse_meteo_deck, MeteoRecord};
 
 use core::fmt;
 
@@ -49,7 +54,11 @@ pub enum MeteoError {
     /// Unsupported relative humidity mode.
     UnsupportedRelativeHumidityMode { mode: i32 },
     /// Malformed or unreadable meteorological deck.
-    InvalidMeteoDeck { reason: &'static str },
+    InvalidMeteoDeck { path: String, reason: String },
+    /// Crop growth table larger than the Fortran limit of 1000 rows (`INPUT.FOR:999-1003`).
+    GrowthTableOverflow { count: i32 },
+    /// Selection outside the Gate A scope (bare soil, daily records, solar radiation input).
+    UnsupportedMeteoSelection { field: &'static str, value: i32 },
 }
 
 impl fmt::Display for MeteoError {
@@ -103,8 +112,14 @@ impl fmt::Display for MeteoError {
             Self::UnsupportedRelativeHumidityMode { mode } => {
                 write!(f, "unsupported relative humidity mode: {mode}")
             }
-            Self::InvalidMeteoDeck { reason } => {
-                write!(f, "invalid meteo deck: {reason}")
+            Self::InvalidMeteoDeck { path, reason } => {
+                write!(f, "invalid meteo deck {path}: {reason}")
+            }
+            Self::GrowthTableOverflow { count } => {
+                write!(f, "crop growth table has {count} rows (maximum 1000)")
+            }
+            Self::UnsupportedMeteoSelection { field, value } => {
+                write!(f, "unsupported meteo selection: {field}={value}")
             }
         }
     }
