@@ -374,6 +374,10 @@ pub struct VaporAtmosphericState {
     pub kod_top: i8,
     pub h_top: f64,
     pub r_top_old: f64,
+    /// Current `rTop`, fixed over each forcing record; updated only at record boundaries.
+    pub r_top: f64,
+    /// Forcing record (event cursor) for which `r_top` was set; `None` before the first step.
+    pub record_cursor: Option<usize>,
     /// Top-half-cell flux of the last accepted trial (the `vTop` of `Shift`).
     pub v_top: f64,
     pub event_cursor: usize,
@@ -386,6 +390,8 @@ impl VaporAtmosphericState {
             kod_top: -4,
             h_top: 0.0,
             r_top_old: 0.0,
+            r_top: 0.0,
+            record_cursor: None,
             v_top: 0.0,
             event_cursor: 0,
         }
@@ -417,8 +423,10 @@ pub struct VaporSwitchRecord {
     pub time: f64,
     pub top_head: f64,
     pub v_top: f64,
-    /// The re-solved trial would switch again; the second result was kept.
-    pub oscillation: bool,
+    /// The `Shift` test on the re-solved trial would flip the mode again. Expected on dry
+    /// head-mode steps, where Fortran also flips in iteration 1 and back in iteration 2;
+    /// the second result is kept. Not an error.
+    pub second_shift_would_flip: bool,
 }
 
 /// Accepted-candidate result; the caller commits the vapor and water state.
@@ -529,15 +537,31 @@ pub fn advance_atmospheric_step_vapor(
     let (step_input, rates) =
         clip_to_next_event(vapor_state.event_cursor, state.time(), input, schedule)?;
     let n = state.heads().len();
-    let r_top = rates.evaporation - rates.precipitation;
+    let time = state.time();
+    // rTop is piecewise constant over a forcing record (HYDRUS.FOR:573-628): at a record
+    // boundary `SetBC` first sets rTop = -|Prec| (TIME.FOR:131, lMeteo) and runs the reset
+    // below; the met update and HYDRUS.FOR:627-628 then set rTop = |rSoil| - |Prec|, for
+    // either KodTop. Shift flips never change it mid-record.
+    let at_boundary = vapor_state.record_cursor != Some(vapor_state.event_cursor);
+    let r_top_old = if at_boundary {
+        vapor_state.r_top
+    } else {
+        vapor_state.r_top_old
+    };
+    let r_top = if at_boundary {
+        rates.evaporation - rates.precipitation
+    } else {
+        vapor_state.r_top
+    };
+    let r_top_setbc = -rates.precipitation.abs();
     let mut switches = Vec::new();
     let mut initial_heads = context.initial_heads.to_vec();
     let mut kod = vapor_state.kod_top;
     let mut h_top = vapor_state.h_top;
-    let time = state.time();
 
-    // SetBC rain reset (TIME.FOR:133-141, iModel != 3, WLayer false).
-    if r_top > 0.0 && vapor_state.r_top_old < 0.0 {
+    // SetBC rain reset (TIME.FOR:133-141, iModel != 3, WLayer false). It reads the interim
+    // rTop = -|Prec|, so under lMeteo it cannot fire; ported as written.
+    if at_boundary && r_top_setbc > 0.0 && r_top_old < 0.0 {
         let mut x_limit = 0.0;
         if kod == 4 || initial_heads[n - 1] > x_limit {
             x_limit = -0.01 * coupling.x_conv;
@@ -549,7 +573,7 @@ pub fn advance_atmospheric_step_vapor(
                     time,
                     top_head: initial_heads[n - 1],
                     v_top: vapor_state.v_top,
-                    oscillation: false,
+                    second_shift_would_flip: false,
                 });
             }
             initial_heads[n - 1] = x_limit;
@@ -573,7 +597,7 @@ pub fn advance_atmospheric_step_vapor(
             time,
             top_head: initial_heads[n - 1],
             v_top: vapor_state.v_top,
-            oscillation: false,
+            second_shift_would_flip: false,
         });
     }
     kod = pre_kod;
@@ -612,7 +636,7 @@ pub fn advance_atmospheric_step_vapor(
             time,
             top_head: trial.candidate.heads()[n - 1],
             v_top,
-            oscillation: false,
+            second_shift_would_flip: false,
         });
         kod = post_kod;
         h_top = post_h;
@@ -628,7 +652,7 @@ pub fn advance_atmospheric_step_vapor(
         );
         if again != kod {
             if let Some(last) = switches.last_mut() {
-                last.oscillation = true;
+                last.second_shift_would_flip = true;
             }
         }
     }
@@ -643,7 +667,9 @@ pub fn advance_atmospheric_step_vapor(
         state: VaporAtmosphericState {
             kod_top: kod,
             h_top,
-            r_top_old: r_top,
+            r_top_old,
+            r_top,
+            record_cursor: Some(vapor_state.event_cursor),
             v_top,
             event_cursor: cursor,
         },
@@ -1019,7 +1045,7 @@ mod tests {
             assert_eq!(step.state.h_top, H_CRIT);
             let record = step.switches.first().expect("a switch is recorded");
             assert_eq!((record.from_kod, record.to_kod), (-4, 4));
-            assert!(!record.oscillation);
+            assert!(!record.second_shift_would_flip);
             assert!((step.trial.candidate.heads()[2] - H_CRIT).abs() < 1.0e-6);
         }
 
@@ -1033,6 +1059,8 @@ mod tests {
                 kod_top: 4,
                 h_top: H_CRIT,
                 r_top_old: 0.1,
+                r_top: 0.1,
+                record_cursor: None,
                 v_top: 0.01,
                 event_cursor: 0,
             };
@@ -1043,6 +1071,37 @@ mod tests {
                 (4, -4)
             );
             assert_eq!(step.state.kod_top, -4);
+        }
+
+        #[test]
+        fn r_top_is_fixed_within_a_record_and_reset_at_the_boundary() {
+            let head_mode = VaporAtmosphericState {
+                kod_top: 4,
+                h_top: H_CRIT,
+                r_top_old: 0.0,
+                r_top: 0.01,
+                record_cursor: Some(0),
+                v_top: 0.001,
+                event_cursor: 0,
+            };
+            // Mid-record (same record cursor): the stored demand survives, whatever the
+            // rates say, as after a mid-record flux-to-head switch.
+            let quiet = AtmosphericRates {
+                precipitation: 0.0,
+                evaporation: 0.0,
+            };
+            let mid = run(H_CRIT, quiet, head_mode, coupling()).unwrap();
+            assert_eq!(mid.state.r_top, 0.01);
+            // Record boundary in head mode: rTop = |rSoil| - |Prec| (HYDRUS.FOR:627-628),
+            // here 0 on a dry day with no evaporation, and rTopOld keeps the old value.
+            let boundary = VaporAtmosphericState {
+                record_cursor: None,
+                ..head_mode
+            };
+            let next = run(H_CRIT, quiet, boundary, coupling()).unwrap();
+            assert_eq!(next.state.r_top, 0.0);
+            assert_eq!(next.state.r_top_old, 0.01);
+            assert_eq!(next.state.record_cursor, Some(0));
         }
 
         #[test]
