@@ -23,9 +23,9 @@ Branch: `feat/vapor-flux-fixedhead`. Tracked planning (D-5).
 | 2 | 31.2.1 met reference harness | done | `bcefbc5` |
 | 2 | 31.2.2 radiation Rn/Rns/Rnl port | done | `b7acedf` |
 | 2 | 31.2.3 C5 criteria entry (M1) | done | `d2d1f32` |
-| 3 | 31.3.1 evaporation port | pending | |
-| 3 | 31.3.2 vapor-aware atmospheric switching | pending | |
-| 3 | 31.3.3 Meteo.in reader (D-11) | pending | |
+| 3 | 31.3.1 evaporation port | done | `ea3c7a9` |
+| 3 | 31.3.2 vapor-aware atmospheric switching | done | `d96fcb7`, `5c286f4` |
+| 3 | 31.3.3 Meteo.in reader (D-11) | done | `c98dca8` |
 | 4 | 31.4.1 met parity | pending | |
 | 4 | 31.4.2 met water balance | pending | |
 | 5 | 31.5.1 record G22.2 close and G22.3 acceptance | pending | |
@@ -47,6 +47,13 @@ Branch: `feat/vapor-flux-fixedhead`. Tracked planning (D-5).
 - 31.2.1 gate checked independently from `RUN_INF.OUT`: 2400 steps reaching 240 h; non-convergence 0; `KodT` switches 3 (-4 to 4 at 42.7 h, 4 to -4 at 120.1 h, -4 to 4 at 200.3 h); no NaN in `T_LEVEL.OUT` or `NOD_INF.OUT`. `criteria.json`, `src_reference/` and `crates/` are unchanged.
 - Deck deviation for review: `TopInf=t` (needed for `SetBC` to apply `hCritA`), with daily print times 24 to 240 h. The first switch (42.7 h) falls between print times.
 - `cargo test --workspace --no-fail-fast`: 658 passed, 0 failed. clippy `-D warnings`: clean. fmt: clean. Python tools: 504 tests, OK.
+
+## Wave 3 end verification (2026-11-22, orchestrator, at `8ca11f1`)
+
+- Merged: 31.3.1 (fast-forward), 31.3.3 (`3ce0c01`; `meteo/mod.rs` and STATE conflicts resolved by keeping both sides), 31.3.2 (`8ca11f1`). Targeted tests were rerun by the orchestrator before each merge.
+- 31.3.2 retry: the orchestrator's FAILED VERIFICATION note claimed head-mode rTop = -|Prec|. The worker corrected it from the source: `HYDRUS.FOR:628` sets rTop = |rSoil|-|Prec| at every record boundary, whatever KodTop is. rTop is held fixed within a record (`5c286f4`). Verified by the orchestrator.
+- `cargo test --workspace --no-fail-fast`: 686 passed, 0 failed. clippy `-D warnings`: clean. fmt: clean. Python tools: 504 tests, OK.
+- Risk carried to 31.4.1: the 31.3.2 unit fixture hit a singular pivot or infinite `ConVh` at dry heads, so it used about -100 cm. The pinned met run holds hTop = -1000 cm from 42.7 h to 120.1 h. 31.4.1 should first confirm that the Rust vapor solve runs at -1000 cm with the deck's soil before judging D-10.
 
 ## Task reports
 
