@@ -1,7 +1,10 @@
 //! Minimal in-memory atmospheric boundary scheduling.
-use crate::forcing::{AtmosphericRates, ForcingSchedule};
+use crate::forcing::{AtmosphericRates, ForcingSchedule, VaporAtmosphericCoupling};
+use crate::heat::vapor::{VaporWaterContext, VaporWaterTrial};
 use crate::hydraulics::{BoundaryCondition, BoundaryRow};
+use crate::water_solver::solve_vapor_water_trial;
 use crate::water_state::validate_finite;
+use crate::UpperBoundary;
 use crate::{
     WaterState, WaterStepError, WaterStepInput, WaterStepPolicy, WaterStepReport, WaterWorkspace,
 };
@@ -59,30 +62,12 @@ pub fn advance_atmospheric_step<'a>(
     policy: WaterStepPolicy,
     schedule: &ForcingSchedule<'_>,
 ) -> Result<WaterStepReport<'a>, WaterStepError> {
-    if state.atmospheric.event_cursor > schedule.events().len() {
-        return Err(WaterStepError::InvalidForcing {
-            name: "event_cursor",
-            reason: "cursor exceeds schedule length",
-        });
-    }
-    if schedule.events()[state.atmospheric.event_cursor..]
-        .iter()
-        .any(|event| event.time <= state.time())
-    {
-        return Err(WaterStepError::InvalidForcing {
-            name: "event_times",
-            reason: "events must be later than the current accepted time",
-        });
-    }
-    let mut next_input = input;
-    if let Some(event) = schedule.events().get(state.atmospheric.event_cursor) {
-        next_input.target_time = next_input.target_time.min(event.time);
-    }
-    let rates = if state.atmospheric.event_cursor == 0 {
-        schedule.initial
-    } else {
-        schedule.events()[state.atmospheric.event_cursor - 1].rates
-    };
+    let (next_input, rates) = clip_to_next_event(
+        state.atmospheric.event_cursor,
+        state.time(),
+        input,
+        schedule,
+    )?;
     let mut report = crate::water_solver::advance_atmospheric_inner(
         state, workspace, next_input, policy, rates,
     )?;
@@ -93,6 +78,40 @@ pub fn advance_atmospheric_step<'a>(
     }
     report.accepted_time = state.time();
     Ok(report)
+}
+
+/// Validates the forcing cursor, clips the target to the next event and picks the active rates.
+fn clip_to_next_event<'a>(
+    cursor: usize,
+    time: f64,
+    input: WaterStepInput<'a>,
+    schedule: &ForcingSchedule<'_>,
+) -> Result<(WaterStepInput<'a>, AtmosphericRates), WaterStepError> {
+    if cursor > schedule.events().len() {
+        return Err(WaterStepError::InvalidForcing {
+            name: "event_cursor",
+            reason: "cursor exceeds schedule length",
+        });
+    }
+    if schedule.events()[cursor..]
+        .iter()
+        .any(|event| event.time <= time)
+    {
+        return Err(WaterStepError::InvalidForcing {
+            name: "event_times",
+            reason: "events must be later than the current accepted time",
+        });
+    }
+    let mut next_input = input;
+    if let Some(event) = schedule.events().get(cursor) {
+        next_input.target_time = next_input.target_time.min(event.time);
+    }
+    let rates = if cursor == 0 {
+        schedule.initial
+    } else {
+        schedule.events()[cursor - 1].rates
+    };
+    Ok((next_input, rates))
 }
 
 pub(crate) fn net_flux(rates: AtmosphericRates) -> f64 {
@@ -314,6 +333,325 @@ fn top_row(
     Ok(row)
 }
 
+// ---------------------------------------------------------------------------
+// Vapor-aware atmospheric switching (D-10, ADR 0010)
+// ---------------------------------------------------------------------------
+
+/// Typed rejections of the vapor atmospheric step.
+#[derive(Clone, Debug, PartialEq)]
+pub enum VaporAtmosphericError {
+    /// A surface water layer or `hCritS` was requested.
+    SurfacePondingUnsupported,
+    Water(WaterStepError),
+}
+
+impl std::fmt::Display for VaporAtmosphericError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::SurfacePondingUnsupported => f.write_str(
+                "surface ponding (WLayer/hCritS) with vapor: out of scope for G22.3 first fixture",
+            ),
+            Self::Water(error) => write!(f, "{error:?}"),
+        }
+    }
+}
+
+impl std::error::Error for VaporAtmosphericError {}
+
+impl From<WaterStepError> for VaporAtmosphericError {
+    fn from(error: WaterStepError) -> Self {
+        Self::Water(error)
+    }
+}
+
+/// Top-boundary memory carried between vapor atmospheric steps (Fortran `KodTop`,
+/// `hTop`, `rTopOld`, `vTop`). Signs follow the source: `r_top` and `v_top` are positive
+/// out of the soil. Kept apart from the pub `AtmosphericState`, which the water-only
+/// path owns.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct VaporAtmosphericState {
+    /// `-4` flux mode, `4` head mode.
+    pub kod_top: i8,
+    pub h_top: f64,
+    pub r_top_old: f64,
+    /// Top-half-cell flux of the last accepted trial (the `vTop` of `Shift`).
+    pub v_top: f64,
+    pub event_cursor: usize,
+}
+
+impl VaporAtmosphericState {
+    /// Source start state: flux mode (`INPUT.FOR:106-108`).
+    pub fn new() -> Self {
+        Self {
+            kod_top: -4,
+            h_top: 0.0,
+            r_top_old: 0.0,
+            v_top: 0.0,
+            event_cursor: 0,
+        }
+    }
+}
+
+impl Default for VaporAtmosphericState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Where a vapor-path switch was decided.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum VaporSwitchStage {
+    /// `SetBC` rain reset (`TIME.FOR:133-141`).
+    Reset,
+    /// `Shift` on the start-of-step iterate (`WATFLOW.FOR:86`, iteration 1).
+    PreSolve,
+    /// `Shift` on the converged trial (stands in for iteration 2).
+    PostSolve,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct VaporSwitchRecord {
+    pub stage: VaporSwitchStage,
+    pub from_kod: i8,
+    pub to_kod: i8,
+    pub time: f64,
+    pub top_head: f64,
+    pub v_top: f64,
+    /// The re-solved trial would switch again; the second result was kept.
+    pub oscillation: bool,
+}
+
+/// Accepted-candidate result; the caller commits the vapor and water state.
+#[derive(Clone, Debug)]
+pub struct VaporAtmosphericStep {
+    pub trial: VaporWaterTrial,
+    pub state: VaporAtmosphericState,
+    pub switches: Vec<VaporSwitchRecord>,
+    /// The kept trial is in flux mode with top head below `hCritA` (clamp not applied).
+    pub below_critical_head: bool,
+}
+
+/// Port of `Shift` top block (`WATFLOW.FOR:392-426`) with `TopInF` true, `WLayer` false.
+/// Returns the new `(kod_top, h_top)`. `r_top`/`v_top` are positive outward.
+pub(crate) fn fortran_top_switch(
+    kod: i8,
+    h_top: f64,
+    r_top: f64,
+    v_top: f64,
+    top_head: f64,
+    h_crit_a: f64,
+) -> (i8, f64) {
+    if kod.abs() != 4 {
+        return (kod, h_top);
+    }
+    let mut kod = kod;
+    let mut h_top = h_top;
+    if kod > 0 {
+        if v_top.abs() > r_top.abs() || v_top * r_top <= 0.0 {
+            kod = -4;
+        }
+        if kod == 4 && top_head <= 0.99 * h_crit_a && r_top < 0.0 {
+            kod = -4;
+        }
+    } else {
+        if top_head > 0.0 {
+            kod = 4;
+            h_top = 0.0;
+        }
+        if top_head <= h_crit_a {
+            kod = 4;
+            h_top = h_crit_a;
+        }
+    }
+    (kod, h_top)
+}
+
+const ZERO_ROW: BoundaryRow = BoundaryRow {
+    lower: 0.0,
+    diagonal: 1.0,
+    upper: 0.0,
+    rhs: 0.0,
+};
+
+fn upper_for(kod: i8, h_top: f64, rates: AtmosphericRates) -> UpperBoundary {
+    if kod > 0 {
+        UpperBoundary::Head {
+            head: h_top,
+            row: ZERO_ROW,
+            flux: 0.0,
+        }
+    } else {
+        UpperBoundary::Flux {
+            flux: net_flux(rates),
+            row: ZERO_ROW,
+        }
+    }
+}
+
+/// `vTop` of `Shift` (`WATFLOW.FOR:395-407`) from a trial: liquid plus vapor flux across
+/// the top cell face, top half-cell storage and sink; positive outward.
+fn trial_v_top(state: &WaterState, input: WaterStepInput<'_>, trial: &VaporWaterTrial) -> f64 {
+    let n = trial.candidate.heads().len();
+    let coordinates = input.mesh.coordinates();
+    let dx = coordinates[n - 1] - coordinates[n - 2];
+    trial.liquid_face_fluxes[n - 1] + trial.vapor_face_fluxes[n - 1]
+        - (trial.candidate.water_contents()[n - 1] - state.water_contents()[n - 1]) * dx
+            / 2.0
+            / trial.timestep
+        - input.sink[n - 1] * dx / 2.0
+}
+
+/// Vapor-coupled atmospheric step decomposed into the existing Flux/Head pairs.
+///
+/// Order, per `WATFLOW.FOR`/`TIME.FOR`: `SetBC` rain reset, `Shift` on the start-of-step
+/// iterate (`context.initial_heads`, the driver's extrapolated predictor,
+/// `Update` `WATFLOW.FOR:1097-1098`), solve under the selected pair, `Shift` on the
+/// converged trial; a changed mode re-solves the step once from the old state. Fortran
+/// switches inside the Picard loop, so this step-level re-solve is the D-10
+/// approximation (one iteration of history differs); 31.4.1 decides whether it holds.
+/// `input.upper` must be `Atmospheric { critical_head }` (`hCritA`, stored negative).
+/// Does not mutate accepted state.
+#[allow(clippy::too_many_arguments)]
+pub fn advance_atmospheric_step_vapor(
+    state: &WaterState,
+    workspace: &WaterWorkspace,
+    input: WaterStepInput<'_>,
+    policy: WaterStepPolicy,
+    schedule: &ForcingSchedule<'_>,
+    vapor_state: VaporAtmosphericState,
+    coupling: VaporAtmosphericCoupling,
+    context: VaporWaterContext<'_>,
+) -> Result<VaporAtmosphericStep, VaporAtmosphericError> {
+    if coupling.surface_layer || coupling.ponding_threshold.is_some() {
+        return Err(VaporAtmosphericError::SurfacePondingUnsupported);
+    }
+    let h_crit_a = -input.upper.critical_head()?.abs();
+    let (step_input, rates) =
+        clip_to_next_event(vapor_state.event_cursor, state.time(), input, schedule)?;
+    let n = state.heads().len();
+    let r_top = rates.evaporation - rates.precipitation;
+    let mut switches = Vec::new();
+    let mut initial_heads = context.initial_heads.to_vec();
+    let mut kod = vapor_state.kod_top;
+    let mut h_top = vapor_state.h_top;
+    let time = state.time();
+
+    // SetBC rain reset (TIME.FOR:133-141, iModel != 3, WLayer false).
+    if r_top > 0.0 && vapor_state.r_top_old < 0.0 {
+        let mut x_limit = 0.0;
+        if kod == 4 || initial_heads[n - 1] > x_limit {
+            x_limit = -0.01 * coupling.x_conv;
+            if kod != -4 {
+                switches.push(VaporSwitchRecord {
+                    stage: VaporSwitchStage::Reset,
+                    from_kod: kod,
+                    to_kod: -4,
+                    time,
+                    top_head: initial_heads[n - 1],
+                    v_top: vapor_state.v_top,
+                    oscillation: false,
+                });
+            }
+            initial_heads[n - 1] = x_limit;
+            kod = -4;
+        }
+    }
+    // Shift on the start-of-step iterate.
+    let (pre_kod, pre_h) = fortran_top_switch(
+        kod,
+        h_top,
+        r_top,
+        vapor_state.v_top,
+        initial_heads[n - 1],
+        h_crit_a,
+    );
+    if pre_kod != kod {
+        switches.push(VaporSwitchRecord {
+            stage: VaporSwitchStage::PreSolve,
+            from_kod: kod,
+            to_kod: pre_kod,
+            time,
+            top_head: initial_heads[n - 1],
+            v_top: vapor_state.v_top,
+            oscillation: false,
+        });
+    }
+    kod = pre_kod;
+    h_top = pre_h;
+
+    let solve = |kod: i8, h_top: f64| -> Result<VaporWaterTrial, VaporAtmosphericError> {
+        let mut trial_input = step_input;
+        trial_input.upper = upper_for(kod, h_top, rates);
+        let trial_context = VaporWaterContext {
+            initial_heads: &initial_heads,
+            ..context
+        };
+        Ok(solve_vapor_water_trial(
+            state,
+            workspace,
+            trial_input,
+            policy,
+            trial_context,
+        )?)
+    };
+    let mut trial = solve(kod, h_top)?;
+    let mut v_top = trial_v_top(state, step_input, &trial);
+    let (post_kod, post_h) = fortran_top_switch(
+        kod,
+        h_top,
+        r_top,
+        v_top,
+        trial.candidate.heads()[n - 1],
+        h_crit_a,
+    );
+    if post_kod != kod {
+        switches.push(VaporSwitchRecord {
+            stage: VaporSwitchStage::PostSolve,
+            from_kod: kod,
+            to_kod: post_kod,
+            time,
+            top_head: trial.candidate.heads()[n - 1],
+            v_top,
+            oscillation: false,
+        });
+        kod = post_kod;
+        h_top = post_h;
+        trial = solve(kod, h_top)?;
+        v_top = trial_v_top(state, step_input, &trial);
+        let (again, _) = fortran_top_switch(
+            kod,
+            h_top,
+            r_top,
+            v_top,
+            trial.candidate.heads()[n - 1],
+            h_crit_a,
+        );
+        if again != kod {
+            if let Some(last) = switches.last_mut() {
+                last.oscillation = true;
+            }
+        }
+    }
+    let top_head = trial.candidate.heads()[n - 1];
+    let mut cursor = vapor_state.event_cursor;
+    while cursor < schedule.events().len() && trial.accepted_time >= schedule.events()[cursor].time
+    {
+        cursor += 1;
+    }
+    Ok(VaporAtmosphericStep {
+        below_critical_head: kod < 0 && top_head < h_crit_a,
+        state: VaporAtmosphericState {
+            kod_top: kod,
+            h_top,
+            r_top_old: r_top,
+            v_top,
+            event_cursor: cursor,
+        },
+        switches,
+        trial,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -503,5 +841,239 @@ mod tests {
             .unwrap();
         assert_eq!(plan.mode, Head);
         assert_eq!(plan.condition, BoundaryCondition::Dirichlet { value: -3.0 });
+    }
+
+    mod vapor_switch {
+        use super::*;
+        use crate::forcing::ForcingUnits;
+        use crate::heat::config::HeatConfigInput;
+        use crate::heat::vapor::kernels;
+        use crate::heat::vapor::{
+            VaporConfig, VaporConfigInput, VaporHistoryView, VaporPrimitiveInput,
+            VaporSourceMaterial,
+        };
+        use crate::hydraulics::{VanGenuchtenModel, VanGenuchtenParameters};
+
+        const H_CRIT: f64 = -105.0;
+
+        fn config() -> VaporConfig {
+            VaporConfig::new(VaporConfigInput {
+                heat: HeatConfigInput {
+                    l_vapor: true,
+                    l_en_bal: false,
+                    i_dual_por: 0,
+                    l_w_dep: false,
+                    i_model: 0,
+                    domain_count: 1,
+                    k_top_t: 1,
+                    t_period: 0.0,
+                    k_bot_t: 1,
+                    campbell: false,
+                },
+                water_enabled: true,
+                heat_enabled: true,
+                i_enhanc: 1,
+                hysteresis: 0,
+                chemistry: false,
+                density_coupling: false,
+                centrifugal: false,
+                top_temperature: 20.0,
+                bottom_temperature: 20.0,
+                x_conv: 1.0,
+                t_conv: 1.0,
+            })
+            .unwrap()
+        }
+
+        /// Runs one vapor atmospheric step on a 3-node column at `top` head.
+        fn run(
+            top: f64,
+            rates: AtmosphericRates,
+            vapor_state: VaporAtmosphericState,
+            coupling: VaporAtmosphericCoupling,
+        ) -> Result<VaporAtmosphericStep, VaporAtmosphericError> {
+            let model = VanGenuchtenModel::new(
+                VanGenuchtenParameters::new(0.05, 0.45, 0.04, 1.6, 1.0e-5).unwrap(),
+            )
+            .unwrap();
+            let mesh = Mesh1D::new(vec![0.0, 0.5, 1.0], vec![0; 3], None, 1, 1, 1.0).unwrap();
+            let heads = vec![-100.0, -100.0, top];
+            let theta: Vec<f64> = heads
+                .iter()
+                .map(|h| model.evaluate(*h).unwrap().theta)
+                .collect();
+            let state = WaterState::new(0.0, heads.clone(), theta.clone()).unwrap();
+            let workspace = WaterWorkspace::new(3).unwrap();
+            let temperature = [20.0; 3];
+            let zero = [0.0; 3];
+            let evals: Vec<_> = heads.iter().map(|h| model.evaluate(*h).unwrap()).collect();
+            let conductivities: Vec<f64> = evals.iter().map(|e| e.conductivity).collect();
+            let capacities: Vec<f64> = evals.iter().map(|e| e.capacity).collect();
+            let vapor = kernels::evaluate(&VaporPrimitiveInput {
+                heads: &heads,
+                temperatures: &temperature,
+                liquid_water_contents: &theta,
+                liquid_conductivities: &conductivities,
+                liquid_capacities: &capacities,
+                material_indices: &[0; 3],
+                saturated_water_contents: &[0.45],
+                x_conv: 1.0,
+                t_conv: 1.0,
+            })
+            .unwrap();
+            let old = VaporHistoryView {
+                time: 0.0,
+                previous_timestep: None,
+                heads: &heads,
+                liquid_water_contents: &theta,
+                temperatures: &temperature,
+                vapor_contents: &vapor.vapor_contents,
+                liquid_velocities: &zero,
+                vapor_velocities: &zero,
+                head_predictor: &heads,
+            };
+            let source = [VaporSourceMaterial {
+                model: &model,
+                table: None,
+            }];
+            let config = config();
+            let context = VaporWaterContext {
+                config: &config,
+                old,
+                temperature_estimate: &temperature,
+                initial_heads: &heads,
+                initial_material_heads: &heads,
+                source_materials: &source,
+            };
+            let materials: [&dyn HydraulicModel; 1] = [&model];
+            let sink = [0.0; 3];
+            let input = WaterStepInput {
+                mesh: &mesh,
+                materials: &materials,
+                sink: &sink,
+                root_uptake: None,
+                timestep: 0.1,
+                target_time: 0.1,
+                face_averaging: FaceAveraging::Arithmetic,
+                lower: LowerBoundaryMode::FixedHead {
+                    head: -100.0,
+                    row: BoundaryRow {
+                        lower: 0.0,
+                        diagonal: 1.0,
+                        upper: 0.0,
+                        rhs: -100.0,
+                    },
+                    flux: 0.0,
+                },
+                upper: UpperBoundary::Atmospheric {
+                    critical_head: -H_CRIT,
+                },
+            };
+            let policy = WaterStepPolicy {
+                max_iterations: 20,
+                head_tolerance: 1.0e-8,
+                water_tolerance: 1.0e-8,
+                minimum_timestep: 1.0e-6,
+                retry_factor: 3.0,
+                minimum_pivot: 1.0e-14,
+            };
+            let schedule = ForcingSchedule::new(
+                rates,
+                Vec::new(),
+                ForcingUnits {
+                    time: "h",
+                    water_depth_rate: "cm/h",
+                },
+            )
+            .unwrap();
+            advance_atmospheric_step_vapor(
+                &state,
+                &workspace,
+                input,
+                policy,
+                &schedule,
+                vapor_state,
+                coupling,
+                context,
+            )
+        }
+
+        fn coupling() -> VaporAtmosphericCoupling {
+            VaporAtmosphericCoupling::new(1.0).unwrap()
+        }
+
+        #[test]
+        fn flux_switches_to_head_when_surface_reaches_critical_head() {
+            let evaporation = AtmosphericRates {
+                precipitation: 0.0,
+                evaporation: 1.0e-2,
+            };
+            let step = run(
+                -104.5,
+                evaporation,
+                VaporAtmosphericState::new(),
+                coupling(),
+            )
+            .unwrap();
+            assert_eq!(step.state.kod_top, 4);
+            assert_eq!(step.state.h_top, H_CRIT);
+            let record = step.switches.first().expect("a switch is recorded");
+            assert_eq!((record.from_kod, record.to_kod), (-4, 4));
+            assert!(!record.oscillation);
+            assert!((step.trial.candidate.heads()[2] - H_CRIT).abs() < 1.0e-6);
+        }
+
+        #[test]
+        fn head_switches_to_flux_on_rain() {
+            let rain = AtmosphericRates {
+                precipitation: 1.0e-6,
+                evaporation: 0.0,
+            };
+            let head_mode = VaporAtmosphericState {
+                kod_top: 4,
+                h_top: H_CRIT,
+                r_top_old: 0.1,
+                v_top: 0.01,
+                event_cursor: 0,
+            };
+            let step = run(H_CRIT, rain, head_mode, coupling()).unwrap();
+            assert_eq!(step.switches[0].stage, VaporSwitchStage::PreSolve);
+            assert_eq!(
+                (step.switches[0].from_kod, step.switches[0].to_kod),
+                (4, -4)
+            );
+            assert_eq!(step.state.kod_top, -4);
+        }
+
+        #[test]
+        fn surface_ponding_is_rejected_explicitly() {
+            let rates = rates(0.0);
+            let mut layered = coupling();
+            layered.surface_layer = true;
+            let error = run(-500.0, rates, VaporAtmosphericState::new(), layered).unwrap_err();
+            assert_eq!(error, VaporAtmosphericError::SurfacePondingUnsupported);
+            assert!(error.to_string().contains("WLayer/hCritS"));
+        }
+
+        #[test]
+        fn top_switch_follows_shift_order() {
+            // Flux mode, head above zero: head mode at zero.
+            assert_eq!(fortran_top_switch(-4, 0.0, 1.0, 0.0, 0.5, H_CRIT), (4, 0.0));
+            // Flux mode at hCritA wins over the ponding test.
+            assert_eq!(
+                fortran_top_switch(-4, 0.0, 1.0, 0.0, H_CRIT, H_CRIT),
+                (4, H_CRIT)
+            );
+            // Head mode, supply below demand with matching signs: stays.
+            assert_eq!(
+                fortran_top_switch(4, H_CRIT, 1.0, 0.5, H_CRIT, H_CRIT),
+                (4, H_CRIT)
+            );
+            // 0.99*hCritA rule needs rTop < 0 and flips to flux.
+            assert_eq!(
+                fortran_top_switch(4, H_CRIT, -1.0, -2.0, -119.0, H_CRIT).0,
+                -4
+            );
+        }
     }
 }
