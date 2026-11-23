@@ -109,3 +109,11 @@ Branch: `feat/vapor-flux-fixedhead`. Tracked planning (D-5).
 - Measured from RUN_INF.OUT (2400 steps, dt=0.1 h, max 2 iterations, Convergency column all T; no Error.msg) and KodT column: switches at 42.7 h (-4 to 4, hTop reaches hCritA=-1000), 120.1 h (4 to -4, rain), 200.3 h (-4 to 4). T_LEVEL.OUT hTop confirms (-912 at 42 h, -1000 from 42.7 h, -58 at 144 h).
 - Deviations: TopInf=t with KodTop=-4 (TopInf=f never applies hCritA in SetBC); MPL=10 daily print times 24..240 instead of the template's 6/24/72/240.
 - Gotchas for 31.3.3/31.4.1: Meteo.in record = `tAtm[h] Rad[MJ/m2/d] TMax TMin RHMean[%] Wind[km/d] SunHours`; tAtm must equal ATMOSPH.IN times (24..240). ATMOSPH.IN records have 11 columns (lTemp adds tTop tBot Ampl); with lMeteo only Prec (cm/h) and hCritA (positive, stored negative) are used, rSoil is overwritten by Meteo (EvapP). Records apply to the interval ending at tAtm. Heights are cm (200/190); bare soil CropHeight=0.1 cm. Latitude -30.0 deg.min format, altitude 100 m. Day 6 rain = 0.1 cm/h (24 mm/d); PET about 5.5 mm/d dry days.
+
+## 31.3.3 Meteo.in reader
+- Status: done.
+- Files: `crates/hydrus-core/src/meteo/config.rs` (new, ~1-370 incl. tests), `crates/hydrus-core/src/meteo/series.rs` (new, ~1-230 incl. tests), `crates/hydrus-core/src/meteo/mod.rs` (mod/pub use lines at top; `MeteoError` enum and Display: `InvalidMeteoDeck { path: String, reason: String }`, new `GrowthTableOverflow { count }`, new `UnsupportedMeteoSelection { field, value }`).
+- Code commit: `c98dca8`.
+- Tests: `cargo test -p hydrus-core --lib meteo::` -> 24 passed, 0 failed (8 config, 7 series, 9 radiation); clippy `-D warnings` clean; `cargo fmt --all -- --check` clean.
+- Deviations: none from approved plan; no other crate callers of `InvalidMeteoDeck` existed.
+- Gotchas for 31.4.1: entry point is `meteo::parse_meteo_deck(text, path) -> (MeteoConfig, Vec<MeteoRecord>)`; text is in-memory (caller reads file). Records are f32, `t_atm_h` in hours, wind in km/d (convert with /86.4 for m/s), `tAtm` must be strictly increasing (not cross-checked against ATMOSPH.IN). `MeteoConfig::radiation` is a `RadiationParams` with albedo set; `crop_height` is fixed 0.1 cm for bare soil. `iRadiation` 0/2, `iCrop`!=0, `iSunSh`/`iRelHum`!=0, `lMetDaily=t` give `UnsupportedMeteoSelection`; `lEnBal=t` gives `SurfaceEnergyBalanceUnsupported`.
