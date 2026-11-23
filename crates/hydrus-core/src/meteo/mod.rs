@@ -1,6 +1,12 @@
 //! Meteorological parameter and radiation modeling for HYDRUS (`INPUT.FOR:934-1066`, `TIME.FOR:443-800`).
 
+pub mod evaporation;
 pub mod radiation;
+
+pub use evaporation::{
+    aerodynamic_terms, calculate_bare_soil_et, penman_monteith_et, wind_km_day_to_m_s,
+    EvaporationInput, EvaporationResult, MeteoSite,
+};
 
 pub use radiation::{
     calculate_net_radiation, cloudiness_factor, dew_point_vapor_pressure,
