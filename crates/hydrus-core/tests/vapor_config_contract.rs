@@ -6,8 +6,8 @@ use hydrus_core::hydraulics::{
     BoundaryRow, Evaluation, FaceAveraging, HydraulicDerivatives, HydraulicModel, Mesh1D,
 };
 use hydrus_core::{
-    HydraulicError, LowerBoundaryMode, UpperBoundary, WaterState, WaterStepInput, WaterStepPolicy,
-    WaterWorkspace,
+    HydraulicError, LowerBoundaryMode, UnsupportedLowerBoundaryMode, UpperBoundary, WaterState,
+    WaterStepInput, WaterStepPolicy, WaterWorkspace,
 };
 use hydrus_core::{RootUptakeInput, RootUptakeModel};
 
@@ -275,21 +275,39 @@ fn preflight_rejects_bad_dimensions_mapping_modes_and_sink() {
         matches!(error, VaporError::UnsupportedLowerBoundary(_)),
         "{error:?}"
     );
+    let flux_upper = UpperBoundary::Flux {
+        flux: 0.0,
+        row: row(),
+    };
+    assert_eq!(
+        c.validate_water_input(
+            &water_input(
+                &mesh,
+                &[0.0; 3],
+                LowerBoundaryMode::FixedHead {
+                    head: 0.0,
+                    row: row(),
+                    flux: 0.0,
+                },
+                flux_upper,
+            ),
+            0.0,
+            policy()
+        ),
+        Ok(())
+    );
     assert!(matches!(
         c.validate_water_input(
             &water_input(
                 &mesh,
                 &[0.0; 3],
-                lower,
-                UpperBoundary::Flux {
-                    flux: 0.0,
-                    row: row()
-                }
+                LowerBoundaryMode::Unsupported(UnsupportedLowerBoundaryMode::WaterTable),
+                flux_upper,
             ),
             0.0,
             policy()
         ),
-        Err(VaporError::UnsupportedUpperBoundary(_))
+        Err(VaporError::UnsupportedLowerBoundary(_))
     ));
     let mut bad = water_input(&mesh, &[0.0; 3], lower, upper);
     bad.face_averaging = FaceAveraging::Geometric;

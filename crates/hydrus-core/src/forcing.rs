@@ -15,6 +15,35 @@ pub struct AtmosphericRates {
     pub evaporation: f64,
 }
 
+/// Vapor-path surface settings for `advance_atmospheric_step_vapor`.
+///
+/// `surface_layer` (`WLayer`) and `ponding_threshold` (`hCritS`) are carried only so
+/// a request for them is rejected explicitly; the vapor switch does not model them.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct VaporAtmosphericCoupling {
+    /// Length conversion `xConv` used by the `SetBC` rain reset head (`TIME.FOR:133-141`).
+    pub x_conv: f64,
+    pub surface_layer: bool,
+    pub ponding_threshold: Option<f64>,
+}
+
+impl VaporAtmosphericCoupling {
+    /// Bare-soil coupling without a surface water layer.
+    pub fn new(x_conv: f64) -> Result<Self, WaterStepError> {
+        if !x_conv.is_finite() || x_conv <= 0.0 {
+            return Err(WaterStepError::InvalidForcing {
+                name: "x_conv",
+                reason: "must be finite and positive",
+            });
+        }
+        Ok(Self {
+            x_conv,
+            surface_layer: false,
+            ponding_threshold: None,
+        })
+    }
+}
+
 /// A forcing discontinuity and the rates active from that time onward.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct ForcingEvent {

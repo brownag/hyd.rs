@@ -37,6 +37,8 @@ From the repository root, stage and build as documented in
 python3 tools/run_vapor_reference.py --all --build-dir .development/25.2.2/reference-build --task-base .development/25.2.2/reference-runs
 ```
 
+Closed flux/flux decks (`vapor_closed_flux_*`, `vapor_flux_known_*`) are specified in `planning/master/M6_VAPOR_CLOSED_PAIR_FIXTURE_DESIGN.md`; fixtures are generated separately.
+
 This is reference-only evidence labelled `pinned-fortran-trajectory`. It does not
 establish Rust parity, numerical acceptance, tolerance, or direct vapor-content
 trajectory observations. Fixture provenance includes input, output, source/build,

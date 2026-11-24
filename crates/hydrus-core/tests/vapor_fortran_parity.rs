@@ -48,7 +48,7 @@ use hydrus_core::{
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 
-const CRITERIA_SHA256: &str = "1d0acf88bebd5f14d866171d3301f0715c0d2829944868649560dcea659dd17e";
+const CRITERIA_SHA256: &str = "b03047a6e0091b227d50da205de08c731e825ce192d88e8d4cadd9fc3b8a8541";
 const X_CONV: f64 = 100.0; // INPUT.FOR:190 (cm)
 const T_CONV: f64 = 1.0 / 3600.0; // INPUT.FOR:197 (hours)
 const MINIMUM_PIVOT: f64 = 1e-12;
@@ -66,6 +66,17 @@ const ALL_CASES: [&str; 5] = [
     "vapor_dry_thermal_gradient",
     "vapor_dry_off_control",
 ];
+const FLUX_CASES: [&str; 8] = [
+    "vapor_dry_isothermal_on",
+    "vapor_dry_isothermal_off",
+    "vapor_free_drainage_on",
+    "vapor_free_drainage_off",
+    "vapor_closed_flux_on",
+    "vapor_closed_flux_off",
+    "vapor_flux_known_on",
+    "vapor_flux_known_off",
+];
+const FIXEDHEAD_CASES: [&str; 1] = ["vapor_flux_fixedhead_wet_on"];
 const BASE_FIELDS: [&str; 3] = ["head", "liquid_moisture", "temperature_c"];
 const VAPOR_FIELDS: [&str; 9] = [
     "con",
@@ -449,7 +460,10 @@ struct Deck {
     top_inf: bool,
     k_top: i32,
     bot_inf: bool,
+    free_d: bool,
     k_bot: i32,
+    r_top: f64,
+    r_bot: f64,
     model: i32,
     hysteresis: i32,
     h_tab_1: f64,
@@ -501,6 +515,17 @@ fn parse_deck(text: &str) -> Deck {
         times
     };
 
+    let (r_top, r_bot) = if lines.iter().any(|l| l.contains("rTop rBot rRoot")) {
+        let r_bc = numbers(&after(&lines, "rTop rBot rRoot"));
+        assert!(
+            r_bc.len() >= 2,
+            "rTop rBot line must have at least two numbers"
+        );
+        (r_bc[0], r_bc[1])
+    } else {
+        (0.0, 0.0)
+    };
+
     Deck {
         l_wat: flag(&block1[0]),
         l_chem: flag(&block1[1]),
@@ -514,7 +539,10 @@ fn parse_deck(text: &str) -> Deck {
         top_inf: flag(&top[0]),
         k_top: top[2].parse().expect("KodTop"),
         bot_inf: flag(&bot[0]),
+        free_d: flag(&bot[2]),
         k_bot: bot[4].parse().expect("KodBot"),
+        r_top,
+        r_bot,
         model: model[0] as i32,
         hysteresis: model[1] as i32,
         h_tab_1: htab[0],
@@ -613,6 +641,30 @@ fn placeholder_row(rhs: f64) -> BoundaryRow {
     }
 }
 
+#[allow(clippy::too_many_arguments)]
+fn richards_upper_flux_row(
+    x_top: f64,
+    x_prev: f64,
+    head_top: f64,
+    k_top: f64,
+    k_prev: f64,
+    cap_top: f64,
+    dt: f64,
+    cos_alpha: f64,
+    sink_top: f64,
+) -> BoundaryRow {
+    let dx_a = x_top - x_prev;
+    let dx = dx_a / 2.0;
+    let k_face = 0.5 * (k_top + k_prev);
+    let storage = cap_top * dx / dt;
+    BoundaryRow {
+        lower: -k_face / dx_a,
+        diagonal: k_face / dx_a + storage,
+        upper: 0.0,
+        rhs: storage * head_top - k_face * cos_alpha - sink_top * dx,
+    }
+}
+
 /// Table inside the `hTab` span, analytic van Genuchten outside it (`SetMat` fallback).
 struct SpanModel<'a> {
     table: &'a HydraulicTables,
@@ -706,10 +758,33 @@ fn run_case(case: &str, expect_vapor: bool) -> Result<Candidate, String> {
     );
     assert!(deck.l_wat && !deck.l_chem, "{case}: lWat on, lChem off");
     assert!(!deck.l_w_dep && !deck.l_meteo, "{case}: lWDep/lMeteo off");
-    assert!(
-        !deck.top_inf && !deck.bot_inf && deck.k_top == 1 && deck.k_bot == 1,
-        "{case}: fixed heads at both ends"
-    );
+    if deck.k_top == -1 && deck.k_bot == -5 {
+        assert!(
+            !deck.top_inf && !deck.bot_inf && deck.free_d,
+            "{case}: prescribed top flux with free drainage"
+        );
+        assert!(deck.r_top.is_finite(), "{case}: finite rTop");
+    } else if deck.k_top == -1 && deck.k_bot == 1 {
+        assert!(
+            !deck.top_inf && !deck.bot_inf,
+            "{case}: prescribed flux top with fixed-head bottom"
+        );
+        assert!(deck.r_top.is_finite(), "{case}: finite rTop");
+    } else if deck.k_top == -1 && deck.k_bot == -1 {
+        assert!(
+            !deck.top_inf && !deck.bot_inf,
+            "{case}: prescribed flux both ends"
+        );
+        assert!(
+            deck.r_top.is_finite() && deck.r_bot.is_finite(),
+            "{case}: finite rTop and rBot"
+        );
+    } else {
+        assert!(
+            !deck.top_inf && !deck.bot_inf && deck.k_top == 1 && deck.k_bot == 1,
+            "{case}: fixed heads at both ends"
+        );
+    }
     assert!(
         deck.k_top_t == 1 && deck.k_bot_t == 1,
         "{case}: Dirichlet temperature both ends"
@@ -814,8 +889,23 @@ fn run_case(case: &str, expect_vapor: bool) -> Result<Candidate, String> {
         steps: 0,
         dt: deck.dt,
     };
+    let is_flux_case = deck.k_top == -1;
+    let lower = if deck.k_bot == -5 {
+        LowerBoundaryMode::FreeDrainage
+    } else if deck.k_bot == -1 {
+        LowerBoundaryMode::PrescribedFlux { flux: deck.r_bot }
+    } else {
+        LowerBoundaryMode::FixedHead {
+            head: head_bottom,
+            row: placeholder_row(head_bottom),
+            flux: 0.0,
+        }
+    };
     macro_rules! step_input {
         ($target:expr) => {
+            step_input!($target, placeholder_row(0.0))
+        };
+        ($target:expr, $upper_row:expr) => {
             WaterStepInput {
                 mesh: &mesh,
                 materials: &models,
@@ -824,15 +914,18 @@ fn run_case(case: &str, expect_vapor: bool) -> Result<Candidate, String> {
                 timestep: deck.dt,
                 target_time: $target,
                 face_averaging: FaceAveraging::Arithmetic,
-                lower: LowerBoundaryMode::FixedHead {
-                    head: head_bottom,
-                    row: placeholder_row(head_bottom),
-                    flux: 0.0,
-                },
-                upper: UpperBoundary::Head {
-                    head: head_top,
-                    row: placeholder_row(head_top),
-                    flux: 0.0,
+                lower,
+                upper: if is_flux_case {
+                    UpperBoundary::Flux {
+                        flux: -deck.r_top,
+                        row: $upper_row,
+                    }
+                } else {
+                    UpperBoundary::Head {
+                        head: head_top,
+                        row: placeholder_row(head_top),
+                        flux: 0.0,
+                    }
                 },
             }
         };
@@ -851,12 +944,41 @@ fn run_case(case: &str, expect_vapor: bool) -> Result<Candidate, String> {
         )
         .map_err(|e| format!("{e:?}"))?;
         for &print_time in &deck.print_times[1..] {
-            while water.time() < print_time - 1e-12 {
+            while water.time() < print_time - 1e-9 {
+                let upper_row = if is_flux_case {
+                    let h_top = water.heads()[n - 1];
+                    let h_prev = water.heads()[n - 2];
+                    let k_top = analytic
+                        .evaluate(h_top)
+                        .map_err(|e| format!("{e:?}"))?
+                        .conductivity;
+                    let k_prev = analytic
+                        .evaluate(h_prev)
+                        .map_err(|e| format!("{e:?}"))?
+                        .conductivity;
+                    let cap_top = analytic
+                        .evaluate(h_top)
+                        .map_err(|e| format!("{e:?}"))?
+                        .capacity;
+                    richards_upper_flux_row(
+                        x[n - 1],
+                        x[n - 2],
+                        h_top,
+                        k_top,
+                        k_prev,
+                        cap_top,
+                        deck.dt,
+                        deck.cos_alpha,
+                        sink[n - 1],
+                    )
+                } else {
+                    placeholder_row(0.0)
+                };
                 driver
                     .step(
                         &mut water,
                         &mut workspace,
-                        step_input!(print_time),
+                        step_input!(print_time, upper_row),
                         policy,
                         coupled,
                     )
@@ -946,7 +1068,7 @@ fn run_case(case: &str, expect_vapor: bool) -> Result<Candidate, String> {
 
     let mut last: Option<VaporStepReport> = None;
     for &print_time in &deck.print_times[1..] {
-        while water.time() < print_time - 1e-12 {
+        while water.time() < print_time - 1e-9 {
             let report = driver
                 .step(
                     &mut water,
@@ -1115,6 +1237,105 @@ fn compare_case(
         }
     }
     Ok(rows)
+}
+
+fn compare_flux_case(
+    case: &str,
+    c: &Candidate,
+    fixture: &Value,
+    crits: &BTreeMap<String, Crit>,
+) -> Result<Vec<Row>, String> {
+    let mut rows = Vec::new();
+    if vec_f64(&fixture["time_points"]) != c.time_points {
+        return Err(format!("{case}: time points differ"));
+    }
+    if vec_f64(&fixture["node_depths"]) != c.node_depths {
+        return Err(format!("{case}: node depths differ"));
+    }
+    let nodes: Vec<usize> = (1..=c.node_depths.len()).collect();
+    type FieldRows<'a> = (&'a str, &'a Vec<Vec<f64>>, Vec<Vec<f64>>);
+    let fields: [FieldRows; 3] = [
+        ("head", &c.head, matrix(&fixture["head"])),
+        (
+            "liquid_moisture",
+            &c.liquid_moisture,
+            matrix(&fixture["liquid_moisture"]),
+        ),
+        (
+            "temperature_c",
+            &c.temperature_c,
+            matrix(&fixture["temperature_c"]),
+        ),
+    ];
+    for (name, cand, reference) in fields {
+        let crit = *crits
+            .get(name)
+            .ok_or_else(|| format!("no criteria for {name}"))?;
+        for (index, time) in c.time_points.iter().enumerate() {
+            rows.extend(compare_series(
+                case,
+                name,
+                *time,
+                &nodes,
+                &cand[index],
+                &reference[index],
+                crit,
+                None,
+            )?);
+        }
+    }
+    Ok(rows)
+}
+
+fn write_flux_comparison_report(rows: &BTreeMap<String, Vec<Row>>) {
+    let dir = repo_root().join(".development/30.1.1");
+    let _ = fs::create_dir_all(&dir);
+    let mut report = String::from("# Task 30.1.1 Closed-Pair Flux Parity Comparison Report\n\n");
+    report.push_str("| Case | Field | Time (h) | Max Abs Diff | Max Rel Diff | Bound | Pass |\n");
+    report.push_str("|---|---|---|---|---|---|---|\n");
+    for case in FLUX_CASES {
+        let case_rows = match rows.get(case) {
+            Some(r) => r,
+            None => continue,
+        };
+        for field in BASE_FIELDS {
+            let field_rows: Vec<&Row> = case_rows.iter().filter(|r| r.field == field).collect();
+            let mut times: Vec<f64> = field_rows.iter().map(|r| r.time).collect();
+            times.sort_by(|a, b| a.partial_cmp(b).unwrap());
+            times.dedup();
+            for time in times {
+                let time_rows: Vec<&&Row> = field_rows
+                    .iter()
+                    .filter(|r| (r.time - time).abs() < 1e-9)
+                    .collect();
+                let mut max_abs = 0.0f64;
+                let mut max_rel = 0.0f64;
+                let mut max_bound = 0.0f64;
+                let mut all_pass = true;
+                for r in time_rows {
+                    let abs_diff = (r.candidate - r.reference).abs();
+                    let rel_diff = if r.reference.abs() > 0.0 {
+                        abs_diff / r.reference.abs()
+                    } else {
+                        0.0
+                    };
+                    max_abs = max_abs.max(abs_diff);
+                    max_rel = max_rel.max(rel_diff);
+                    max_bound = max_bound.max(r.bound);
+                    if !r.pass {
+                        all_pass = false;
+                    }
+                }
+                report.push_str(&format!(
+                    "| `{case}` | `{field}` | {time:.1} | {max_abs:.6e} | {max_rel:.6e} | {max_bound:.6e} | {} |\n",
+                    if all_pass { "PASS" } else { "**FAIL**" }
+                ));
+            }
+        }
+    }
+    let path = dir.join("flux_comparison_report.md");
+    let _ = fs::write(&path, &report);
+    println!("wrote flux comparison report: {}", path.display());
 }
 
 // ----------------------------------------------------------------------------------------------
@@ -1357,6 +1578,34 @@ fn outcome() -> &'static Result<Outcome, String> {
             rows.insert(case.to_owned(), compare_case(case, &c, &fixture, &crits)?);
             candidates.insert(case.to_owned(), c);
         }
+        for case in FIXEDHEAD_CASES {
+            let expect_vapor = case.ends_with("_on");
+            let c = run_case(case, expect_vapor)?;
+            let json = candidate_json(case, &c, CRITERIA_SHA256);
+            let path = root.join(format!("{case}.candidate.json"));
+            let _ = write_json(&path, &json);
+            let fixture = read_json(&ref_dir().join("fixtures").join(format!("{case}.json")));
+            rows.insert(case.to_owned(), compare_case(case, &c, &fixture, &crits)?);
+            candidates.insert(case.to_owned(), c);
+        }
+        for case in FLUX_CASES {
+            let expect_vapor = case.ends_with("_on");
+            let c = run_case(case, expect_vapor)?;
+            let json = candidate_json(case, &c, CRITERIA_SHA256);
+            let path = root.join(format!("{case}.candidate.json"));
+            let sha = write_json(&path, &json);
+            println!(
+                "candidate {} sha256 {sha} (steps {})",
+                path.display(),
+                c.steps
+            );
+            let fixture = read_json(&ref_dir().join("fixtures").join(format!("{case}.json")));
+            rows.insert(
+                case.to_owned(),
+                compare_flux_case(case, &c, &fixture, &crits)?,
+            );
+            candidates.insert(case.to_owned(), c);
+        }
         let (kernel_rows, observations) = run_kernel(&crits)?;
         let kernel_json = json!({
             "schema_version": "vapor-kernel-candidate-v1",
@@ -1387,7 +1636,11 @@ fn outcome() -> &'static Result<Outcome, String> {
         for case in ALL_CASES {
             print_table(case, &rows[case]);
         }
+        for case in FLUX_CASES {
+            print_table(case, &rows[case]);
+        }
         print_table("kernel", &kernel_rows);
+        write_flux_comparison_report(&rows);
         Ok(Outcome {
             root,
             candidates,
@@ -1516,6 +1769,72 @@ fn vapor_dry_thermal_gradient_matches_fixture() {
 fn vapor_dry_off_control_matches_fixture() {
     let o = out();
     assert_rows_pass("vapor_dry_off_control", &o.rows["vapor_dry_off_control"]);
+}
+
+#[test]
+fn closed_flux_on_matches_fixture() {
+    let o = out();
+    assert_rows_pass("vapor_closed_flux_on", &o.rows["vapor_closed_flux_on"]);
+}
+
+#[test]
+fn closed_flux_off_matches_fixture() {
+    let o = out();
+    assert_rows_pass("vapor_closed_flux_off", &o.rows["vapor_closed_flux_off"]);
+}
+
+#[test]
+fn closed_flux_known_on_matches_fixture() {
+    let o = out();
+    assert_rows_pass("vapor_flux_known_on", &o.rows["vapor_flux_known_on"]);
+}
+
+#[test]
+fn closed_flux_known_off_matches_fixture() {
+    let o = out();
+    assert_rows_pass("vapor_flux_known_off", &o.rows["vapor_flux_known_off"]);
+}
+
+#[test]
+fn dry_isothermal_on_matches_fixture() {
+    let o = out();
+    assert_rows_pass(
+        "vapor_dry_isothermal_on",
+        &o.rows["vapor_dry_isothermal_on"],
+    );
+}
+
+#[test]
+fn dry_isothermal_off_matches_fixture() {
+    let o = out();
+    assert_rows_pass(
+        "vapor_dry_isothermal_off",
+        &o.rows["vapor_dry_isothermal_off"],
+    );
+}
+
+#[test]
+fn flux_fixedhead_wet_on_matches_fixture() {
+    let o = out();
+    assert_rows_pass(
+        "vapor_flux_fixedhead_wet_on",
+        &o.rows["vapor_flux_fixedhead_wet_on"],
+    );
+}
+
+#[test]
+fn free_drainage_on_matches_fixture() {
+    let o = out();
+    assert_rows_pass("vapor_free_drainage_on", &o.rows["vapor_free_drainage_on"]);
+}
+
+#[test]
+fn free_drainage_off_matches_fixture() {
+    let o = out();
+    assert_rows_pass(
+        "vapor_free_drainage_off",
+        &o.rows["vapor_free_drainage_off"],
+    );
 }
 
 #[test]

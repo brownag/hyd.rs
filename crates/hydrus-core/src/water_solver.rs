@@ -4,9 +4,12 @@ use crate::atmospheric::{
 use crate::forcing::AtmosphericRates;
 use crate::heat::vapor::kernels;
 use crate::heat::vapor::water::{
-    assemble_water_rows, phase_velocities, PhaseVelocityInput, VaporWaterRowsInput,
+    assemble_water_rows, phase_velocities, vapor_lower_flux_row, vapor_lower_free_drainage_row,
+    vapor_upper_flux_row, PhaseVelocityInput, VaporWaterRowsInput,
 };
-use crate::heat::vapor::{VaporError, VaporPrimitiveInput, VaporWaterContext, VaporWaterTrial};
+use crate::heat::vapor::{
+    VaporBoundaryPair, VaporError, VaporPrimitiveInput, VaporWaterContext, VaporWaterTrial,
+};
 use crate::hydraulics::{
     arithmetic_face_conductivity, geometric_face_conductivity, nodal_control_volume_width,
     solve_tridiagonal_in_place, transform_boundary_row, BoundaryCondition, BoundaryRow,
@@ -236,6 +239,7 @@ pub(crate) fn solve_vapor_water_trial(
     context
         .config
         .validate_water_input(&input, state.time, policy)?;
+    let boundary_pair = VaporBoundaryPair::classify(input.lower, input.upper)?;
     let n = input.mesh.coordinates().len();
     for (name, values) in [
         ("temperature_estimate", context.temperature_estimate),
@@ -337,7 +341,7 @@ pub(crate) fn solve_vapor_water_trial(
             };
             // Keep the per-iteration properties owned before row construction.
             let properties = kernels::evaluate(&primitive)?;
-            let rows = assemble_water_rows(&VaporWaterRowsInput {
+            let rows_input = VaporWaterRowsInput {
                 coordinates: input.mesh.coordinates(),
                 gravity: input.mesh.inclination_cosine(),
                 liquid_conductivities: &liquid,
@@ -351,8 +355,49 @@ pub(crate) fn solve_vapor_water_trial(
                 sink: input.sink,
                 timestep: dt,
                 vapor: &properties,
-            })?;
-            let (upper_mode, lower_flux) = assemble(
+            };
+            let rows = assemble_water_rows(&rows_input)?;
+            // Closed flux/flux pair (task 29.2.1): `(rBot, -rTop)`, both positive
+            // Free-drainage lower with flux upper (task 30.2.1): dynamic `rBot` carries ConVh
+            // Classified by `VaporBoundaryPair` (task 29.2.2).
+            let closed_rows = match boundary_pair {
+                VaporBoundaryPair::ClosedFlux {
+                    lower_flux: lower_flux_in,
+                    upper_flux: upper_flux_in,
+                } => Some((
+                    lower_flux_in,
+                    upper_flux_in,
+                    vapor_lower_flux_row(&rows_input, input.face_averaging)?,
+                    vapor_upper_flux_row(&rows_input, input.face_averaging)?,
+                )),
+                VaporBoundaryPair::FreeDrainage {
+                    upper_flux: upper_flux_in,
+                } => {
+                    let (r_bot, lower_row) =
+                        vapor_lower_free_drainage_row(&rows_input, input.face_averaging)?;
+                    Some((
+                        r_bot,
+                        upper_flux_in,
+                        lower_row,
+                        vapor_upper_flux_row(&rows_input, input.face_averaging)?,
+                    ))
+                }
+                VaporBoundaryPair::HeadHead | VaporBoundaryPair::FixedHeadLowerFluxUpper { .. } => {
+                    None
+                }
+            };
+            // Fixed-head lower with flux upper: the lower Dirichlet row from `assemble` is kept;
+            // only the upper row takes the vapor flux row (`WATFLOW.FOR:288-291`).
+            let fixed_head_upper = match boundary_pair {
+                VaporBoundaryPair::FixedHeadLowerFluxUpper {
+                    upper_flux: upper_flux_in,
+                } => Some((
+                    upper_flux_in,
+                    vapor_upper_flux_row(&rows_input, input.face_averaging)?,
+                )),
+                _ => None,
+            };
+            let (upper_mode, mut lower_flux) = assemble(
                 &mut candidate_workspace,
                 state,
                 input,
@@ -360,6 +405,55 @@ pub(crate) fn solve_vapor_water_trial(
                 dt,
                 None,
             )?;
+            if let Some((lower_flux_in, upper_flux_in, closed_lower, closed_upper)) = closed_rows {
+                lower_flux = lower_flux_in;
+                for (location, node, flux, row) in [
+                    (BoundaryRowLocation::Lower, 0, lower_flux_in, closed_lower),
+                    (
+                        BoundaryRowLocation::Upper,
+                        n - 1,
+                        upper_flux_in,
+                        closed_upper,
+                    ),
+                ] {
+                    let row = transform_boundary_row(
+                        n,
+                        location,
+                        BoundaryRow {
+                            lower: row.lower,
+                            diagonal: row.diagonal,
+                            upper: row.upper,
+                            rhs: row.rhs,
+                        },
+                        BoundaryCondition::Neumann { flux },
+                        policy.minimum_pivot,
+                    )?;
+                    candidate_workspace.lower[node] = row.lower;
+                    candidate_workspace.diagonal[node] = row.diagonal;
+                    candidate_workspace.upper[node] = row.upper;
+                    candidate_workspace.rhs[node] = row.rhs;
+                }
+            }
+            if let Some((upper_flux_in, fixed_upper)) = fixed_head_upper {
+                let row = transform_boundary_row(
+                    n,
+                    BoundaryRowLocation::Upper,
+                    BoundaryRow {
+                        lower: fixed_upper.lower,
+                        diagonal: fixed_upper.diagonal,
+                        upper: fixed_upper.upper,
+                        rhs: fixed_upper.rhs,
+                    },
+                    BoundaryCondition::Neumann {
+                        flux: upper_flux_in,
+                    },
+                    policy.minimum_pivot,
+                )?;
+                candidate_workspace.lower[n - 1] = row.lower;
+                candidate_workspace.diagonal[n - 1] = row.diagonal;
+                candidate_workspace.upper[n - 1] = row.upper;
+                candidate_workspace.rhs[n - 1] = row.rhs;
+            }
             for (node, vapor_row) in (1..n - 1).zip(rows) {
                 // Replace the liquid-only row, not add it a second time.
                 candidate_workspace.lower[node] = vapor_row.lower;

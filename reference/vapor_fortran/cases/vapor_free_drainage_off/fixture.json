@@ -1,0 +1,25 @@
+{
+  "case_id": "vapor_free_drainage_off",
+  "runner": {
+    "inputs": [
+      "LEVEL_01.DIR",
+      "SELECTOR.IN",
+      "PROFILE.DAT"
+    ],
+    "outputs": [
+      {
+        "name": "NOD_INF.OUT",
+        "marker": "end"
+      },
+      {
+        "name": "BALANCE.OUT",
+        "marker": "Calculation time"
+      }
+    ],
+    "aliases": {
+      "SELECTOR.IN": "Selector.in",
+      "PROFILE.DAT": "Profile.dat"
+    },
+    "data_prefix": "vapor_free_drainage_off"
+  }
+}
