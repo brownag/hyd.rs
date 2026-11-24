@@ -1,56 +1,19 @@
 # Project Goals (`planning/GOALS.md`)
 
-Last Updated: 2026-11-22
+Last Updated: 2026-11-23
 Source State: [STATE_31.md](STATE_31.md) (plan [EXECUTION_PLAN_31.md](EXECUTION_PLAN_31.md))
 
 Magic Wand refresh (2026-11-22, user-approved): extra ranking criteria are retire Fortran risk early, land on main soon, and minimize gate load. G22.3 is split into M1 to M7, which map to Plan 31 tasks. M2 (the `Meteo.in` reader) is new: the G22.3 contract names `meteo::config::MeteoConfig` and `meteo::series::MeteoRecord`, but no Plan 31 task owned them.
 
 ## Circled Goal (Active)
 
-- **[G22.3-M1]** A pinned-Fortran met fixture `reference/vapor_fortran/fixtures/vapor_met_bare_soil_on.json` exists. It is produced through `tools/run_vapor_reference.py` from the deck `reference/vapor_fortran/cases/vapor_met_bare_soil_on/`: `lMeteo=t`, `lVapor=t`, `AtmBC=t`, `KodTop=-4`, fixed-head lower at -100 cm, `iCrop=0`, 10 daily records over 240 h. (Plan 31 task 31.2.1.)
-  - Why now: the only unstarted input to the parity gate (M5), and the largest Fortran risk in Plan 31. The pinned reference has already diverged with vapor in the dry regime (G22.2-C3). Met evaporation can dry the surface node. Running it first tests the deck design and D-10 before M3 and M4 build on them. No user gate beyond the answers already given.
-  - Exit criteria: Fortran reaches 240 h without abort, and the non-convergence count is recorded. The fixture records the number of upper-boundary flux/head switches. Zero switches is a design finding, because M5 could not then test D-10. `python3 -m unittest tools.test_run_vapor_reference` passes. `git diff --quiet -- reference/vapor_fortran/criteria.json`. Provenance (source hash, deck hash) is in the fixture. On divergence: write a record in the G22.2-C3 style and stop at a gate. Do not tune the deck to force convergence without approval.
-  - Files: `tools/run_vapor_reference.py` (allowlist ~line 318; the vapor flag check ~line 264 must also accept `f f t t f f`), `tools/test_run_vapor_reference.py`, the case directory, `reference/vapor_fortran/fixtures/`, `planning/STATE_31.md`.
-  - Decisions (2026-11-22, user): case name `vapor_met_bare_soil_on`; 240 h with 10 daily records. These answer the open questions in the worker's `planning/tasks/31.2.1.todo.md`.
-  - First action: write those answers into the 31.2.1 worker todo and approve its plan. Rebase the worker worktree from `e4fd0ae` onto `49ebb43` and resume it.
-  - Depends on: G22.3 contract (31.1.3, done), Gate A (approved 2026-11-15).
+- None selected (2026-11-23). G22.2 and G22.3 closed in orchestration 31. Candidates for the next circle: G24 (merge to `main`), G20 (energy balance; its trigger is now met), G26 (met run path in `src/`), G25 (solved head-end boundary fluxes). Run Magic Wand to select.
 
 ## Sequenced Goals (Dependency DAG)
 
-```
-M1 fixture --+-------------> M5 parity --+
-             +-(deck)-> M2 reader -> M5   +-> M7 record G22.2 close + G22.3 -> G20 (deferred)
-M3 evaporation ---------> M5              |
-M4 vapor switching -+---> M5              |
-                    +---> M6 balance -----+
-```
-
-G22.3 (atmospheric water switching with vapor, meteorology contracted in [M6_VAPOR_G22_3_CONTRACT.md](master/M6_VAPOR_G22_3_CONTRACT.md)) is the parent of M1 to M7. It is accepted at M7.
-
-- **[G22.3-M2]** Rust reads `Meteo.in` and its met records into `meteo::config::MeteoConfig` and `meteo::series::MeteoRecord` (`INPUT.FOR:934-1066`, `TIME.FOR:484-497`). Every rejection in contract section 7 (`InvalidMeteoDeck`, temperature range, RH, wind, radiation, radiation mode, growth table) is a typed error raised before state mutation. (New Plan 31 task 31.3.3, wave 3.)
-  - Exit criteria: `cargo test -p hydrus-core meteo::config meteo::series` passes, parsing the M1 deck and one test per named rejection.
-  - Files: `crates/hydrus-core/src/meteo/config.rs`, `meteo/series.rs` (create), plus module declarations in `meteo/mod.rs`. `meteo/mod.rs` is shared with 31.3.1: one-line `mod` additions only, merged at wave end.
-  - Depends on: M1 (deck format; soft), contract (done).
-
-- **[G22.3-M3]** `meteo::evaporation` computes potential evaporation from the 31.2.2 radiation terms in `f32` with source operation order (ADR 0010/0015). (Task 31.3.1.)
-  - Exit criteria: `cargo test -p hydrus-core meteo::evaporation` passes against the source formulas.
-  - Depends on: 31.2.2 (done).
-
-- **[G22.3-M4]** `advance_atmospheric_step` drives the vapor path by decomposing each step into existing Flux/Head pairs, in Fortran switching order (D-10). The water-only atmospheric tests stay unchanged and green. (Task 31.3.2.)
-  - Exit criteria: `cargo test -p hydrus-core atmospheric` passes. `water_solver.rs` is not edited; if it must be, re-scope (escalation 4).
-  - Depends on: contract (done), 31.2.2 (done).
-
-- **[G22.3-M5]** `vapor_met_parity` matches the pinned met trajectory from M1. Source-precision rows are listed, not widened. A failure re-opens D-10. (Task 31.4.1.)
-  - Depends on: M1, M2, M3, M4.
-
-- **[G22.3-M6]** `vapor_met_balance` reports a water-balance residual within tolerance over the met-switched run. (Task 31.4.2.)
-  - Depends on: M4.
-
-- **[G22.3-M7]** G22.2 is recorded closed and G22.3 accepted in `M6_VAPOR_COVERAGE.md`, `M6_VAPOR_G22_3_ACCEPTANCE.md` (create) and this file. (Task 31.5.1.)
-  - Depends on: M5, M6, 31.2.3 (done).
-
-- **[G22.2]** Water-flux and free-drainage boundary pairs (and supported mixed pairs) are implemented with vapor, including vapor boundary/storage accounting and balance evidence.
-  - Status (2026-11-22): all slices done; only the closure record remains, owned by G22.3-M7. C1, C3, C4 and C6 done (STATE_29/30). C2 confirmed by the user (`M6_VAPOR_G22_2_ACCEPTANCE.md`). C5 done: Gate A Option A (no closed-pair head entries) and M1 (`flux_known_on_off_liquid_moisture`, factor 0.75, `d2d1f32`). Flux upper with fixed-head lower: wet pair accepted (`880c6c2`), G22.2-F1 landing-step artifact fixed, parity 19/19; matrix corrected (`ffa1af1`). Dry (-10000 cm) divergence recorded, not converged. Full history: [STATE_30.md](STATE_30.md), [M6_VAPOR_G22_2_ACCEPTANCE.md](master/M6_VAPOR_G22_2_ACCEPTANCE.md), and git history of this file.
+- **[G20]** Energy balance (`lEnBal`, `UpdateEnergy`, surface energy terms `Evap`, `Rn`, `Rns`, `Rnl`) is added to the coupled capability with its own contract, fixtures and acceptance gate.
+  - Status: radiation (`Rn`, `Rns`, `Rnl`) ported in Plan 31 (31.2.2, `b7acedf`) per D-4. Trigger met 2026-11-23 (G22.3 accepted). Next step: contract and reprioritize the energy update as its own orchestration.
+  - Depends on: G22.3 (done), G26 (soft; a `src/` met run path).
 
 ## Independent Backlog
 
@@ -64,7 +27,7 @@ G22.3 (atmospheric water switching with vapor, meteorology contracted in [M6_VAP
 - **[G27]** A met discrimination entry (vapor fields nonzero for `vapor_met_bare_soil_on`) is approved and added to `criteria.json`.
   - Gate: D-9. A user-approved criteria edit and the hash-pin updates (as in 31.2.3).
 
-- **[G24]** `feat/vapor-flux-fixedhead` is merged into `main` with the full AGENTS.md suites green. At 2026-11-22 it is 21 commits ahead of `main` and 0 behind: G22.2 work, the C5 criteria entry, the radiation port.
+- **[G24]** `feat/vapor-flux-fixedhead` is merged into `main` with the full AGENTS.md suites green. At 2026-11-23 it is 47 commits ahead of `main` and 0 behind: G22.2 closure, G22.3 (meteorology, evaporation, radiation, vapor atmospheric switching, met parity and balance).
   - Why: scores on "land on main soon"; one approval, no dependency. Can run in parallel with M1.
   - Gate: user approval before the merge.
 
@@ -86,10 +49,6 @@ G22.3 (atmospheric water switching with vapor, meteorology contracted in [M6_VAP
 
 ## Deferred
 
-- **[G20]** Energy balance (`lEnBal`, `UpdateEnergy`, surface energy terms `Evap`, `Rn`, `Rns`, `Rnl`) is added to the coupled capability with its own contract, fixtures and acceptance gate.
-  - Status: radiation (`Rn`, `Rns`, `Rnl`) ported in Plan 31 (31.2.2, `b7acedf`) per D-4. The energy update is split out.
-  - Trigger: G22.3-M7 records G22.3 accepted; then contract and reprioritize the remainder as its own orchestration.
-
 - **[G23]** Temperature-dependent liquid-water coupling (`lWDep` / `lWTDep`, including `ConLT` in water flux and liquid material temperature adjustments) is separately contracted, implemented and validated when selected.
   - Trigger: separate user scope approval. Remains rejected in orchestration 25; not conflated with vapor's thermal-gradient terms or G20 energy balance.
 
@@ -97,6 +56,11 @@ G22.3 (atmospheric water switching with vapor, meteorology contracted in [M6_VAP
   - Trigger: only if a real supported-use case needs a stronger temporal claim or an observed timestep effect could change a decision.
 
 ## Completed
+
+- **[G22.3]** Atmospheric water switching is implemented with vapor, with its meteorological and evaporation prerequisites contracted.
+  - Result (2026-11-23): **accepted with exceptions** (user decision). Bare soil, daily `Meteo.in`, fixed-head lower, vapor on. Parity `vapor_met_parity` (D-10 gate: 12 fields within the unchanged bounds, switches on the Fortran steps) and balance `vapor_met_balance` (precedent tolerance on all 2400 steps). Exceptions: head-end boundary flux checked as interior conservation only (G25), met run path only in the test driver (G26), no met discrimination entry (G27). Record: [M6_VAPOR_G22_3_ACCEPTANCE.md](master/M6_VAPOR_G22_3_ACCEPTANCE.md). Sub-goals M1 to M7 were Plan 31 tasks 31.2.1, 31.3.1 to 31.3.3, 31.4.1, 31.4.2 and 31.5.1.
+- **[G22.2]** Water-flux and free-drainage boundary pairs (and supported mixed pairs) are implemented with vapor, including vapor boundary/storage accounting and balance evidence.
+  - Result (2026-11-23): **closed with exceptions** (user decision). C1 to C6 done; C5 entry `d2d1f32`; flux upper with fixed-head lower implemented (`880c6c2`) with exact parity. Forms accepted but not implemented stay listed in the coverage matrix; the dry (-10000 cm) divergence is recorded. Record: [M6_VAPOR_G22_2_ACCEPTANCE.md](master/M6_VAPOR_G22_2_ACCEPTANCE.md), history in [STATE_30.md](STATE_30.md) and [STATE_31.md](STATE_31.md).
 
 - **[G22.4]** Remaining G22 rows: nonuniform-temperature coverage for default thermal conductivity, scalar `ConVh` reachability audit, and nonzero prescribed sink or root uptake with heat/vapor.
   - Result (2026-11-13): **complete with exceptions** (user decision). Nonuniform T accepted with exceptions (`vapor_nonuniform_step_on`/`_off`); scalar `ConVh` helper removed (`cbc52c0`); sink and root rejected with triggers at Gate S (no implementation). Record: [M6_VAPOR_G22_4_ACCEPTANCE.md](master/M6_VAPOR_G22_4_ACCEPTANCE.md).

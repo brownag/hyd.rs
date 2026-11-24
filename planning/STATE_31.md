@@ -28,7 +28,7 @@ Branch: `feat/vapor-flux-fixedhead`. Tracked planning (D-5).
 | 3 | 31.3.3 Meteo.in reader (D-11) | done | `c98dca8` |
 | 4 | 31.4.1 met parity | done | `87fae80` |
 | 4 | 31.4.2 met water balance | done | `87defcf` |
-| 5 | 31.5.1 record G22.2 close and G22.3 acceptance | pending | |
+| 5 | 31.5.1 record G22.2 close and G22.3 acceptance | done | docs only |
 
 ## Gate A decisions (2026-11-15, user)
 
@@ -60,6 +60,11 @@ Branch: `feat/vapor-flux-fixedhead`. Tracked planning (D-5).
 - Run in sequence per D-12. 31.4.1 merged after the orchestrator reran `vapor_met_parity` (3 passed) and checked that the driver reads only deck inputs. 31.4.2 merged after a rerun (balance 5 passed, parity 3 passed).
 - 31.4.2 user decision (2026-11-23): split check. The flux-mode top is checked independently against the prescribed rTop, which is already the total liquid plus vapor flux; adding the vapor face flux double-counts it and is kept as a negative check. The head-mode top and fixed-head bottom use the vTop form, labelled as interior conservation. Solved boundary fluxes at head ends are follow-up goal G25.
 - `cargo test --workspace --no-fail-fast`: 694 passed, 0 failed. clippy `-D warnings`: clean. fmt: clean. Python tools: 504 tests, OK.
+
+## 31.5.1 Record G22.2 close and G22.3 acceptance (2026-11-23, orchestrator, user approved the wording)
+- G22.3 accepted with exceptions and G22.2 closed with exceptions (user, 2026-11-23). Created `planning/master/M6_VAPOR_G22_3_ACCEPTANCE.md`. Updated the `M6_VAPOR_COVERAGE.md` status line and atmospheric row, the `M6_VAPOR_G22_2_ACCEPTANCE.md` status line, and `GOALS.md` (both goals Completed; G20 moved to Sequenced since its trigger is met; Circled left for selection).
+- Exceptions carried as goals: G25 (solved head-end boundary flux), G26 (met run path in `src/`), G27 (met discrimination entry, D-9).
+- Orchestration 31 complete: all wave-board rows done.
 
 ## Task reports
 

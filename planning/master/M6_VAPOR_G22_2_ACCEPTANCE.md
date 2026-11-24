@@ -1,6 +1,8 @@
 # M6 vapor G22.2 acceptance (orchestration 28, task 28.2.1)
 
-Status: **GATE W1 decided, 2026-11-13 (user). Goal G22.2 stays Circled.** At least one form is
+Status: **closed with exceptions, 2026-11-23 (user, orchestration 31, task 31.5.1). Goal G22.2 is Completed.** C1 to C6 are done; C5 landed as `flux_known_on_off_liquid_moisture` (`d2d1f32`); the flux upper with fixed-head lower wet pair is implemented with exact parity. Exceptions: forms the [coverage matrix](M6_VAPOR_COVERAGE.md) marks accepted but not implemented (for example a prescribed lower flux with a fixed-head or free-drainage upper partner, and the reverse pair with a fixed-head upper) stay unimplemented; dry (-10000 cm) divergence is recorded, not converged. Earlier status follows.
+
+Earlier status: **GATE W1 decided, 2026-11-13 (user). Goal G22.2 stays Circled.** At least one form is
 accepted for orchestration 29. No implementation, fixture or run was done in orchestration 28.
 
 Basis: [M6_VAPOR_FREE_DRAINAGE_AUDIT.md](M6_VAPOR_FREE_DRAINAGE_AUDIT.md),
