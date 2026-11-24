@@ -153,3 +153,12 @@ Branch: `feat/vapor-flux-fixedhead`. Tracked planning (D-5).
 - Probe (dry head, run first): Rust vapor solve at top -1000 cm works (finite, no singular pivot/inf ConVh); an abrupt -1000/-100 profile is NonConverged but is artificial.
 - Deviations: none from the approved plan. Support driver re-composes the two-pass driver around `advance_atmospheric_step_vapor` (the vapor driver has no atmospheric entry); pass two starts from pass one's boundary memory.
 - Gotchas for 31.4.2: top temperature per record is (TMax+TMin)/2 (f32), via one `VaporConfig` per record, `tTop` in the `SetMeteo` `TAver` slot; steps use time grid k/10 (exact event landing); Rust Picard iterations per pass reach 6-7 at the rain record (Fortran caps at 2). Follow-up: met discrimination criteria entry needs user approval (D-9).
+
+## 31.4.2 Met water balance
+- Status: done. Files: tests/vapor_met_balance.rs (new), tests/support/vapor_met.rs (additive StepTrace fields), planning/tasks/31.4.2.todo.md. Code commit 87defcf.
+- Tests: vapor_met_balance 5 passed / 0 failed; vapor_met_parity 3 passed; fmt and clippy clean.
+- Residual (precedent max(1e-9*|netIn|,1e-13) holds on all 2400 steps): flux mode max 1.1e-15 cm (0.0004 x tol); head mode max 9.0e-16 cm (0.0017 x tol); cumulative at print times <= 4.3e-14 cm.
+- Fortran BALANCE.OUT WatBalT (cm) at 24..240 h: 1.052e-4, 1.061e-4, 1.055e-4, 1.060e-4, 1.049e-4, 1.026e-4, 1.008e-4, 1.001e-4, 9.66e-5, 9.92e-5 (WatBalR 0.014 % down to 0.001 %); evidence only, much coarser than Rust.
+- Deviation: spec said flux-mode top = prescribed flux plus solved vapor term. Measured: prescribed flux already is the total top flux; adding vapor face entry fails by 5e7 x tol (negative check). So top = prescribed flux only.
+- Head-mode top and fixed-head bottom use the vTop form (WATFLOW.FOR:395-407) and close by construction: an interior-conservation check, not a boundary-flux test.
+- Gotchas for 31.5.1: upper_for (atmospheric.rs:486) and support FixedHead (vapor_met.rs:505) pass flux 0.0, so total_face_fluxes at head ends is not a solved boundary flux (follow-up goal). Face index n-1 is the interior face; x is bottom-first after reversing node_depths. StepTrace now carries face fluxes and old/new contents (pass 2).

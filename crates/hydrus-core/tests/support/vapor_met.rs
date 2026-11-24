@@ -93,6 +93,15 @@ pub struct StepTrace {
     /// Switches in pass one and pass two, in decision order (pass number first).
     pub switches: Vec<(u8, VaporSwitchRecord)>,
     pub below_critical_head: [bool; 2],
+    /// Pass-two (committed trial) face fluxes, node 0 = bottom face, `n` = top face, `n + 1` entries.
+    pub liquid_face_fluxes: Vec<f64>,
+    pub vapor_face_fluxes: Vec<f64>,
+    pub total_face_fluxes: Vec<f64>,
+    /// Bottom-first node contents before and after the step (cm3/cm3).
+    pub liquid_contents_old: Vec<f64>,
+    pub liquid_contents_new: Vec<f64>,
+    pub vapor_contents_old: Vec<f64>,
+    pub vapor_contents_new: Vec<f64>,
 }
 
 /// A change of `KodTop` between consecutive accepted steps.
@@ -695,6 +704,13 @@ pub fn run_met_case(options: RunOptions) -> Result<MetRun, String> {
             iterations: [s1.trial.iterations, trial2.iterations],
             switches,
             below_critical_head: [s1.below_critical_head, s2.below_critical_head],
+            liquid_face_fluxes: trial2.liquid_face_fluxes.clone(),
+            vapor_face_fluxes: trial2.vapor_face_fluxes.clone(),
+            total_face_fluxes: trial2.total_face_fluxes.clone(),
+            liquid_contents_old: liquid_old.clone(),
+            liquid_contents_new: trial2.candidate.water_contents().to_vec(),
+            vapor_contents_old: vapor_old.clone(),
+            vapor_contents_new: trial2.properties.vapor_contents.clone(),
         });
         let report = VaporStepReport {
             accepted_time: trial2.accepted_time,
