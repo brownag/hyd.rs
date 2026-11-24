@@ -27,7 +27,7 @@ Branch: `feat/vapor-flux-fixedhead`. Tracked planning (D-5).
 | 3 | 31.3.2 vapor-aware atmospheric switching | done | `d96fcb7`, `5c286f4` |
 | 3 | 31.3.3 Meteo.in reader (D-11) | done | `c98dca8` |
 | 4 | 31.4.1 met parity | done | `87fae80` |
-| 4 | 31.4.2 met water balance | pending | |
+| 4 | 31.4.2 met water balance | done | `87defcf` |
 | 5 | 31.5.1 record G22.2 close and G22.3 acceptance | pending | |
 
 ## Gate A decisions (2026-11-15, user)
@@ -54,6 +54,12 @@ Branch: `feat/vapor-flux-fixedhead`. Tracked planning (D-5).
 - 31.3.2 retry: the orchestrator's FAILED VERIFICATION note claimed head-mode rTop = -|Prec|. The worker corrected it from the source: `HYDRUS.FOR:628` sets rTop = |rSoil|-|Prec| at every record boundary, whatever KodTop is. rTop is held fixed within a record (`5c286f4`). Verified by the orchestrator.
 - `cargo test --workspace --no-fail-fast`: 686 passed, 0 failed. clippy `-D warnings`: clean. fmt: clean. Python tools: 504 tests, OK.
 - Risk carried to 31.4.1: the 31.3.2 unit fixture hit a singular pivot or infinite `ConVh` at dry heads, so it used about -100 cm. The pinned met run holds hTop = -1000 cm from 42.7 h to 120.1 h. 31.4.1 should first confirm that the Rust vapor solve runs at -1000 cm with the deck's soil before judging D-10.
+
+## Wave 4 end verification (2026-11-23, orchestrator)
+
+- Run in sequence per D-12. 31.4.1 merged after the orchestrator reran `vapor_met_parity` (3 passed) and checked that the driver reads only deck inputs. 31.4.2 merged after a rerun (balance 5 passed, parity 3 passed).
+- 31.4.2 user decision (2026-11-23): split check. The flux-mode top is checked independently against the prescribed rTop, which is already the total liquid plus vapor flux; adding the vapor face flux double-counts it and is kept as a negative check. The head-mode top and fixed-head bottom use the vTop form, labelled as interior conservation. Solved boundary fluxes at head ends are follow-up goal G25.
+- `cargo test --workspace --no-fail-fast`: 694 passed, 0 failed. clippy `-D warnings`: clean. fmt: clean. Python tools: 504 tests, OK.
 
 ## Task reports
 
