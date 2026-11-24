@@ -26,7 +26,7 @@ Branch: `feat/vapor-flux-fixedhead`. Tracked planning (D-5).
 | 3 | 31.3.1 evaporation port | done | `ea3c7a9` |
 | 3 | 31.3.2 vapor-aware atmospheric switching | done | `d96fcb7`, `5c286f4` |
 | 3 | 31.3.3 Meteo.in reader (D-11) | done | `c98dca8` |
-| 4 | 31.4.1 met parity | pending | |
+| 4 | 31.4.1 met parity | done | `87fae80` |
 | 4 | 31.4.2 met water balance | pending | |
 | 5 | 31.5.1 record G22.2 close and G22.3 acceptance | pending | |
 
