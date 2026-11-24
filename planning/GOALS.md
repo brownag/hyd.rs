@@ -54,6 +54,16 @@ G22.3 (atmospheric water switching with vapor, meteorology contracted in [M6_VAP
 
 ## Independent Backlog
 
+- **[G25]** The water solver reports solved boundary fluxes at head-type ends (top head mode, fixed-head bottom), and the Rust vTop/vBot match the pinned Fortran `T_LEVEL.OUT` vTop/vBot for `vapor_met_bare_soil_on`.
+  - Why: found in 31.4.2 (2026-11-23). `upper_for` (`atmospheric.rs:486`) and the met driver's FixedHead pass flux 0.0, so `total_face_fluxes` at those ends is a 0.0 fallback, not a solved flux (`water_solver.rs:584-586`). The met balance checks those ends only as interior conservation (vTop form). User decision: split check now, this follow-up later.
+  - Gate: edits `water_solver.rs`, and adding `T_LEVEL.OUT` to the fixture is a runner change (same gate class as G22.2-C4).
+
+- **[G26]** A production met run path exists in `src/`. The vapor water-heat driver has an atmospheric entry around `advance_atmospheric_step_vapor`, and with `lMeteo` the per-record top temperature is (TMax+TMin)/2 in f32 (`TIME.FOR:519`). Today both live only in `tests/support/vapor_met.rs` (31.4.1 Discovered).
+  - Exit: `vapor_met_parity` passes through the `src/` path, with the test driver reduced to wiring.
+
+- **[G27]** A met discrimination entry (vapor fields nonzero for `vapor_met_bare_soil_on`) is approved and added to `criteria.json`.
+  - Gate: D-9. A user-approved criteria edit and the hash-pin updates (as in 31.2.3).
+
 - **[G24]** `feat/vapor-flux-fixedhead` is merged into `main` with the full AGENTS.md suites green. At 2026-11-22 it is 21 commits ahead of `main` and 0 behind: G22.2 work, the C5 criteria entry, the radiation port.
   - Why: scores on "land on main soon"; one approval, no dependency. Can run in parallel with M1.
   - Gate: user approval before the merge.
