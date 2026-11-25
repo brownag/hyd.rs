@@ -24,6 +24,7 @@
 | [0020](0020-keep-architecture-decisions-distinct-from-project-policy.md) | Keep architecture decisions distinct from project policy | Accepted | 2026-11-11 | - | - | 2026-11-11 policy review |
 | [0021](0021-couple-heat-transport-one-way-after-the-accepted-water-step-and-reject-unsupported-heat-configurations.md) | Couple heat transport one-way after the accepted water step and reject unsupported heat configurations | Proposed | 2026-11-11 | - | - | 24.6.2; D7, D9, D13 |
 | [0022](0022-re-solve-the-step-on-atmospheric-switches-with-vapor.md) | Re-solve the step on atmospheric switches with vapor | Accepted | 2026-11-24 | - | - | Orch 32 (32.1.1); plan 32 D-13, D-15 |
+| [0023](0023-report-end-boundary-fluxes-in-the-tlinf-output-form.md) | Report end boundary fluxes in the TLInf output form | Accepted | 2026-11-24 | - | - | Orch 33 (33.1.1); plan 33 D-1, D-2, D-4 |
 
 ## Scope and Status Notes
 
