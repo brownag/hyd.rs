@@ -20,7 +20,7 @@ Branch: `feat/met-run-path` (from `main` `3f328fc`). Tracked planning (D-5).
 | 1 | 32.1.2 `MetForcing` builder | done | `fc16698` |
 | 1 | 32.1.3 `step_atmospheric` | done | `5beb4ad`, `a6a2211`, `123ac63` |
 | 2 | 32.2.1 rewire test driver (bit-identical) | done | `a6c2ee4` |
-| 3 | 32.3.1 record G26/G28, add G31 | pending | |
+| 3 | 32.3.1 record G26/G28, add G31 | done | `7a9321b` |
 
 ## Orchestrator log
 
@@ -34,6 +34,13 @@ Branch: `feat/met-run-path` (from `main` `3f328fc`). Tracked planning (D-5).
   - `before.json` (17:31:33) predates the code commit (17:32:09).
   - The scratch test is gone, the spec grep returns nothing, and the forbidden paths show no diff.
 - Wave 2 end (head `f954c47`), serial: workspace tests 704 passed, 0 failed, 4 ignored; clippy clean; fmt clean; Python 504 OK. Wave 2 done.
+- 2026-11-24 wave 3: 32.3.1 (docs only) was reviewed. The worker's report names its report commit as `d679497`; that commit was amended to `9494a5a`. Orchestrator fix in the closing commit: the M6 coverage row had listed the `src/` met path under "Exceptions", so it now reads as the original exception marked resolved.
+- Wave 3 end: `git diff 5a7fb87 HEAD -- crates/ tools/ reference/ Cargo.*` is empty, so the wave 2 serial suites (704/0/4, clippy, fmt, Python 504 OK) apply to the final code tree. Wave 3 done.
+- **Orchestration 32 complete.** Exit criteria met:
+  - `vapor_met_parity` (5) and `vapor_met_balance` (3) pass through `src/` with unchanged tolerances and criteria. `reference/` has no diff, and the MetRun is bit-identical.
+  - ADR 0022 records D-10.
+  - The full suites are green.
+  - Leftover: three merged wave 1 worktrees under `.claude/worktrees/agent-*` (branches `worktree-agent-*`), kept for the user to remove (G22.2-C7 gate).
 
 ## Task reports
 

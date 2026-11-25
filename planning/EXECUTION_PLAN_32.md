@@ -1,6 +1,6 @@
 # Execution Plan 32: production met run path in `src/` (G26, with G28)
 
-Status: APPROVED 2026-11-24 (user).
+Status: APPROVED 2026-11-24 (user). COMPLETE 2026-11-24 (see [STATE_32.md](STATE_32.md)).
 Repo: hyd.rs (branch `feat/met-run-path`, cut from `main` at `3f328fc`). Tracked planning (D-5).
 Source goal: [GOALS.md](GOALS.md) Circled G26, with G28 folded in as step 1.
 
