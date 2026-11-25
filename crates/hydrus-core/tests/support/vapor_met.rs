@@ -17,7 +17,9 @@ use hydrus_core::heat::config::HeatConfigInput;
 use hydrus_core::heat::driver::CoupledHeatInput;
 use hydrus_core::heat::vapor::driver::VaporWaterHeatDriver;
 use hydrus_core::heat::vapor::kernels;
-use hydrus_core::heat::vapor::output::{observe_step, observe_vapor, VaporObservationInput};
+use hydrus_core::heat::vapor::output::{
+    observe_step, observe_vapor, t_level_fluxes_for_step, VaporObservationInput,
+};
 use hydrus_core::heat::vapor::state::VaporStateInput;
 use hydrus_core::heat::vapor::{
     VaporConfig, VaporConfigInput, VaporPrimitiveInput, VaporSourceMaterial,
@@ -93,6 +95,11 @@ pub struct StepTrace {
     pub liquid_contents_new: Vec<f64>,
     pub vapor_contents_old: Vec<f64>,
     pub vapor_contents_new: Vec<f64>,
+    /// Reported `TLInf` boundary fluxes (`OUTPUT.FOR:25-54`), positive upward (cm/h).
+    pub v_top_reported: f64,
+    pub v_bot_reported: f64,
+    pub v_top_liquid_reported: f64,
+    pub v_top_vapor_reported: f64,
 }
 
 /// A change of `KodTop` between consecutive accepted steps.
@@ -523,6 +530,8 @@ pub fn run_met_case(options: RunOptions) -> Result<MetRun, String> {
             .map_err(|e| format!("step {k}: {e:?}"))?;
         let step = &report.step;
         atmo = report.state;
+        let fluxes = t_level_fluxes_for_step(driver.state(), step, &x, &sink, cos_alpha)
+            .map_err(|e| format!("t_level_fluxes step {k}: {e:?}"))?;
         run.steps.push(StepTrace {
             index: k,
             time: step.accepted_time,
@@ -542,6 +551,10 @@ pub fn run_met_case(options: RunOptions) -> Result<MetRun, String> {
             liquid_contents_new: step.liquid_contents_new.clone(),
             vapor_contents_old: step.vapor_contents_old.clone(),
             vapor_contents_new: step.vapor_contents_new.clone(),
+            v_top_reported: fluxes.v_top,
+            v_bot_reported: fluxes.v_bot,
+            v_top_liquid_reported: fluxes.v_top_liquid,
+            v_top_vapor_reported: fluxes.v_top_vapor,
         });
 
         if (water.time() - time_points[next_print]).abs() < 1e-9 {
