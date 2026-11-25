@@ -236,6 +236,7 @@ def parse_t_level(source: str | Path) -> list[dict]:
 
     rows: list[dict] = []
     in_table = False
+    ended = False
     prev_time: float | None = None
     prev_t_level: int | None = None
     for raw in text.splitlines():
@@ -247,6 +248,7 @@ def parse_t_level(source: str | Path) -> list[dict]:
         if not stripped or stripped.startswith("[T]"):
             continue
         if stripped.lower() == "end":
+            ended = True
             break
         if "*" in raw:
             raise ValueError("Fortran field overflow in T_LEVEL.OUT row")
@@ -274,6 +276,8 @@ def parse_t_level(source: str | Path) -> list[dict]:
 
     if not in_table:
         raise ValueError("missing T_LEVEL.OUT format-130 header")
+    if not ended:
+        raise ValueError("T_LEVEL.OUT missing standalone end marker")
     if not rows:
         raise ValueError("T_LEVEL.OUT contains no data rows")
     return rows

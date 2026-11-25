@@ -173,6 +173,7 @@ impl VaporConfig {
             return Err(VaporError::UnsupportedUpperBoundary(input.upper));
         };
         validate_finite("critical head", critical_head)?;
+        validate_atmospheric_lower_boundary(input.lower)?;
         let stand_in = UpperBoundary::Flux {
             flux: 0.0,
             row: BoundaryRow {
@@ -261,6 +262,16 @@ impl VaporConfig {
         VaporBoundaryPair::classify(input.lower, upper)?;
         Ok(())
     }
+}
+
+fn validate_atmospheric_lower_boundary(lower: LowerBoundaryMode) -> Result<(), VaporError> {
+    if matches!(
+        lower,
+        LowerBoundaryMode::PrescribedFlux { .. } | LowerBoundaryMode::FreeDrainage
+    ) {
+        return Err(VaporError::UnsupportedLowerBoundary(lower));
+    }
+    Ok(())
 }
 
 /// Boundary pair accepted by the vapor water path.
@@ -781,5 +792,26 @@ mod boundary_pair_tests {
             row: row(1.0),
         };
         assert!(VaporBoundaryPair::classify(lower, bad).is_err());
+    }
+
+    #[test]
+    fn atmospheric_input_rejects_lower_modes_that_cannot_survive_head_switching() {
+        for lower in [
+            LowerBoundaryMode::PrescribedFlux { flux: 0.5 },
+            LowerBoundaryMode::FreeDrainage,
+        ] {
+            assert_eq!(
+                validate_atmospheric_lower_boundary(lower),
+                Err(VaporError::UnsupportedLowerBoundary(lower))
+            );
+        }
+        assert_eq!(
+            validate_atmospheric_lower_boundary(LowerBoundaryMode::FixedHead {
+                head: 0.0,
+                row: row(1.0),
+                flux: 0.0,
+            }),
+            Ok(())
+        );
     }
 }

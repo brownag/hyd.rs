@@ -534,6 +534,11 @@ class TLevelParserTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "no data rows"):
             vapor.parse_t_level(sample_tlevel_text(rows=[]))
 
+    def test_rejects_missing_end_marker_after_complete_rows(self):
+        text = sample_tlevel_text().replace("end\n", "")
+        with self.assertRaisesRegex(ValueError, "missing standalone end marker"):
+            vapor.parse_t_level(text)
+
     def test_rejects_truncated_row(self):
         short_row = tlevel_row(time=0.1, t_level=1)[:-5]
         with self.assertRaisesRegex(ValueError, "truncated"):
