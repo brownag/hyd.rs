@@ -18,11 +18,16 @@ use serde_json::Value;
 use sha2::{Digest, Sha256};
 use vapor_met::{MetRun, RunOptions, StepTrace};
 
+const CRITERIA_SHA256: &str = "8f9e78d1a82a5910c1fc9c0a98ac61e899d0a247ba992b3b1e70d513582ab71f";
 const SIDECAR_SHA256: &str = "4f819abe86fe0cfd33b9b82e04f30da1bb2f78d8530560ce1ebc3079dbfff20b";
 const SWITCH_TIMES: [f64; 3] = [42.7, 120.1, 200.3];
 
 fn ref_dir() -> PathBuf {
     vapor_met::repo_root().join("reference/vapor_fortran")
+}
+
+fn criteria_path() -> PathBuf {
+    ref_dir().join("criteria.json")
 }
 
 fn sidecar_path() -> PathBuf {
@@ -475,4 +480,133 @@ fn measure_tlevel_flux_discrepancies() {
         max_cum_vbot_t,
         max_cum_vbot_rel,
     );
+}
+
+fn load_criteria() -> &'static Value {
+    static CRITERIA: OnceLock<Value> = OnceLock::new();
+    CRITERIA.get_or_init(|| {
+        let path = criteria_path();
+        assert_eq!(
+            sha256_hex(&path),
+            CRITERIA_SHA256,
+            "criteria.json SHA-256 differs from the pinned value"
+        );
+        read_json(&path)
+    })
+}
+
+struct CheckBound {
+    absolute: f64,
+    relative: f64,
+}
+
+impl CheckBound {
+    fn limit(&self, reference: f64) -> f64 {
+        self.absolute + self.relative * reference.abs()
+    }
+}
+
+fn load_check_bound(name: &str, expected_unit: &str) -> CheckBound {
+    let criteria = load_criteria();
+    let entry = &criteria["checks"][name];
+    assert!(
+        entry.is_object(),
+        "criteria.json missing checks.{name} entry"
+    );
+    assert_eq!(
+        entry["scale"].as_str(),
+        Some("ref_abs"),
+        "criteria.json checks.{name}.scale must be ref_abs"
+    );
+    assert_eq!(
+        entry["unit"].as_str(),
+        Some(expected_unit),
+        "criteria.json checks.{name}.unit must be {expected_unit}"
+    );
+    CheckBound {
+        absolute: entry["absolute"].as_f64().expect("check absolute bound"),
+        relative: entry["relative"].as_f64().expect("check relative bound"),
+    }
+}
+
+#[test]
+fn t_level_per_step_flux_parity() {
+    let bound = load_check_bound("t_level_boundary_flux", "cm/h");
+    let sidecar = load_sidecar();
+    let run = met_run();
+    let rows = parse_rows(sidecar);
+    assert_eq!(rows.len(), run.steps.len());
+
+    for (row, step) in rows.iter().zip(run.steps.iter()) {
+        let diff_top = (step.v_top_reported - row.v_top).abs();
+        let lim_top = bound.limit(row.v_top);
+        assert!(
+            diff_top <= lim_top,
+            "vTop mismatch at t_level={} (t={} h, kod_top={}): rust={:+.8e}, fortran={:+.8e}, |diff|={:.6e} > limit={:.6e}",
+            row.t_level,
+            step.time,
+            step.kod_top,
+            step.v_top_reported,
+            row.v_top,
+            diff_top,
+            lim_top,
+        );
+
+        let diff_bot = (step.v_bot_reported - row.v_bot).abs();
+        let lim_bot = bound.limit(row.v_bot);
+        assert!(
+            diff_bot <= lim_bot,
+            "vBot mismatch at t_level={} (t={} h, kod_top={}): rust={:+.8e}, fortran={:+.8e}, |diff|={:.6e} > limit={:.6e}",
+            row.t_level,
+            step.time,
+            step.kod_top,
+            step.v_bot_reported,
+            row.v_bot,
+            diff_bot,
+            lim_bot,
+        );
+    }
+}
+
+#[test]
+fn t_level_cumulative_flux_parity() {
+    let bound = load_check_bound("t_level_cumulative_flux", "cm");
+    let sidecar = load_sidecar();
+    let run = met_run();
+    let rows = parse_rows(sidecar);
+    assert_eq!(rows.len(), run.steps.len());
+
+    let mut rust_sum_vtop = 0.0_f64;
+    let mut rust_sum_vbot = 0.0_f64;
+
+    for (row, step) in rows.iter().zip(run.steps.iter()) {
+        rust_sum_vtop += step.v_top_reported * step.timestep;
+        rust_sum_vbot += step.v_bot_reported * step.timestep;
+
+        let diff_top = (rust_sum_vtop - row.sum_v_top).abs();
+        let lim_top = bound.limit(row.sum_v_top);
+        assert!(
+            diff_top <= lim_top,
+            "sum_v_top mismatch at t_level={} (t={} h): rust={:+.8e}, fortran={:+.8e}, |diff|={:.6e} > limit={:.6e}",
+            row.t_level,
+            step.time,
+            rust_sum_vtop,
+            row.sum_v_top,
+            diff_top,
+            lim_top,
+        );
+
+        let diff_bot = (rust_sum_vbot - row.sum_v_bot).abs();
+        let lim_bot = bound.limit(row.sum_v_bot);
+        assert!(
+            diff_bot <= lim_bot,
+            "sum_v_bot mismatch at t_level={} (t={} h): rust={:+.8e}, fortran={:+.8e}, |diff|={:.6e} > limit={:.6e}",
+            row.t_level,
+            step.time,
+            rust_sum_vbot,
+            row.sum_v_bot,
+            diff_bot,
+            lim_bot,
+        );
+    }
 }

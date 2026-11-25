@@ -13,6 +13,30 @@
    "scale": "max_abs_row_term",
    "unit": "model"
   },
+  "t_level_boundary_flux": {
+   "absolute": 5e-06,
+   "assumptions": [
+    "case vapor_met_bare_soil_on only; per-step vTop and vBot reported in the TLInf output form (OUTPUT.FOR:25-54)",
+    "compared against pinned-Fortran sidecar reference/vapor_fortran/fixtures/vapor_met_bare_soil_on_tlevel.json (T_LEVEL.OUT format 170)",
+    "Fortran T_LEVEL.OUT prints fluxes in e13.5 (~5 significant digits; print floor 0.5*10^(floor(log10|r|)-4))",
+    "pass rule: |rust - ref| <= absolute + relative * |ref| (scale ref_abs) across all 2400 steps"
+   ],
+   "relative": 0.0002,
+   "scale": "ref_abs",
+   "unit": "cm/h"
+  },
+  "t_level_cumulative_flux": {
+   "absolute": 0.00025,
+   "assumptions": [
+    "case vapor_met_bare_soil_on only; cumulative sum_v_top and sum_v_bot from TLInf-reported vTop*dt and vBot*dt (OUTPUT.FOR:25-54)",
+    "compared against pinned-Fortran sidecar reference/vapor_fortran/fixtures/vapor_met_bare_soil_on_tlevel.json (T_LEVEL.OUT format 170)",
+    "Fortran T_LEVEL.OUT prints cumulative sums in e13.5 (~5 significant digits; print floor 0.5*10^(floor(log10|r|)-4))",
+    "pass rule: |rust - ref| <= absolute + relative * |ref| (scale ref_abs) across all 2400 steps"
+   ],
+   "relative": 0.0002,
+   "scale": "ref_abs",
+   "unit": "cm"
+  },
   "water_balance_interior": {
    "absolute": 1e-15,
    "assumptions": [
@@ -492,6 +516,6 @@
    }
   }
  },
- "revision_note": "post-failure owner override of v1 (sha256 d645cae2a0ba44219eed7b53185abb09a1815ee481041f4e7a3b9fbc0cbbf008); only v_vapor, v_vap_term, v_total zero_rule changed; v4 (task 28.3, 2026-11-13) adds only checks.water_balance_interior_step_off_reference (static-water consistency, case vapor_nonuniform_step_off) and rebinds contract_revision/contract_sha256 to the v4 contract section; v5 (task 30.6.1, G30.6 approved 2026-11-14) adds only discrimination entries free_drain_on_off_{liquid_moisture,temperature_c}, closed_flux_on_off_temperature_c, flux_known_on_off_temperature_c and nonzero entries closed_vapor_fields_nonzero, dry_iso_vapor_fields_nonzero, free_drain_vapor_fields_nonzero; contract_revision/contract_sha256 unchanged; v6 (C5, user decision 2026-11-15) adds only discrimination entry closed_flux_on_off_liquid_moisture at factor_of_tolerance 0.85 (largest passing factor 0.8571); contract_revision/contract_sha256 unchanged; v7 (task 31.2.3, GATE A approved 2026-11-15, Option M1) adds only discrimination entry flux_known_on_off_liquid_moisture at factor_of_tolerance 0.75 (largest passing factor 0.7619); contract_revision/contract_sha256 unchanged",
+ "revision_note": "post-failure owner override of v1 (sha256 d645cae2a0ba44219eed7b53185abb09a1815ee481041f4e7a3b9fbc0cbbf008); only v_vapor, v_vap_term, v_total zero_rule changed; v4 (task 28.3, 2026-11-13) adds only checks.water_balance_interior_step_off_reference (static-water consistency, case vapor_nonuniform_step_off) and rebinds contract_revision/contract_sha256 to the v4 contract section; v5 (task 30.6.1, G30.6 approved 2026-11-14) adds only discrimination entries free_drain_on_off_{liquid_moisture,temperature_c}, closed_flux_on_off_temperature_c, flux_known_on_off_temperature_c and nonzero entries closed_vapor_fields_nonzero, dry_iso_vapor_fields_nonzero, free_drain_vapor_fields_nonzero; contract_revision/contract_sha256 unchanged; v6 (C5, user decision 2026-11-15) adds only discrimination entry closed_flux_on_off_liquid_moisture at factor_of_tolerance 0.85 (largest passing factor 0.8571); contract_revision/contract_sha256 unchanged; v7 (task 31.2.3, GATE A approved 2026-11-15, Option M1) adds only discrimination entry flux_known_on_off_liquid_moisture at factor_of_tolerance 0.75 (largest passing factor 0.7619); contract_revision/contract_sha256 unchanged; v8 (task 33.4.1, Gate G-1 / D-13 approved 2026-11-24, Option B) adds only checks.t_level_boundary_flux (absolute 5e-6, relative 2e-4, scale ref_abs, unit cm/h) and checks.t_level_cumulative_flux (absolute 2.5e-4, relative 2e-4, scale ref_abs, unit cm) for vapor_met_bare_soil_on T_LEVEL.OUT parity; contract_revision/contract_sha256 unchanged",
  "schema_version": "vapor-criteria-v2"
 }
