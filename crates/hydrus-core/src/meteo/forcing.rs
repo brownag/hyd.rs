@@ -26,6 +26,10 @@ pub struct AtmosphericRecord {
 /// Errors raised while building met forcing.
 #[derive(Clone, Debug, PartialEq)]
 pub enum MetForcingError {
+    /// A length/time conversion factor was not finite and positive.
+    InvalidConversion { name: &'static str, value: f64 },
+    /// A record endpoint is not finite or strictly greater than its predecessor.
+    InvalidRecordTime { index: usize, time: f64 },
     /// The two decks have different record counts.
     RecordCountMismatch { meteo: usize, atmosphere: usize },
     /// `tAtm` differs between the decks at a record.
@@ -45,6 +49,13 @@ pub enum MetForcingError {
 impl fmt::Display for MetForcingError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Self::InvalidConversion { name, value } => {
+                write!(f, "{name} must be finite and positive, got {value}")
+            }
+            Self::InvalidRecordTime { index, time } => write!(
+                f,
+                "record time at index {index} must be finite and strictly increasing, got {time}"
+            ),
             Self::RecordCountMismatch { meteo, atmosphere } => write!(
                 f,
                 "record count mismatch: Meteo.in has {meteo}, ATMOSPH.IN has {atmosphere}"
@@ -96,6 +107,23 @@ impl MetForcing {
         }
         if meteo.is_empty() {
             return Err(MetForcingError::NoRecords);
+        }
+        for (name, value) in [("x_conv", x_conv), ("t_conv", t_conv)] {
+            if !value.is_finite() || value <= 0.0 {
+                return Err(MetForcingError::InvalidConversion { name, value });
+            }
+        }
+        let mut previous_time = None;
+        for (index, record) in atmosphere.iter().enumerate() {
+            if !record.t_atm.is_finite()
+                || previous_time.is_some_and(|previous| record.t_atm <= previous)
+            {
+                return Err(MetForcingError::InvalidRecordTime {
+                    index,
+                    time: record.t_atm,
+                });
+            }
+            previous_time = Some(record.t_atm);
         }
         // SetMeteo conversion: rSoil = EvapP*rConv/TTConv, rConv = 0.001*xConv, TTConv = 86400*tConv.
         let r_conv = 0.001 * x_conv;
@@ -319,6 +347,53 @@ mod tests {
         match MetForcing::new(&config, &meteo, &a, X_CONV, T_CONV) {
             Err(MetForcingError::TAtmMismatch { index: 2, .. }) => {}
             other => panic!("unexpected {other:?}"),
+        }
+    }
+
+    #[test]
+    fn conversion_factors_must_be_finite_and_positive() {
+        let (config, meteo, atm) = decks();
+        for (name, value) in [
+            ("x_conv", 0.0),
+            ("x_conv", f64::NAN),
+            ("x_conv", f64::INFINITY),
+            ("t_conv", -1.0),
+            ("t_conv", f64::NAN),
+            ("t_conv", f64::INFINITY),
+        ] {
+            let (x_conv, t_conv) = if name == "x_conv" {
+                (value, T_CONV)
+            } else {
+                (X_CONV, value)
+            };
+            assert!(matches!(
+                MetForcing::new(&config, &meteo, &records(&atm), x_conv, t_conv),
+                Err(MetForcingError::InvalidConversion {
+                    name: actual_name,
+                    value: actual_value
+                }) if actual_name == name && actual_value.to_bits() == value.to_bits()
+            ));
+        }
+    }
+
+    #[test]
+    fn all_record_times_must_be_finite_and_strictly_increasing() {
+        let (config, meteo, atm) = decks();
+        for (index, time) in [
+            (0, f64::NAN),
+            (0, f64::INFINITY),
+            (1, 24.0),
+            (atm.len() - 1, atm[atm.len() - 2][0]),
+        ] {
+            let mut a = records(&atm);
+            a[index].t_atm = time;
+            assert!(matches!(
+                MetForcing::new(&config, &meteo, &a, X_CONV, T_CONV),
+                Err(MetForcingError::InvalidRecordTime {
+                    index: actual_index,
+                    time: actual_time
+                }) if actual_index == index && actual_time.to_bits() == time.to_bits()
+            ));
         }
     }
 
