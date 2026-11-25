@@ -359,7 +359,6 @@ impl VaporWaterHeatDriver {
         })
     }
 
-    #[allow(clippy::too_many_arguments)]
     /// Advances one accepted step with the upper boundary `Atmospheric`, in a single attempt.
     ///
     /// Same two-pass structure as [`Self::step`] (shared `attempt`), with each water pass run
