@@ -1,29 +1,21 @@
 # Project Goals (`planning/GOALS.md`)
 
 Last Updated: 2026-11-24
-Source State: [STATE_31.md](STATE_31.md) (plan [EXECUTION_PLAN_31.md](EXECUTION_PLAN_31.md))
+Source State: [STATE_32.md](STATE_32.md) (plan [EXECUTION_PLAN_32.md](EXECUTION_PLAN_32.md))
 
 Magic Wand refresh (2026-11-24, user-approved): ranking criteria unchanged (retire Fortran risk early, land on main soon, minimize gate load). Circle is one root goal plus an orthogonal no-code cleanup track. G24 is complete (PR #1, `3f328fc`). New candidates: G28 (Picard switching deviation, folded into G26), G29 (hysteresis, roadmap M7) and G30 (input deck and CLI, roadmap M10).
 
-Dependency graph: `G26 -> [G25, G20, G30]`, `G28 -> [G26]` (folded in as G26 step 1), `G25 -> [G20]` (soft). G22.2-C7, G27 and G29 have no dependencies.
+Dependency graph: `G25 -> [G20]` (soft). G26 and G28 are complete (orchestration 32), which unblocks G25, G20 and G30. G22.2-C7, G27, G29 and G31 have no dependencies.
 
 ## Circled Goal (Active)
 
-- **[G26]** A production met run path exists in `src/`. A met-driven vapor water-heat run reads `Meteo.in`, sets the top temperature per record to (TMax+TMin)/2 in f32 (`TIME.FOR:519`) and calls `advance_atmospheric_step_vapor` (`atmospheric.rs:523`). It owns the KodTop and fixed-head switching. `tests/support/vapor_met.rs` (785 lines) is reduced to case wiring.
-  - Why now: it unblocks G25 (solved head-end fluxes belong in the `src/` driver), G20 (energy balance builds on a supported met path) and G30 (needs a production run path to call). It moves parity-proven logic from test-only code into a supported path. No criteria or fixture edits.
-  - Exit criteria: `vapor_met_parity` and `vapor_met_balance` pass through the `src/` path with tolerances and criteria hashes unchanged. The D-10 switching deviation (G28) is decided and recorded as an ADR. The full AGENTS.md suites are green.
-  - Scope: `src/atmospheric.rs`, `src/meteo/{config,series}.rs`, `src/heat/driver.rs`, `src/lib.rs`, `tests/support/vapor_met.rs`, `tests/vapor_met_{parity,balance}.rs`, `docs/decisions/`. Out of scope: G25, G20, `criteria.json`.
-  - Critical path: (1) G28 decision and ADR; (2) public met-run API (config, series iterator, per-record `VaporConfig`); (3) move predictor/commit, switching and per-record temperature logic from test support into `src/`; (4) point both met tests at `src/` and confirm parity and balance are unchanged; (5) reduce the driver to wiring and run the full suites.
-  - First action: read the 31.4.1 report and `tests/support/vapor_met.rs:262-520` (`run_met_case`) to list what moves and to gather the facts for D-10.
+- None selected (2026-11-24). G26 and G28 closed in orchestration 32. Candidates for the next circle: G25 (solved head-end boundary fluxes) and G20 (energy balance). Run Magic Wand to select.
 
 - **[G22.2-C7]** (parallel, no code) Cleanup. The `planning/STATE_29.md` rows for 29.3.3 and 29.4.x are corrected from pending. About 90 stale worktrees (`git worktree list`, 91 lines on 2026-11-24) and unmerged `docs/master-plan-*` and other task branches are resolved after each is checked for unmerged work. The failed-trial output in `.development/29.4.1/runs/B` (1.5 GB) and `.development/29.3.3/quarantine/` (16 KB) are removed.
   - Why now: touches no code, so it is orthogonal to G26. It cuts noise for future orchestrations.
   - Gate: a read-only report comes first. Any `rm`, `git worktree remove` or branch deletion needs explicit user approval.
 
 ## Sequenced Goals (Dependency DAG)
-
-- **[G28]** The Picard switching deviation (D-10) is decided and documented. Fortran switches the top mode inside the Picard loop (2 iterations or fewer per step). Rust re-solves the whole step on a mode change and reaches 6-7 Picard iterations per pass at the rain record. Either Rust matches the in-loop switch or the deviation is recorded in an ADR with evidence that parity is unaffected.
-  - Depends on: none. Folded into G26 as critical-path step 1, so the `src/` path encodes the decided structure.
 
 - **[G25]** The water solver reports solved boundary fluxes at head-type ends (top head mode, fixed-head bottom), and the Rust vTop/vBot match the pinned Fortran `T_LEVEL.OUT` vTop/vBot for `vapor_met_bare_soil_on`.
   - Why: found in 31.4.2 (2026-11-23). `upper_for` (`atmospheric.rs:484`) and the met driver's FixedHead pass flux 0.0, so `total_face_fluxes` at those ends is a 0.0 fallback, not a solved flux (`water_solver.rs:584-586`). The met balance checks those ends only as interior conservation (vTop form).
@@ -61,7 +53,15 @@ Dependency graph: `G26 -> [G25, G20, G30]`, `G28 -> [G26]` (folded in as G26 ste
 - **[G9]** Time-axis convergence is re-validated with three time-axis study levels or dual-axis centre reuse.
   - Trigger: only if a real supported-use case needs a stronger temporal claim or an observed timestep effect could change a decision.
 
+- **[G31]** In-loop Picard switching on the met path, so that adaptive dt becomes possible. Fortran switches the top mode inside the Picard loop; Rust does not yet.
+  - Trigger (ADR 0022): a request for adaptive dt on the met path, or a met case that fails parity.
+
 ## Completed
+
+- **[G26]** A production met run path exists in `src/`: `MetForcing` (`meteo::forcing`) and `VaporWaterHeatDriver::step_atmospheric`, with the `src/` entry points `hydrus_core::MetForcing`, `VaporWaterHeatDriver::step_atmospheric` and `VaporAtmosphericStepReport`.
+  - Result (2026-11-24): **complete**. Delivered by `fc16698`, `5beb4ad`, `a6a2211`, `123ac63` and `a6c2ee4`. `vapor_met_parity` 5/5 and `vapor_met_balance` 3/3 pass with unchanged tolerances and criteria. Workspace 704 passed, 0 failed, 4 ignored. Plan [EXECUTION_PLAN_32.md](EXECUTION_PLAN_32.md).
+- **[G28]** Picard switching deviation (D-10) decided and recorded.
+  - Result (2026-11-24): **resolved**. Step-level re-solve kept, limited to fixed-schedule runs. Record: [ADR 0022](../docs/decisions/0022-re-solve-the-step-on-atmospheric-switches-with-vapor.md) (`e8bbb3f`).
 
 - **[G24]** `feat/vapor-flux-fixedhead` is merged into `main`.
   - Result (2026-11-24 check): merged as PR #1 (`3f328fc`); `main` contains G22.2 closure and G22.3.

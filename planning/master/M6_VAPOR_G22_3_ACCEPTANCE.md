@@ -52,3 +52,7 @@ Workspace at wave 4 end: `cargo test --workspace` 694 passed, 0 failed; clippy `
 4. **One fixture, one selection.** Evidence covers a single bare-soil daily case at a fixed-head bottom. Print times are daily, so the switches are checked from the driver trace, not from the fixture.
 5. **Iteration history differs.** Fortran switches inside its Picard loop (at most 2 iterations per step). Rust re-solves the step under the new pair (D-10) and needs up to 6 or 7 iterations per pass at the rain record. Trajectories still match within bounds.
 6. **Not ported.** Interception, crop modes, Hargreaves, sub-daily records, surface ponding with vapor, and the Sink<=0 90%-depth head clamp (`WATFLOW.FOR:99-100`; bare soil has no sink).
+
+## Update (2026-11-24)
+
+Exception 2 ("the met run path exists only in the test driver") is resolved by plan 32 (G26). The met run path now lives in `src/` (`MetForcing`, `VaporWaterHeatDriver::step_atmospheric`), and both met tests run through it with unchanged tolerances. Plan: [EXECUTION_PLAN_32.md](../EXECUTION_PLAN_32.md).
