@@ -1,7 +1,7 @@
 //! Structural checks and measurement harness for `T_LEVEL.OUT` boundary fluxes (`vTop`, `vBot`,
 //! `sum_v_top`, `sum_v_bot`) on `vapor_met_bare_soil_on` (Plan 33 / G25).
 //!
-//! Authenticates the pinned `vapor_met_bare_soil_on_tlevel.json` sidecar against the committed
+//! Authenticates the pinned `vapor_met_bare_soil_on_tlevel.json.gz` sidecar against the committed
 //! deck, verifies its structural alignment with the Rust met run, and reports per-step and
 //! cumulative discrepancies for bounds selection (gate G-1).
 
@@ -10,7 +10,9 @@ mod vapor_met;
 
 use std::{
     fs,
+    io::Write,
     path::{Path, PathBuf},
+    process::{Command, Stdio},
     sync::OnceLock,
 };
 
@@ -19,7 +21,7 @@ use sha2::{Digest, Sha256};
 use vapor_met::{MetRun, RunOptions, StepTrace};
 
 const CRITERIA_SHA256: &str = "8f9e78d1a82a5910c1fc9c0a98ac61e899d0a247ba992b3b1e70d513582ab71f";
-const SIDECAR_SHA256: &str = "4f819abe86fe0cfd33b9b82e04f30da1bb2f78d8530560ce1ebc3079dbfff20b";
+const SIDECAR_SHA256: &str = "8052ceeb0df84c5271ac43c5f082a82be46acd9873928a56fb47ad7b01defaec";
 const SWITCH_TIMES: [f64; 3] = [42.7, 120.1, 200.3];
 
 fn ref_dir() -> PathBuf {
@@ -31,7 +33,7 @@ fn criteria_path() -> PathBuf {
 }
 
 fn sidecar_path() -> PathBuf {
-    ref_dir().join(format!("fixtures/{}_tlevel.json", vapor_met::CASE))
+    ref_dir().join(format!("fixtures/{}_tlevel.json.gz", vapor_met::CASE))
 }
 
 fn sha256_hex(path: &Path) -> String {
@@ -40,9 +42,29 @@ fn sha256_hex(path: &Path) -> String {
     digest.iter().map(|b| format!("{b:02x}")).collect()
 }
 
-fn read_json(path: &Path) -> Value {
-    let text = fs::read_to_string(path).unwrap_or_else(|e| panic!("read {}: {e}", path.display()));
-    serde_json::from_str(&text).unwrap_or_else(|e| panic!("parse {}: {e}", path.display()))
+fn read_json(path: &Path, compressed: bool) -> Value {
+    let bytes = fs::read(path).unwrap_or_else(|e| panic!("read {}: {e}", path.display()));
+    let payload = if compressed {
+        let script = "import gzip,sys; sys.stdout.buffer.write(gzip.decompress(sys.stdin.buffer.read()))";
+        let mut child = Command::new("python3")
+            .args(["-c", script])
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .spawn()
+            .expect("python3 is required to decompress the pinned gzip fixture");
+        child.stdin.take().unwrap().write_all(&bytes).unwrap();
+        let output = child.wait_with_output().expect("wait for gzip decompression");
+        assert!(
+            output.status.success(),
+            "gzip decompression failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        output.stdout
+    } else {
+        bytes
+    };
+    serde_json::from_slice(&payload)
+        .unwrap_or_else(|e| panic!("parse decompressed {}: {e}", path.display()))
 }
 
 /// Sidecar and deck authentication: the sidecar SHA-256 is pinned here, and the deck files are
@@ -50,14 +72,16 @@ fn read_json(path: &Path) -> Value {
 fn load_sidecar() -> &'static Value {
     static SIDECAR: OnceLock<Value> = OnceLock::new();
     SIDECAR.get_or_init(|| {
+        let compressed_path = sidecar_path();
         assert_eq!(
-            sha256_hex(&sidecar_path()),
+            sha256_hex(&compressed_path),
             SIDECAR_SHA256,
             "tlevel sidecar SHA-256 differs from the pinned value"
         );
-        let sidecar = read_json(&sidecar_path());
+        let sidecar = read_json(&compressed_path, true);
         assert_eq!(sidecar["case_id"], vapor_met::CASE);
         assert_eq!(sidecar["evidence_class"], "pinned-fortran-t-level");
+        assert!(sidecar.get("time_points").is_none());
         let hashes = sidecar["manifest"]["input_sha256"]
             .as_object()
             .expect("manifest.input_sha256");
@@ -188,32 +212,14 @@ fn sidecar_structure_and_time_alignment() {
     let sidecar = load_sidecar();
     let run = met_run();
     let rows = parse_rows(sidecar);
-    let time_points: Vec<f64> = sidecar["time_points"]
-        .as_array()
-        .expect("time_points")
-        .iter()
-        .map(|v| v.as_f64().expect("time_point f64"))
-        .collect();
-
     assert_eq!(rows.len(), 2400, "expected 2400 T_LEVEL rows");
-    assert_eq!(time_points.len(), 2400, "expected 2400 time_points");
     assert_eq!(run.steps.len(), 2400, "expected 2400 Rust steps");
 
-    for (i, ((row, &tp), step)) in rows
-        .iter()
-        .zip(time_points.iter())
-        .zip(run.steps.iter())
-        .enumerate()
-    {
+    for (i, (row, step)) in rows.iter().zip(run.steps.iter()).enumerate() {
         let expected_tlevel = i + 1;
         assert_eq!(
             row.t_level, expected_tlevel,
             "t_level mismatch at index {i}"
-        );
-        assert!(
-            (tp - step.time).abs() <= 1e-9,
-            "time_points[{i}]={tp} != step.time={}",
-            step.time
         );
         assert!(
             (row.time - step.time).abs() <= 1e-9,
@@ -491,7 +497,7 @@ fn load_criteria() -> &'static Value {
             CRITERIA_SHA256,
             "criteria.json SHA-256 differs from the pinned value"
         );
-        read_json(&path)
+        read_json(&path, false)
     })
 }
 

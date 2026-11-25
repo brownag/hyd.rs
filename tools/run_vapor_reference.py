@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import gzip
 import hashlib
 import json
 import math
@@ -345,7 +346,7 @@ def run_case(case_id: str, task_base: Path, build_dir: Path, timeout: int | None
     sidecar_mode = produce_balance or produce_tlevel
     output_path = FIXTURES / f"{case_id}.json"
     balance_path = FIXTURES / f"{case_id}_balance.json"
-    tlevel_path = FIXTURES / f"{case_id}_tlevel.json"
+    tlevel_path = FIXTURES / f"{case_id}_tlevel.json.gz"
     if produce_balance and balance_path.exists():
         raise FileExistsError(f"refusing to overwrite balance fixture: {balance_path}")
     if produce_tlevel and tlevel_path.exists():
@@ -444,12 +445,12 @@ def run_case(case_id: str, task_base: Path, build_dir: Path, timeout: int | None
             "schema_version": 1, "case_id": case_id, "source_matched": True,
             "evidence_class": "pinned-fortran-t-level",
             "output_format": T_LEVEL_FORMAT_170,
-            "time_points": [r["time"] for r in tlevel_rows],
             "rows": tlevel_rows,
             "manifest": {"source_and_archive_sha256": staged["source_and_archive_sha256"], "patch_sha256": build["patch_sha256"], "executable_sha256": build["executable_sha256"], "build_manifest_sha256": info["build_manifest_sha256"], "staging_manifest_sha256": info["staging_manifest_sha256"], "compiler": build["gnu_fortran_version"], "host_os": build["host_os"], "host_architecture": build["host_architecture"], "flags": build["flags"], "command": command, "input_sha256": hashes, "output_sha256": tlevel_outputs, "selector_sha256": hashlib.sha256(selector.encode()).hexdigest(), "profile_sha256": sha256(case_dir / "PROFILE.DAT"), "runner_sha256": sha256(Path(__file__))}
         }
         tlevel_path.parent.mkdir(parents=True, exist_ok=True)
-        tlevel_path.write_text(json.dumps(tlevel_record, indent=2, sort_keys=True) + "\n")
+        payload = (json.dumps(tlevel_record, indent=2, sort_keys=True) + "\n").encode()
+        tlevel_path.write_bytes(gzip.compress(payload, mtime=0))
     if produce_tlevel and not produce_balance:
         return tlevel_path
     return balance_path if (produce_balance and output_path.exists()) else output_path
@@ -464,7 +465,7 @@ def main(argv=None) -> int:
     parser.add_argument("--task-base", type=Path, required=True)
     parser.add_argument("--timeout-seconds", type=int)
     parser.add_argument("--balance", action="store_true", help="parse BALANCE.OUT and write <case>_balance.json")
-    parser.add_argument("--tlevel", action="store_true", help="parse T_LEVEL.OUT and write <case>_tlevel.json")
+    parser.add_argument("--tlevel", action="store_true", help="parse T_LEVEL.OUT and write <case>_tlevel.json.gz")
     args = parser.parse_args(argv)
     development = ROOT / ".development"
     if args.task_base.resolve() == development.resolve() or development.resolve() not in args.task_base.resolve().parents:

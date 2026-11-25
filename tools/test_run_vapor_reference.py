@@ -579,7 +579,7 @@ class TLevelRunnerIntegrationTests(unittest.TestCase):
 
     def test_run_case_refuses_to_overwrite_existing_tlevel_fixture(self):
         def mock_exists(self):
-            return self.name.endswith("_tlevel.json")
+            return self.name.endswith("_tlevel.json.gz")
         with mock.patch.object(Path, "exists", mock_exists):
             with self.assertRaisesRegex(FileExistsError, "refusing to overwrite tlevel fixture"):
                 vapor.run_case("vapor_met_bare_soil_on", Path("tb"), Path("bd"), None, tlevel=True)
@@ -613,15 +613,17 @@ class TLevelRunnerIntegrationTests(unittest.TestCase):
                  mock.patch.object(vapor, "load_build", return_value=mock_build), \
                  mock.patch("subprocess.run", side_effect=fake_run):
                 out = vapor.run_case("vapor_met_bare_soil_on", task_base, build_dir, None, tlevel=True)
-                self.assertEqual(out, fixtures_dir / "vapor_met_bare_soil_on_tlevel.json")
+                self.assertEqual(out, fixtures_dir / "vapor_met_bare_soil_on_tlevel.json.gz")
                 self.assertEqual(existing_fixture.read_text(), '{"existing": true}\n')
-                tl = json.loads(out.read_text())
+                import gzip
+                tl = json.loads(gzip.decompress(out.read_bytes()))
                 self.assertEqual(tl["schema_version"], 1)
                 self.assertEqual(tl["case_id"], "vapor_met_bare_soil_on")
                 self.assertTrue(tl["source_matched"])
                 self.assertEqual(tl["evidence_class"], "pinned-fortran-t-level")
                 self.assertEqual(tl["output_format"], vapor.T_LEVEL_FORMAT_170)
-                self.assertEqual(tl["time_points"], [0.1, 0.2])
+                self.assertNotIn("time_points", tl)
+                self.assertEqual([row["time"] for row in tl["rows"]], [0.1, 0.2])
                 self.assertEqual(len(tl["rows"]), 2)
                 self.assertEqual(set(tl["manifest"]["output_sha256"].keys()), {"T_LEVEL.OUT", "NOD_INF.OUT", "NOD_INF_V.OUT"})
 
