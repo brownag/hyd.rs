@@ -22,7 +22,7 @@ Branch: `feat/tlevel-head-end-flux` (stacked on `feat/met-run-path` at `c7c294c`
 | 2 | 33.2.1 `T_LEVEL.OUT` sidecar | done | `9d35728` |
 | 2 | 33.2.2 reported fluxes in met trace; balance uses `src/` | done | `7a1fec8` |
 | 3 | 33.3.1 structural checks and measurement report | done | `b72d5a7`, `0486164` |
-| gate | G-1 user bounds approval | in_progress | |
+| gate | G-1 user bounds approval | done | D-13 (Option B) |
 | 4 | 33.4.1 criteria v8, hash rebind, asserting tests | pending | |
 | 5 | 33.5.1 record G25 done | pending | |
 

@@ -53,6 +53,7 @@ Source goal: [GOALS.md](GOALS.md) Circled G25 (`c7c294c`).
 - **D-10 (2026-11-24, user):** Branch `feat/tlevel-head-end-flux` from `feat/met-run-path` at `c7c294c`. After the user merges G32 into `main`, the orchestrator rebases onto `main` between waves, only with the tree clean and no worker running. The G25 PR targets `main` and is a user action.
 - **D-11 (carried):** Haiku for docs tasks and Sonnet for code tasks. Escalation to Opus per the ladder.
 - **D-12 (orchestrator, acceptance):** Pre-existing outputs are unchanged. 33.2.2 dumps every pre-existing `MetRun` and `StepTrace` field before and after (plan 32 D-17 protocol) and requires byte equality. Only the new fields may differ.
+- **D-13 (2026-11-24, user, Gate G-1):** Approved Option B bounds for `criteria.json` v8: `t_level_boundary_flux` (`absolute = 5.0e-6`, `relative = 2.0e-4`, `scale = "ref_abs"`, `unit = "cm/h"`) and `t_level_cumulative_flux` (`absolute = 2.5e-4`, `relative = 2.0e-4`, `scale = "ref_abs"`, `unit = "cm"`).
 
 ## Recon facts (anchors)
 
