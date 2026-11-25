@@ -2,6 +2,7 @@
 
 pub mod config;
 pub mod evaporation;
+pub mod forcing;
 pub mod radiation;
 pub mod series;
 
@@ -18,6 +19,7 @@ pub use radiation::{
 };
 
 pub use config::MeteoConfig;
+pub use forcing::{AtmosphericRecord, MetForcing, MetForcingError};
 pub use series::{parse_meteo_deck, MeteoRecord};
 
 use core::fmt;
