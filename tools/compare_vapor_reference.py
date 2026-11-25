@@ -223,7 +223,12 @@ def _vector(value, label):
 
 
 def is_trajectory_fixture(data):
-    return isinstance(data, dict) and "case_id" in data and "time_points" in data
+    return (
+        isinstance(data, dict)
+        and "case_id" in data
+        and "time_points" in data
+        and "node_numbers" in data
+    )
 
 
 def validate_trajectory(data, label, candidate=False):
