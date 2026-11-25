@@ -182,6 +182,8 @@ impl VaporWaterHeatDriver {
         heat_input: CoupledHeatInput,
     ) -> Result<VaporStepReport, VaporDriverError> {
         self.preflight(
+            &self.config,
+            false,
             water_state,
             water_workspace,
             &water_input,
@@ -205,6 +207,30 @@ impl VaporWaterHeatDriver {
                 return Err(error);
             }
         };
+        self.commit_step(
+            water_state,
+            water_workspace,
+            &old_heads,
+            bottom_fixed,
+            top_fixed,
+            passes,
+            restarts,
+        )
+    }
+
+    /// Stages and accepts the vapor history, then moves the final water pass into the caller's
+    /// state. Rejects staged vapor state on any failure.
+    #[allow(clippy::too_many_arguments)]
+    fn commit_step(
+        &mut self,
+        water_state: &mut WaterState,
+        water_workspace: &mut WaterWorkspace,
+        old_heads: &[f64],
+        bottom_fixed: bool,
+        top_fixed: bool,
+        passes: Passes,
+        restarts: usize,
+    ) -> Result<VaporStepReport, VaporDriverError> {
         let Passes {
             trial1,
             trial2,
@@ -215,7 +241,7 @@ impl VaporWaterHeatDriver {
         let vapor_contents_old = snapshot.vapor_contents.to_vec();
         let temperatures = reports[1].temperatures.clone();
         let predictor =
-            commit_predictor(&trial2.candidate.heads, &old_heads, bottom_fixed, top_fixed);
+            commit_predictor(&trial2.candidate.heads, old_heads, bottom_fixed, top_fixed);
         let timestep = trial2.timestep;
         let accepted_time = trial2.candidate.time;
 
@@ -307,8 +333,11 @@ impl VaporWaterHeatDriver {
         })
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn preflight(
         &self,
+        config: &VaporConfig,
+        atmospheric: bool,
         water_state: &WaterState,
         water_workspace: &WaterWorkspace,
         input: &WaterStepInput<'_>,
@@ -318,9 +347,12 @@ impl VaporWaterHeatDriver {
     ) -> Result<(), VaporDriverError> {
         let fail = |reason| Err(VaporDriverError::Preflight { reason });
         let n = self.x.len();
-        self.config
-            .validate_water_input(input, water_state.time(), policy)
-            .map_err(VaporDriverError::Vapor)?;
+        if atmospheric {
+            config.validate_atmospheric_water_input(input, water_state.time(), policy)
+        } else {
+            config.validate_water_input(input, water_state.time(), policy)
+        }
+        .map_err(VaporDriverError::Vapor)?;
         let old = self.state.snapshot();
         old.validate().map_err(VaporDriverError::Vapor)?;
         if old.time != water_state.time()
@@ -345,10 +377,10 @@ impl VaporWaterHeatDriver {
         if source_materials.len() != input.materials.len() {
             return fail("source material table differs from water material table");
         }
-        if heat.top_temperature != self.config.top_temperature()
-            || heat.bottom_temperature != self.config.bottom_temperature()
-            || heat.x_conv != self.config.x_conv()
-            || heat.t_conv != self.config.t_conv()
+        if heat.top_temperature != config.top_temperature()
+            || heat.bottom_temperature != config.bottom_temperature()
+            || heat.x_conv != config.x_conv()
+            || heat.t_conv != config.t_conv()
         {
             return fail("heat boundary or conversion differs from vapor config");
         }
@@ -392,13 +424,16 @@ impl VaporWaterHeatDriver {
             let mut input = water_input;
             input.timestep = dt;
             let result = self.attempt(
-                water_state,
-                workspace,
+                &self.config,
                 input,
                 local,
                 source_materials,
                 heat_input,
                 &guess,
+                |_pass, context| {
+                    solve_vapor_water_trial(water_state, workspace, input, local, context)
+                        .map_err(VaporDriverError::Water)
+                },
             );
             match result {
                 Ok(passes) => return Ok((passes, restarts)),
@@ -424,41 +459,44 @@ impl VaporWaterHeatDriver {
         }
     }
 
+    /// One two-pass attempt. `water_pass(pass, context)` solves each water pass, so the
+    /// plain and atmospheric steps share the predictor, pass-two inputs and heat passes.
     #[allow(clippy::too_many_arguments)]
     fn attempt(
         &self,
-        water_state: &WaterState,
-        workspace: &WaterWorkspace,
+        config: &VaporConfig,
         input: WaterStepInput<'_>,
         policy: WaterStepPolicy,
         source_materials: &[VaporSourceMaterial<'_>],
         heat_input: CoupledHeatInput,
         guess: &[f64],
+        mut water_pass: impl FnMut(
+            u8,
+            VaporWaterContext<'_>,
+        ) -> Result<VaporWaterTrial, VaporDriverError>,
     ) -> Result<Passes, VaporDriverError> {
+        #[cfg(not(test))]
+        let _ = policy; // only the test injection reads it
         let snapshot = self.state.snapshot();
         let n = self.x.len();
         let mut old: VaporHistoryView<'_> = snapshot;
         old.head_predictor = guess;
-        let water_error = |source| VaporDriverError::Water(source);
 
         // Pass one: old temperatures, predictor (or old heads after a restart).
-        let trial1 = solve_vapor_water_trial(
-            water_state,
-            workspace,
-            input,
-            policy,
+        let trial1 = water_pass(
+            1,
             VaporWaterContext {
-                config: &self.config,
+                config,
                 old,
                 temperature_estimate: snapshot.temperatures,
                 initial_heads: guess,
                 initial_material_heads: guess,
                 source_materials,
             },
-        )
-        .map_err(water_error)?;
+        )?;
         let mut heat1 = vec![0.0; n];
         let heat_report1 = self.heat_pass(
+            config,
             1,
             &snapshot,
             &trial1,
@@ -480,21 +518,17 @@ impl VaporWaterHeatDriver {
                 retries: 0,
             }));
         }
-        let trial2 = solve_vapor_water_trial(
-            water_state,
-            workspace,
-            input,
-            policy,
+        let trial2 = water_pass(
+            2,
             VaporWaterContext {
-                config: &self.config,
+                config,
                 old,
                 temperature_estimate: &heat1,
                 initial_heads: &trial1.candidate.heads,
                 initial_material_heads: &trial1.pre_solve_heads,
                 source_materials,
             },
-        )
-        .map_err(water_error)?;
+        )?;
         #[cfg(test)]
         self.fire(Inject::AfterWater2)?;
         if trial2.timestep != trial1.timestep {
@@ -504,7 +538,7 @@ impl VaporWaterHeatDriver {
         }
         let mut heat2 = vec![0.0; n];
         let heat_report2 = self.heat_pass(
-            2, &snapshot, &trial2, &heat1, input.sink, heat_input, &mut heat2,
+            config, 2, &snapshot, &trial2, &heat1, input.sink, heat_input, &mut heat2,
         )?;
         #[cfg(test)]
         self.fire(Inject::AfterHeat2)?;
@@ -542,6 +576,7 @@ impl VaporWaterHeatDriver {
     #[allow(clippy::too_many_arguments)]
     fn heat_pass(
         &self,
+        config: &VaporConfig,
         pass: u8,
         old: &VaporHistoryView<'_>,
         trial: &VaporWaterTrial,
@@ -563,7 +598,7 @@ impl VaporWaterHeatDriver {
             t_conv: heat.t_conv,
         };
         let report = solve_vapor_heat_transport(
-            self.config,
+            *config,
             HeatTransportInput {
                 x: &self.x,
                 dt: trial.timestep,
