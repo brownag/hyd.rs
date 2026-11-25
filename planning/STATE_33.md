@@ -21,14 +21,15 @@ Branch: `feat/tlevel-head-end-flux` (stacked on `feat/met-run-path` at `c7c294c`
 | 1 | 33.1.3 `TLInf` vT/vB port | done | `a8bc3fc` |
 | 2 | 33.2.1 `T_LEVEL.OUT` sidecar | done | `9d35728` |
 | 2 | 33.2.2 reported fluxes in met trace; balance uses `src/` | done | `7a1fec8` |
-| 3 | 33.3.1 structural checks and measurement report | pending | |
-| gate | G-1 user bounds approval | pending | |
+| 3 | 33.3.1 structural checks and measurement report | done | `b72d5a7`, `0486164` |
+| gate | G-1 user bounds approval | in_progress | |
 | 4 | 33.4.1 criteria v8, hash rebind, asserting tests | pending | |
 | 5 | 33.5.1 record G25 done | pending | |
 
 ## Orchestrator log
 - 2026-11-24: Wave 1 complete (`ba96556`, `56b842a`, `a8bc3fc`). Serial verification green: Rust 709 passed / 0 failed / 4 ignored, Python 515 OK, clippy/fmt clean.
 - 2026-11-24: Wave 2 complete (`9d35728`, `7a1fec8`, plus `661ec91` fixing `is_trajectory_fixture` to skip `_tlevel.json`). Serial verification green: Rust 709 passed / 0 failed / 4 ignored, Python 515 OK, clippy/fmt clean.
+- 2026-11-24: Wave 3 complete (`b72d5a7`, `0486164`). Targeted parity test 2 passed, clippy/fmt clean. Stopped at hard Gate G-1 for user bounds approval.
 
 ## Task reports
 
@@ -53,3 +54,7 @@ Branch: `feat/tlevel-head-end-flux` (stacked on `feat/met-run-path` at `c7c294c`
 - Status: done (`7a1fec8`). Edited `crates/hydrus-core/tests/support/vapor_met.rs` (added `v_top_reported`, `v_bot_reported`, `v_top_liquid_reported`, `v_top_vapor_reported` to `StepTrace`) and `crates/hydrus-core/tests/vapor_met_balance.rs` (documented `net_vtop`). Byte-identity `cmp before.json after.json` passed (15 MB). Targeted tests: 5 + 3 passing; clippy/fmt clean.
 - Deviations (user-approved D-9 amendment, Option 1): kept `net_vtop` in `vapor_met_balance.rs` because `t_level_fluxes_for_step` uses post-heat-solve temperatures (matching Fortran `TLInf`), differing from water-solve `total_face_fluxes` (pre-heat-solve temperatures) by ~9.4e-6 cm/h.
 - Gotchas (33.3.1): `StepTrace` exposes `v_top_reported`, `v_bot_reported`, `v_top_liquid_reported`, `v_top_vapor_reported` (cm/h, positive upward).
+
+### 33.3.1
+- Status: done (`b72d5a7`, `0486164`). Created `crates/hydrus-core/tests/vapor_met_tlevel_parity.rs` and `planning/master/M6_VAPOR_G25_TLEVEL_MEASUREMENT.md`. Targeted test: 2 passed; clippy/fmt clean. No deviations.
+- Key measurements: 2400/2400 sign agreement (positive upward); `max |ΔvTop| = 5.40e-7 cm/h` (`1.59x` `e13.5` floor), `max |ΔvBot| = 1.11e-6 cm/h`; cumulative `max |Δsum_v_top| = 5.39e-5 cm` (final `2.55e-5`), `max |Δsum_v_bot| = 8.25e-6 cm` (final `1.06e-7`). Recommended Option B bounds await Gate G-1 approval.
