@@ -39,12 +39,13 @@ Chosen option: 1.
 
 - **Pure `TLInf` output port (D-1, plan 33).** The met path reports `vTop` and `vBot` through a pure port of `TLInf` (`src_reference/OUTPUT.FOR:25-54`) in `crates/hydrus-core/src/heat/vapor/output.rs`, computed from the accepted step.
 - **Solver and switching form unchanged (D-1, plan 33).** `crates/hydrus-core/src/water_solver.rs` and `crates/hydrus-core/src/atmospheric.rs` (`trial_v_top`, `upper_for`) are unchanged. `total_face_fluxes` end entries are not a reported boundary flux.
-- **Evidence and bounds (D-2, D-4, plan 33).** Evidence is a runner-produced `T_LEVEL.OUT` sidecar fixture (`reference/vapor_fortran/fixtures/vapor_met_bare_soil_on_tlevel.json`) and a `reference/vapor_fortran/criteria.json` v8 entry approved after measurement.
+- **Evidence and bounds (D-2, D-4, plan 33).** Evidence is a runner-produced `T_LEVEL.OUT` sidecar fixture (`reference/vapor_fortran/fixtures/vapor_met_bare_soil_on_tlevel.json.gz`) and a `reference/vapor_fortran/criteria.json` v8 entry approved after measurement.
 
 ## Consequences
 
 - **Positive:** Heads and all pre-existing solver fields stay bit-identical by construction.
 - **Positive:** The `TLInf` output formula stays decoupled from `trial_v_top` (`Shift`) and `total_face_fluxes`, matching Fortran's separation between `WATFLOW.FOR` and `OUTPUT.FOR`.
+- **Storage update (2026-11-24):** The complete parsed sidecar is stored as deterministic gzip JSON; all 2,400 rows and fields remain, with only the redundant `time_points` array omitted. The criteria v8 numerical bounds are unchanged.
 - **Negative:** The water-only (non-vapor) path has no reported head-end flux yet.
 - **Follow-up (G20):** G20 must decide which `vTop` `UpdateEnergy` reads: in Fortran, `call UpdateEnergy` at `src_reference/HYDRUS.FOR:462` runs before `Temper` (`:490`) and before `call TLInf` at `:530` (where `:538` passes `dummy1, dummy2` for `vTop, vBot`).
 - **Revisit when:** a caller needs solver-level head-end fluxes (for example on the water-only path or when implementing `UpdateEnergy` in G20).

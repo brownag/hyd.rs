@@ -48,7 +48,7 @@ use hydrus_core::{
 use serde_json::{json, Value};
 use sha2::{Digest, Sha256};
 
-const CRITERIA_SHA256: &str = "8f9e78d1a82a5910c1fc9c0a98ac61e899d0a247ba992b3b1e70d513582ab71f";
+const CRITERIA_SHA256: &str = "ba0e5d5a6a0cef5e9159c07d7c72a8e245f4de62dd43f4950bcef7115f08d3a7";
 const X_CONV: f64 = 100.0; // INPUT.FOR:190 (cm)
 const T_CONV: f64 = 1.0 / 3600.0; // INPUT.FOR:197 (hours)
 const MINIMUM_PIVOT: f64 = 1e-12;

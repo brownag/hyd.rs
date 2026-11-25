@@ -4,6 +4,7 @@
 - **Sidecar:** `reference/vapor_fortran/fixtures/vapor_met_bare_soil_on_tlevel.json.gz` (gzip-compressed JSON; SHA-256 pins the compressed bytes)
 - **Original uncompressed sidecar SHA-256:** `4f819abe86fe0cfd33b9b82e04f30da1bb2f78d8530560ce1ebc3079dbfff20b` (historical artifact)
 - **Current compressed artifact SHA-256:** `09c7c89bd9fc1f0f17bf148c09f2acc97c784512ec6e4c55ac492c7db6d598a9` (deterministic gzip; all 2400 parsed rows and all 22 fields retained; duplicate `time_points` omitted)
+- **Current criteria artifact SHA-256:** `ba0e5d5a6a0cef5e9159c07d7c72a8e245f4de62dd43f4950bcef7115f08d3a7` (storage-only v9 metadata update; original v8 approved bounds unchanged)
 - **Rust implementation:** `hydrus_core::heat::vapor::output::t_level_fluxes_for_step` (Plan 33, task 33.1.3 `a8bc3fc`, wired in 33.2.2 `7a1fec8`)
 - **Measurement harness:** `crates/hydrus-core/tests/vapor_met_tlevel_parity.rs`
 - **Command:** `cargo test -p hydrus-core --release --test vapor_met_tlevel_parity -- --nocapture`

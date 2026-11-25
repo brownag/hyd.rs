@@ -28,7 +28,7 @@ use serde_json::Value;
 use sha2::{Digest, Sha256};
 use vapor_met::{KodChange, MetRun, RunOptions};
 
-const CRITERIA_SHA256: &str = "8f9e78d1a82a5910c1fc9c0a98ac61e899d0a247ba992b3b1e70d513582ab71f";
+const CRITERIA_SHA256: &str = "ba0e5d5a6a0cef5e9159c07d7c72a8e245f4de62dd43f4950bcef7115f08d3a7";
 const FIXTURE_SHA256: &str = "75b4207387dff4838fba38c88eaed2527f7e450683e0f12ed418061abdd9a877";
 /// Fortran `KodT` switches (RUN_INF.OUT of the pinned run, task 31.2.1 gate): the first
 /// step whose printed `KodT` has the new value, as time at the end of that step.

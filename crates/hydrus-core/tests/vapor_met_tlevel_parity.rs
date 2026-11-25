@@ -20,7 +20,7 @@ use serde_json::Value;
 use sha2::{Digest, Sha256};
 use vapor_met::{MetRun, RunOptions, StepTrace};
 
-const CRITERIA_SHA256: &str = "8f9e78d1a82a5910c1fc9c0a98ac61e899d0a247ba992b3b1e70d513582ab71f";
+const CRITERIA_SHA256: &str = "ba0e5d5a6a0cef5e9159c07d7c72a8e245f4de62dd43f4950bcef7115f08d3a7";
 const SIDECAR_SHA256: &str = "09c7c89bd9fc1f0f17bf148c09f2acc97c784512ec6e4c55ac492c7db6d598a9";
 const SWITCH_TIMES: [f64; 3] = [42.7, 120.1, 200.3];
 
