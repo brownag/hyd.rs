@@ -14,7 +14,7 @@ pub mod water;
 use std::fmt;
 
 use crate::heat::config::{HeatConfig, HeatConfigError, HeatConfigInput};
-use crate::hydraulics::{HydraulicTables, VanGenuchtenModel};
+use crate::hydraulics::{BoundaryRow, HydraulicTables, VanGenuchtenModel};
 use crate::{
     HydraulicError, LowerBoundaryMode, UpperBoundary, WaterState, WaterStepInput, WaterStepPolicy,
     WaterWorkspace,
@@ -113,6 +113,22 @@ impl VaporConfig {
         })
     }
 
+    /// Copy of this configuration with a different top temperature (per forcing record).
+    pub fn with_top_temperature(self, top_temperature: f64) -> Result<Self, VaporError> {
+        let name = "top_temperature";
+        validate_finite(name, top_temperature)?;
+        if top_temperature + 273.15 <= 0.0 {
+            return Err(VaporError::InvalidValue {
+                name,
+                value: top_temperature,
+            });
+        }
+        Ok(Self {
+            top_temperature,
+            ..self
+        })
+    }
+
     pub fn heat(&self) -> HeatConfig {
         self.heat
     }
@@ -141,6 +157,40 @@ impl VaporConfig {
         input: &WaterStepInput<'_>,
         accepted_time: f64,
         policy: WaterStepPolicy,
+    ) -> Result<(), VaporError> {
+        self.validate_water_input_with(input, accepted_time, policy, input.upper)
+    }
+
+    /// Same checks as [`Self::validate_water_input`] for an atmospheric upper boundary, which
+    /// the step decomposes into Flux/Head pairs: the pair is classified with a Flux upper.
+    pub(crate) fn validate_atmospheric_water_input(
+        &self,
+        input: &WaterStepInput<'_>,
+        accepted_time: f64,
+        policy: WaterStepPolicy,
+    ) -> Result<(), VaporError> {
+        let UpperBoundary::Atmospheric { critical_head } = input.upper else {
+            return Err(VaporError::UnsupportedUpperBoundary(input.upper));
+        };
+        validate_finite("critical head", critical_head)?;
+        let stand_in = UpperBoundary::Flux {
+            flux: 0.0,
+            row: BoundaryRow {
+                lower: 0.0,
+                diagonal: 0.0,
+                upper: 0.0,
+                rhs: 0.0,
+            },
+        };
+        self.validate_water_input_with(input, accepted_time, policy, stand_in)
+    }
+
+    fn validate_water_input_with(
+        &self,
+        input: &WaterStepInput<'_>,
+        accepted_time: f64,
+        policy: WaterStepPolicy,
+        upper: UpperBoundary,
     ) -> Result<(), VaporError> {
         let mesh = input.mesh;
         let n = mesh.coordinates().len();
@@ -208,7 +258,7 @@ impl VaporConfig {
                 });
             }
         }
-        VaporBoundaryPair::classify(input.lower, input.upper)?;
+        VaporBoundaryPair::classify(input.lower, upper)?;
         Ok(())
     }
 }
