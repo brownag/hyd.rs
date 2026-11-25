@@ -19,7 +19,7 @@ Branch: `feat/met-run-path` (from `main` `3f328fc`). Tracked planning (D-5).
 | 1 | 32.1.1 ADR 0022 (G28) | done | `e8bbb3f` |
 | 1 | 32.1.2 `MetForcing` builder | done | `fc16698` |
 | 1 | 32.1.3 `step_atmospheric` | done | `5beb4ad`, `a6a2211`, `123ac63` |
-| 2 | 32.2.1 rewire test driver (bit-identical) | pending | |
+| 2 | 32.2.1 rewire test driver (bit-identical) | done | `a6c2ee4` |
 | 3 | 32.3.1 record G26/G28, add G31 | pending | |
 
 ## Orchestrator log
@@ -29,6 +29,11 @@ Branch: `feat/met-run-path` (from `main` `3f328fc`). Tracked planning (D-5).
 - 32.1.2 answers: the `schedule` error is `MetForcingError::Schedule(WaterStepError)`; `NoRecords` added; `AtmosphericRecord`, `MetForcing` and `MetForcingError` re-exported from `lib.rs`; the hCritA check stays in the test wiring.
 - 32.1.3 answers: preflight uses a new `pub(crate) VaporConfig::validate_atmospheric_water_input` (mod.rs). It shares a helper with `validate_water_input`, whose public behaviour is unchanged, and classifies the pair with a Flux stand-in. Errors from `advance_atmospheric_step_vapor` surface as `VaporDriverError::Atmospheric { pass, source }`, including `Water(..)`. Orchestrator review nit: a duplicate lint allow, fixed in `123ac63`.
 - Wave 1 end (head `123ac63`), serial: workspace tests 704 passed, 0 failed, 4 ignored (+6 forcing, +4 driver); clippy clean; fmt clean; Python 504 OK. Forbidden paths (`water_solver.rs`, `atmospheric.rs`, `reference/`, `tests/`) have no diff since `3fc4f2a`. Wave 1 done.
+- 2026-11-24 wave 2: 32.2.1 ran in the main checkout (single task, no worktree). Orchestrator verification:
+  - Re-ran `cmp` of `before.json` and `after.json`: OK.
+  - `before.json` (17:31:33) predates the code commit (17:32:09).
+  - The scratch test is gone, the spec grep returns nothing, and the forbidden paths show no diff.
+- Wave 2 end (head `f954c47`), serial: workspace tests 704 passed, 0 failed, 4 ignored; clippy clean; fmt clean; Python 504 OK. Wave 2 done.
 
 ## Task reports
 
