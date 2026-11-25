@@ -32,6 +32,36 @@ BAL_PATTERNS = [
     ("wat_bal_r", re.compile(r"^\s*WatBalR\s+\[%\]\s+(.*)$", re.I)),
 ]
 
+T_LEVEL_FORMAT_170 = "format 170: f13.4,11e13.5,2e13.5,5e13.5,i7,e13.5,f11.3"
+T_LEVEL_HEADER_RE = re.compile(
+    r"^\s*Time\s+rTop\s+rRoot\s+vTop\s+vRoot\s+vBot\b.*\bTLevel\b.*\bSnowLayer\s*$"
+)
+T_LEVEL_FIELDS = (
+    ("time", 0, 13, "float"),
+    ("r_top", 13, 26, "float"),
+    ("r_root", 26, 39, "float"),
+    ("v_top", 39, 52, "float"),
+    ("v_root", 52, 65, "float"),
+    ("v_bot", 65, 78, "float"),
+    ("sum_r_top", 78, 91, "float"),
+    ("sum_r_root", 91, 104, "float"),
+    ("sum_v_top", 104, 117, "float"),
+    ("sum_v_root", 117, 130, "float"),
+    ("sum_v_bot", 130, 143, "float"),
+    ("h_top", 143, 156, "float"),
+    ("h_root", 156, 169, "float"),
+    ("h_bot", 169, 182, "float"),
+    ("run_off", 182, 195, "float"),
+    ("sum_run_off", 195, 208, "float"),
+    ("volume", 208, 221, "float"),
+    ("sum_infil", 221, 234, "float"),
+    ("sum_evap", 234, 247, "float"),
+    ("t_level", 247, 254, "int"),
+    ("cum_wtrans", 254, 267, "float"),
+    ("snow_layer", 267, 278, "float"),
+)
+T_LEVEL_ROW_WIDTH = 278
+
 
 def sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
@@ -192,6 +222,62 @@ def parse_balance(source: str | Path) -> list[dict]:
     return blocks
 
 
+def parse_t_level(source: str | Path) -> list[dict]:
+    """Parse T_LEVEL.OUT format-170 rows after the format-130 header."""
+    if isinstance(source, Path):
+        if not source.is_file() or not source.stat().st_size:
+            raise RuntimeError(f"required output absent/empty: {source.name}")
+        text = source.read_text(errors="strict")
+    else:
+        text = source
+    if not text:
+        raise ValueError("empty T_LEVEL.OUT")
+
+    rows: list[dict] = []
+    in_table = False
+    prev_time: float | None = None
+    prev_t_level: int | None = None
+    for raw in text.splitlines():
+        stripped = raw.strip()
+        if not in_table:
+            if T_LEVEL_HEADER_RE.match(raw):
+                in_table = True
+            continue
+        if not stripped or stripped.startswith("[T]"):
+            continue
+        if stripped.lower() == "end":
+            break
+        if "*" in raw:
+            raise ValueError("Fortran field overflow in T_LEVEL.OUT row")
+        if len(raw) < T_LEVEL_ROW_WIDTH:
+            raise ValueError(f"truncated T_LEVEL.OUT row (len={len(raw)} < {T_LEVEL_ROW_WIDTH})")
+        row: dict[str, float | int] = {}
+        for name, start, end, kind in T_LEVEL_FIELDS:
+            cell = raw[start:end]
+            if kind == "int":
+                try:
+                    row[name] = int(cell.strip())
+                except ValueError as exc:
+                    raise ValueError(f"malformed {name} field {cell!r}") from exc
+            else:
+                row[name] = finite_number(cell, name)
+        t = row["time"]
+        tl = row["t_level"]
+        if prev_time is not None and t <= prev_time:
+            raise ValueError(f"duplicate or non-increasing time {t} after {prev_time}")
+        if prev_t_level is not None and tl != prev_t_level + 1:
+            raise ValueError(f"t_level must increase by 1: got {tl} after {prev_t_level}")
+        prev_time = float(t)
+        prev_t_level = int(tl)
+        rows.append(row)
+
+    if not in_table:
+        raise ValueError("missing T_LEVEL.OUT format-130 header")
+    if not rows:
+        raise ValueError("T_LEVEL.OUT contains no data rows")
+    return rows
+
+
 def load_build(directory: Path) -> dict:
     build_path, staged_path = directory / "build-manifest.json", directory / "staging-manifest.json"
     build, staged = json.loads(build_path.read_text()), json.loads(staged_path.read_text())
@@ -248,18 +334,23 @@ def generate_met_case(dest: Path) -> None:
     (dest / "fixture.json").write_text(json.dumps(spec, indent=1) + "\n")
 
 
-def run_case(case_id: str, task_base: Path, build_dir: Path, timeout: int | None, balance: bool = False) -> Path:
+def run_case(case_id: str, task_base: Path, build_dir: Path, timeout: int | None, balance: bool = False, tlevel: bool = False) -> Path:
     case_dir = CASES / case_id
     spec = json.loads((case_dir / "fixture.json").read_text())
     if spec.get("case_id") != case_id:
         raise ValueError(f"case id mismatch in {case_dir}")
     config = spec["runner"]
     produce_balance = balance or any(e["name"] == "BALANCE.OUT" for e in config["outputs"])
+    produce_tlevel = tlevel or any(e["name"] == "T_LEVEL.OUT" for e in config["outputs"])
+    sidecar_mode = produce_balance or produce_tlevel
     output_path = FIXTURES / f"{case_id}.json"
     balance_path = FIXTURES / f"{case_id}_balance.json"
+    tlevel_path = FIXTURES / f"{case_id}_tlevel.json"
     if produce_balance and balance_path.exists():
         raise FileExistsError(f"refusing to overwrite balance fixture: {balance_path}")
-    if not produce_balance and output_path.exists():
+    if produce_tlevel and tlevel_path.exists():
+        raise FileExistsError(f"refusing to overwrite tlevel fixture: {tlevel_path}")
+    if not sidecar_mode and output_path.exists():
         raise FileExistsError(f"refusing to overwrite fixture: {output_path}")
     run_root = task_base / case_id
     if run_root.exists():
@@ -291,6 +382,8 @@ def run_case(case_id: str, task_base: Path, build_dir: Path, timeout: int | None
     outputs_to_check = list(config["outputs"])
     if produce_balance and not any(e["name"] == "BALANCE.OUT" for e in outputs_to_check):
         outputs_to_check.append({"name": "BALANCE.OUT", "marker": "Calculation time"})
+    if produce_tlevel and not any(e["name"] == "T_LEVEL.OUT" for e in outputs_to_check):
+        outputs_to_check.append({"name": "T_LEVEL.OUT", "marker": "end"})
     for entry in outputs_to_check:
         path = run_dir / f"{prefix}\\{entry['name']}"
         if not path.is_file() or not path.stat().st_size:
@@ -301,6 +394,8 @@ def run_case(case_id: str, task_base: Path, build_dir: Path, timeout: int | None
         outputs[entry["name"]] = path
         if entry["name"] == "BALANCE.OUT":
             parsed[entry["name"]] = parse_balance(raw)
+        elif entry["name"] == "T_LEVEL.OUT":
+            parsed[entry["name"]] = parse_t_level(raw)
         else:
             parsed[entry["name"]] = parse_blocks(raw, entry["name"] == "NOD_INF_V.OUT")
     main_blocks = parsed["NOD_INF.OUT"]
@@ -313,7 +408,7 @@ def run_case(case_id: str, task_base: Path, build_dir: Path, timeout: int | None
         raise ValueError(f"{case_id}: selector vapor reachability disagrees with output availability")
     staged, build = load_build(build_dir)["staged"], load_build(build_dir)["build"]
     info = load_build(build_dir)
-    outputs_for_main = {n: p for n, p in outputs.items() if n != "BALANCE.OUT"}
+    outputs_for_main = {n: p for n, p in outputs.items() if n not in ("BALANCE.OUT", "T_LEVEL.OUT")}
     if not output_path.exists():
         record = {
             "schema_version": 1, "case_id": case_id, "source_matched": True,
@@ -342,6 +437,21 @@ def run_case(case_id: str, task_base: Path, build_dir: Path, timeout: int | None
         }
         balance_path.parent.mkdir(parents=True, exist_ok=True)
         balance_path.write_text(json.dumps(balance_record, indent=2, sort_keys=True) + "\n")
+    if produce_tlevel:
+        tlevel_rows = parsed["T_LEVEL.OUT"]
+        tlevel_outputs = {n: sha256(outputs[n]) for n in ("T_LEVEL.OUT", "NOD_INF.OUT", "NOD_INF_V.OUT") if n in outputs}
+        tlevel_record = {
+            "schema_version": 1, "case_id": case_id, "source_matched": True,
+            "evidence_class": "pinned-fortran-t-level",
+            "output_format": T_LEVEL_FORMAT_170,
+            "time_points": [r["time"] for r in tlevel_rows],
+            "rows": tlevel_rows,
+            "manifest": {"source_and_archive_sha256": staged["source_and_archive_sha256"], "patch_sha256": build["patch_sha256"], "executable_sha256": build["executable_sha256"], "build_manifest_sha256": info["build_manifest_sha256"], "staging_manifest_sha256": info["staging_manifest_sha256"], "compiler": build["gnu_fortran_version"], "host_os": build["host_os"], "host_architecture": build["host_architecture"], "flags": build["flags"], "command": command, "input_sha256": hashes, "output_sha256": tlevel_outputs, "selector_sha256": hashlib.sha256(selector.encode()).hexdigest(), "profile_sha256": sha256(case_dir / "PROFILE.DAT"), "runner_sha256": sha256(Path(__file__))}
+        }
+        tlevel_path.parent.mkdir(parents=True, exist_ok=True)
+        tlevel_path.write_text(json.dumps(tlevel_record, indent=2, sort_keys=True) + "\n")
+    if produce_tlevel and not produce_balance:
+        return tlevel_path
     return balance_path if (produce_balance and output_path.exists()) else output_path
 
 
@@ -354,6 +464,7 @@ def main(argv=None) -> int:
     parser.add_argument("--task-base", type=Path, required=True)
     parser.add_argument("--timeout-seconds", type=int)
     parser.add_argument("--balance", action="store_true", help="parse BALANCE.OUT and write <case>_balance.json")
+    parser.add_argument("--tlevel", action="store_true", help="parse T_LEVEL.OUT and write <case>_tlevel.json")
     args = parser.parse_args(argv)
     development = ROOT / ".development"
     if args.task_base.resolve() == development.resolve() or development.resolve() not in args.task_base.resolve().parents:
@@ -369,7 +480,7 @@ def main(argv=None) -> int:
         parser.error(f"cases must be a subset of: {', '.join(sorted(expected))}")
     args.task_base.mkdir(parents=True, exist_ok=False)
     for case in cases:
-        print(f"wrote {run_case(case, args.task_base, args.build_dir.resolve(), args.timeout_seconds, args.balance)}")
+        print(f"wrote {run_case(case, args.task_base, args.build_dir.resolve(), args.timeout_seconds, args.balance, args.tlevel)}")
     return 0
 
 
