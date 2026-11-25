@@ -1,42 +1,17 @@
 # Project Goals (`planning/GOALS.md`)
 
 Last Updated: 2026-11-24
-Source State: [STATE_32.md](STATE_32.md) (plan [EXECUTION_PLAN_32.md](EXECUTION_PLAN_32.md))
+Source State: [STATE_33.md](STATE_33.md) (plan [EXECUTION_PLAN_33.md](EXECUTION_PLAN_33.md))
 
 Magic Wand refresh (2026-11-24, user-approved): ranking criteria unchanged (retire Fortran risk early, land on main soon, minimize gate load). Circle is one root goal plus an orthogonal no-code cleanup track. G24 is complete (PR #1, `3f328fc`). New candidates: G28 (Picard switching deviation, folded into G26), G29 (hysteresis, roadmap M7) and G30 (input deck and CLI, roadmap M10).
 
 Magic Wand refresh (2026-11-24, second, user-approved): ranking criteria unchanged. G26 and G28 are complete (orchestration 32). G25 is circled. G32 (merge `feat/met-run-path` to `main`) is new and is G25's step 0. G25 -> G20 is now hard: `UpdateEnergy` reads `vTop` directly (`TIME.FOR:1166-1195`), and Rust's head-mode top flux is the 0.0 fallback. G30 moves to the Independent Backlog, because nothing on the list waits on it.
 
-Dependency graph: `G32 -> [G25, G20, G30]` (soft; clean base on `main`), `G25 -> [G20]` (hard). G22.2-C7, G27, G29, G30 and G31 have no open dependencies.
+Dependency graph: `G32 -> [G20, G30]` (soft; clean base on `main`). G25 is complete (orchestration 33), which satisfies G20's hard dependency. G22.2-C7, G27, G29, G30 and G31 have no open dependencies.
 
 ## Circled Goal (Active)
 
-- **[G25]** At head-type ends (top in head mode, fixed-head bottom), the water solver reports the solved boundary flux, not the 0.0 fallback. The Rust vTop/vBot match the pinned Fortran `T_LEVEL.OUT` vTop/vBot for `vapor_met_bare_soil_on`.
-  - Why now: it is the only code goal that unblocks another. G20's `UpdateEnergy` reads `vTop` (`TIME.FOR:1166-1195`), so G20 cannot be right on head-mode steps without it. It retires the last Fortran-facing G22.3 exception (head-end flux checked as interior conservation only), and it has the smallest scope of the code goals.
-  - Found in 31.4.2 (2026-11-23): `upper_for` (`atmospheric.rs:484`) and the FixedHead lower pass flux 0.0, so `total_face_fluxes` at those ends is a fallback (`water_solver.rs:584`, `measured_flux().unwrap_or(0.0)`).
-  - Exit criteria:
-    - The pinned-Fortran vTop/vBot series is produced through `tools/run_vapor_reference.py`, with provenance.
-    - A parity test compares the Rust vTop/vBot against it within user-approved bounds.
-    - `vapor_met_balance` checks the head ends against the solved flux.
-    - Heads and all other fields stay bit-identical. Every existing parity suite passes unchanged.
-    - The full AGENTS.md suites are green.
-  - Scope:
-    - `src/water_solver.rs`, `src/atmospheric.rs` (`upper_for`).
-    - `tools/run_vapor_reference.py` (outputs list near `:239`; `runner_sha256` is in the fixture manifest, so a runner change moves the hash pins) and `tools/test_run_vapor_reference.py`.
-    - The met fixture or a new vTop/vBot sidecar, and `tests/vapor_met_balance.rs`.
-    - `criteria.json` only with approved bounds.
-    - Out of scope: G20, G31.
-  - Gate: edits `water_solver.rs`, and a runner/fixture change (same gate class as G22.2-C4). The user decides between extending the fixture and adding a sidecar, the hash-pin consequences, and the vTop/vBot bounds.
-  - Critical path:
-    - (0) G32 merge (user action).
-    - (1) Read-only audit: the Fortran head-end vTop/vBot (the vTop form at `WATFLOW.FOR:395-407` and the `T_LEVEL.OUT` write site) against the Rust end-row residual.
-    - (2) Gate decision.
-    - (3) Solved head-end flux in `water_solver.rs`, report-only, with heads bit-identical.
-    - (4) The runner emits `T_LEVEL.OUT`; regenerate the fixture or sidecar.
-    - (5) vTop/vBot parity test; balance test upgraded.
-    - (6) Full suites.
-  - First action: run plan-wave on G25, starting with the step (1) audit.
-  - Depends on: G26 (done); G32 (soft).
+- None selected (2026-11-24). G25 closed in orchestration 33. Candidate for the next circle: G20 (energy balance; its G25 dependency is now met). Run Magic Wand to select.
 
 - **[G22.2-C7]** (parallel, no code) Cleanup. The `planning/STATE_29.md` rows for 29.3.3 and 29.4.x are corrected from pending. About 90 stale worktrees (`git worktree list`, 91 lines on 2026-11-24) and unmerged `docs/master-plan-*` and other task branches are resolved after each is checked for unmerged work. The failed-trial output in `.development/29.4.1/runs/B` (1.5 GB) and `.development/29.3.3/quarantine/` (16 KB) are removed.
   - Why now: touches no code, so it is orthogonal to G25. It cuts noise for future orchestrations.
@@ -50,8 +25,8 @@ Dependency graph: `G32 -> [G25, G20, G30]` (soft; clean base on `main`), `G25 ->
   - Depends on: none.
 
 - **[G20]** Energy balance (`lEnBal`, `UpdateEnergy`, surface energy terms `Evap`, `Rn`, `Rns`, `Rnl`) is added to the coupled capability with its own contract, fixtures and acceptance gate.
-  - Status: radiation (`Rn`, `Rns`, `Rnl`) ported in Plan 31 (31.2.2, `b7acedf`) per D-4. Trigger met 2026-11-23 (G22.3 accepted).
-  - Depends on: G25 (hard: `UpdateEnergy` reads `vTop`, `TIME.FOR:1166-1195`). G26 is done.
+  - Status: radiation (`Rn`, `Rns`, `Rnl`) ported in Plan 31 (31.2.2, `b7acedf`) per D-4. Trigger met 2026-11-23 (G22.3 accepted). Note ([ADR 0023](../docs/decisions/0023-report-end-boundary-fluxes-in-the-tlinf-output-form.md)): `UpdateEnergy`'s `vTop` source must be decided (`HYDRUS.FOR:462` runs before `TLInf` at `:530`, so G20 must choose between `trial_v_top` and `TLInf` `v_top`).
+  - Depends on: G25 (done), G26 (done).
 
 ## Independent Backlog
 
@@ -84,6 +59,9 @@ Dependency graph: `G32 -> [G25, G20, G30]` (soft; clean base on `main`), `G25 ->
   - Trigger (ADR 0022): a request for adaptive dt on the met path, or a met case that fails parity.
 
 ## Completed
+
+- **[G25]** At head-type ends (top in head mode, fixed-head bottom), the met path reports the end boundary fluxes `vTop` and `vBot` in the `TLInf` output form (`OUTPUT.FOR:25-54`) via `heat::vapor::output::{t_level_fluxes, t_level_fluxes_for_step}`, rather than the water solver's 0.0 fallback. The Rust `vTop`/`vBot` match the pinned Fortran `T_LEVEL.OUT` sidecar (`vapor_met_bare_soil_on_tlevel.json`) for `vapor_met_bare_soil_on` per step and cumulatively, and `vapor_met_balance` uses the `src/` function.
+  - Result (2026-11-24): **complete**. Delivered by `ba96556` ([ADR 0023](../docs/decisions/0023-report-end-boundary-fluxes-in-the-tlinf-output-form.md)), `56b842a`, `a8bc3fc`, `9d35728`, `7a1fec8`, `661ec91`, `b72d5a7`, `0486164` ([M6_VAPOR_G25_TLEVEL_MEASUREMENT.md](master/M6_VAPOR_G25_TLEVEL_MEASUREMENT.md)), and `30423f3` (`criteria.json` v8, `8f9e78d1…`, entries `t_level_boundary_flux` and `t_level_cumulative_flux`). `vapor_met_tlevel_parity` (4/4), `vapor_met_parity` (5/5), and `vapor_met_balance` (3/3) pass; heads and solver outputs remain bit-identical (`water_solver.rs` and `atmospheric.rs` unchanged per D-1). Plan [EXECUTION_PLAN_33.md](EXECUTION_PLAN_33.md), board [STATE_33.md](STATE_33.md).
 
 - **[G26]** A production met run path exists in `src/`: `MetForcing` (`meteo::forcing`) and `VaporWaterHeatDriver::step_atmospheric`, with the `src/` entry points `hydrus_core::MetForcing`, `VaporWaterHeatDriver::step_atmospheric` and `VaporAtmosphericStepReport`.
   - Result (2026-11-24): **complete**. Delivered by `fc16698`, `5beb4ad`, `a6a2211`, `123ac63` and `a6c2ee4`. `vapor_met_parity` 5/5 and `vapor_met_balance` 3/3 pass with unchanged tolerances and criteria. Workspace 704 passed, 0 failed, 4 ignored. Plan [EXECUTION_PLAN_32.md](EXECUTION_PLAN_32.md).

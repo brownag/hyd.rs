@@ -56,3 +56,5 @@ Workspace at wave 4 end: `cargo test --workspace` 694 passed, 0 failed; clippy `
 ## Update (2026-11-24)
 
 Exception 2 ("the met run path exists only in the test driver") is resolved by plan 32 (G26). The met run path now lives in `src/` (`MetForcing`, `VaporWaterHeatDriver::step_atmospheric`), and both met tests run through it with unchanged tolerances. Plan: [EXECUTION_PLAN_32.md](../EXECUTION_PLAN_32.md).
+
+Exception 1 ("boundary flux at head-type ends is not independently checked" — checked as interior conservation only) is resolved by plan 33 (G25, [ADR 0023](../../docs/decisions/0023-report-end-boundary-fluxes-in-the-tlinf-output-form.md)). The met path now reports `vTop` and `vBot` via `heat::vapor::output::{t_level_fluxes, t_level_fluxes_for_step}`, `vapor_met_balance` uses the `src/` function, and `vapor_met_tlevel_parity` verifies per-step and cumulative flux parity against the pinned `T_LEVEL.OUT` sidecar (`vapor_met_bare_soil_on_tlevel.json`) under `criteria.json` v8 (`8f9e78d1…`, entries `t_level_boundary_flux` and `t_level_cumulative_flux`). Plan: [EXECUTION_PLAN_33.md](../EXECUTION_PLAN_33.md).
