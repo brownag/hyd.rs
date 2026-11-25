@@ -19,8 +19,8 @@ Branch: `feat/tlevel-head-end-flux` (stacked on `feat/met-run-path` at `c7c294c`
 | 1 | 33.1.1 ADR 0023 (`TLInf` reported form) | done | `ba96556` |
 | 1 | 33.1.2 runner `--tlevel` mode | done | `56b842a` |
 | 1 | 33.1.3 `TLInf` vT/vB port | done | `a8bc3fc` |
-| 2 | 33.2.1 `T_LEVEL.OUT` sidecar | pending | |
-| 2 | 33.2.2 reported fluxes in met trace; balance uses `src/` | pending | |
+| 2 | 33.2.1 `T_LEVEL.OUT` sidecar | done | `9d35728` |
+| 2 | 33.2.2 reported fluxes in met trace; balance uses `src/` | done | `7a1fec8` |
 | 3 | 33.3.1 structural checks and measurement report | pending | |
 | gate | G-1 user bounds approval | pending | |
 | 4 | 33.4.1 criteria v8, hash rebind, asserting tests | pending | |
@@ -28,6 +28,7 @@ Branch: `feat/tlevel-head-end-flux` (stacked on `feat/met-run-path` at `c7c294c`
 
 ## Orchestrator log
 - 2026-11-24: Wave 1 complete (`ba96556`, `56b842a`, `a8bc3fc`). Serial verification green: Rust 709 passed / 0 failed / 4 ignored, Python 515 OK, clippy/fmt clean.
+- 2026-11-24: Wave 2 complete (`9d35728`, `7a1fec8`, plus `661ec91` fixing `is_trajectory_fixture` to skip `_tlevel.json`). Serial verification green: Rust 709 passed / 0 failed / 4 ignored, Python 515 OK, clippy/fmt clean.
 
 ## Task reports
 
@@ -42,3 +43,13 @@ Branch: `feat/tlevel-head-end-flux` (stacked on `feat/met-run-path` at `c7c294c`
 ### 33.1.3
 - Status: done (`a8bc3fc`). Edited `crates/hydrus-core/src/heat/vapor/output.rs` (L235-652: `TLevelFluxInput`, `TLevelFluxes`, `t_level_fluxes`, `t_level_fluxes_for_step`, 5 unit tests). Targeted suite: 5 passed; clippy/fmt clean. No deviations.
 - Gotchas (33.2.2): `hydrus_core::heat::vapor::output::{TLevelFluxInput, TLevelFluxes, t_level_fluxes, t_level_fluxes_for_step}` is already public. `v_top` and `v_bot` are positive upward (out of soil at top, into soil at bottom).
+
+### 33.2.1
+- Status: done (`9d35728`). Created `reference/vapor_fortran/fixtures/vapor_met_bare_soil_on_tlevel.json` (SHA-256 `4f819abe86fe0cfd33b9b82e04f30da1bb2f78d8530560ce1ebc3079dbfff20b`). Verified exact match on `executable_sha256` (`87969711…`), `input_sha256`, `NOD_INF_V.OUT` (`a80e702f…`), 2400 rows, `t_level` 1..2400, last `time` = 240.0.
+- Deviations (user-approved Option A): `NOD_INF.OUT` (`ca49c9ff…`) is byte-identical to 31.2.1 (`22dc9a1c…`) modulo line 3 (HYDRUS wall-clock `Date: ... Time: ...`).
+- Gotchas (33.3.1): Pin `SIDECAR_SHA256 = "4f819abe86fe0cfd33b9b82e04f30da1bb2f78d8530560ce1ebc3079dbfff20b"`.
+
+### 33.2.2
+- Status: done (`7a1fec8`). Edited `crates/hydrus-core/tests/support/vapor_met.rs` (added `v_top_reported`, `v_bot_reported`, `v_top_liquid_reported`, `v_top_vapor_reported` to `StepTrace`) and `crates/hydrus-core/tests/vapor_met_balance.rs` (documented `net_vtop`). Byte-identity `cmp before.json after.json` passed (15 MB). Targeted tests: 5 + 3 passing; clippy/fmt clean.
+- Deviations (user-approved D-9 amendment, Option 1): kept `net_vtop` in `vapor_met_balance.rs` because `t_level_fluxes_for_step` uses post-heat-solve temperatures (matching Fortran `TLInf`), differing from water-solve `total_face_fluxes` (pre-heat-solve temperatures) by ~9.4e-6 cm/h.
+- Gotchas (33.3.1): `StepTrace` exposes `v_top_reported`, `v_bot_reported`, `v_top_liquid_reported`, `v_top_vapor_reported` (cm/h, positive upward).
