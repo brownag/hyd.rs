@@ -16,9 +16,9 @@ Branch: `feat/tlevel-head-end-flux` (stacked on `feat/met-run-path` at `c7c294c`
 
 | Wave | Task | Status | Commit(s) |
 | --- | --- | --- | --- |
-| 1 | 33.1.1 ADR 0023 (`TLInf` reported form) | pending | |
-| 1 | 33.1.2 runner `--tlevel` mode | pending | |
-| 1 | 33.1.3 `TLInf` vT/vB port | pending | |
+| 1 | 33.1.1 ADR 0023 (`TLInf` reported form) | done | `ba96556` |
+| 1 | 33.1.2 runner `--tlevel` mode | done | `56b842a` |
+| 1 | 33.1.3 `TLInf` vT/vB port | done | `a8bc3fc` |
 | 2 | 33.2.1 `T_LEVEL.OUT` sidecar | pending | |
 | 2 | 33.2.2 reported fluxes in met trace; balance uses `src/` | pending | |
 | 3 | 33.3.1 structural checks and measurement report | pending | |
@@ -27,5 +27,18 @@ Branch: `feat/tlevel-head-end-flux` (stacked on `feat/met-run-path` at `c7c294c`
 | 5 | 33.5.1 record G25 done | pending | |
 
 ## Orchestrator log
+- 2026-11-24: Wave 1 complete (`ba96556`, `56b842a`, `a8bc3fc`). Serial verification green: Rust 709 passed / 0 failed / 4 ignored, Python 515 OK, clippy/fmt clean.
 
 ## Task reports
+
+### 33.1.1
+- Status: done (`ba96556`). Created `docs/decisions/0023-report-end-boundary-fluxes-in-the-tlinf-output-form.md` (L1-57) and added README row (L27). Acceptance checks passed; no deviations.
+- Gotchas (33.5.1): G20 must decide whether `UpdateEnergy` (`HYDRUS.FOR:462`) reads `trial_v_top` or `TLInf` (`:530`).
+
+### 33.1.2
+- Status: done (`56b842a`). Edited `tools/run_vapor_reference.py` (`T_LEVEL_FORMAT_170`, `parse_t_level`, `--tlevel`, generalised sidecar guards, `<case>_tlevel.json` writer) and `tools/test_run_vapor_reference.py` (+11 tests). Targeted suite: 56 passed; full tools suite on main checkout: 515 OK. No deviations.
+- Gotchas (33.2.1): `parse_t_level` expects format-130 header, 278-char format-170 rows, and `end` marker; `run_case(..., tlevel=True)` refuses to overwrite an existing `_tlevel.json`.
+
+### 33.1.3
+- Status: done (`a8bc3fc`). Edited `crates/hydrus-core/src/heat/vapor/output.rs` (L235-652: `TLevelFluxInput`, `TLevelFluxes`, `t_level_fluxes`, `t_level_fluxes_for_step`, 5 unit tests). Targeted suite: 5 passed; clippy/fmt clean. No deviations.
+- Gotchas (33.2.2): `hydrus_core::heat::vapor::output::{TLevelFluxInput, TLevelFluxes, t_level_fluxes, t_level_fluxes_for_step}` is already public. `v_top` and `v_bot` are positive upward (out of soil at top, into soil at bottom).
