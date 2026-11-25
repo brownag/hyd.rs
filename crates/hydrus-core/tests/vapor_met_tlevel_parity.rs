@@ -21,7 +21,7 @@ use sha2::{Digest, Sha256};
 use vapor_met::{MetRun, RunOptions, StepTrace};
 
 const CRITERIA_SHA256: &str = "8f9e78d1a82a5910c1fc9c0a98ac61e899d0a247ba992b3b1e70d513582ab71f";
-const SIDECAR_SHA256: &str = "8052ceeb0df84c5271ac43c5f082a82be46acd9873928a56fb47ad7b01defaec";
+const SIDECAR_SHA256: &str = "09c7c89bd9fc1f0f17bf148c09f2acc97c784512ec6e4c55ac492c7db6d598a9";
 const SWITCH_TIMES: [f64; 3] = [42.7, 120.1, 200.3];
 
 fn ref_dir() -> PathBuf {
@@ -45,7 +45,8 @@ fn sha256_hex(path: &Path) -> String {
 fn read_json(path: &Path, compressed: bool) -> Value {
     let bytes = fs::read(path).unwrap_or_else(|e| panic!("read {}: {e}", path.display()));
     let payload = if compressed {
-        let script = "import gzip,sys; sys.stdout.buffer.write(gzip.decompress(sys.stdin.buffer.read()))";
+        let script =
+            "import gzip,sys; sys.stdout.buffer.write(gzip.decompress(sys.stdin.buffer.read()))";
         let mut child = Command::new("python3")
             .args(["-c", script])
             .stdin(Stdio::piped())
@@ -53,7 +54,9 @@ fn read_json(path: &Path, compressed: bool) -> Value {
             .spawn()
             .expect("python3 is required to decompress the pinned gzip fixture");
         child.stdin.take().unwrap().write_all(&bytes).unwrap();
-        let output = child.wait_with_output().expect("wait for gzip decompression");
+        let output = child
+            .wait_with_output()
+            .expect("wait for gzip decompression");
         assert!(
             output.status.success(),
             "gzip decompression failed: {}",

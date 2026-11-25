@@ -1,8 +1,9 @@
 # M6 Vapor G25: `T_LEVEL.OUT` Boundary-Flux Measurement Report
 
 - **Case:** `vapor_met_bare_soil_on` (2400 steps, constant `dt = 0.1 h`, `t = 0.1..240.0 h`, `KodTop` switches at `42.7`, `120.1`, `200.3 h`)
-- **Sidecar:** `reference/vapor_fortran/fixtures/vapor_met_bare_soil_on_tlevel.json`
-- **Pinned Sidecar SHA-256:** `4f819abe86fe0cfd33b9b82e04f30da1bb2f78d8530560ce1ebc3079dbfff20b`
+- **Sidecar:** `reference/vapor_fortran/fixtures/vapor_met_bare_soil_on_tlevel.json.gz` (gzip-compressed JSON; SHA-256 pins the compressed bytes)
+- **Original uncompressed sidecar SHA-256:** `4f819abe86fe0cfd33b9b82e04f30da1bb2f78d8530560ce1ebc3079dbfff20b` (historical artifact)
+- **Current compressed artifact SHA-256:** `09c7c89bd9fc1f0f17bf148c09f2acc97c784512ec6e4c55ac492c7db6d598a9` (deterministic gzip; all 2400 parsed rows and all 22 fields retained; duplicate `time_points` omitted)
 - **Rust implementation:** `hydrus_core::heat::vapor::output::t_level_fluxes_for_step` (Plan 33, task 33.1.3 `a8bc3fc`, wired in 33.2.2 `7a1fec8`)
 - **Measurement harness:** `crates/hydrus-core/tests/vapor_met_tlevel_parity.rs`
 - **Command:** `cargo test -p hydrus-core --release --test vapor_met_tlevel_parity -- --nocapture`
@@ -96,16 +97,16 @@ Notes:
 
 ## Bound Options for Gate G-1 (`criteria.json` v8)
 
-`criteria.json` `checks` entries use `{absolute, relative, scale, unit, assumptions}` with tolerance `tol = max(absolute, relative * |ref|)` (or `scale`-based floor). Because `vBot` and `sum_v_top` cross zero, an absolute floor is required alongside any relative term.
+`criteria.json` `checks` entries use `{absolute, relative, scale, unit, assumptions}` with tolerance `tol = absolute + relative * |ref|` (or `scale`-based floor). Because `vBot` and `sum_v_top` cross zero, an absolute floor is required alongside any relative term.
 
 ### Per-step boundary flux (`t_level_boundary_flux`, unit `cm/h`)
 Observed maxima: `max |ΔvTop| = 5.40e-7 cm/h`, `max |ΔvBot| = 1.11e-6 cm/h`, `e13.5` floor at peak = `5.0e-7 cm/h`.
 
 | Option | `absolute` (cm/h) | `relative` | `scale` | Pass margin (`vTop` / `vBot`) | Notes |
 | --- | ---: | ---: | --- | --- | --- |
-| **A (Tight)** | `2.0e-6` | `1.0e-4` | `ref_abs` | `3.7x` / `1.8x` | Close to observed `f32` cancellation in `vBot` at `t=0.5 h` (`1.11e-6`). |
-| **B (Balanced — Recommended)** | `5.0e-6` | `2.0e-4` | `ref_abs` | `9.3x` / `4.5x` | `10x` the `e13.5` print floor; cleanly separates `TLInf` (`1.11e-6`) from switching-form `v_top` (`8.01e-5`, fails by `16x`). |
-| **C (Conservative)** | `1.0e-5` | `5.0e-4` | `ref_abs` | `18.5x` / `9.0x` | Still rejects switching-form `v_top` (`8.01e-5`, fails by `8x`) with wider headroom. |
+| **A (Tight)** | `2.0e-6` | `1.0e-4` | `ref_abs` | `5.7x` / `2.6x` | Close to observed `f32` cancellation in `vBot` at `t=0.5 h` (`1.11e-6`). |
+| **B (Balanced — Recommended)** | `5.0e-6` | `2.0e-4` | `ref_abs` | `13.2x` / `6.1x` | `10x` the `e13.5` print floor; cleanly separates `TLInf` (`1.11e-6`) from switching-form `v_top` (`8.01e-5`, fails by `3.4x`). |
+| **C (Conservative)** | `1.0e-5` | `5.0e-4` | `ref_abs` | `28.3x` / `13.0x` | Still rejects switching-form `v_top` (`8.01e-5`, fails by `1.4x`) with wider headroom. |
 
 ### Cumulative boundary flux (`t_level_cumulative_flux`, unit `cm`)
 Observed maxima: `max |Δsum_v_top| = 5.39e-5 cm` (final `2.55e-5 cm`, `e13.5` floor `5.0e-5 cm`), `max |Δsum_v_bot| = 8.25e-6 cm` (final `1.06e-7 cm`, `e13.5` floor `5.0e-6 cm`).

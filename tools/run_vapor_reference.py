@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import gzip
 import hashlib
+import io
 import json
 import math
 import re
@@ -66,6 +67,13 @@ T_LEVEL_ROW_WIDTH = 278
 
 def sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def deterministic_gzip(payload: bytes) -> bytes:
+    output = io.BytesIO()
+    with gzip.GzipFile(fileobj=output, mode="wb", filename="", mtime=0) as stream:
+        stream.write(payload)
+    return output.getvalue()
 
 
 def finite_number(text: str, label: str) -> float:
@@ -454,7 +462,7 @@ def run_case(case_id: str, task_base: Path, build_dir: Path, timeout: int | None
         }
         tlevel_path.parent.mkdir(parents=True, exist_ok=True)
         payload = (json.dumps(tlevel_record, indent=2, sort_keys=True) + "\n").encode()
-        tlevel_path.write_bytes(gzip.compress(payload, mtime=0))
+        tlevel_path.write_bytes(deterministic_gzip(payload))
     if produce_tlevel and not produce_balance:
         return tlevel_path
     return balance_path if (produce_balance and output_path.exists()) else output_path

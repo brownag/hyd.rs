@@ -622,6 +622,7 @@ class TLevelRunnerIntegrationTests(unittest.TestCase):
                 self.assertEqual(existing_fixture.read_text(), '{"existing": true}\n')
                 import gzip
                 tl = json.loads(gzip.decompress(out.read_bytes()))
+                self.assertEqual(out.read_bytes(), vapor.deterministic_gzip(gzip.decompress(out.read_bytes())))
                 self.assertEqual(tl["schema_version"], 1)
                 self.assertEqual(tl["case_id"], "vapor_met_bare_soil_on")
                 self.assertTrue(tl["source_matched"])
