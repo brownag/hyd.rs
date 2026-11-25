@@ -1,53 +1,59 @@
 # Project Goals (`planning/GOALS.md`)
 
-Last Updated: 2026-11-23
+Last Updated: 2026-11-24
 Source State: [STATE_31.md](STATE_31.md) (plan [EXECUTION_PLAN_31.md](EXECUTION_PLAN_31.md))
 
-Magic Wand refresh (2026-11-22, user-approved): extra ranking criteria are retire Fortran risk early, land on main soon, and minimize gate load. G22.3 is split into M1 to M7, which map to Plan 31 tasks. M2 (the `Meteo.in` reader) is new: the G22.3 contract names `meteo::config::MeteoConfig` and `meteo::series::MeteoRecord`, but no Plan 31 task owned them.
+Magic Wand refresh (2026-11-24, user-approved): ranking criteria unchanged (retire Fortran risk early, land on main soon, minimize gate load). Circle is one root goal plus an orthogonal no-code cleanup track. G24 is complete (PR #1, `3f328fc`). New candidates: G28 (Picard switching deviation, folded into G26), G29 (hysteresis, roadmap M7) and G30 (input deck and CLI, roadmap M10).
+
+Dependency graph: `G26 -> [G25, G20, G30]`, `G28 -> [G26]` (folded in as G26 step 1), `G25 -> [G20]` (soft). G22.2-C7, G27 and G29 have no dependencies.
 
 ## Circled Goal (Active)
 
-- None selected (2026-11-23). G22.2 and G22.3 closed in orchestration 31. Candidates for the next circle: G24 (merge to `main`), G20 (energy balance; its trigger is now met), G26 (met run path in `src/`), G25 (solved head-end boundary fluxes). Run Magic Wand to select.
+- **[G26]** A production met run path exists in `src/`. A met-driven vapor water-heat run reads `Meteo.in`, sets the top temperature per record to (TMax+TMin)/2 in f32 (`TIME.FOR:519`) and calls `advance_atmospheric_step_vapor` (`atmospheric.rs:523`). It owns the KodTop and fixed-head switching. `tests/support/vapor_met.rs` (785 lines) is reduced to case wiring.
+  - Why now: it unblocks G25 (solved head-end fluxes belong in the `src/` driver), G20 (energy balance builds on a supported met path) and G30 (needs a production run path to call). It moves parity-proven logic from test-only code into a supported path. No criteria or fixture edits.
+  - Exit criteria: `vapor_met_parity` and `vapor_met_balance` pass through the `src/` path with tolerances and criteria hashes unchanged. The D-10 switching deviation (G28) is decided and recorded as an ADR. The full AGENTS.md suites are green.
+  - Scope: `src/atmospheric.rs`, `src/meteo/{config,series}.rs`, `src/heat/driver.rs`, `src/lib.rs`, `tests/support/vapor_met.rs`, `tests/vapor_met_{parity,balance}.rs`, `docs/decisions/`. Out of scope: G25, G20, `criteria.json`.
+  - Critical path: (1) G28 decision and ADR; (2) public met-run API (config, series iterator, per-record `VaporConfig`); (3) move predictor/commit, switching and per-record temperature logic from test support into `src/`; (4) point both met tests at `src/` and confirm parity and balance are unchanged; (5) reduce the driver to wiring and run the full suites.
+  - First action: read the 31.4.1 report and `tests/support/vapor_met.rs:262-520` (`run_met_case`) to list what moves and to gather the facts for D-10.
+
+- **[G22.2-C7]** (parallel, no code) Cleanup. The `planning/STATE_29.md` rows for 29.3.3 and 29.4.x are corrected from pending. About 90 stale worktrees (`git worktree list`, 91 lines on 2026-11-24) and unmerged `docs/master-plan-*` and other task branches are resolved after each is checked for unmerged work. The failed-trial output in `.development/29.4.1/runs/B` (1.5 GB) and `.development/29.3.3/quarantine/` (16 KB) are removed.
+  - Why now: touches no code, so it is orthogonal to G26. It cuts noise for future orchestrations.
+  - Gate: a read-only report comes first. Any `rm`, `git worktree remove` or branch deletion needs explicit user approval.
 
 ## Sequenced Goals (Dependency DAG)
 
-- **[G20]** Energy balance (`lEnBal`, `UpdateEnergy`, surface energy terms `Evap`, `Rn`, `Rns`, `Rnl`) is added to the coupled capability with its own contract, fixtures and acceptance gate.
-  - Status: radiation (`Rn`, `Rns`, `Rnl`) ported in Plan 31 (31.2.2, `b7acedf`) per D-4. Trigger met 2026-11-23 (G22.3 accepted). Next step: contract and reprioritize the energy update as its own orchestration.
-  - Depends on: G22.3 (done), G26 (soft; a `src/` met run path).
-
-## Independent Backlog
+- **[G28]** The Picard switching deviation (D-10) is decided and documented. Fortran switches the top mode inside the Picard loop (2 iterations or fewer per step). Rust re-solves the whole step on a mode change and reaches 6-7 Picard iterations per pass at the rain record. Either Rust matches the in-loop switch or the deviation is recorded in an ADR with evidence that parity is unaffected.
+  - Depends on: none. Folded into G26 as critical-path step 1, so the `src/` path encodes the decided structure.
 
 - **[G25]** The water solver reports solved boundary fluxes at head-type ends (top head mode, fixed-head bottom), and the Rust vTop/vBot match the pinned Fortran `T_LEVEL.OUT` vTop/vBot for `vapor_met_bare_soil_on`.
-  - Why: found in 31.4.2 (2026-11-23). `upper_for` (`atmospheric.rs:486`) and the met driver's FixedHead pass flux 0.0, so `total_face_fluxes` at those ends is a 0.0 fallback, not a solved flux (`water_solver.rs:584-586`). The met balance checks those ends only as interior conservation (vTop form). User decision: split check now, this follow-up later.
+  - Why: found in 31.4.2 (2026-11-23). `upper_for` (`atmospheric.rs:484`) and the met driver's FixedHead pass flux 0.0, so `total_face_fluxes` at those ends is a 0.0 fallback, not a solved flux (`water_solver.rs:584-586`). The met balance checks those ends only as interior conservation (vTop form).
   - Gate: edits `water_solver.rs`, and adding `T_LEVEL.OUT` to the fixture is a runner change (same gate class as G22.2-C4).
+  - Depends on: G26.
 
-- **[G26]** A production met run path exists in `src/`. The vapor water-heat driver has an atmospheric entry around `advance_atmospheric_step_vapor`, and with `lMeteo` the per-record top temperature is (TMax+TMin)/2 in f32 (`TIME.FOR:519`). Today both live only in `tests/support/vapor_met.rs` (31.4.1 Discovered).
-  - Exit: `vapor_met_parity` passes through the `src/` path, with the test driver reduced to wiring.
+- **[G20]** Energy balance (`lEnBal`, `UpdateEnergy`, surface energy terms `Evap`, `Rn`, `Rns`, `Rnl`) is added to the coupled capability with its own contract, fixtures and acceptance gate.
+  - Status: radiation (`Rn`, `Rns`, `Rnl`) ported in Plan 31 (31.2.2, `b7acedf`) per D-4. Trigger met 2026-11-23 (G22.3 accepted).
+  - Depends on: G26; G25 (soft, so the balance checks use solved boundary fluxes).
+
+- **[G30]** A legacy input-deck reader and CLI run a supported HYDRUS case end to end from its input files (roadmap M10 groundwork). Start with the met vapor case and the M4 water cases.
+  - Depends on: G26.
+
+## Independent Backlog
 
 - **[G27]** A met discrimination entry (vapor fields nonzero for `vapor_met_bare_soil_on`) is approved and added to `criteria.json`.
   - Gate: D-9. A user-approved criteria edit and the hash-pin updates (as in 31.2.3).
 
-- **[G24]** `feat/vapor-flux-fixedhead` is merged into `main` with the full AGENTS.md suites green. At 2026-11-23 it is 47 commits ahead of `main` and 0 behind: G22.2 closure, G22.3 (meteorology, evaporation, radiation, vapor atmospheric switching, met parity and balance).
-  - Why: scores on "land on main soon"; one approval, no dependency. Can run in parallel with M1.
-  - Gate: user approval before the merge.
-
-- **[G7]** Superseded by [G22.2-C6], which carries the same free-drainage end-row assessment inside G22.2.
-  - Status: merged into G22.2-C6. Kept for history.
-
-- **[G22.2-C7]** Cleanup: the `planning/STATE_29.md` wave-board rows for 29.3.3 and 29.4.x are updated from pending; the untracked failed-trial output in `.development/29.4.1/runs/B` (about 1.5 GB) and the quarantined partial fixture at `.development/29.3.3/quarantine/` are removed with user approval. Added 2026-11-22: about 100 stale worktrees from plans 1 to 31 (`git worktree list`), pruned after checking each for unmerged work.
-  - Why now: hygiene only; low leverage.
-  - Gate: deletion needs explicit user approval before any `rm`.
-  - Depends on: none.
-
-- **[G22.5]** Enhancement off (`iEnhanc=0`) evidence strategy decided and implemented. The kernel harness can select it; the full executable cannot via input.
-  - Trigger to promote: a user decision on the evidence strategy.
-
-- **[G22.6]** Campbell (`iCampbell=1`) vapor path: resolve SD-006 policy, add discriminating fixtures, no silent source correction.
-  - Trigger to promote: SD-006 policy decision by the user.
+- **[G29]** Hysteresis (roadmap M7, Lenhard) is contracted and implemented with rollback-safe reversal state and drainage/imbibition fixtures.
+  - Why backlog: large new capability, orthogonal to the met and energy chain. Its entry evidence (M4 rollback and history contract) already exists.
 
 - **[G10]** Investigate the Robin refinement anomaly only if a real supported-use case shows it could change a decision; the current finding is nonblocking.
 
 ## Deferred
+
+- **[G22.5]** Enhancement off (`iEnhanc=0`) evidence strategy decided and implemented. The kernel harness can select it; the full executable cannot via input.
+  - Trigger: a user decision on the evidence strategy.
+
+- **[G22.6]** Campbell (`iCampbell=1`) vapor path: resolve SD-006 policy, add discriminating fixtures, no silent source correction.
+  - Trigger: SD-006 policy decision by the user.
 
 - **[G23]** Temperature-dependent liquid-water coupling (`lWDep` / `lWTDep`, including `ConLT` in water flux and liquid material temperature adjustments) is separately contracted, implemented and validated when selected.
   - Trigger: separate user scope approval. Remains rejected in orchestration 25; not conflated with vapor's thermal-gradient terms or G20 energy balance.
@@ -56,6 +62,9 @@ Magic Wand refresh (2026-11-22, user-approved): extra ranking criteria are retir
   - Trigger: only if a real supported-use case needs a stronger temporal claim or an observed timestep effect could change a decision.
 
 ## Completed
+
+- **[G24]** `feat/vapor-flux-fixedhead` is merged into `main`.
+  - Result (2026-11-24 check): merged as PR #1 (`3f328fc`); `main` contains G22.2 closure and G22.3.
 
 - **[G22.3]** Atmospheric water switching is implemented with vapor, with its meteorological and evaporation prerequisites contracted.
   - Result (2026-11-23): **accepted with exceptions** (user decision). Bare soil, daily `Meteo.in`, fixed-head lower, vapor on. Parity `vapor_met_parity` (D-10 gate: 12 fields within the unchanged bounds, switches on the Fortran steps) and balance `vapor_met_balance` (precedent tolerance on all 2400 steps). Exceptions: head-end boundary flux checked as interior conservation only (G25), met run path only in the test driver (G26), no met discrimination entry (G27). Record: [M6_VAPOR_G22_3_ACCEPTANCE.md](master/M6_VAPOR_G22_3_ACCEPTANCE.md). Sub-goals M1 to M7 were Plan 31 tasks 31.2.1, 31.3.1 to 31.3.3, 31.4.1, 31.4.2 and 31.5.1.
@@ -104,3 +113,6 @@ Magic Wand refresh (2026-11-22, user-approved): extra ranking criteria are retir
 - **[G22 umbrella]** Retained as the parent of G22.1–G22.6 in the coverage matrix; not a single executable goal.
   - Status: Parent
   - Reason: Completion rule and matrix live in [M6_VAPOR_COVERAGE.md](master/M6_VAPOR_COVERAGE.md).
+- **[G7]** Free-drainage end-row assessment.
+  - Status: Pruned
+  - Reason: superseded by G22.2-C6, which carried the same assessment inside G22.2 (closed 2026-11-23).
