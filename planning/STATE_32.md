@@ -69,3 +69,10 @@ Branch: `feat/met-run-path` (from `main` `3f328fc`). Tracked planning (D-5).
 - Tests: `cargo test -p hydrus-core --release --test vapor_met_parity --test vapor_met_balance`: 5 + 3 pass. Spec grep empty; reference/parity/balance diff clean; fmt and `clippy --workspace --all-targets -D warnings` clean.
 - Deviations: none.
 - Gotchas for 32.3.1: `AtmosphericRecord` has only `t_atm` and `precipitation`. The driver is built once with `top_temperatures[0]`, and `step_atmospheric` swaps in the per-step value. The caller keeps the hCritA assert and moves `water`/`workspace` in place.
+
+## 32.3.1
+- Status: done. Docs only. Plan approved with amendments (Circled bullet per 30a96ed; G26/G28 placed above G24 in Completed; G31 in Deferred; line 8 updated; no wave-board edit by worker).
+- Files: `planning/GOALS.md`, `planning/master/M6_VAPOR_G22_3_ACCEPTANCE.md` (dated update section), `planning/master/M6_VAPOR_COVERAGE.md` (row 34), `planning/tasks/32.3.1.todo.md`.
+- Commits: plan `c430403`; GOALS and M6 docs `7a9321b`; report `d679497`.
+- Acceptance: `grep -n "G31" planning/GOALS.md` matches (line 56). `git diff --quiet -- crates/ reference/` clean.
+- Deviations: none.
