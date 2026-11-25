@@ -23,13 +23,14 @@ Branch: `feat/tlevel-head-end-flux` (stacked on `feat/met-run-path` at `c7c294c`
 | 2 | 33.2.2 reported fluxes in met trace; balance uses `src/` | done | `7a1fec8` |
 | 3 | 33.3.1 structural checks and measurement report | done | `b72d5a7`, `0486164` |
 | gate | G-1 user bounds approval | done | D-13 (Option B) |
-| 4 | 33.4.1 criteria v8, hash rebind, asserting tests | pending | |
+| 4 | 33.4.1 criteria v8, hash rebind, asserting tests | done | `30423f3` |
 | 5 | 33.5.1 record G25 done | pending | |
 
 ## Orchestrator log
 - 2026-11-24: Wave 1 complete (`ba96556`, `56b842a`, `a8bc3fc`). Serial verification green: Rust 709 passed / 0 failed / 4 ignored, Python 515 OK, clippy/fmt clean.
 - 2026-11-24: Wave 2 complete (`9d35728`, `7a1fec8`, plus `661ec91` fixing `is_trajectory_fixture` to skip `_tlevel.json`). Serial verification green: Rust 709 passed / 0 failed / 4 ignored, Python 515 OK, clippy/fmt clean.
 - 2026-11-24: Wave 3 complete (`b72d5a7`, `0486164`). Targeted parity test 2 passed, clippy/fmt clean. Stopped at hard Gate G-1 for user bounds approval.
+- 2026-11-24: Gate G-1 approved (Option B, D-13, `254650b`). Wave 4 complete (`30423f3`, `CRITERIA_SHA256 = 8f9e78d1…`). Serial verification green: Rust 713 passed / 0 failed / 4 ignored, Python 515 OK, clippy/fmt clean.
 
 ## Task reports
 
@@ -58,3 +59,7 @@ Branch: `feat/tlevel-head-end-flux` (stacked on `feat/met-run-path` at `c7c294c`
 ### 33.3.1
 - Status: done (`b72d5a7`, `0486164`). Created `crates/hydrus-core/tests/vapor_met_tlevel_parity.rs` and `planning/master/M6_VAPOR_G25_TLEVEL_MEASUREMENT.md`. Targeted test: 2 passed; clippy/fmt clean. No deviations.
 - Key measurements: 2400/2400 sign agreement (positive upward); `max |ΔvTop| = 5.40e-7 cm/h` (`1.59x` `e13.5` floor), `max |ΔvBot| = 1.11e-6 cm/h`; cumulative `max |Δsum_v_top| = 5.39e-5 cm` (final `2.55e-5`), `max |Δsum_v_bot| = 8.25e-6 cm` (final `1.06e-7`). Recommended Option B bounds await Gate G-1 approval.
+
+### 33.4.1
+- Status: done (`30423f3`). Added `t_level_boundary_flux` and `t_level_cumulative_flux` (v8, Option B) to `reference/vapor_fortran/criteria.json` (new `CRITERIA_SHA256 = 8f9e78d1a82a5910c1fc9c0a98ac61e899d0a247ba992b3b1e70d513582ab71f`), rebound all 5 pin files, and added asserting per-step and cumulative tests to `vapor_met_tlevel_parity.rs` (4 passed). Targeted 6 parity suites: 41 passed, 0 failed, 2 ignored; Python: 515 OK; `b03047a6` absent from `crates/`; clippy/fmt clean. No deviations.
+- Discovered (33.5.1): `planning/master/M6_VAPOR_G22_3_ACCEPTANCE.md` cites old criteria hash `b03047a6`.
