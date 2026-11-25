@@ -55,3 +55,12 @@ Branch: `feat/met-run-path` (from `main` `3f328fc`). Tracked planning (D-5).
   - `heat_input.top_temperature` must equal the `top_temperature` argument.
   - The report carries `step`, `state`, `switches: Vec<(pass, record)>` and `below_critical_head`.
 
+
+## 32.2.1
+- Status: done. Code commit `a6c2ee4`.
+- Files: `crates/hydrus-core/tests/support/vapor_met.rs` only (forcing, driver build, step loop and imports rewritten; module doc updated; predictors and heat closure removed).
+- Dump: scratch test (deleted) wrote the full MetRun (all fields via `{:?}`, whole `StepTrace` Debug, kod_changes). Before was deterministic across two runs.
+- `cmp .development/32.2.1/before.json .development/32.2.1/after.json`: identical (16391862 bytes).
+- Tests: `cargo test -p hydrus-core --release --test vapor_met_parity --test vapor_met_balance`: 5 + 3 pass. Spec grep empty; reference/parity/balance diff clean; fmt and `clippy --workspace --all-targets -D warnings` clean.
+- Deviations: none.
+- Gotchas for 32.3.1: `AtmosphericRecord` has only `t_atm` and `precipitation`. The driver is built once with `top_temperatures[0]`, and `step_atmospheric` swaps in the per-step value. The caller keeps the hCritA assert and moves `water`/`workspace` in place.
