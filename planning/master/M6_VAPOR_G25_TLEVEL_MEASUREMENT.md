@@ -114,9 +114,9 @@ Observed maxima: `max |Δsum_v_top| = 5.39e-5 cm` (final `2.55e-5 cm`, `e13.5` f
 
 | Option | `absolute` (cm) | `relative` | `scale` | Pass margin (`sum_v_top` / `sum_v_bot`) | Notes |
 | --- | ---: | ---: | --- | --- | --- |
-| **A (Tight)** | `1.0e-4` | `1.0e-4` | `ref_abs` | `1.9x` / `12.1x` | Only `2x` the `e13.5` print floor (`5.0e-5 cm`). |
-| **B (Balanced — Recommended)** | `2.5e-4` | `2.0e-4` | `ref_abs` | `4.6x` / `30.3x` | `5x` the `e13.5` print floor; catches ~0.02% cumulative drift. |
-| **C (Conservative)** | `5.0e-4` | `5.0e-4` | `ref_abs` | `9.3x` / `60.6x` | `10x` the `e13.5` print floor. |
+| **A (Tight)** | `1.0e-4` | `1.0e-4` | `ref_abs` | `4.0x` / `17.1x` | Only `2x` the `e13.5` print floor (`5.0e-5 cm`). |
+| **B (Balanced — Recommended)** | `2.5e-4` | `2.0e-4` | `ref_abs` | `8.9x` / `40.2x` | `5x` the `e13.5` print floor; catches ~0.02% cumulative drift. |
+| **C (Conservative)** | `5.0e-4` | `5.0e-4` | `ref_abs` | `19.8x` / `85.4x` | `10x` the `e13.5` print floor. |
 
 **Recommendation:** Adopt **Option B** for both checks (`t_level_boundary_flux`: `absolute = 5.0e-6 cm/h`, `relative = 2.0e-4`, `scale = "ref_abs"`; `t_level_cumulative_flux`: `absolute = 2.5e-4 cm`, `relative = 2.0e-4`, `scale = "ref_abs"`). Both give comfortable headroom above the `e13.5` print floor and Fortran `f32` cancellation while decisively rejecting the switching-form `v_top` omission (`8.01e-5 cm/h`).
 
