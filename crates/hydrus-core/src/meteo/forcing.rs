@@ -137,7 +137,7 @@ impl MetForcing {
         let mut records = Vec::with_capacity(meteo.len());
         let mut top_temperatures = Vec::with_capacity(meteo.len());
         for (index, (a, m)) in atmosphere.iter().zip(meteo).enumerate() {
-            if f64::from(m.t_atm_h) != a.t_atm {
+            if !m.t_atm_h.is_finite() || m.t_atm_h != a.t_atm as f32 {
                 return Err(MetForcingError::TAtmMismatch {
                     index,
                     meteo: f64::from(m.t_atm_h),
@@ -348,6 +348,29 @@ mod tests {
             Err(MetForcingError::TAtmMismatch { index: 2, .. }) => {}
             other => panic!("unexpected {other:?}"),
         }
+    }
+
+    #[test]
+    fn decimal_t_atm_endpoints_pair_across_f32_and_f64() {
+        let (config, mut meteo, atm) = decks();
+        meteo.truncate(3);
+        let mut a = records(&atm[..3]);
+        for (i, t) in [0.1_f64, 0.2_f64, 0.3_f64].into_iter().enumerate() {
+            meteo[i].t_atm_h = t as f32;
+            a[i].t_atm = t;
+        }
+        let forcing = MetForcing::new(&config, &meteo, &a, X_CONV, T_CONV).unwrap();
+        assert_eq!(forcing.records().len(), 3);
+        assert_eq!(forcing.records()[0].0, 0.1_f64);
+        assert_eq!(forcing.records()[1].0, 0.2_f64);
+        assert_eq!(forcing.records()[2].0, 0.3_f64);
+
+        // Genuinely different decimal endpoint is still rejected.
+        a[1].t_atm = 0.2001_f64;
+        assert!(matches!(
+            MetForcing::new(&config, &meteo, &a, X_CONV, T_CONV),
+            Err(MetForcingError::TAtmMismatch { index: 1, .. })
+        ));
     }
 
     #[test]
