@@ -1,44 +1,37 @@
 //! Reusable met-run driver for the vapor + Meteo.in case family (`vapor_met_bare_soil_on`).
 //!
-//! Included by tests with `#[path = "support/vapor_met.rs"] mod vapor_met;`. It rebuilds the
-//! run only from the committed deck (`SELECTOR.IN`, `PROFILE.DAT`, `ATMOSPH.IN`, `Meteo.in`):
-//! `Meteo.in` records -> bare-soil ET (`meteo::calculate_bare_soil_et`) -> forcing schedule ->
-//! `advance_atmospheric_step_vapor` (the D-10 Flux/Head decomposition) for each water pass, with
-//! the source-ordered two-pass heat coupling of `VaporWaterHeatDriver::step` (`HYDRUS.FOR:399-403`)
-//! re-composed here because that driver has no atmospheric entry point. Pass two starts from
-//! the top-boundary memory left by pass one, as Fortran iteration two does. No `src/` code is
-//! modified.
+//! Included by tests with `#[path = "support/vapor_met.rs"] mod vapor_met;`. The run path is
+//! `src/`: `MetForcing` turns the `Meteo.in` and `ATMOSPH.IN` records into the forcing schedule
+//! and top temperatures, and `VaporWaterHeatDriver::step_atmospheric` runs each step (two
+//! source-ordered water/heat passes and the commit). This file is wiring: it parses the committed
+//! deck (`SELECTOR.IN`, `PROFILE.DAT`, `ATMOSPH.IN`, `Meteo.in`), applies `RunOptions`, walks the
+//! k/10 time grid, samples print times and builds the `StepTrace` records from the step report.
 #![allow(dead_code)]
 
 use std::{collections::BTreeMap, fs, path::PathBuf};
 
-use hydrus_core::atmospheric::{
-    advance_atmospheric_step_vapor, VaporAtmosphericState, VaporSwitchRecord,
-};
+use hydrus_core::atmospheric::{VaporAtmosphericState, VaporSwitchRecord};
 use hydrus_core::forcing::VaporAtmosphericCoupling;
 use hydrus_core::heat::capacity::TempMaterial;
 use hydrus_core::heat::config::HeatConfigInput;
-use hydrus_core::heat::transport::{solve_vapor_heat_transport, HeatTransportInput};
-use hydrus_core::heat::vapor::adjust::VaporHeatAdjustmentInput;
-use hydrus_core::heat::vapor::driver::{VaporPassReport, VaporStepReport};
+use hydrus_core::heat::driver::CoupledHeatInput;
+use hydrus_core::heat::vapor::driver::VaporWaterHeatDriver;
 use hydrus_core::heat::vapor::kernels;
-use hydrus_core::heat::vapor::output::{observe_step, observe_vapor, VaporObservationInput};
-use hydrus_core::heat::vapor::state::{VaporState, VaporStateInput};
+use hydrus_core::heat::vapor::output::{
+    observe_step, observe_vapor, t_level_fluxes_for_step, VaporObservationInput,
+};
+use hydrus_core::heat::vapor::state::VaporStateInput;
 use hydrus_core::heat::vapor::{
-    VaporConfig, VaporConfigInput, VaporPrimitiveInput, VaporSourceMaterial, VaporWaterContext,
-    VaporWaterTrial,
+    VaporConfig, VaporConfigInput, VaporPrimitiveInput, VaporSourceMaterial,
 };
 use hydrus_core::hydraulics::{
     BoundaryRow, Evaluation, FaceAveraging, HydraulicDerivatives, HydraulicModel, HydraulicTables,
     Mesh1D, UnitSymbol, VanGenuchtenModel, VanGenuchtenParameters,
 };
-use hydrus_core::meteo::evaporation::{calculate_bare_soil_et, EvaporationInput, MeteoSite};
-use hydrus_core::meteo::{
-    parse_meteo_deck, RadiationDailyInput, RadiationMode, RelativeHumidityMode, SunshineMode,
-};
+use hydrus_core::meteo::parse_meteo_deck;
 use hydrus_core::{
-    AtmosphericRates, ForcingEvent, ForcingSchedule, ForcingUnits, HydraulicError,
-    LowerBoundaryMode, UpperBoundary, WaterState, WaterStepInput, WaterStepPolicy, WaterWorkspace,
+    AtmosphericRates, AtmosphericRecord, ForcingUnits, HydraulicError, LowerBoundaryMode,
+    MetForcing, UpperBoundary, WaterState, WaterStepInput, WaterStepPolicy, WaterWorkspace,
 };
 
 pub const X_CONV: f64 = 100.0;
@@ -102,6 +95,11 @@ pub struct StepTrace {
     pub liquid_contents_new: Vec<f64>,
     pub vapor_contents_old: Vec<f64>,
     pub vapor_contents_new: Vec<f64>,
+    /// Reported `TLInf` boundary fluxes (`OUTPUT.FOR:25-54`), positive upward (cm/h).
+    pub v_top_reported: f64,
+    pub v_bot_reported: f64,
+    pub v_top_liquid_reported: f64,
+    pub v_top_vapor_reported: f64,
 }
 
 /// A change of `KodTop` between consecutive accepted steps.
@@ -203,32 +201,6 @@ fn rev(values: &[f64]) -> Vec<f64> {
 
 fn err<E: std::fmt::Debug>(context: &str) -> impl Fn(E) -> String + '_ {
     move |e| format!("{context}: {e:?}")
-}
-
-fn next_predictor(heads: &[f64], stored: &[f64], dt: f64, previous: f64) -> Vec<f64> {
-    heads
-        .iter()
-        .zip(stored)
-        .map(|(&h, &p)| h + (p - h) * dt / previous)
-        .collect()
-}
-
-/// Unit-ratio predictor stored at commit (driver convention, `HYDRUS.FOR:650-662`).
-fn commit_predictor(heads: &[f64], old: &[f64], bottom_fixed: bool, top_fixed: bool) -> Vec<f64> {
-    let first = usize::from(bottom_fixed);
-    let end = heads.len() - usize::from(top_fixed);
-    heads
-        .iter()
-        .zip(old)
-        .enumerate()
-        .map(|(i, (&h, &h_old))| {
-            if i >= first && i < end && h < 0.0 && h_old < 0.0 {
-                h + (h - h_old)
-            } else {
-                h
-            }
-        })
-        .collect()
 }
 
 fn vapor_rows(
@@ -346,63 +318,25 @@ pub fn run_met_case(options: RunOptions) -> Result<MetRun, String> {
         parse_meteo_deck(&meteo_text, "Meteo.in").map_err(err("Meteo.in"))?;
     assert_eq!(atm.len(), meteo_records.len(), "records per file");
 
-    // SetMeteo conversion: rSoil = EvapP*rConv/TTConv, rConv = 0.001*xConv, TTConv = 86400*tConv.
-    let r_conv = 0.001 * X_CONV;
-    let tt_conv = 86400.0 * T_CONV;
-    let site = MeteoSite {
-        latitude: meteo_config.latitude,
-        altitude: meteo_config.altitude,
-        wind_height: meteo_config.wind_height,
-        temp_height: meteo_config.temp_height,
-    };
-    let mut records = Vec::new();
-    for (a, m) in atm.iter().zip(&meteo_records) {
-        assert_eq!(f64::from(m.t_atm_h), a[0], "tAtm must agree in both decks");
+    for a in &atm {
         assert_eq!(a[4].abs(), -h_crit_a, "one hCritA for the run");
-        let result = calculate_bare_soil_et(
-            &site,
-            &EvaporationInput {
-                radiation: RadiationDailyInput {
-                    day_no: (a[0] / tt_conv) as f32,
-                    radiation_input: m.rad,
-                    t_max: m.t_max,
-                    t_min: m.t_min,
-                    rh_input: m.rh_mean,
-                    sun_hours: m.sun_hours,
-                    radiation_mode: RadiationMode::SolarRadiationInput,
-                    sunshine_mode: SunshineMode::SunshineHours,
-                    rel_hum_mode: RelativeHumidityMode::RelativeHumidityPercent,
-                },
-                wind_km_d: m.wind_km_d,
-            },
-            &meteo_config.radiation,
-        )
-        .map_err(err("evaporation"))?;
-        records.push((
-            a[0],
-            AtmosphericRates {
-                precipitation: a[1].abs(),
-                evaporation: f64::from(result.evap_p) * r_conv / tt_conv,
-            },
-        ));
     }
-    // Each record applies to the interval ending at its tAtm.
-    let events: Vec<ForcingEvent> = records
-        .windows(2)
-        .map(|w| ForcingEvent {
-            time: w[0].0,
-            rates: w[1].1,
+    let atm_records: Vec<AtmosphericRecord> = atm
+        .iter()
+        .map(|a| AtmosphericRecord {
+            t_atm: a[0],
+            precipitation: a[1],
         })
         .collect();
-    let schedule = ForcingSchedule::new(
-        records[0].1,
-        events,
-        ForcingUnits {
+    let forcing = MetForcing::new(&meteo_config, &meteo_records, &atm_records, X_CONV, T_CONV)
+        .map_err(err("forcing"))?;
+    let records = forcing.records().to_vec();
+    let schedule = forcing
+        .schedule(ForcingUnits {
             time: "h",
             water_depth_rate: "cm/h",
-        },
-    )
-    .map_err(err("schedule"))?;
+        })
+        .map_err(err("schedule"))?;
 
     let analytic = VanGenuchtenModel::new(
         VanGenuchtenParameters::new(vg[0], vg[1], vg[2], vg[3], vg[4]).map_err(err("vg"))?,
@@ -446,29 +380,24 @@ pub fn run_met_case(options: RunOptions) -> Result<MetRun, String> {
     };
     let t_bot = bc[3];
     // `SetMeteo` receives `tTop` in its `TAver` slot (`HYDRUS.FOR:592-612` -> `TIME.FOR:519`), so
-    // with lMeteo the Dirichlet top temperature is the record's `(TMax+TMin)/2` (single
-    // precision), held over the record's interval, like rSoil.
-    let mut configs = Vec::new();
-    for m in &meteo_records {
-        let t_top_record = f64::from((m.t_max + m.t_min) / 2.0_f32);
-        configs.push(
-            VaporConfig::new(VaporConfigInput {
-                heat: heat_input,
-                water_enabled: true,
-                heat_enabled: true,
-                i_enhanc: 1,
-                hysteresis: 0,
-                chemistry: false,
-                density_coupling: false,
-                centrifugal: false,
-                top_temperature: t_top_record,
-                bottom_temperature: t_bot,
-                x_conv: X_CONV,
-                t_conv: T_CONV,
-            })
-            .map_err(err("vapor config"))?,
-        );
-    }
+    // with lMeteo the Dirichlet top temperature is the record's `(TMax+TMin)/2`, held over the
+    // record's interval (`MetForcing::top_temperatures`); the driver swaps it in per step.
+    let top_temperatures = forcing.top_temperatures().to_vec();
+    let config = VaporConfig::new(VaporConfigInput {
+        heat: heat_input,
+        water_enabled: true,
+        heat_enabled: true,
+        i_enhanc: 1,
+        hysteresis: 0,
+        chemistry: false,
+        density_coupling: false,
+        centrifugal: false,
+        top_temperature: top_temperatures[0],
+        bottom_temperature: t_bot,
+        x_conv: X_CONV,
+        t_conv: T_CONV,
+    })
+    .map_err(err("vapor config"))?;
     let policy = WaterStepPolicy {
         max_iterations: tols[0] as usize,
         head_tolerance: tols[2],
@@ -488,15 +417,20 @@ pub fn run_met_case(options: RunOptions) -> Result<MetRun, String> {
         x_conv: X_CONV,
         t_conv: T_CONV,
     };
-    let mut vstate = VaporState::new(VaporStateInput {
-        primitive,
-        coordinates: &x,
-        gravity: cos_alpha,
-        initial_head_predictor: &heads,
-        initialization_timestep: dt,
-        time: 0.0,
-    })
-    .map_err(err("vapor state"))?;
+    let mut driver = VaporWaterHeatDriver::new(
+        config,
+        VaporStateInput {
+            primitive,
+            coordinates: &x,
+            gravity: cos_alpha,
+            initial_head_predictor: &heads,
+            initialization_timestep: dt,
+            time: 0.0,
+        },
+        &indices,
+        &[material],
+    )
+    .map_err(err("vapor driver"))?;
     let source = [VaporSourceMaterial {
         model: &analytic,
         table: Some(&tables),
@@ -553,7 +487,6 @@ pub fn run_met_case(options: RunOptions) -> Result<MetRun, String> {
     let steps_per_unit = (1.0 / dt).round(); // exact grid: t_k = k / steps_per_unit
     let mut next_print = 1usize;
     let mut k = 0usize;
-    let mut last_report: Option<VaporStepReport> = None;
     while next_print < time_points.len() {
         if options.max_steps.is_some_and(|m| k >= m) {
             break;
@@ -574,212 +507,68 @@ pub fn run_met_case(options: RunOptions) -> Result<MetRun, String> {
                 critical_head: h_crit_a,
             },
         };
-        let config = configs[atmo.event_cursor];
-        let t_top = config.top_temperature();
-        let snap = vstate.snapshot();
-        let previous = snap.previous_timestep.unwrap_or(1.0);
-        let guess = next_predictor(snap.heads, snap.head_predictor, step_dt, previous);
-        let mut old = snap;
-        old.head_predictor = &guess;
-        let mut local = policy;
-        local.minimum_timestep = step_dt; // no internal retry; none occurs in the pinned run
-
-        // Pass one: old temperatures, predictor heads.
-        let ctx1 = VaporWaterContext {
-            config: &config,
-            old,
-            temperature_estimate: snap.temperatures,
-            initial_heads: &guess,
-            initial_material_heads: &guess,
-            source_materials: &source,
-        };
-        let s1 = advance_atmospheric_step_vapor(
-            &water, &workspace, input, local, &schedule, atmo, coupling, ctx1,
-        )
-        .map_err(|e| format!("step {k} pass 1: {e}"))?;
-        let heat = |trial: &VaporWaterTrial,
-                    estimate: &[f64],
-                    out: &mut [f64]|
-         -> Result<(f64, f64), String> {
-            let adjust = VaporHeatAdjustmentInput {
-                coordinates: &x,
-                temperature_old: snap.temperatures,
-                temperature_new_estimate: estimate,
-                vapor_velocity_old: snap.vapor_velocities,
-                vapor_velocity_new: &trial.vapor_velocities,
-                vapor_content_old: snap.vapor_contents,
-                vapor_content_new: &trial.properties.vapor_contents,
-                timestep: trial.timestep,
-                x_conv: X_CONV,
-                t_conv: T_CONV,
-            };
-            let r = solve_vapor_heat_transport(
-                config,
-                HeatTransportInput {
-                    x: &x,
-                    dt: trial.timestep,
-                    material_indices: &indices,
-                    materials: &[material],
-                    temp_old: snap.temperatures,
-                    water_old: snap.liquid_water_contents,
-                    water_new: trial.candidate.water_contents(),
-                    velocity_old: snap.liquid_velocities,
-                    velocity_new: &trial.liquid_velocities,
-                    sink: &sink,
+        let t_top = top_temperatures[atmo.event_cursor];
+        let report = driver
+            .step_atmospheric(
+                &mut water,
+                &mut workspace,
+                input,
+                policy,
+                &schedule,
+                atmo,
+                coupling,
+                t_top,
+                &source,
+                CoupledHeatInput {
                     top_temperature: t_top,
                     bottom_temperature: t_bot,
                     x_conv: X_CONV,
                     t_conv: T_CONV,
                     minimum_pivot: MINIMUM_PIVOT,
                 },
-                &adjust,
-                out,
             )
-            .map_err(|e| format!("heat: {e:?}"))?;
-            Ok((r.heat_flux, r.minimum_absolute_pivot))
-        };
-        let mut heat1 = vec![0.0; n];
-        let hr1 = heat(&s1.trial, snap.temperatures, &mut heat1)?;
-
-        // Pass two: first heat result as temperature estimate; boundary memory of pass one,
-        // same forcing record (event cursor of the step start).
-        let atmo2 = VaporAtmosphericState {
-            event_cursor: atmo.event_cursor,
-            ..s1.state
-        };
-        let ctx2 = VaporWaterContext {
-            config: &config,
-            old,
-            temperature_estimate: &heat1,
-            initial_heads: s1.trial.candidate.heads(),
-            initial_material_heads: &s1.trial.pre_solve_heads,
-            source_materials: &source,
-        };
-        let s2 = advance_atmospheric_step_vapor(
-            &water, &workspace, input, local, &schedule, atmo2, coupling, ctx2,
-        )
-        .map_err(|e| format!("step {k} pass 2: {e}"))?;
-        if s2.trial.timestep != s1.trial.timestep {
-            return Err(format!("step {k}: passes used different timesteps"));
-        }
-        let mut heat2 = vec![0.0; n];
-        let hr2 = heat(&s2.trial, &heat1, &mut heat2)?;
-
-        // Commit (driver order): vapor history first, then water.
-        let liquid_old = snap.liquid_water_contents.to_vec();
-        let temps_old = snap.temperatures.to_vec();
-        let vapor_old = snap.vapor_contents.to_vec();
-        let top_fixed = s2.state.kod_top > 0;
-        let old_heads = water.heads().to_vec();
-        let predictor = commit_predictor(s2.trial.candidate.heads(), &old_heads, true, top_fixed);
-        let trial2 = s2.trial;
-        vstate
-            .stage(
-                trial2.accepted_time,
-                trial2.timestep,
-                trial2.candidate.heads(),
-                trial2.candidate.water_contents(),
-                &heat2,
-                &trial2.properties.vapor_contents,
-                &trial2.liquid_velocities,
-                &trial2.vapor_velocities,
-                &predictor,
-            )
-            .map_err(|e| format!("step {k} stage: {e:?}"))?;
-        vstate
-            .accept()
-            .map_err(|e| format!("step {k} accept: {e:?}"))?;
-        let mut switches: Vec<(u8, VaporSwitchRecord)> =
-            s1.switches.iter().map(|r| (1, *r)).collect();
-        switches.extend(s2.switches.iter().map(|r| (2, *r)));
+            .map_err(|e| format!("step {k}: {e:?}"))?;
+        let step = &report.step;
+        atmo = report.state;
+        let fluxes = t_level_fluxes_for_step(driver.state(), step, &x, &sink, cos_alpha)
+            .map_err(|e| format!("t_level_fluxes step {k}: {e:?}"))?;
         run.steps.push(StepTrace {
             index: k,
-            time: trial2.accepted_time,
-            timestep: trial2.timestep,
-            kod_top: s2.state.kod_top,
-            h_top: s2.state.h_top,
-            r_top: s2.state.r_top,
-            v_top: s2.state.v_top,
-            top_head: trial2.candidate.heads()[n - 1],
-            iterations: [s1.trial.iterations, trial2.iterations],
-            switches,
-            below_critical_head: [s1.below_critical_head, s2.below_critical_head],
-            liquid_face_fluxes: trial2.liquid_face_fluxes.clone(),
-            vapor_face_fluxes: trial2.vapor_face_fluxes.clone(),
-            total_face_fluxes: trial2.total_face_fluxes.clone(),
-            liquid_contents_old: liquid_old.clone(),
-            liquid_contents_new: trial2.candidate.water_contents().to_vec(),
-            vapor_contents_old: vapor_old.clone(),
-            vapor_contents_new: trial2.properties.vapor_contents.clone(),
+            time: step.accepted_time,
+            timestep: step.timestep,
+            kod_top: atmo.kod_top,
+            h_top: atmo.h_top,
+            r_top: atmo.r_top,
+            v_top: atmo.v_top,
+            top_head: water.heads()[n - 1],
+            iterations: [step.passes[0].iterations, step.passes[1].iterations],
+            switches: report.switches.clone(),
+            below_critical_head: report.below_critical_head,
+            liquid_face_fluxes: step.liquid_face_fluxes.clone(),
+            vapor_face_fluxes: step.vapor_face_fluxes.clone(),
+            total_face_fluxes: step.total_face_fluxes.clone(),
+            liquid_contents_old: step.liquid_contents_old.clone(),
+            liquid_contents_new: step.liquid_contents_new.clone(),
+            vapor_contents_old: step.vapor_contents_old.clone(),
+            vapor_contents_new: step.vapor_contents_new.clone(),
+            v_top_reported: fluxes.v_top,
+            v_bot_reported: fluxes.v_bot,
+            v_top_liquid_reported: fluxes.v_top_liquid,
+            v_top_vapor_reported: fluxes.v_top_vapor,
         });
-        let report = VaporStepReport {
-            accepted_time: trial2.accepted_time,
-            timestep: trial2.timestep,
-            restarts: 0,
-            passes: [
-                VaporPassReport {
-                    timestep: s1.trial.timestep,
-                    iterations: s1.trial.iterations,
-                    temperature_estimate: temps_old,
-                    initial_heads: guess.clone(),
-                    initial_material_heads: guess.clone(),
-                    heads: s1.trial.candidate.heads().to_vec(),
-                    temperatures: heat1.clone(),
-                    heat_flux: hr1.0,
-                    minimum_absolute_pivot: hr1.1,
-                },
-                VaporPassReport {
-                    timestep: trial2.timestep,
-                    iterations: trial2.iterations,
-                    temperature_estimate: heat1.clone(),
-                    initial_heads: s1.trial.candidate.heads().to_vec(),
-                    initial_material_heads: s1.trial.pre_solve_heads.clone(),
-                    heads: trial2.candidate.heads().to_vec(),
-                    temperatures: heat2.clone(),
-                    heat_flux: hr2.0,
-                    minimum_absolute_pivot: hr2.1,
-                },
-            ],
-            heat_flux: hr2.0,
-            minimum_absolute_pivot: hr2.1,
-            liquid_contents_old: liquid_old,
-            liquid_contents_new: trial2.candidate.water_contents().to_vec(),
-            vapor_contents_old: vapor_old,
-            vapor_contents_new: trial2.properties.vapor_contents.clone(),
-            liquid_conductivities: trial2.properties.liquid_conductivities.clone(),
-            liquid_thermal_conductivities: trial2.properties.liquid_thermal_conductivities.clone(),
-            vapor_head_conductivities: trial2.properties.vapor_head_conductivities.clone(),
-            vapor_thermal_conductivities: trial2.properties.vapor_thermal_conductivities.clone(),
-            pre_solve_heads: trial2.pre_solve_heads.clone(),
-            pre_solve_liquid_water_contents: trial2.pre_solve_liquid_water_contents.clone(),
-            effective_hydraulic_capacities: trial2
-                .properties
-                .effective_hydraulic_capacities
-                .clone(),
-            liquid_velocities: trial2.liquid_velocities.clone(),
-            vapor_velocities: trial2.vapor_velocities.clone(),
-            liquid_face_fluxes: trial2.liquid_face_fluxes.clone(),
-            vapor_face_fluxes: trial2.vapor_face_fluxes.clone(),
-            total_face_fluxes: trial2.total_face_fluxes.clone(),
-            temperatures: heat2,
-        };
-        water = trial2.candidate;
-        workspace = trial2.workspace;
-        atmo = s2.state;
 
         if (water.time() - time_points[next_print]).abs() < 1e-9 {
-            let obs = observe_step(&vstate, &report, &x, &sink, cos_alpha)
+            let obs = observe_step(driver.state(), step, &x, &sink, cos_alpha)
                 .map_err(|e| format!("observe: {e:?}"))?;
             for (name, r) in vapor_rows(&obs, n) {
                 run.vapor.get_mut(name).unwrap().push(r);
             }
             run.head.push(rev(water.heads()));
             run.liquid_moisture.push(rev(water.water_contents()));
-            run.temperature_c.push(rev(vstate.snapshot().temperatures));
+            run.temperature_c
+                .push(rev(driver.state().snapshot().temperatures));
             next_print += 1;
         }
-        last_report = Some(report);
     }
-    let _ = last_report;
     Ok(run)
 }

@@ -28,9 +28,9 @@ pub use lower_boundary::{LowerBoundaryMode, UnsupportedLowerBoundaryMode};
 pub use meteo::{
     calculate_net_radiation, cloudiness_factor, dew_point_vapor_pressure,
     extraterrestrial_radiation, net_longwave, net_radiation, net_shortwave, parse_latitude_deg_min,
-    saturation_vapor_pressure, CloudinessResult, ExtraterrestrialRadiation, MeteoError,
-    NetRadiation, RadiationDailyInput, RadiationMode, RadiationParams, RelativeHumidityMode,
-    SunshineMode,
+    saturation_vapor_pressure, AtmosphericRecord, CloudinessResult, ExtraterrestrialRadiation,
+    MetForcing, MetForcingError, MeteoError, NetRadiation, RadiationDailyInput, RadiationMode,
+    RadiationParams, RelativeHumidityMode, SunshineMode,
 };
 pub use root_uptake::{feddes_reduction, RootUptakeInput, RootUptakeModel};
 pub use solute::{

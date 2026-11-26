@@ -30,6 +30,10 @@ use super::adjust::VaporHeatAdjustmentInput;
 use super::state::{VaporState, VaporStateInput};
 use super::VaporWaterTrial;
 use super::{VaporConfig, VaporError, VaporHistoryView, VaporSourceMaterial, VaporWaterContext};
+use crate::atmospheric::{
+    advance_atmospheric_step_vapor, VaporAtmosphericError, VaporAtmosphericState, VaporSwitchRecord,
+};
+use crate::forcing::{ForcingSchedule, VaporAtmosphericCoupling};
 use crate::heat::capacity::TempMaterial;
 use crate::heat::driver::CoupledHeatInput;
 use crate::heat::transport::{solve_vapor_heat_transport, HeatTransportError, HeatTransportInput};
@@ -55,6 +59,28 @@ pub enum VaporDriverError {
     State(VaporError),
     /// A driver-level precondition or diagnostic failed.
     Preflight { reason: &'static str },
+    /// The atmospheric vapor water step failed in the numbered pass (1 or 2).
+    Atmospheric {
+        pass: u8,
+        source: VaporAtmosphericError,
+    },
+}
+
+/// Result of [`VaporWaterHeatDriver::step_atmospheric`]: the ordinary step report plus the
+/// atmospheric boundary memory, per-pass switches and clamp diagnostics.
+///
+/// The step re-solves on a top-boundary switch within a pass, a fixed-schedule
+/// approximation of the source's in-loop switching; see ADR 0022
+/// (`docs/decisions/0022-re-solve-the-step-on-atmospheric-switches-with-vapor.md`).
+#[derive(Clone, Debug)]
+pub struct VaporAtmosphericStepReport {
+    pub step: VaporStepReport,
+    /// Boundary memory after pass two; carry it into the next step.
+    pub state: VaporAtmosphericState,
+    /// Switches recorded in each pass, tagged with the pass number (1 or 2).
+    pub switches: Vec<(u8, VaporSwitchRecord)>,
+    /// Per pass: the kept trial is in flux mode with the top head below `hCritA`.
+    pub below_critical_head: [bool; 2],
 }
 
 /// Diagnostics for one final water/velocity/heat pass.
@@ -182,6 +208,8 @@ impl VaporWaterHeatDriver {
         heat_input: CoupledHeatInput,
     ) -> Result<VaporStepReport, VaporDriverError> {
         self.preflight(
+            &self.config,
+            false,
             water_state,
             water_workspace,
             &water_input,
@@ -205,6 +233,30 @@ impl VaporWaterHeatDriver {
                 return Err(error);
             }
         };
+        self.commit_step(
+            water_state,
+            water_workspace,
+            &old_heads,
+            bottom_fixed,
+            top_fixed,
+            passes,
+            restarts,
+        )
+    }
+
+    /// Stages and accepts the vapor history, then moves the final water pass into the caller's
+    /// state. Rejects staged vapor state on any failure.
+    #[allow(clippy::too_many_arguments)]
+    fn commit_step(
+        &mut self,
+        water_state: &mut WaterState,
+        water_workspace: &mut WaterWorkspace,
+        old_heads: &[f64],
+        bottom_fixed: bool,
+        top_fixed: bool,
+        passes: Passes,
+        restarts: usize,
+    ) -> Result<VaporStepReport, VaporDriverError> {
         let Passes {
             trial1,
             trial2,
@@ -215,7 +267,7 @@ impl VaporWaterHeatDriver {
         let vapor_contents_old = snapshot.vapor_contents.to_vec();
         let temperatures = reports[1].temperatures.clone();
         let predictor =
-            commit_predictor(&trial2.candidate.heads, &old_heads, bottom_fixed, top_fixed);
+            commit_predictor(&trial2.candidate.heads, old_heads, bottom_fixed, top_fixed);
         let timestep = trial2.timestep;
         let accepted_time = trial2.candidate.time;
 
@@ -307,8 +359,132 @@ impl VaporWaterHeatDriver {
         })
     }
 
+    /// Advances one accepted step with the upper boundary `Atmospheric`, in a single attempt.
+    ///
+    /// Same two-pass structure as [`Self::step`] (shared `attempt`), with each water pass run
+    /// through `advance_atmospheric_step_vapor`. Pass two receives pass one's boundary memory
+    /// with the step-start `event_cursor`. There is no retry: `minimum_timestep` is set to the
+    /// step's timestep, and any failure rejects staged state and returns. `top_temperature`
+    /// builds the per-step config and must equal `heat_input.top_temperature`. The top node
+    /// counts as fixed at commit when the final pass ended in head mode (`kod_top > 0`).
+    ///
+    /// See ADR 0022 for the step-level switching approximation.
+    #[allow(clippy::too_many_arguments)]
+    pub fn step_atmospheric(
+        &mut self,
+        water_state: &mut WaterState,
+        water_workspace: &mut WaterWorkspace,
+        water_input: WaterStepInput<'_>,
+        policy: WaterStepPolicy,
+        schedule: &ForcingSchedule<'_>,
+        atmo: VaporAtmosphericState,
+        coupling: VaporAtmosphericCoupling,
+        top_temperature: f64,
+        source_materials: &[VaporSourceMaterial<'_>],
+        heat_input: CoupledHeatInput,
+    ) -> Result<VaporAtmosphericStepReport, VaporDriverError> {
+        let config = self
+            .config
+            .with_top_temperature(top_temperature)
+            .map_err(VaporDriverError::Vapor)?;
+        let mut local = policy;
+        local.minimum_timestep = water_input.timestep;
+        self.preflight(
+            &config,
+            true,
+            water_state,
+            water_workspace,
+            &water_input,
+            local,
+            source_materials,
+            &heat_input,
+        )?;
+        let old_heads = water_state.heads().to_vec();
+        let bottom_fixed = fixed_ends(water_input.lower, water_input.upper).0;
+        let previous = self.state.snapshot().previous_timestep.unwrap_or(1.0);
+        let guess = {
+            let old = self.state.snapshot();
+            next_predictor(
+                old.heads,
+                old.head_predictor,
+                water_input.timestep,
+                previous,
+            )
+        };
+        let mut memory: [Option<(VaporAtmosphericState, Vec<VaporSwitchRecord>, bool)>; 2] =
+            [None, None];
+        let mut pass_state = atmo;
+        let attempt = self.attempt(
+            &config,
+            water_input,
+            local,
+            source_materials,
+            heat_input,
+            &guess,
+            |pass, context| {
+                if pass == 2 {
+                    if let Some((state, _, _)) = &memory[0] {
+                        pass_state = VaporAtmosphericState {
+                            event_cursor: atmo.event_cursor,
+                            ..*state
+                        };
+                    }
+                }
+                let step = advance_atmospheric_step_vapor(
+                    water_state,
+                    water_workspace,
+                    water_input,
+                    local,
+                    schedule,
+                    pass_state,
+                    coupling,
+                    context,
+                )
+                .map_err(|source| VaporDriverError::Atmospheric { pass, source })?;
+                memory[usize::from(pass - 1)] =
+                    Some((step.state, step.switches, step.below_critical_head));
+                Ok(step.trial)
+            },
+        );
+        let passes = match attempt {
+            Ok(passes) => passes,
+            Err(error) => {
+                self.state.reject();
+                return Err(error);
+            }
+        };
+        let [Some((_, switches1, below1)), Some((state2, switches2, below2))] = memory else {
+            self.state.reject();
+            return Err(VaporDriverError::Preflight {
+                reason: "atmospheric passes did not both run",
+            });
+        };
+        let top_fixed = state2.kod_top > 0;
+        let step = self.commit_step(
+            water_state,
+            water_workspace,
+            &old_heads,
+            bottom_fixed,
+            top_fixed,
+            passes,
+            0,
+        )?;
+        let mut switches: Vec<(u8, VaporSwitchRecord)> =
+            switches1.into_iter().map(|r| (1, r)).collect();
+        switches.extend(switches2.into_iter().map(|r| (2, r)));
+        Ok(VaporAtmosphericStepReport {
+            step,
+            state: state2,
+            switches,
+            below_critical_head: [below1, below2],
+        })
+    }
+
+    #[allow(clippy::too_many_arguments)]
     fn preflight(
         &self,
+        config: &VaporConfig,
+        atmospheric: bool,
         water_state: &WaterState,
         water_workspace: &WaterWorkspace,
         input: &WaterStepInput<'_>,
@@ -318,9 +494,12 @@ impl VaporWaterHeatDriver {
     ) -> Result<(), VaporDriverError> {
         let fail = |reason| Err(VaporDriverError::Preflight { reason });
         let n = self.x.len();
-        self.config
-            .validate_water_input(input, water_state.time(), policy)
-            .map_err(VaporDriverError::Vapor)?;
+        if atmospheric {
+            config.validate_atmospheric_water_input(input, water_state.time(), policy)
+        } else {
+            config.validate_water_input(input, water_state.time(), policy)
+        }
+        .map_err(VaporDriverError::Vapor)?;
         let old = self.state.snapshot();
         old.validate().map_err(VaporDriverError::Vapor)?;
         if old.time != water_state.time()
@@ -345,10 +524,10 @@ impl VaporWaterHeatDriver {
         if source_materials.len() != input.materials.len() {
             return fail("source material table differs from water material table");
         }
-        if heat.top_temperature != self.config.top_temperature()
-            || heat.bottom_temperature != self.config.bottom_temperature()
-            || heat.x_conv != self.config.x_conv()
-            || heat.t_conv != self.config.t_conv()
+        if heat.top_temperature != config.top_temperature()
+            || heat.bottom_temperature != config.bottom_temperature()
+            || heat.x_conv != config.x_conv()
+            || heat.t_conv != config.t_conv()
         {
             return fail("heat boundary or conversion differs from vapor config");
         }
@@ -392,13 +571,16 @@ impl VaporWaterHeatDriver {
             let mut input = water_input;
             input.timestep = dt;
             let result = self.attempt(
-                water_state,
-                workspace,
+                &self.config,
                 input,
                 local,
                 source_materials,
                 heat_input,
                 &guess,
+                |_pass, context| {
+                    solve_vapor_water_trial(water_state, workspace, input, local, context)
+                        .map_err(VaporDriverError::Water)
+                },
             );
             match result {
                 Ok(passes) => return Ok((passes, restarts)),
@@ -424,41 +606,44 @@ impl VaporWaterHeatDriver {
         }
     }
 
+    /// One two-pass attempt. `water_pass(pass, context)` solves each water pass, so the
+    /// plain and atmospheric steps share the predictor, pass-two inputs and heat passes.
     #[allow(clippy::too_many_arguments)]
     fn attempt(
         &self,
-        water_state: &WaterState,
-        workspace: &WaterWorkspace,
+        config: &VaporConfig,
         input: WaterStepInput<'_>,
         policy: WaterStepPolicy,
         source_materials: &[VaporSourceMaterial<'_>],
         heat_input: CoupledHeatInput,
         guess: &[f64],
+        mut water_pass: impl FnMut(
+            u8,
+            VaporWaterContext<'_>,
+        ) -> Result<VaporWaterTrial, VaporDriverError>,
     ) -> Result<Passes, VaporDriverError> {
+        #[cfg(not(test))]
+        let _ = policy; // only the test injection reads it
         let snapshot = self.state.snapshot();
         let n = self.x.len();
         let mut old: VaporHistoryView<'_> = snapshot;
         old.head_predictor = guess;
-        let water_error = |source| VaporDriverError::Water(source);
 
         // Pass one: old temperatures, predictor (or old heads after a restart).
-        let trial1 = solve_vapor_water_trial(
-            water_state,
-            workspace,
-            input,
-            policy,
+        let trial1 = water_pass(
+            1,
             VaporWaterContext {
-                config: &self.config,
+                config,
                 old,
                 temperature_estimate: snapshot.temperatures,
                 initial_heads: guess,
                 initial_material_heads: guess,
                 source_materials,
             },
-        )
-        .map_err(water_error)?;
+        )?;
         let mut heat1 = vec![0.0; n];
         let heat_report1 = self.heat_pass(
+            config,
             1,
             &snapshot,
             &trial1,
@@ -480,21 +665,17 @@ impl VaporWaterHeatDriver {
                 retries: 0,
             }));
         }
-        let trial2 = solve_vapor_water_trial(
-            water_state,
-            workspace,
-            input,
-            policy,
+        let trial2 = water_pass(
+            2,
             VaporWaterContext {
-                config: &self.config,
+                config,
                 old,
                 temperature_estimate: &heat1,
                 initial_heads: &trial1.candidate.heads,
                 initial_material_heads: &trial1.pre_solve_heads,
                 source_materials,
             },
-        )
-        .map_err(water_error)?;
+        )?;
         #[cfg(test)]
         self.fire(Inject::AfterWater2)?;
         if trial2.timestep != trial1.timestep {
@@ -504,7 +685,7 @@ impl VaporWaterHeatDriver {
         }
         let mut heat2 = vec![0.0; n];
         let heat_report2 = self.heat_pass(
-            2, &snapshot, &trial2, &heat1, input.sink, heat_input, &mut heat2,
+            config, 2, &snapshot, &trial2, &heat1, input.sink, heat_input, &mut heat2,
         )?;
         #[cfg(test)]
         self.fire(Inject::AfterHeat2)?;
@@ -542,6 +723,7 @@ impl VaporWaterHeatDriver {
     #[allow(clippy::too_many_arguments)]
     fn heat_pass(
         &self,
+        config: &VaporConfig,
         pass: u8,
         old: &VaporHistoryView<'_>,
         trial: &VaporWaterTrial,
@@ -563,7 +745,7 @@ impl VaporWaterHeatDriver {
             t_conv: heat.t_conv,
         };
         let report = solve_vapor_heat_transport(
-            self.config,
+            *config,
             HeatTransportInput {
                 x: &self.x,
                 dt: trial.timestep,
@@ -1026,5 +1208,179 @@ mod tests {
             assert_eq!(state.time(), 0.1 / 3.0);
             assert_eq!(state.accounting().accepted_steps, 1);
         });
+    }
+
+    fn atmospheric_fixture_parts() -> (ForcingSchedule<'static>, VaporAtmosphericCoupling) {
+        let schedule = ForcingSchedule::new(
+            crate::AtmosphericRates {
+                precipitation: 0.0,
+                evaporation: 0.1,
+            },
+            Vec::new(),
+            crate::forcing::ForcingUnits {
+                time: "day",
+                water_depth_rate: "cm/day",
+            },
+        )
+        .unwrap();
+        (schedule, VaporAtmosphericCoupling::new(100.0).unwrap())
+    }
+
+    #[test]
+    fn flux_mode_atmospheric_step_equals_plain_flux_step() {
+        let (schedule, coupling) = atmospheric_fixture_parts();
+        let mut atmospheric = None;
+        with_fixture(|driver, state, workspace, input, policy, source, heat| {
+            let mut input = input;
+            input.upper = UpperBoundary::Atmospheric {
+                critical_head: -1.0e5,
+            };
+            let report = driver
+                .step_atmospheric(
+                    state,
+                    workspace,
+                    input,
+                    policy,
+                    &schedule,
+                    VaporAtmosphericState::new(),
+                    coupling,
+                    heat.top_temperature,
+                    source,
+                    heat,
+                )
+                .unwrap();
+            assert!(report.switches.is_empty());
+            assert_eq!(report.state.kod_top, -4);
+            assert_eq!(report.step.restarts, 0);
+            assert_eq!(report.below_critical_head, [false, false]);
+            atmospheric = Some((driver.state.clone(), state.clone(), report.step));
+        });
+        let (vapor_a, water_a, step_a) = atmospheric.unwrap();
+        with_fixture(|driver, state, workspace, input, policy, source, heat| {
+            let mut input = input;
+            input.upper = UpperBoundary::Flux {
+                flux: -0.1,
+                row: row(0.0),
+            };
+            let report = driver
+                .step(state, workspace, input, policy, source, heat)
+                .unwrap();
+            assert_eq!(driver.state, vapor_a);
+            assert_eq!(*state, water_a);
+            assert_eq!(report, step_a);
+        });
+    }
+
+    #[test]
+    fn atmospheric_non_convergence_errors_without_retry_or_state_change() {
+        let (schedule, coupling) = atmospheric_fixture_parts();
+        with_fixture(|driver, state, workspace, input, policy, source, heat| {
+            let mut input = input;
+            input.upper = UpperBoundary::Atmospheric {
+                critical_head: -1.0e5,
+            };
+            let mut policy = policy;
+            policy.max_iterations = 1;
+            policy.head_tolerance = 1.0e-14;
+            policy.water_tolerance = 1.0e-14;
+            let vapor_before = driver.state.clone();
+            let water_before = state.clone();
+            let workspace_before = format!("{workspace:?}");
+            let error = driver
+                .step_atmospheric(
+                    state,
+                    workspace,
+                    input,
+                    policy,
+                    &schedule,
+                    VaporAtmosphericState::new(),
+                    coupling,
+                    heat.top_temperature,
+                    source,
+                    heat,
+                )
+                .unwrap_err();
+            assert!(
+                matches!(
+                    error,
+                    VaporDriverError::Atmospheric {
+                        pass: 1,
+                        source: VaporAtmosphericError::Water(WaterStepError::NonConverged {
+                            timestep,
+                            retries: 0,
+                            ..
+                        }),
+                    } if timestep == 0.1
+                ),
+                "{error:?}"
+            );
+            assert_eq!(driver.state, vapor_before);
+            assert!(!driver.state.has_staged_candidate());
+            assert_eq!(*state, water_before);
+            assert_eq!(format!("{workspace:?}"), workspace_before);
+        });
+    }
+
+    #[test]
+    fn atmospheric_step_rejects_non_atmospheric_upper_and_top_temperature_mismatch() {
+        let (schedule, coupling) = atmospheric_fixture_parts();
+        with_fixture(|driver, state, workspace, input, policy, source, heat| {
+            // The fixture upper is Head: not atmospheric.
+            let error = driver
+                .step_atmospheric(
+                    state,
+                    workspace,
+                    input,
+                    policy,
+                    &schedule,
+                    VaporAtmosphericState::new(),
+                    coupling,
+                    heat.top_temperature,
+                    source,
+                    heat,
+                )
+                .unwrap_err();
+            assert!(matches!(
+                error,
+                VaporDriverError::Vapor(VaporError::UnsupportedUpperBoundary(_))
+            ));
+            let mut input = input;
+            input.upper = UpperBoundary::Atmospheric {
+                critical_head: -1.0e5,
+            };
+            let error = driver
+                .step_atmospheric(
+                    state,
+                    workspace,
+                    input,
+                    policy,
+                    &schedule,
+                    VaporAtmosphericState::new(),
+                    coupling,
+                    25.0,
+                    source,
+                    heat,
+                )
+                .unwrap_err();
+            assert_eq!(
+                error,
+                VaporDriverError::Preflight {
+                    reason: "heat boundary or conversion differs from vapor config"
+                }
+            );
+            assert_eq!(state.accounting().accepted_steps, 0);
+        });
+    }
+
+    #[test]
+    fn config_top_temperature_override_validates() {
+        let c = config();
+        assert_eq!(c.with_top_temperature(5.0).unwrap().top_temperature(), 5.0);
+        assert_eq!(
+            c.with_top_temperature(5.0).unwrap().bottom_temperature(),
+            10.0
+        );
+        assert!(c.with_top_temperature(f64::NAN).is_err());
+        assert!(c.with_top_temperature(-273.15).is_err());
     }
 }

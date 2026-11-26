@@ -56,6 +56,11 @@ fn d_storage(s: &StepTrace, w: &[f64]) -> f64 {
 }
 
 /// Bottom inflow-minus-top-outflow (cm/h, positive up) by the `vTop` form at both ends.
+///
+/// Uses the water solve's `total_face_fluxes` (evaluated at pre-heat-solve temperatures) rather
+/// than the post-`Temper` `TLInf` fluxes (`v_top_reported`/`v_bot_reported`), so this closes the
+/// water solve's `d_storage` to machine precision; post-`Temper` `TLInf` parity is tested in
+/// `vapor_met_tlevel_parity`.
 fn net_vtop(s: &StepTrace, w: &[f64], drop_vapor_storage: bool) -> f64 {
     let n = w.len();
     let t = s.timestep;

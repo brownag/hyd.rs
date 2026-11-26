@@ -469,5 +469,170 @@ class MetCaseTests(unittest.TestCase):
         self.assertIn(self.CASE, called)
 
 
+def tlevel_row(
+    time=0.1, r_top=1.0e-3, r_root=0.0, v_top=9.5e-4, v_root=0.0, v_bot=-1.2e-5,
+    sum_r_top=1.0e-4, sum_r_root=0.0, sum_v_top=9.5e-5, sum_v_root=0.0, sum_v_bot=-1.2e-6,
+    h_top=-100.5, h_root=0.0, h_bot=-100.0, run_off=0.0, sum_run_off=0.0,
+    volume=11.409, sum_infil=0.0, sum_evap=9.5e-5, t_level=1, cum_wtrans=0.0, snow_layer=0.0,
+):
+    floats_18 = (
+        r_top, r_root, v_top, v_root, v_bot,
+        sum_r_top, sum_r_root, sum_v_top, sum_v_root, sum_v_bot,
+        h_top, h_root, h_bot, run_off, sum_run_off, volume, sum_infil, sum_evap,
+    )
+    return (
+        f"{time:13.4f}"
+        + "".join(f"{v:13.5E}" for v in floats_18)
+        + f"{t_level:7d}{cum_wtrans:13.5E}{snow_layer:11.3f}"
+    )
+
+
+def sample_tlevel_text(rows=None):
+    header = [
+        " ******* Program HYDRUS",
+        "",
+        "       Time          rTop        rRoot        vTop         vRoot        vBot       sum(rTop)   sum(rRoot)    sum(vTop)   sum(vRoot)    sum(vBot)      hTop         hRoot        hBot        RunOff    sum(RunOff)     Volume     sum(Infil)    sum(Evap) TLevel Cum(WTrans)  SnowLayer",
+        "        [T]         [L/T]        [L/T]        [L/T]        [L/T]        [L/T]         [L]          [L]          [L]         [L]           [L]         [L]           [L]         [L]          [L/T]         [L]          [L]          [L]          [L]",
+        "",
+    ]
+    if rows is None:
+        rows = [
+            tlevel_row(time=0.1, t_level=1),
+            tlevel_row(time=0.2, v_top=8.5e-4, sum_v_top=1.8e-4, t_level=2),
+        ]
+    return "\n".join(header + rows + ["end"]) + "\n"
+
+
+class TLevelParserTests(unittest.TestCase):
+    def test_parses_format_170_rows_and_round_trips_values(self):
+        rows = vapor.parse_t_level(sample_tlevel_text())
+        self.assertEqual(len(rows), 2)
+        expected_keys = [
+            "time", "r_top", "r_root", "v_top", "v_root", "v_bot",
+            "sum_r_top", "sum_r_root", "sum_v_top", "sum_v_root", "sum_v_bot",
+            "h_top", "h_root", "h_bot", "run_off", "sum_run_off", "volume",
+            "sum_infil", "sum_evap", "t_level", "cum_wtrans", "snow_layer",
+        ]
+        self.assertEqual(list(rows[0].keys()), expected_keys)
+        self.assertAlmostEqual(rows[0]["time"], 0.1)
+        self.assertAlmostEqual(rows[0]["v_top"], 9.5e-4)
+        self.assertAlmostEqual(rows[0]["v_bot"], -1.2e-5)
+        self.assertAlmostEqual(rows[0]["h_top"], -100.5)
+        self.assertAlmostEqual(rows[0]["volume"], 11.409)
+        self.assertEqual(rows[0]["t_level"], 1)
+        self.assertEqual(rows[1]["t_level"], 2)
+        self.assertAlmostEqual(rows[1]["time"], 0.2)
+        self.assertAlmostEqual(rows[1]["v_top"], 8.5e-4)
+        self.assertAlmostEqual(rows[1]["sum_v_top"], 1.8e-4)
+
+    def test_rejects_missing_header(self):
+        text = "\n".join([tlevel_row(time=0.1, t_level=1), "end"]) + "\n"
+        with self.assertRaisesRegex(ValueError, "header"):
+            vapor.parse_t_level(text)
+
+    def test_rejects_empty_table(self):
+        with self.assertRaisesRegex(ValueError, "no data rows"):
+            vapor.parse_t_level(sample_tlevel_text(rows=[]))
+
+    def test_rejects_missing_end_marker_after_complete_rows(self):
+        text = sample_tlevel_text().replace("end\n", "")
+        with self.assertRaisesRegex(ValueError, "missing standalone end marker"):
+            vapor.parse_t_level(text)
+
+    def test_rejects_truncated_row(self):
+        short_row = tlevel_row(time=0.1, t_level=1)[:-5]
+        with self.assertRaisesRegex(ValueError, "truncated"):
+            vapor.parse_t_level(sample_tlevel_text(rows=[short_row]))
+
+    def test_rejects_field_overflow(self):
+        bad_row = tlevel_row(time=0.1, t_level=1).replace("  9.50000E-04", "*************")
+        with self.assertRaisesRegex(ValueError, "overflow"):
+            vapor.parse_t_level(sample_tlevel_text(rows=[bad_row]))
+
+    def test_rejects_nonfinite_values(self):
+        bad_row = tlevel_row(time=0.1, t_level=1).replace("  9.50000E-04", "          NaN")
+        with self.assertRaisesRegex(ValueError, "nonfinite"):
+            vapor.parse_t_level(sample_tlevel_text(rows=[bad_row]))
+
+    def test_rejects_duplicate_and_non_increasing_times(self):
+        dup = [tlevel_row(time=0.1, t_level=1), tlevel_row(time=0.1, t_level=2)]
+        with self.assertRaisesRegex(ValueError, "duplicate or non-increasing time"):
+            vapor.parse_t_level(sample_tlevel_text(rows=dup))
+        dec = [tlevel_row(time=0.2, t_level=1), tlevel_row(time=0.1, t_level=2)]
+        with self.assertRaisesRegex(ValueError, "duplicate or non-increasing time"):
+            vapor.parse_t_level(sample_tlevel_text(rows=dec))
+
+    def test_rejects_non_unit_increment_t_level(self):
+        rows = [tlevel_row(time=0.1, t_level=1), tlevel_row(time=0.2, t_level=3)]
+        with self.assertRaisesRegex(ValueError, "t_level must increase by 1"):
+            vapor.parse_t_level(sample_tlevel_text(rows=rows))
+
+
+class TLevelRunnerIntegrationTests(unittest.TestCase):
+    BASE = str(vapor.ROOT / ".development/33.1.2/unit-test-never-created")
+
+    def test_main_accepts_tlevel_flag(self):
+        called = []
+        argv = ["--case", "vapor_met_bare_soil_on", "--build-dir", "unused", "--task-base", self.BASE, "--tlevel"]
+        with mock.patch.object(vapor, "run_case", side_effect=lambda c, *a: called.append((c, a)) or Path(c)), \
+             mock.patch.object(Path, "mkdir"), mock.patch("builtins.print"), redirect_stderr(io.StringIO()):
+            self.assertEqual(vapor.main(argv), 0)
+        self.assertEqual(len(called), 1)
+        self.assertEqual(called[0][0], "vapor_met_bare_soil_on")
+        self.assertFalse(called[0][1][3])
+        self.assertTrue(called[0][1][4])
+
+    def test_run_case_refuses_to_overwrite_existing_tlevel_fixture(self):
+        def mock_exists(self):
+            return self.name.endswith("_tlevel.json.gz")
+        with mock.patch.object(Path, "exists", mock_exists):
+            with self.assertRaisesRegex(FileExistsError, "refusing to overwrite tlevel fixture"):
+                vapor.run_case("vapor_met_bare_soil_on", Path("tb"), Path("bd"), None, tlevel=True)
+
+    def test_run_case_produces_tlevel_without_overwriting_existing_fixture(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as td:
+            base = Path(td)
+            task_base = base / "tb"
+            build_dir = base / "bd"
+            fixtures_dir = base / "fixtures"
+            fixtures_dir.mkdir()
+            existing_fixture = fixtures_dir / "vapor_met_bare_soil_on.json"
+            existing_fixture.write_text('{"existing": true}\n')
+
+            def fake_run(cmd, cwd, text, capture_output, timeout):
+                prefix = "vapor_met_bare_soil_on"
+                (cwd / f"{prefix}\\NOD_INF.OUT").write_text(blocks([main_row(1, 0), main_row(2, -1)], (0, 24)))
+                (cwd / f"{prefix}\\NOD_INF_V.OUT").write_text(blocks([vapor_row(1, 0), vapor_row(2, -1)], (0, 24)))
+                (cwd / f"{prefix}\\T_LEVEL.OUT").write_text(sample_tlevel_text())
+                return mock.Mock(returncode=0, stdout="", stderr="")
+
+            mock_build = {
+                "build": {"executable_sha256": "e", "patch_sha256": "p", "gnu_fortran_version": "g", "host_os": "l", "host_architecture": "x", "flags": []},
+                "staged": {"source_and_archive_sha256": "s"},
+                "exe": build_dir / "hydrus-reference",
+                "build_manifest_sha256": "bm",
+                "staging_manifest_sha256": "sm",
+            }
+            with mock.patch.object(vapor, "FIXTURES", fixtures_dir), \
+                 mock.patch.object(vapor, "load_build", return_value=mock_build), \
+                 mock.patch("subprocess.run", side_effect=fake_run):
+                out = vapor.run_case("vapor_met_bare_soil_on", task_base, build_dir, None, tlevel=True)
+                self.assertEqual(out, fixtures_dir / "vapor_met_bare_soil_on_tlevel.json.gz")
+                self.assertEqual(existing_fixture.read_text(), '{"existing": true}\n')
+                import gzip
+                tl = json.loads(gzip.decompress(out.read_bytes()))
+                self.assertEqual(out.read_bytes(), vapor.deterministic_gzip(gzip.decompress(out.read_bytes())))
+                self.assertEqual(tl["schema_version"], 1)
+                self.assertEqual(tl["case_id"], "vapor_met_bare_soil_on")
+                self.assertTrue(tl["source_matched"])
+                self.assertEqual(tl["evidence_class"], "pinned-fortran-t-level")
+                self.assertEqual(tl["output_format"], vapor.T_LEVEL_FORMAT_170)
+                self.assertNotIn("time_points", tl)
+                self.assertEqual([row["time"] for row in tl["rows"]], [0.1, 0.2])
+                self.assertEqual(len(tl["rows"]), 2)
+                self.assertEqual(set(tl["manifest"]["output_sha256"].keys()), {"T_LEVEL.OUT", "NOD_INF.OUT", "NOD_INF_V.OUT"})
+
+
 if __name__ == "__main__":
     unittest.main()
